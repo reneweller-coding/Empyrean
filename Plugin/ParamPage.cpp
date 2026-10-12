@@ -17,7 +17,8 @@ constexpr int kPad = 8;           ///< inside a box
 
 } // namespace
 
-ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups) : proc_(proc)
+ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups, frame::LiveRings* live)
+    : proc_(proc)
 {
     const frame::Skin& skin = additivui::skin();
     for (const Group& g : groups) {
@@ -60,6 +61,7 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
                 controls_.add(k);
                 sliders_.push_back(std::make_unique<juce::SliderParameterAttachment>(*param, *k));
                 k->setDoubleClickReturnValue(true, d.def);
+                if (live != nullptr) live->add(*k, id);   // where the matrix makes it play
                 cell.width = kKnobCell;
             }
             addAndMakeVisible(controls_.getLast());

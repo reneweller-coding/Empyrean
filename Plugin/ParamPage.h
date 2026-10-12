@@ -28,8 +28,9 @@ public:
      * @param proc     the processor whose parameters the controls edit
      * @param actions  what the controls' right-click menu does
      * @param groups   the boxes, in order
+     * @param live     the live rings every knob joins (may be null)
      */
-    ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups);
+    ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups, frame::LiveRings* live = nullptr);
 
     /** @brief Flows the boxes and lays out their cells. */
     void resized() override;

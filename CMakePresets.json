@@ -18,6 +18,18 @@
         "FAMILY_BIN_DIR": "${sourceDir}/bin/msvc",
         "CMAKE_CUDA_ARCHITECTURES": "120"
       }
+    },
+    {
+      "name": "release",
+      "inherits": "msvc",
+      "displayName": "Release (MSVC, static runtime, what ships)",
+      "description": "build/release for every GeForce RTX (20: sm_75, 30: sm_86, 40: sm_89, 50: sm_120, and PTX for what comes after); Deploy/build_release.ps1 stages, zips and packs it into dist/",
+      "binaryDir": "${sourceDir}/build/release",
+      "cacheVariables": {
+        "CMAKE_CUDA_ARCHITECTURES": "75-real;86-real;89-real;120",
+        "FAMILY_BIN_DIR": "",
+        "ADDITIV_STATIC_RUNTIME": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -30,6 +42,11 @@
       "name": "msvc-debug",
       "configurePreset": "msvc",
       "configuration": "Debug"
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "Release"
     }
   ],
   "testPresets": [
@@ -37,13 +54,25 @@
       "name": "msvc",
       "configurePreset": "msvc",
       "configuration": "Release",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
     },
     {
       "name": "msvc-debug",
       "configurePreset": "msvc",
       "configuration": "Debug",
-      "output": { "outputOnFailure": true }
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "configuration": "Release",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

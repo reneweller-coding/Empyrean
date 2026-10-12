@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include "Jam.h"
+
 #include "additiv/Engine.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
@@ -16,10 +18,12 @@
 #include <array>
 #include <atomic>
 #include <bitset>
+#include <mutex>
+#include <string>
 #include <vector>
 
 /** @brief The plugin and the standalone: the engine behind JUCE's processor interface. */
-class AdditivProcessor : public juce::AudioProcessor {
+class AdditivProcessor : public juce::AudioProcessor, private juce::AsyncUpdater, private juce::Timer {
 public:
     AdditivProcessor();
     ~AdditivProcessor() override;
@@ -47,14 +51,14 @@ public:
     /** @brief The far reverb rings on. @return seconds */
     double getTailLengthSeconds() const override { return 30.0; }
 
-    /** @brief One program, the current state. @return 1 */
-    int getNumPrograms() override { return 1; }
-    /** @brief The one program. @return 0 */
-    int getCurrentProgram() override { return 0; }
-    /** @brief Nothing to switch. @param index ignored */
-    void setCurrentProgram(int index) override { (void)index; }
-    /** @brief No program names. @param index ignored @return "" */
-    const juce::String getProgramName(int index) override { (void)index; return {}; }
+    /** @brief The factory presets are the programs. @return their count */
+    int getNumPrograms() override;
+    /** @brief The preset last applied. @return its index (0 when none was) */
+    int getCurrentProgram() override { return std::max(current_.load(std::memory_order_relaxed), 0); }
+    /** @brief Applies a factory preset (message thread). @param index the preset */
+    void setCurrentProgram(int index) override { applyPreset(index); }
+    /** @brief A preset's name with its group. @param index the preset @return "Group: Name" */
+    const juce::String getProgramName(int index) override;
     /** @brief Nothing to rename. @param index ignored @param name ignored */
     void changeProgramName(int index, const juce::String& name) override { (void)index; (void)name; }
 
@@ -86,6 +90,23 @@ public:
     /** @brief Whether a learn is waiting for its controller. @return the parameter waiting, -1 none */
     int learning() const { return learning_.load(std::memory_order_relaxed); }
 
+    /**
+     * @brief Applies a factory preset: every parameter to the preset's value (its default where the
+     *        preset says nothing), the whole matrix replaced. Message thread.
+     * @param index  the preset
+     */
+    void applyPreset(int index);
+    /** @brief The preset last applied. @return its index, -1 none */
+    int currentPreset() const { return current_.load(std::memory_order_relaxed); }
+
+    /** @brief The family jam's line for the settings menu. @return who leads, who follows, what is heard */
+    juce::String jamStatus() const { return jam_.status(); }
+    /** @brief Why the GPU engine did not open, for the status line. @return the reason, empty when it runs */
+    juce::String engineError() const { const std::lock_guard<std::mutex> lock(errorLock_); return juce::String(engineError_); }
+    /** @brief The hands arriving from a Quest app in bridge mode. @return the headset */
+    frame::Headset& headset() { return headset_; }
+    static constexpr const char* kApp = "AdditivAmbientSynth";   ///< the settings' and the jam's name
+
 private:
     additiv::Engine engine_;                               ///< the instrument
     std::vector<juce::RangedAudioParameter*> params_;      ///< the host's parameters, index = ParamId
@@ -93,6 +114,24 @@ private:
     juce::AudioBuffer<float> spare_;                       ///< a right channel when the host gives only one
     std::array<std::atomic<int>, 128> ccMap_;              ///< per controller the parameter it moves, -1 none
     std::atomic<int> learning_{ -1 };                      ///< the parameter waiting for a controller, -1 none
+    /** @brief Applies a program change that came from MIDI (message thread). */
+    void handleAsyncUpdate() override;
+    /** @brief The jam's role from the settings, and the headset's hands, thirty times a second (message thread). */
+    void timerCallback() override;
+    /** @brief The hands' moves in the family's grammar, on the macros every preset shares. */
+    void pollHeadset();
+
+    frame::JamBus jam_{ kApp };                            ///< the family jam's bus
+    frame::Headset headset_;                               ///< the hands from the Quest app (bridge mode)
+    int jamPostedRoot_ = -1;                               ///< leading: the root posted last
+    int jamPostedScale_ = -1;                              ///< leading: the scale posted last
+
+    std::atomic<int> current_{ -1 };                       ///< the preset last applied, -1 none
+    mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)
+    std::string engineError_;                              ///< why the engine did not open, empty when it runs
+    const bool muted_ = juce::SystemStats::getEnvironmentVariable("ADDITIV_MUTE", {}).isNotEmpty();   ///< ADDITIV_MUTE: silent output
+    std::atomic<int> pendingProgram_{ -1 };                ///< a MIDI program change waiting for the message thread
+    int bankGroup_ = 0;                                    ///< the group bank select (CC 0) chose
     bool sustain_ = false;                                 ///< the hold pedal (CC 64) is down
     std::bitset<128> held_;                                ///< notes let go while the pedal was down, released with it
 

@@ -6,6 +6,8 @@
 
 #include "PluginEditor.h"
 
+#include "additiv/Presets.h"
+
 #include <algorithm>
 #include <cmath>
 #include <map>
@@ -71,6 +73,29 @@ AdditivProcessor::AdditivProcessor()
     for (auto& g : groups) addParameterGroup(std::move(g));
     pushed_.assign(params_.size(), -1.0e30f);
     for (auto& c : ccMap_) c.store(-1, std::memory_order_relaxed);
+    startTimerHz(30);
+}
+
+void AdditivProcessor::timerCallback()
+{
+    jam_.setRole(frame::Settings::of(kApp).jamRole());   // the family jam (Jam.h): Off, Lead or Follow, from the settings
+    pollHeadset();
+}
+
+void AdditivProcessor::pollHeadset()
+{
+    frame::Settings& st = frame::Settings::of(kApp);
+    headset_.listen(st.headset() == frame::Settings::HeadsetMode::Off ? 0 : st.headsetPort());
+    const frame::HeadsetEvents e = headset_.poll();
+    // The family's grammar on what every preset means the same by: the left hand the brightness
+    // (Macro 2), the right the motion (Macro 1); pinches play and stop the conductor, step it,
+    // bring Brain 2 in and out, and both hands move to the next preset.
+    if (e.playStop) setValue(static_cast<int>(ParamId::BrainOn), value(static_cast<int>(ParamId::BrainOn)) >= 0.5f ? 0.0f : 1.0f);
+    if (e.action) engine_.autoplayStep();
+    if (e.hold) setValue(static_cast<int>(ParamId::Brain2On), value(static_cast<int>(ParamId::Brain2On)) >= 0.5f ? 0.0f : 1.0f);
+    if (e.filterMoved) setValue(static_cast<int>(ParamId::Macro2), 0.5f * (e.filter + 1.0f));
+    if (e.throwMoved) setValue(static_cast<int>(ParamId::Macro1), e.throwAmount);
+    if (e.next) applyPreset((currentPreset() + 1) % additiv::numPresets());
 }
 
 AdditivProcessor::~AdditivProcessor() { engine_.release(); }
@@ -86,6 +111,10 @@ void AdditivProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     engine_.setRealtime(!isNonRealtime());
     std::string error;
     if (!engine_.prepare(c, &error)) { DBG("AdditivAmbientSynth: the engine did not open: " << error); }
+    {
+        const std::lock_guard<std::mutex> lock(errorLock_);
+        engineError_ = engine_.prepared() ? std::string() : error;
+    }
     std::fill(pushed_.begin(), pushed_.end(), -1.0e30f);
     setLatencySamples(engine_.latencySamples());
 }
@@ -130,6 +159,32 @@ void AdditivProcessor::resetToDefault(int id)
     setValue(id, additiv::paramDesc(static_cast<ParamId>(id)).def);
 }
 
+int AdditivProcessor::getNumPrograms() { return additiv::numPresets(); }
+
+const juce::String AdditivProcessor::getProgramName(int index)
+{
+    const additiv::Preset& p = additiv::preset(index);
+    return juce::String(additiv::kPresetGroupNames[p.group]) + ": " + p.name;
+}
+
+void AdditivProcessor::applyPreset(int index)
+{
+    if (index < 0 || index >= additiv::numPresets()) return;
+    float values[additiv::kNumParams];
+    std::string mod;
+    additiv::presetValues(index, values, &mod);
+    for (int i = 0; i < additiv::kNumParams; ++i) setValue(i, values[i]);
+    engine_.setModText(mod);
+    engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way)
+    current_.store(index, std::memory_order_relaxed);
+}
+
+void AdditivProcessor::handleAsyncUpdate()
+{
+    const int index = pendingProgram_.exchange(-1, std::memory_order_relaxed);
+    if (index >= 0) applyPreset(index);
+}
+
 void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
@@ -157,7 +212,9 @@ void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                 learning_.store(waiting, std::memory_order_relaxed);   // the pedal is never learned
             }
             const int target = ccMap_[static_cast<size_t>(cc)].load(std::memory_order_relaxed);
-            if (target >= 0) {
+            if (cc == 0 && target < 0) {
+                bankGroup_ = m.getControllerValue() % additiv::kNumPresetGroups;   // bank select: a group of the bank
+            } else if (target >= 0) {
                 if (auto* p = parameter(target)) p->setValueNotifyingHost(x);
             } else if (cc == 64) {
                 const bool down = m.getControllerValue() >= 64;
@@ -168,12 +225,40 @@ void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
                 sustain_ = down;
             } else if (cc == 74) {
                 if (auto* p = parameter(static_cast<int>(ParamId::Cutoff))) p->setValueNotifyingHost(x);   // the family's filter controller
+            } else if (cc == 1) {
+                engine_.setModWheel(x);   // a source of the matrix (the family leaves the wheel free)
             }
+        } else if (m.isProgramChange()) {
+            // Bank select (CC 0) chooses the group, the program its preset: applied on the message thread.
+            const int index = additiv::presetAt(bankGroup_, m.getProgramChangeNumber());
+            if (index >= 0) { pendingProgram_.store(index, std::memory_order_relaxed); triggerAsyncUpdate(); }
+        } else if (m.isChannelPressure()) {
+            engine_.setPressure(static_cast<float>(m.getChannelPressureValue()) / 127.0f);
+        } else if (m.isAftertouch()) {
+            engine_.setPressure(static_cast<float>(m.getAfterTouchValue()) / 127.0f);
         }
     }
     for (size_t i = 0; i < params_.size(); ++i) {
         const float v = params_[i]->convertFrom0to1(params_[i]->getValue());
         if (v != pushed_[i]) { engine_.setParam(static_cast<ParamId>(i), v); pushed_[i] = v; }
+    }
+    // The family jam: following, the leader's root and energy; leading, this conductor's root and scale.
+    if (jam_.role() == frame::Settings::JamRole::Follow) {
+        const frame::JamState js = jam_.stateAt(-1.0);
+        engine_.setJamRoot(js.root);
+        engine_.setJamEnergy(js.root >= 0 ? js.energy : 0.5f);
+    } else {
+        engine_.setJamRoot(-1);
+        engine_.setJamEnergy(0.5f);
+        if (jam_.role() == frame::Settings::JamRole::Lead) {
+            const int root = ((engine_.brainRoot() % 12) + 12) % 12;
+            const int scale = juce::roundToInt(value(static_cast<int>(ParamId::Scale)));
+            if (root != jamPostedRoot_ || scale != jamPostedScale_) {
+                jam_.postKey(root, additiv::kScaleNames[std::clamp(scale, 0, additiv::kNumScaleChoices - 1)]);
+                jamPostedRoot_ = root;
+                jamPostedScale_ = scale;
+            }
+        }
     }
     const int n = buffer.getNumSamples();
     float* L = buffer.getWritePointer(0);
@@ -185,6 +270,7 @@ void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
     }
     engine_.process(L, R, n);
     for (int c = 2; c < buffer.getNumChannels(); ++c) buffer.clear(c, 0, n);
+    if (muted_) buffer.clear();   // ADDITIV_MUTE: the engine runs and is seen, nothing is heard (the manual's pictures)
 }
 
 juce::AudioProcessorEditor* AdditivProcessor::createEditor() { return new AdditivEditor(*this); }
@@ -197,6 +283,8 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
         const auto* p = params_[static_cast<size_t>(d.id)];
         xml.setAttribute(d.key, static_cast<double>(p->convertFrom0to1(p->getValue())));
     }
+    xml.createNewChildElement("Mod")->setAttribute("rows", juce::String(engine_.modText()));
+    xml.setAttribute("preset", current_.load(std::memory_order_relaxed));
     for (int cc = 0; cc < 128; ++cc) {
         const int id = ccMap_[static_cast<size_t>(cc)].load(std::memory_order_relaxed);
         if (id < 0) continue;
@@ -218,6 +306,9 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         const float v = xml->hasAttribute(d.key) ? static_cast<float>(xml->getDoubleAttribute(d.key)) : d.def;
         p->setValueNotifyingHost(p->convertTo0to1(std::clamp(v, d.min, d.max)));
     }
+    current_.store(xml->getIntAttribute("preset", -1), std::memory_order_relaxed);
+    const juce::XmlElement* mod = xml->getChildByName("Mod");
+    engine_.setModText(mod != nullptr ? mod->getStringAttribute("rows").toStdString() : std::string());   // no rows named: an empty matrix
     for (auto& c : ccMap_) c.store(-1, std::memory_order_relaxed);
     for (auto* e : xml->getChildWithTagNameIterator("Learn")) {
         const int cc = e->getIntAttribute("cc", -1);

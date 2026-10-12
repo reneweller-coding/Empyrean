@@ -1,0 +1,43 @@
+/**
+ * @file MatrixView.h
+ * @brief The modulation matrix on the panel: sixteen rows of source, target and depth, written
+ *        straight into the engine (the rows are data, not host parameters -- Modulation.h).
+ */
+#pragma once
+
+#include "PluginProcessor.h"
+
+#include <memory>
+#include <vector>
+
+/** @brief The matrix's rows (see the file comment). */
+class MatrixView final : public juce::Component, private juce::Timer {
+public:
+    /** @brief The rows of @p proc's engine. @param proc the processor */
+    explicit MatrixView(AdditivProcessor& proc);
+    /** @brief Two columns of eight rows. */
+    void resized() override;
+    /** @brief The rows' numbers and the column heads. */
+    void paint(juce::Graphics& g) override;
+    /** @brief The height the rows need. @return pixels */
+    static int idealHeight() { return 28 + 8 * 30; }
+    /** @brief The rows in words, for the help. @return the text */
+    juce::String describe() const;
+
+private:
+    /** @brief One row's controls. */
+    struct Row {
+        juce::ComboBox source;   ///< where from
+        juce::ComboBox target;   ///< what it moves
+        juce::Slider depth;      ///< how far, -1 .. 1
+    };
+    /** @brief Reads the engine's rows into the controls (a preset or a state may have changed them). */
+    void timerCallback() override;
+    /** @brief Writes one row's controls into the engine. @param i the row */
+    void push(int i);
+
+    AdditivProcessor& proc_;                       ///< whose engine
+    std::vector<std::unique_ptr<Row>> rows_;       ///< kModRows of them
+    std::vector<int> targets_;                     ///< the target menu's ParamIds, in its order (item id = index + 2)
+    bool updating_ = false;                        ///< the controls are being set from the engine: push nothing
+};

@@ -11,7 +11,7 @@
 # Built with CUDA 13.4 for the RTX 5090 (Blackwell, sm_120); the presets select CUDA 13.4 by its folder, whatever
 # CUDA_PATH or the nvcc on the PATH say. Windows only for now; no macOS path (user, 11.10.2026).
 cmake_minimum_required(VERSION 3.30)
-project(AdditivAmbientSynth VERSION 0.2.0 LANGUAGES C CXX CUDA)
+project(AdditivAmbientSynth VERSION 0.6.0 LANGUAGES C CXX CUDA)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake (the same file in
 # every repository of the family), CMakePresets.json and build.ps1.
@@ -30,6 +30,10 @@ add_compile_definitions(ADDITIV_VERSION="${PROJECT_VERSION}")
 option(ADDITIV_BUILD_TOOLS "Build probe, additiv_render and the tests" ON)
 option(ADDITIV_BUILD_PLUGIN "Build the JUCE plugin (VST3 + Standalone)" ON)
 option(ADDITIV_AVX2 "Build the C++ of the core with AVX2 + FMA (the effects' vector paths)" ON)
+option(ADDITIV_STATIC_RUNTIME "Link the MSVC runtime statically (the release: no redistributable, no DLL beside the program)" OFF)
+if(ADDITIV_STATIC_RUNTIME)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 set(ADDITIV_JUCE_TAG "9.0.1" CACHE STRING "JUCE git tag to fetch when no local checkout is found")
 if(MSVC)
     add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/MP>)
@@ -48,6 +52,8 @@ add_library(AdditivCore STATIC
     Core/src/Params.cpp
     Core/src/Tuning.cpp
     Core/src/Effects.cpp
+    Core/src/Modulation.cpp
+    Core/src/Presets.cpp
     Core/src/Engine.cpp)
 target_include_directories(AdditivCore PUBLIC Core/include PRIVATE ThirdParty/dr_libs)
 target_compile_definitions(AdditivCore PRIVATE $<$<COMPILE_LANGUAGE:CXX>:_WIN32_WINNT=0x0A00 UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS>)
@@ -74,6 +80,12 @@ if(ADDITIV_BUILD_TOOLS)
     target_compile_options(additiv_render PRIVATE /W4 /permissive-)
     target_link_libraries(additiv_render PRIVATE AdditivCore)
     family_bin(additiv_render)
+
+    # additiv_presets: every factory preset's level, for make_presets.py to bring the bank to one level.
+    add_executable(additiv_presets Tools/presets/main.cpp)
+    target_compile_options(additiv_presets PRIVATE /W4 /permissive-)
+    target_link_libraries(additiv_presets PRIVATE AdditivCore)
+    family_bin(additiv_presets)
 
     add_executable(additiv_selftest Tests/selftest.cpp)
     target_compile_options(additiv_selftest PRIVATE /W4 /permissive-)

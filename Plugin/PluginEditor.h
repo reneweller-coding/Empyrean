@@ -10,6 +10,7 @@
 
 #include "CloudView.h"
 #include "Frame.h"
+#include "MatrixView.h"
 #include "ParamPage.h"
 #include "PluginProcessor.h"
 #include "Theme.h"
@@ -72,6 +73,16 @@ private:
     TitleComponent title_;                                     ///< the name
     frame::IconButton play_{ frame::IconButton::Icon::Play, "Autoplay: start the conductor" };   ///< Autoplay on and off
     juce::TextButton step_{ "Step" };                          ///< Autoplay: exchange a voice now
+    juce::TextButton prevPreset_{ "<" };                       ///< the preset before
+    juce::TextButton presetName_;                              ///< the preset playing; a click opens the bank
+    juce::TextButton nextPreset_{ ">" };                       ///< the preset after
+    /** @brief The bank as a menu of its groups. */
+    void showPresets();
+    /**
+     * @brief Applies a preset as one undo step.
+     * @param index  the preset
+     */
+    void loadPreset(int index);
     frame::Choice mode_{ &actions_, static_cast<int>(additiv::ParamId::AutoMode) };      ///< Free or Chords
     frame::Choice scale_{ &actions_, static_cast<int>(additiv::ParamId::Scale) };        ///< the scale
     frame::Choice root_{ &actions_, static_cast<int>(additiv::ParamId::RootNote) };      ///< its root
@@ -84,13 +95,14 @@ private:
     frame::IconButton help_{ frame::IconButton::Icon::Help, "Help (F1)" };              ///< the help
     frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
     CloudView cloud_{ proc_ };                                 ///< the picture
+    frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play
     juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages
-    std::vector<ParamPage*> pages_;                            ///< the pages' contents, for the help
+    std::vector<std::function<juce::String()>> describe_;     ///< per page its parameters in words, for the help
     std::unique_ptr<frame::HelpView> helpView_;                ///< the help, while it is open
     frame::UndoHistory history_;                               ///< undo and redo
     bool applying_ = false;                                    ///< an undo is being applied: record nothing
     int headerBottom_ = 0;                                     ///< where the header ends, for the backdrop
-    juce::String shotPrefix_;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png, then the standalone quits
+    juce::String shotPrefix_;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png (ADDITIV_PRESET first), then the standalone quits
     int shotTick_ = 0;                                         ///< timer ticks since the screenshots were asked for
     int logTick_ = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
     /** @brief One step of the screenshot mode (ADDITIV_SHOT), from the timer. */

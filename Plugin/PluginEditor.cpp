@@ -7,6 +7,7 @@
 #include "AdditivData.h"
 
 #include "additiv/Landscape.h"
+#include "additiv/Presets.h"
 
 using additiv::ParamId;
 
@@ -17,8 +18,8 @@ constexpr const char* kApp = "AdditivAmbientSynth";   ///< the settings' name (a
 /** @brief A page in a viewport: it scrolls only where the window is smaller than the page. */
 class ScrollPage final : public juce::Viewport {
 public:
-    /** @brief Holds @p page. @param page the page (owned) */
-    explicit ScrollPage(ParamPage* page) : page_(page)
+    /** @brief Holds @p page, which needs @p heightFor at a width. @param page the page (owned) @param heightFor its height at a width */
+    ScrollPage(juce::Component* page, std::function<int(int)> heightFor) : page_(page), heightFor_(std::move(heightFor))
     {
         setViewedComponent(page, true);
         setScrollBarsShown(true, false);
@@ -28,11 +29,52 @@ public:
     {
         juce::Viewport::resized();
         const int w = getMaximumVisibleWidth();
-        page_->setSize(w, std::max(page_->heightFor(w), getMaximumVisibleHeight()));
+        page_->setSize(w, std::max(heightFor_(w), getMaximumVisibleHeight()));
     }
+    /** @brief The height the page needs at the viewport's width. @return pixels */
+    int pageHeight() const { return heightFor_(getMaximumVisibleWidth()); }
 
 private:
-    ParamPage* page_;   ///< the page (owned by the viewport)
+    juce::Component* page_;                 ///< the page (owned by the viewport)
+    std::function<int(int)> heightFor_;     ///< its height at a width
+};
+
+/** @brief The Modulation page: the sources' knobs above, the matrix below. */
+class ModPage final : public juce::Component {
+public:
+    /**
+     * @brief Builds the page.
+     * @param proc     the processor
+     * @param actions  the controls' right-click menu
+     * @param live     the live rings
+     */
+    ModPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live)
+        : params_(proc, actions,
+                  { { "LFOs", frame::Family::Motion, { ParamId::Lfo1Shape, ParamId::Lfo1Rate, ParamId::Lfo2Shape, ParamId::Lfo2Rate,
+                                                      ParamId::Lfo3Shape, ParamId::Lfo3Rate, ParamId::Lfo4Shape, ParamId::Lfo4Rate } },
+                    { "Envelopes", frame::Family::Envelope, { ParamId::Env1Shape, ParamId::Env1Rate, ParamId::Env2Shape, ParamId::Env2Rate } },
+                    { "Macros", frame::Family::Source, { ParamId::Macro1, ParamId::Macro2, ParamId::Macro3, ParamId::Macro4 } } },
+                  live),
+          matrix_(proc)
+    {
+        addAndMakeVisible(params_);
+        addAndMakeVisible(matrix_);
+    }
+    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    int heightFor(int w) const { return params_.heightFor(w) + MatrixView::idealHeight() + 10; }
+    /** @brief The knobs above, the matrix below. */
+    void resized() override
+    {
+        const int top = params_.heightFor(getWidth());
+        params_.setBounds(0, 0, getWidth(), top);
+        matrix_.setBounds(10, top, getWidth() - 20, MatrixView::idealHeight());
+    }
+    /** @brief The page in words. @return the text */
+    juce::String describe() const { return params_.describe() + matrix_.describe(); }
+
+private:
+    ParamPage params_;     ///< the sources' knobs
+    MatrixView matrix_;    ///< the matrix
 };
 
 /** @brief A short way to list ParamIds. */
@@ -63,6 +105,13 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         proc_.setValue(static_cast<int>(ParamId::BrainOn), proc_.value(static_cast<int>(ParamId::BrainOn)) >= 0.5f ? 0.0f : 1.0f);
         history_.end(values(), {});
     };
+    for (auto* b : { &prevPreset_, &presetName_, &nextPreset_ }) addAndMakeVisible(b);
+    prevPreset_.setTooltip("The preset before");
+    nextPreset_.setTooltip("The preset after");
+    presetName_.setTooltip("The preset playing: click for the bank (16 groups of 64)");
+    prevPreset_.onClick = [this] { loadPreset((std::max(proc_.currentPreset(), 0) + additiv::numPresets() - 1) % additiv::numPresets()); };
+    nextPreset_.onClick = [this] { loadPreset((proc_.currentPreset() + 1) % additiv::numPresets()); };
+    presetName_.onClick = [this] { showPresets(); };
     addAndMakeVisible(step_);
     step_.setTooltip("Autoplay: exchange one voice of the chord now");
     step_.onClick = [this] { proc_.engine().autoplayStep(); };
@@ -89,9 +138,9 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     addAndMakeVisible(tabs_);
     using F = frame::Family;
     auto page = [this](const juce::String& name, std::vector<ParamPage::Group> groups) {
-        auto* p = new ParamPage(proc_, actions_, std::move(groups));
-        pages_.push_back(p);
-        tabs_.addTab(name, additivui::skin().panel, new ScrollPage(p), true);
+        auto* p = new ParamPage(proc_, actions_, std::move(groups), &live_);
+        describe_.push_back([p] { return p->describe(); });
+        tabs_.addTab(name, additivui::skin().panel, new ScrollPage(p, [p](int w) { return p->heightFor(w); }), true);
     };
     page("Cloud", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
@@ -114,6 +163,11 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                     { "Near", F::Space, Ids{ ParamId::Presence, ParamId::PadLowCut } },
                     { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp } },
                     { "Master", F::Space, Ids{ ParamId::MasterGain, ParamId::BassMono, ParamId::StereoWidth } } });
+    {
+        auto* m = new ModPage(proc_, actions_, &live_);
+        describe_.push_back([m] { return m->describe(); });
+        tabs_.addTab("Modulation", additivui::skin().panel, new ScrollPage(m, [m](int w) { return m->heightFor(w); }), true);
+    }
     tabs_.setTabBarDepth(32);
     tabs_.setOutline(0);
     sendLookAndFeelChange();
@@ -177,13 +231,18 @@ void AdditivEditor::timerCallback()
     additiv::Engine& e = proc_.engine();
     const bool on = proc_.value(static_cast<int>(ParamId::BrainOn)) >= 0.5f;
     play_.show(on ? frame::IconButton::Icon::Stop : frame::IconButton::Icon::Play, on ? "Autoplay: stop the conductor" : "Autoplay: start the conductor");
+    const int cp = proc_.currentPreset();
+    const juce::String name = cp >= 0 ? juce::String(additiv::kPresetGroupNames[additiv::preset(cp).group]) + ": " + additiv::preset(cp).name : juce::String("Presets ...");
+    if (presetName_.getButtonText() != name) presetName_.setButtonText(name);
     undo_.setEnabled(history_.canUndo());
     redo_.setEnabled(history_.canRedo());
     juce::String s;
     if (proc_.learning() >= 0) {
         s << "MIDI learn: move a controller for " << additiv::paramDesc(static_cast<ParamId>(proc_.learning())).name;
     } else if (!e.prepared()) {
-        s << "The GPU engine is not running (no CUDA device, or the audio is off)";
+        const juce::String why = proc_.engineError();
+        s << "The GPU engine is not running: " << (why.isEmpty() ? juce::String("the audio is off") : why)
+          << "  (an NVIDIA card, GeForce RTX 20 or newer, with a current driver)";
     } else {
         static const char* const kNames[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         const int root = e.brainRoot();
@@ -211,6 +270,15 @@ void AdditivEditor::shootStep()
     // ADDITIV_SHOT_AFTER seconds (at least 3) for the engine to sound, then every page: shown on one tick,
     // photographed three ticks later.
     const int start = 15 * std::max(3, juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_AFTER", "3").getIntValue());
+    // ADDITIV_PRESET (a name or a number): the preset the pictures show, loaded before the engine is heard.
+    if (shotPrefix_.isNotEmpty() && shotTick_ == 0) {
+        const juce::String want = juce::SystemStats::getEnvironmentVariable("ADDITIV_PRESET", {});
+        int index = -1;
+        for (int i = 0; i < additiv::numPresets() && index < 0 && want.isNotEmpty(); ++i)
+            if (want == additiv::preset(i).name) index = i;
+        if (index < 0 && want.containsOnly("0123456789") && want.isNotEmpty()) index = want.getIntValue();
+        if (index >= 0) proc_.applyPreset(index);
+    }
     if (shotPrefix_.isEmpty() || ++shotTick_ < start || (shotTick_ - start) % 3 != 0) return;
     const int t = (shotTick_ - start) / 3;
     if (t > 0) {
@@ -222,6 +290,10 @@ void AdditivEditor::shootStep()
     }
     if (t < tabs_.getNumTabs()) {
         tabs_.setCurrentTabIndex(t);
+        // ADDITIV_SHOT_FULL: the window as tall as the page, so that nothing of it scrolls out of the picture.
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_FULL", {}).isNotEmpty())
+            if (auto* sp = dynamic_cast<ScrollPage*>(tabs_.getTabContentComponent(t)))
+                setSize(getWidth(), std::clamp(getHeight() - sp->getMaximumVisibleHeight() + sp->pageHeight() + 16, 860, 3100));
     } else {
         shotPrefix_ = {};
         if (standalone()) juce::JUCEApplicationBase::quit();
@@ -241,7 +313,8 @@ void AdditivEditor::resized()
     h.logo = &logo_;
     h.title = &title_;
     h.titleWidth = static_cast<int>(frame::titleWidth(additivui::skin(), frame::kHeaderRow * 0.62f)) + 8;
-    h.choices = { { &mode_, 96 }, { &scale_, 168 }, { &root_, 64 }, { &motion_, 112 }, { &landscape_, 108 } };
+    h.choices = { { &prevPreset_, 28 }, { &presetName_, 250 }, { &nextPreset_, 28 }, { &mode_, 92 }, { &scale_, 150 }, { &root_, 58 }, { &motion_, 104 } };
+    landscape_.setVisible(false);   // on the Motion page; the header has room for the bank
     h.actions = { { &step_, 64 } };
     h.play = &play_;
     h.status = &status_;
@@ -286,8 +359,9 @@ void AdditivEditor::showHelp(bool on)
         helpView_->extraTopics = [this] {
             std::vector<std::pair<juce::String, juce::String>> t;
             const int i = tabs_.getCurrentTabIndex();
-            if (i >= 0 && i < static_cast<int>(pages_.size())) t.emplace_back("This tab: " + tabs_.getTabNames()[i], pages_[static_cast<size_t>(i)]->describe());
+            if (i >= 0 && i < static_cast<int>(describe_.size())) t.emplace_back("This tab: " + tabs_.getTabNames()[i], describe_[static_cast<size_t>(i)]());
             t.emplace_back("Keys", frame::keysText());
+            t.emplace_back("Headset (Meta Quest)", frame::headsetGrammar("Step", "Brain 2 in or out") + "\n\nThe left hand's height is the brightness (Macro 2), the right hand's the motion (Macro 1); both hands pinched: the next preset.\n\n" + proc_.headset().statusText());
             return t;
         };
         addChildComponent(*helpView_);
@@ -301,6 +375,31 @@ void AdditivEditor::showHelp(bool on)
     else grabKeyboardFocus();
 }
 
+void AdditivEditor::loadPreset(int index)
+{
+    history_.begin("Preset", values(), {}, true);
+    proc_.applyPreset(index);
+    history_.end(values(), {});
+}
+
+void AdditivEditor::showPresets()
+{
+    juce::PopupMenu bank;
+    const int current = proc_.currentPreset();
+    for (int g = 0; g < additiv::kNumPresetGroups; ++g) {
+        juce::PopupMenu group;
+        for (int i = 0; i < 64; ++i) {
+            const int index = additiv::presetAt(g, i);
+            if (index < 0) break;
+            group.addItem(index + 1, additiv::preset(index).name, true, index == current);
+        }
+        bank.addSubMenu(additiv::kPresetGroupNames[g], group, true, nullptr, current >= 0 && additiv::preset(current).group == g);
+    }
+    bank.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presetName_), [this](int id) {
+        if (id > 0) loadPreset(id - 1);
+    });
+}
+
 void AdditivEditor::showSettings()
 {
     frame::SettingsMenu m;
@@ -312,6 +411,8 @@ void AdditivEditor::showSettings()
     m.setWindowScale = [this](float k) {
         if (juce::Desktop::getInstance().getKioskModeComponent() == nullptr) setSize(juce::roundToInt(1280.0f * k), juce::roundToInt(860.0f * k));
     };
+    m.headsetStatus = [this] { return proc_.headset().statusText(); };
+    m.jamStatus = [this] { return proc_.jamStatus(); };   // the family jam: Off, Lead, Follow
     m.about = [this] {
         return juce::String("The additive ambient synth: 20,000 partials per voice on the GPU, after Noctuary.\n")
              + (proc_.engine().prepared() ? proc_.engine().deviceName() : juce::String("GPU engine not running"));

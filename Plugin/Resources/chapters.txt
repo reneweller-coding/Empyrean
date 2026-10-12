@@ -37,6 +37,23 @@ Every note stands on a plane between the ear (0) and the far background (1): the
 
 The far reverb (Level, Size, Decay, Damping) is Noctuary's. Master: the level, the bass made mono below Bass Mono, and the width.
 
+== Modulation | Modulation | ==
+Four LFOs, two envelopes and four macros move the instrument's knobs through a matrix of sixteen rows: a source, a target, a depth. The LFOs are slow by default (their rates step by the golden ratio, so they never line up) and have no hard edges: Square and Ramp glide through their jumps in a few percent of a cycle, Random is a drifting curve, Steps glides from one value to the next. The envelopes are shapes from the motions' bank, played from the start whenever a note arrives into silence; Rate sets how fast they run.
+
+The macros are knobs without a place of their own: they mean what the matrix says. Every factory preset gives them the same meaning, so that a controller mapped to them plays every preset: Macro 1 the motion (Depth and Rate), Macro 2 the brightness or the filter, Macro 3 the air, Macro 4 the depth in the space. The mod wheel, channel pressure, the velocity of the last note and a slow random curve are sources too.
+
+Depth is measured in the knob's own travel: 0.5 moves a knob by half its range up and down, whatever its unit. A knob that is modulated shows a ring around it where its value is now.
+
+== Presets | all | ==
+The bank holds 1024 presets in sixteen groups of 64: Sleep Concert, Choirs, Glass, Bells, Strings, Organs, Air & Noise, Deep Space, Glissandi, Pendulums, Waves, Shepard & Tides, Shimmer, Dark Drones, Microtonal and Keys. The arrows in the header step through them; a click on the name opens the list by group. Every preset was measured by its loudest second and brought to the same level, so stepping through them does not jump.
+
+MIDI program change chooses a preset within the group that bank select (controller 0) names. A preset sets every knob and the matrix; your MIDI-learn bindings stay.
+
+== Family jam and headset | all | ==
+The instruments of the family (Noctuary, Ephemeris, Phosphene, Totality, Parhelion and this one) can play together on one computer or a local network: Settings > Family jam. A follower keeps its conductor's root on the leader's (the nearest note of that pitch class, in its own tuning) and opens or closes with the energy of the leader's section; a leader tells the others its root and scale.
+
+The Meta Quest app has no graphics card to compute twenty thousand partials per voice, so the instrument stays on this computer and the headset sends only its hands (bridge mode): Settings > Headset. The left hand's height is the brightness (Macro 2), the right hand's the motion (Macro 1); the pinches play and stop the conductor, step it, bring Brain 2 in and out, and both hands pinched choose the next preset.
+
 == Playing | all | ==
 The keyboard plays over the conductor. The hold pedal (controller 64) keeps notes sounding until it comes up. Right-click any control for MIDI learn (move a controller to bind it), to forget a binding or to return to the default.
 

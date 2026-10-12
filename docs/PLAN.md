@@ -238,6 +238,54 @@ der Ring stand dann bei 448. Der Vorlauf deckt jetzt zwei Hostblöcke plus 10 ms
 
 **Gemessen:** Doccheck, Selbsttest 14/14, Probe 18/18, **pluginval Stufe 10 mit dem Editor** bestanden.
 
+## Phase 4: Modulation und Presets (gebaut, 12.10.2026)
+
+- **Modulation** (`Modulation.h/.cpp`): vier LFOs (Sine, Triangle, Ramp Up/Down, Square, Random, Steps; Raten im
+  goldenen Schnitt, 0,05 bis 0,21 Hz; keine harten Kanten: Rücksprünge über 7 % des Zyklus, Steps gleitet), zwei
+  Hüllkurven aus der Formenbank (neu ab einer Note in die Stille), vier Makros, Modrad, Druck, Anschlag, eine langsame
+  Zufallskurve; **Matrix aus 16 Zeilen** als Text im Zustand (`lfo1>cutoff:0.35;...`), Tiefe im Reglerweg (normiert,
+  mit Skew). Auf der Seite *Modulation* die Quellen und die Matrix; jeder modulierte Regler zeigt einen Ring.
+- **1024 Presets** in 16 Gruppen zu 64 (`Tools/presets/make_presets.py` schreibt `Core/src/Presets.inc`): Rezepte je
+  Gruppe, Namen aus Adjektiv x Nomen, gemeinsame Bedeutung der Makros (1 Bewegung, 2 Helligkeit oder Filter, 3 Air,
+  4 Tiefe), Modrad und Druck. **Pegel:** `additiv_presets` misst jedes Preset (Akkord 50/57/62/66, ohne Dirigent)
+  an seiner **lautesten Sekunde** (Glocken und Glas würden sonst im Abklingen gemessen), `make_presets.py` zieht alle
+  auf −20 dBFS (Master −18 bis +12 dB). Formant brauchte ×3 (die Chöre lagen 18 dB unter dem Rest).
+- **Gefunden [M]:** `f(x, 0)` strich bei ganzen Zahlen die Endnullen (180 Hz Cutoff wurde 18 Hz): 24 Presets mit einem
+  Cutoff eine Dekade zu tief (sieben Dark Drones bei −60 bis −84 dBFS, also stumm), 9 mit zu schmalem Air-Band.
+  Nach der Korrektur liegt die ganze Bank vor dem Ausgleich bei −30 bis −4 dBFS (Median −20,3), also im Bereich der
+  Korrektur.
+- Programmwechsel mit Bank (CC 0 = Gruppe), Kopfzeile mit Vor/Zurück und Menü nach Gruppen. **Nach einem
+  Presetwechsel füllen beide Dirigenten ihren Akkord im Drittelsekundentakt** (`Engine::requestFill`, Noctuarys
+  `requestBrainFill`): Velvet Dreaming hatte nach 12 s eine Stimme, jetzt nach 8 s sechs.
+
+## Phase 5: Familie (gebaut, 12.10.2026)
+
+- **Familien-Jam** (`Plugin/Jam.h/.cpp`, unverändert aus Totality): als Folger hält der Dirigent seinen Grundton auf
+  der Tonklasse des Leaders (die nächste Note dieser Klasse, die eigene Stimmung bleibt) und öffnet oder schließt
+  Helligkeit (±40 %) und Cutoff (±1 Oktave) mit der Energie des Leader-Abschnitts; als Leader meldet er Grundton und
+  Skala. Selbsttest: Grundton 30 s auf der Tonklasse des Leaders gehalten, obwohl Root Move 1 wandern will.
+- **Headset** im Bridge-Modus: Die Quest hat keine CUDA-Karte, das Instrument bleibt am PC; die Hände kommen über
+  `frame::Headset` (Port 9100 bis zum Namen, `portOf` in `Frame.cpp` aller fünf Repos). Linke Hand Höhe = Makro 2
+  (Helligkeit), rechte = Makro 1 (Bewegung), Pinches: Play/Stop, Step, Brain 2, beide = nächstes Preset.
+- Hilfe: Kapitel *Modulation*, *Presets*, *Family jam and headset*.
+
+## Phase 6: Release (vorbereitet, 12.10.2026; nicht veröffentlicht)
+
+- `release`-Preset: statische Laufzeit, **Code für jede RTX-Generation** (sm_75, 86, 89, 120 und PTX 120). Eine Karte
+  ohne Code oder ein Rechner ohne NVIDIA-Treiber wird mit Namen in der Statuszeile gemeldet (`cudaFuncGetAttributes`
+  in `CloudEngine::open`); das Setup fragt nach, wenn `nvcuda.dll` fehlt oder AVX2.
+- `Deploy/build_release.ps1`: Build, ctest, pluginval mit zwei weiteren Seeds, Bildschirmfotos (`Tools/manual/
+  make_shots.py`, stumm über `ADDITIV_MUTE`, `ADDITIV_PRESET`, `ADDITIV_SHOT_FULL`), Handbuch (`make_manual.py`: Text
+  aus `chapters.txt`, Tabellen aus `additiv_render --dump-params`, Anhang MIDI/Presets/Anforderungen), Stage,
+  dumpbin-Prüfung (keine MSVC- oder CUDA-Laufzeit-DLL), SHA256SUMS, Zip, Inno-Setup 7. Unsigniert.
+- `README.md`, `docs/RELEASE_NOTES.md`, Version 0.6.0.
+
+**Offen:** der Name (Aurora ist besetzt: NI/iZotope, UVI; Vorschläge Nacreous, Irisation, Zodiacal, Empyrean), dann
+Umbenennung (Produkt, Plugin-Codes, Einstellungsname, Headset-Port, Bewegung/Landschaft "Aurora" bleibt Begriff);
+AGPL und die statisch gelinkte CUDA-Laufzeit klären; ein einzelner Unterlauf beim Start des Standalone (in 2 von 6
+Bildschirmfoto-Läufen, mit Log nicht nachgestellt; der Ring fällt beim Start durch zwei WASAPI-Callbacks direkt
+hintereinander auf 576 von 1536); Hören auf älteren Karten (nur RTX 5090 gemessen); Linux optional.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut
@@ -252,6 +300,6 @@ der Ring stand dann bei 448. Der Vorlauf deckt jetzt zwei Hostblöcke plus 10 ms
    (Breite, Steigung, Dichte), Drift, Shimmer; Raummodell und Filter pro Partial auf der GPU; Landschaften als
    Kernstück (Bibliothek, Pegelausgleich); Werksformen nach "Bewegung auf tragendem Klang"; Rauschanteile.
 3. **Gebaut (siehe oben).** Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.
-4. Modulation und Presets (rund 1024 wie die Geschwister).
-5. Familie: Jam, Keyboard-Spiel, Quest.
-6. Release für Windows (Linux optional).
+4. **Gebaut (siehe oben).** Modulation und Presets (1024 wie die Geschwister).
+5. **Gebaut (siehe oben).** Familie: Jam, Headset im Bridge-Modus (eine Quest-App mit CUDA gibt es nicht).
+6. **Vorbereitet (siehe oben).** Release für Windows (Linux optional); veröffentlicht wird nach dem Namen.

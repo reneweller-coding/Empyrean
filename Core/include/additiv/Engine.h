@@ -28,6 +28,7 @@
 #include "additiv/ClusterBrain.h"
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
+#include "additiv/Modulation.h"
 #include "additiv/Params.h"
 #include "additiv/Tuning.h"
 
@@ -135,8 +136,50 @@ public:
     /** @brief Every played note is let go (the conductor's notes stay). Audio thread. */
     void allNotesOff();
 
+    /**
+     * @brief Sets one row of the modulation matrix. Any thread (a row is one atomic word).
+     * @param i    0 .. kModRows-1
+     * @param row  the row
+     */
+    void setModRow(int i, const ModRow& row);
+    /** @brief One row of the matrix. @param i 0 .. kModRows-1 @return the row */
+    ModRow modRow(int i) const;
+    /** @brief The matrix as text (Modulation.h). @return the text */
+    std::string modText() const;
+    /** @brief The matrix from text; rows it does not name are emptied. @param text the text */
+    void setModText(const std::string& text);
+    /** @brief The mod wheel (CC 1). Any thread. @param v 0 .. 1 */
+    void setModWheel(float v) { wheel_.store(v, std::memory_order_relaxed); }
+    /** @brief Channel pressure. Any thread. @param v 0 .. 1 */
+    void setPressure(float v) { pressure_.store(v, std::memory_order_relaxed); }
+    /**
+     * @brief Where a parameter plays after the matrix, normalised, for the panel's live rings.
+     * @param id  the parameter
+     * @return    0 .. 1, NaN when nothing modulates it
+     */
+    float playedNorm(ParamId id) const { return played_[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
+
+    /**
+     * @brief The family jam, following: the leader's root, which the conductor's root is held on (its
+     *        nearest note of that pitch class), as Noctuary follows. Any thread.
+     * @param pitchClass  0 .. 11, -1 when no leader is heard
+     */
+    void setJamRoot(int pitchClass) { jamRoot_.store(pitchClass, std::memory_order_relaxed); }
+    /**
+     * @brief The family jam, following: the energy of the leader's section, which opens or closes the
+     *        brightness and the filter (0.5 changes nothing). Any thread.
+     * @param energy  0 .. 1
+     */
+    void setJamEnergy(float energy) { jamEnergy_.store(energy, std::memory_order_relaxed); }
+
     /** @brief Autoplay: exchange a voice of the cluster at the next block, whatever its timer says. Any thread. */
     void autoplayStep() { stepAsked_.store(true, std::memory_order_relaxed); }
+    /**
+     * @brief Both conductors fill their chords at speed (a note every third of a second) until they
+     *        are full, as Noctuary after a preset change: the arriving preset is heard whole within
+     *        seconds, not after minutes of its own event rate. Any thread.
+     */
+    void requestFill() { fillAsked_.store(true, std::memory_order_relaxed); }
 
     /**
      * @brief The audio callback: n samples of the timeline.
@@ -227,7 +270,9 @@ private:
     void startWorker();                       ///< starts the worker (real-time mode)
     void stopWorker();                        ///< stops and joins it
     void renderBlock();                       ///< one GPU block of the timeline into the ring (renderer thread)
-    void readParams();                        ///< the parameters the block uses, read once per block
+    void readParams();                        ///< the parameters the block uses, read once per block, the modulation applied
+    /** @brief A parameter's effective value this block (after the matrix). @param id the parameter @return the value */
+    float cur(ParamId id) const { return cur_[static_cast<size_t>(id)]; }
     void drainEvents();                       ///< moves the queued events into the pending list
     /**
      * @brief Starts a note on a free voice, or steals one (fading it over a block first).
@@ -285,6 +330,17 @@ private:
     int landChoice_ = -1;                              ///< the landscape on the GPU
     float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
     bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
+    Modulators mods_;                                  ///< the modulation sources
+    std::array<std::atomic<std::uint64_t>, kModRows> modRows_{};   ///< the matrix, a packed row per word (packModRow)
+    std::array<float, kNumParams> cur_{};              ///< every parameter's effective value this block
+    std::array<std::atomic<float>, kNumParams> played_{};   ///< where each plays after the matrix, normalised (NaN: unmodulated)
+    std::atomic<float> wheel_{ 0.0f };                 ///< the mod wheel
+    std::atomic<float> pressure_{ 0.0f };              ///< channel pressure
+    float lastVelocity_ = 0.0f;                        ///< the last note's velocity
+    std::atomic<int> jamRoot_{ -1 };                   ///< the jam leader's root (pitch class), -1 none
+    std::atomic<float> jamEnergy_{ 0.5f };             ///< the jam leader's section energy
+    bool phraseStart_ = false;                         ///< a note arrived into silence: the envelopes start over
+    int prevSounding_ = 0;                             ///< voices sounding after the block before
     FixedScale scale_;                                 ///< the current scale
     int scaleChoice_ = -1;                             ///< the choice scale_ was built from
     int rootPc_ = 0;                                   ///< the scale's root, a pitch class
@@ -358,6 +414,7 @@ private:
     std::thread worker_;                               ///< the renderer in real-time mode
     std::atomic<bool> running_{ false };               ///< the worker runs
     std::atomic<bool> stepAsked_{ false };             ///< autoplayStep() was asked for
+    std::atomic<bool> fillAsked_{ false };             ///< requestFill() was asked for
     std::atomic<int> sounding_{ 0 };                   ///< voices sounding, for status
     std::atomic<int> soundingBy_[3] = {};               ///< voices sounding per source, for status
     std::atomic<int> brainRoot_{ 0 };                  ///< the conductor's root, for status

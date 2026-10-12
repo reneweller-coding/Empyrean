@@ -298,7 +298,9 @@ __device__ float filterGain(int model, float f, float cutoff, float q, float vow
             const float fk = kFormants[i0][k] * exp2f(fr * log2f(kFormants[i0 + 1][k] / kFormants[i0][k]));
             g += w[k] * bandPass(f / fk, q);
         }
-        return g;
+        // Three band passes at unity pass little between them: measured over the factory chord the
+        // formant presets sat 18 dB under the rest of the bank. Made up here, not in every preset.
+        return 3.0f * g;
     }
     default: return 1.0f;
     }
@@ -745,6 +747,14 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     Impl& m = *im;
     bool good = ok(cudaSetDevice(m.device), "cudaSetDevice", error)
              && ok(cudaGetDeviceProperties(&m.props, m.device), "cudaGetDeviceProperties", error);
+    // A card this build has no code for (CMAKE_CUDA_ARCHITECTURES) says so here, by name, not at the
+    // first block's launch.
+    if (cudaFuncAttributes attr{}; good && cudaFuncGetAttributes(&attr, updateKernel) != cudaSuccess) {
+        cudaGetLastError();
+        if (error) *error = std::string(m.props.name) + " (compute " + std::to_string(m.props.major) + "." + std::to_string(m.props.minor)
+                          + ") is not among the cards this build is made for";
+        return false;
+    }
     int lo = 0, hi = 0;
     good = good && ok(cudaDeviceGetStreamPriorityRange(&lo, &hi), "cudaDeviceGetStreamPriorityRange", error)
                 && ok(cudaStreamCreateWithPriority(&m.stream, cudaStreamNonBlocking, hi), "cudaStreamCreateWithPriority", error)

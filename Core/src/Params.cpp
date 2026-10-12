@@ -12,8 +12,10 @@
 #include "additiv/Cloud.h"
 #include "additiv/ClusterBrain.h"
 #include "additiv/Landscape.h"
+#include "additiv/Shapes.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 
 namespace additiv {
@@ -39,6 +41,8 @@ const char* const kKeyMapNames[2] = { "Snap to 12 keys", "Consecutive degrees" }
 const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
+const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
+const char* const kEnvShapeNames[kFactoryShapeCount] = { "Swell", "Pulse", "Bloom", "Flicker", "Wobble", "Rise In", "Fall In", "Saw Up" };
 
 namespace {
 
@@ -186,11 +190,41 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::Doppler,     "doppler",      "Doppler",       "Space",     0.f,   1.f,   0.f,   1.f,  ""),
     F(ParamId::BassMono,    "bass_mono",    "Bass Mono",     "Master",    40.f,  300.f, 150.f, 0.5f, "Hz"),
     F(ParamId::StereoWidth, "stereo_width", "Width",         "Master",    0.f,   2.f,   1.2f,  1.f,  ""),
+
+    C(ParamId::Lfo1Shape,   "lfo1_shape",   "LFO 1",         "Modulation", kLfoShapeNames, kNumLfoShapes, 0),
+    F(ParamId::Lfo1Rate,    "lfo1_rate",    "LFO 1 Rate",    "Modulation", 0.001f, 20.f, 0.05f, 0.2f, "Hz"),
+    C(ParamId::Lfo2Shape,   "lfo2_shape",   "LFO 2",         "Modulation", kLfoShapeNames, kNumLfoShapes, 1),
+    F(ParamId::Lfo2Rate,    "lfo2_rate",    "LFO 2 Rate",    "Modulation", 0.001f, 20.f, 0.0809f, 0.2f, "Hz"),
+    C(ParamId::Lfo3Shape,   "lfo3_shape",   "LFO 3",         "Modulation", kLfoShapeNames, kNumLfoShapes, 5),
+    F(ParamId::Lfo3Rate,    "lfo3_rate",    "LFO 3 Rate",    "Modulation", 0.001f, 20.f, 0.1309f, 0.2f, "Hz"),
+    C(ParamId::Lfo4Shape,   "lfo4_shape",   "LFO 4",         "Modulation", kLfoShapeNames, kNumLfoShapes, 6),
+    F(ParamId::Lfo4Rate,    "lfo4_rate",    "LFO 4 Rate",    "Modulation", 0.001f, 20.f, 0.2118f, 0.2f, "Hz"),
+    C(ParamId::Env1Shape,   "env1_shape",   "Env 1",         "Modulation", kEnvShapeNames, kFactoryShapeCount, 2),
+    F(ParamId::Env1Rate,    "env1_rate",    "Env 1 Rate",    "Modulation", 0.02f, 8.f,  0.25f, 0.4f, "x"),
+    C(ParamId::Env2Shape,   "env2_shape",   "Env 2",         "Modulation", kEnvShapeNames, kFactoryShapeCount, 0),
+    F(ParamId::Env2Rate,    "env2_rate",    "Env 2 Rate",    "Modulation", 0.02f, 8.f,  0.1f,  0.4f, "x"),
+    F(ParamId::Macro1,      "macro1",       "Macro 1",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
+    F(ParamId::Macro2,      "macro2",       "Macro 2",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
+    F(ParamId::Macro3,      "macro3",       "Macro 3",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
+    F(ParamId::Macro4,      "macro4",       "Macro 4",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
 } };
 
 } // namespace
 
 const std::array<ParamDesc, kNumParams>& paramTable() { return kTable; }
+
+float toNorm(const ParamDesc& d, float v)
+{
+    if (d.max <= d.min) return 0.0f;
+    const float x = std::clamp((v - d.min) / (d.max - d.min), 0.0f, 1.0f);
+    return d.skew == 1.0f ? x : std::pow(x, d.skew);
+}
+
+float fromNorm(const ParamDesc& d, float n)
+{
+    const float x = std::clamp(n, 0.0f, 1.0f);
+    return d.min + (d.max - d.min) * (d.skew == 1.0f ? x : std::pow(x, 1.0f / d.skew));
+}
 
 const ParamDesc* findParam(const char* key)
 {

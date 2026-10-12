@@ -6,6 +6,7 @@
  *        measurements are probe's selftest.
  */
 #include "additiv/Engine.h"
+#include "additiv/Presets.h"
 #include "additiv/Spectrum.h"
 
 #define NOMINMAX
@@ -324,6 +325,154 @@ int main()
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
         const double db = rmsDb(lr, 20 * 48000, 40 * 48000);
         check(finite && db > -50.0 && db < -6.0, "everything moving at once: finite and sane", fmt("%.1f dBFS RMS over 20-40 s", db));
+    }
+
+    // 14. The matrix as text: written by one engine, read by another, the same rows.
+    {
+        Engine a, b;
+        a.setModRow(0, { ModSource::Lfo1, static_cast<int>(ParamId::Cutoff), 0.35f });
+        a.setModRow(3, { ModSource::Macro2, static_cast<int>(ParamId::MotionDepth), -0.5f });
+        a.setModRow(5, { ModSource::Env1, static_cast<int>(ParamId::Scale), 0.2f });   // a choice: not a target, dropped
+        const std::string text = a.modText();
+        b.setModText(text);
+        const ModRow r0 = b.modRow(0), r1 = b.modRow(1), r2 = b.modRow(2);
+        const bool same = r0.source == ModSource::Lfo1 && r0.target == static_cast<int>(ParamId::Cutoff) && std::fabs(r0.depth - 0.35f) < 1e-6f
+                       && r1.source == ModSource::Macro2 && r1.target == static_cast<int>(ParamId::MotionDepth) && std::fabs(r1.depth + 0.5f) < 1e-6f
+                       && r2.source == ModSource::Off;
+        check(same, "modulation: the matrix as text and back", "\"" + text + "\"");
+    }
+
+    // 15. No source ever steps: every LFO shape, a hundred cycles at 1 Hz in millisecond steps.
+    {
+        double worst = 0.0;
+        for (int shape = 0; shape < kNumLfoShapes; ++shape) {
+            Modulators m;
+            m.reset(3);
+            ModInputs in;
+            for (int i = 0; i < 4; ++i) { in.lfoShape[i] = shape; in.lfoRate[i] = 1.0f; }
+            m.advance(0.001f, in);
+            float prev = m.value(ModSource::Lfo1);
+            for (int s = 0; s < 100000; ++s) {
+                m.advance(0.001f, in);
+                const float v = m.value(ModSource::Lfo1);
+                worst = std::max(worst, static_cast<double>(std::fabs(v - prev)));
+                prev = v;
+            }
+        }
+        // The steepest a shape may be: a ramp's return over 7 % of a cycle, 2 / 0.07 per cycle.
+        check(worst < 0.03, "modulation: no LFO shape steps", fmt("largest move per millisecond at 1 Hz %.4f (a return over 7 %%: 0.029)", worst));
+    }
+
+    // 16. An LFO on the cutoff moves the level; the live value is where the cutoff plays.
+    {
+        auto swing = [](bool modulated, float* played) {
+            Engine e;
+            if (!openOffline(e, false)) return 0.0;
+            e.setParam(ParamId::FilterModel, 2.0f);   // LP 12
+            e.setParam(ParamId::Cutoff, 400.0f);
+            e.setParam(ParamId::KeyTrack, 0.0f);
+            e.setParam(ParamId::FilterDrift, 0.0f);
+            e.setParam(ParamId::Attack, 0.1f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Lfo1Shape, 0.0f);
+            e.setParam(ParamId::Lfo1Rate, 0.5f);
+            if (modulated) e.setModRow(0, { ModSource::Lfo1, static_cast<int>(ParamId::Cutoff), 0.4f });
+            for (int note : { 45, 52, 57 }) e.noteOn(note, 0.8f, 0);
+            const std::vector<float> lr = render(e, 8.0);
+            double lo = 1e9, hi = -1e9;
+            for (int w = 8; w < 32; ++w) {   // quarter seconds from 2 s on
+                const double db = rmsDb(lr, static_cast<size_t>(w) * 12000, static_cast<size_t>(w + 1) * 12000);
+                lo = std::min(lo, db);
+                hi = std::max(hi, db);
+            }
+            if (played) *played = e.playedNorm(ParamId::Cutoff);
+            return hi - lo;
+        };
+        float played = 0.0f, still = 0.0f;
+        const double moved = swing(true, &played);
+        const double steady = swing(false, &still);
+        // Without the row the level still breathes: behind a 400 Hz low pass only the fundamentals' clouds
+        // remain, and their members beat. The row must move it far more than that.
+        check(moved > steady + 6.0 && std::isfinite(played) && played >= 0.0f && played <= 1.0f && std::isnan(still),
+              "modulation: an LFO on the cutoff, and its live value",
+              fmt("level swings %.1f dB with the row, %.1f dB without; cutoff plays at %.2f", moved, steady, played));
+    }
+
+    // 17. The factory bank: 16 groups of 64, unique names, every key known and every value in its
+    //     range, every matrix row read, and bank select plus program finding each preset again.
+    {
+        int bad = 0, outOfRange = 0, rowsLost = 0, perGroup[kNumPresetGroups] = {};
+        std::vector<std::string> names;
+        for (int i = 0; i < numPresets(); ++i) {
+            const Preset& p = preset(i);
+            ++perGroup[std::clamp(p.group, 0, kNumPresetGroups - 1)];
+            names.push_back(p.name);
+            int entries = 0;
+            for (const char* s = p.params; *s != 0; ++s) if (*s == '=') ++entries;
+            float values[kNumParams];
+            std::string mod;
+            if (presetValues(i, values, &mod) != entries) ++bad;
+            // In range before the clamp: read each value again and compare.
+            for (const char* s = p.params; *s != 0;) {
+                while (*s == ' ') ++s;
+                const char* eq = std::strchr(s, '=');
+                if (eq == nullptr) break;
+                const std::string key(s, eq);
+                const float v = static_cast<float>(std::atof(eq + 1));
+                if (const ParamDesc* d = findParam(key.c_str()); d != nullptr && (v < d->min || v > d->max)) ++outOfRange;
+                const char* end = std::strchr(eq, ' ');
+                s = end != nullptr ? end : eq + std::strlen(eq);
+            }
+            ModRow rows[kModRows];
+            const int want = mod.empty() ? 0 : 1 + static_cast<int>(std::count(mod.begin(), mod.end(), ';'));
+            if (modRowsFromText(mod, rows, kModRows) != want) ++rowsLost;
+            if (presetAt(p.group, presetIndexInGroup(i)) != i) ++bad;
+        }
+        std::sort(names.begin(), names.end());
+        const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
+        bool full = true;
+        for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
+        check(numPresets() == 1024 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
+              fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
+                  bad, outOfRange, rowsLost));
+    }
+
+    // 18. The family jam, following: the conductor's root comes to the leader's pitch class and stays
+    //     there while the conductor plays; the energy's neutral 0.5 changes nothing.
+    {
+        Engine e;
+        if (!openOffline(e, true, 21)) return 1;
+        e.setParam(ParamId::AutoRate, 4.0f);
+        e.setParam(ParamId::AutoRootMove, 1.0f);   // the conductor wants to wander; the jam holds it
+        e.setJamRoot(7);
+        e.setJamEnergy(0.5f);
+        bool held = true;
+        for (int s = 0; s < 30; ++s) {
+            render(e, 1.0);
+            if (s >= 1 && ((e.brainRoot() % 12) + 12) % 12 != 7) held = false;
+        }
+        check(held, "family jam: the root held on the leader's", fmt("root %d (pitch class %d) after 30 s", e.brainRoot(), ((e.brainRoot() % 12) + 12) % 12));
+    }
+
+    // 19. A preset change fills the chord at speed (requestFill, Noctuary's way): with an event every
+    //     two minutes the conductor alone has one or two notes after five seconds, filled it has all five.
+    {
+        auto conducted = [](bool fill, int& count) {
+            Engine e;
+            if (!openOffline(e, true, 23)) return false;
+            e.setParam(ParamId::AutoMode, 1.0f);
+            e.setParam(ParamId::BrainRate, 120.0f);
+            e.setParam(ParamId::AutoRate, 300.0f);
+            e.setParam(ParamId::BrainDensity, 5.0f);
+            render(e, 1.0);
+            if (fill) e.requestFill();
+            render(e, 4.0);
+            count = e.soundingFrom(1);
+            return true;
+        };
+        int slow = 0, filled = 0;
+        if (!conducted(false, slow) || !conducted(true, filled)) return 1;
+        check(slow <= 2 && filled >= 5, "preset change: the chord fills within seconds", fmt("%d notes alone, %d filled, after 5 s", slow, filled));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

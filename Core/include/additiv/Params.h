@@ -97,6 +97,23 @@ enum class ParamId : int {
     Doppler,        ///< 0 .. 1: a voice coming closer rises, one receding falls
     BassMono,       ///< below this the mix is mono, Hz
     StereoWidth,    ///< the master's width
+    // Modulation: the sources' own settings (the matrix rows are data, Modulation.h)
+    Lfo1Shape,      ///< kLfoShapeNames
+    Lfo1Rate,       ///< Hz
+    Lfo2Shape,      ///< kLfoShapeNames
+    Lfo2Rate,       ///< Hz
+    Lfo3Shape,      ///< kLfoShapeNames
+    Lfo3Rate,       ///< Hz
+    Lfo4Shape,      ///< kLfoShapeNames
+    Lfo4Rate,       ///< Hz
+    Env1Shape,      ///< a factory shape (Shapes.h)
+    Env1Rate,       ///< how fast it runs, times its own speed
+    Env2Shape,      ///< a factory shape
+    Env2Rate,       ///< how fast it runs
+    Macro1,         ///< 0 .. 1
+    Macro2,         ///< 0 .. 1
+    Macro3,         ///< 0 .. 1
+    Macro4,         ///< 0 .. 1
     Count           ///< number of parameters
 };
 
@@ -135,6 +152,19 @@ inline const ParamDesc& paramDesc(ParamId id) { return paramTable()[static_cast<
 /** @brief Looks a parameter up by its key. @param key the stable identifier @return the row, or nullptr */
 const ParamDesc* findParam(const char* key);
 
+/**
+ * @brief A value in a parameter's normalised domain: 0 .. 1 across its range, the skew applied as
+ *        the hosts apply it ((v - min) / (max - min))^skew -- where modulation depths are measured, so the
+ *        same depth means the same on a cutoff in hertz and on a mix.
+ * @param d  the row
+ * @param v  the value in its unit
+ * @return   0 .. 1
+ */
+float toNorm(const ParamDesc& d, float v);
+
+/** @brief Back from the normalised domain. @param d the row @param n 0 .. 1 @return the value in its unit */
+float fromNorm(const ParamDesc& d, float n);
+
 constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven tables, the user slot and the timbre scale
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
@@ -145,5 +175,8 @@ extern const char* const kKeyMapNames[2];                 ///< "Snap to 12 keys"
 constexpr int kNumMotions = 7;                       ///< entries of kMotionNames
 extern const char* const kMotionNames[kNumMotions];  ///< None, Random, Wave, Pendulum, Breathe, Glissando, Aurora
 extern const char* const kFilterModelNames[];        ///< Off, LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak, Formant (Cloud.h FilterModel)
+constexpr int kNumLfoShapes = 7;                     ///< entries of kLfoShapeNames
+extern const char* const kLfoShapeNames[kNumLfoShapes];   ///< Sine, Triangle, Ramp Up, Ramp Down, Square, Random, Steps
+extern const char* const kEnvShapeNames[];           ///< the factory shapes' names, for the envelopes' choice (Shapes.h)
 
 } // namespace additiv

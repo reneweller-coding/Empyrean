@@ -16,7 +16,7 @@ juce_add_plugin(AdditivAmbientSynth
     VST3_CATEGORIES             Instrument Synth
     VERSION                     ${PROJECT_VERSION}
     PRODUCT_NAME                "AdditivAmbientSynth")
-target_sources(AdditivAmbientSynth PRIVATE PluginProcessor.cpp PluginEditor.cpp ParamPage.cpp CloudView.cpp Theme.cpp Frame.cpp)
+target_sources(AdditivAmbientSynth PRIVATE PluginProcessor.cpp PluginEditor.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp Theme.cpp Frame.cpp Jam.cpp)
 # The help's prose (frame::HelpView).
 juce_add_binary_data(AdditivData
     HEADER_NAME AdditivData.h

@@ -3,13 +3,16 @@
  * @brief additiv_render: the instrument offline, without a window -- the conductor alone for minutes
  *        or hours, or a chord played and held -- into a 24-bit WAV, with a line every ten seconds.
  *
- *     additiv_render [--seconds S (120)] [--out FILE] [--seed N] [--set key=value]...
+ *     additiv_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain]
+ *     additiv_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
- * --set takes any key of the parameter table (Core/include/additiv/Params.h); a choice takes its
- * index or its name ("--set auto_mode=Free", "--set motion=Aurora").
+ * --preset loads a factory preset (its name, or its number 0 .. 1023) with its matrix; --set takes any
+ * key of the parameter table (Core/include/additiv/Params.h) after it; a choice takes its index or its
+ * name ("--set auto_mode=Free", "--set motion=Aurora").
  */
 #include "additiv/Engine.h"
+#include "additiv/Presets.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -98,6 +101,59 @@ bool applySet(Engine& e, const std::string& arg)
     return true;
 }
 
+/**
+ * @brief A string as a JSON literal.
+ * @param s  the text
+ * @return   it quoted, with quotes and backslashes escaped
+ */
+std::string jsonString(const char* s)
+{
+    std::string r = "\"";
+    for (const char* c = s ? s : ""; *c; ++c) {
+        if (*c == '"' || *c == '\\') r += '\\';
+        r += *c;
+    }
+    return r + "\"";
+}
+
+/** @brief Writes every row of the parameter table as JSON to stdout (key, name, section, kind, range, default, skew, unit, choices). */
+void dumpParams()
+{
+    static const char* const kKinds[] = { "float", "int", "bool", "choice" };
+    std::printf("[\n");
+    const auto& table = paramTable();
+    for (size_t i = 0; i < table.size(); ++i) {
+        const ParamDesc& d = table[i];
+        std::printf("  {\"key\": %s, \"name\": %s, \"section\": %s, \"kind\": \"%s\", \"min\": %g, \"max\": %g, \"default\": %g, \"skew\": %g, \"unit\": %s, \"choices\": [",
+                    jsonString(d.key).c_str(), jsonString(d.name).c_str(), jsonString(d.section).c_str(), kKinds[static_cast<int>(d.kind)],
+                    static_cast<double>(d.min), static_cast<double>(d.max), static_cast<double>(d.def), static_cast<double>(d.skew), jsonString(d.unit).c_str());
+        for (int c = 0; c < d.numChoices; ++c) std::printf("%s%s", c ? ", " : "", jsonString(d.choices[c]).c_str());
+        std::printf("]}%s\n", i + 1 < table.size() ? "," : "");
+    }
+    std::printf("]\n");
+}
+
+/**
+ * @brief Loads a factory preset into the engine: every parameter and the matrix.
+ * @param e     the engine
+ * @param what  the preset's name, or its number
+ * @return      the preset's index, -1 when there is none of that name or number
+ */
+int applyPreset(Engine& e, const std::string& what)
+{
+    int index = -1;
+    for (int i = 0; i < numPresets() && index < 0; ++i)
+        if (what == preset(i).name) index = i;
+    if (index < 0 && !what.empty() && what.find_first_not_of("0123456789") == std::string::npos) index = std::atoi(what.c_str());
+    if (index < 0 || index >= numPresets()) return -1;
+    float values[kNumParams] = {};
+    std::string mod;
+    presetValues(index, values, &mod);
+    for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+    e.setModText(mod);
+    return index;
+}
+
 } // namespace
 
 /**
@@ -113,6 +169,7 @@ int main(int argc, char** argv)
     std::uint64_t seed = 0x5EEDu;
     std::vector<std::string> sets;
     std::vector<int> chord;
+    std::string presetName;
     bool brain = true;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
@@ -123,6 +180,8 @@ int main(int argc, char** argv)
         else if (a == "--set" && has) sets.push_back(argv[++i]);
         else if (a == "--hold" && has) hold = std::atof(argv[++i]);
         else if (a == "--no-brain") brain = false;
+        else if (a == "--preset" && has) presetName = argv[++i];
+        else if (a == "--dump-params") { dumpParams(); return 0; }
         else if (a == "--chord" && has) {
             std::string s = argv[++i];
             for (size_t p = 0; p <= s.size();) {
@@ -132,13 +191,19 @@ int main(int argc, char** argv)
                 p = c + 1;
             }
         } else {
-            std::fprintf(stderr, "additiv_render [--seconds S] [--out FILE] [--seed N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n");
+            std::fprintf(stderr, "additiv_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
+                                 "additiv_render --dump-params\n");
             return 1;
         }
     }
 
     Engine e;
     e.setRealtime(false);
+    if (!presetName.empty()) {
+        const int index = applyPreset(e, presetName);
+        if (index < 0) { std::fprintf(stderr, "additiv_render: no preset %s\n", presetName.c_str()); return 1; }
+        std::printf("preset %d: %s (%s)\n", index, preset(index).name, kPresetGroupNames[preset(index).group]);
+    }
     for (const std::string& s : sets)
         if (!applySet(e, s)) { std::fprintf(stderr, "additiv_render: cannot apply --set %s\n", s.c_str()); return 1; }
     if (!brain) e.setParam(ParamId::BrainOn, 0.0f);

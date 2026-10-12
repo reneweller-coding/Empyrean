@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <limits>
 
 namespace additiv {
 namespace {
@@ -90,7 +91,41 @@ const FactoryLandscapes& factoryLandscapes()
 
 } // namespace
 
-Engine::Engine() { resetParams(); }
+Engine::Engine()
+{
+    resetParams();
+    for (auto& r : modRows_) r.store(packModRow(ModRow{}), std::memory_order_relaxed);
+    for (auto& p : played_) p.store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
+}
+
+void Engine::setModRow(int i, const ModRow& row)
+{
+    if (i < 0 || i >= kModRows) return;
+    ModRow r = row;
+    if (r.target >= 0 && !isModTarget(static_cast<ParamId>(r.target))) r.target = -1;
+    r.depth = std::clamp(r.depth, -1.0f, 1.0f);
+    modRows_[static_cast<size_t>(i)].store(packModRow(r), std::memory_order_relaxed);
+}
+
+ModRow Engine::modRow(int i) const
+{
+    if (i < 0 || i >= kModRows) return {};
+    return unpackModRow(modRows_[static_cast<size_t>(i)].load(std::memory_order_relaxed));
+}
+
+std::string Engine::modText() const
+{
+    ModRow rows[kModRows];
+    for (int i = 0; i < kModRows; ++i) rows[i] = modRow(i);
+    return modRowsToText(rows, kModRows);
+}
+
+void Engine::setModText(const std::string& text)
+{
+    ModRow rows[kModRows];
+    modRowsFromText(text, rows, kModRows);
+    for (int i = 0; i < kModRows; ++i) setModRow(i, rows[i]);
+}
 
 Engine::~Engine() { release(); }
 
@@ -135,6 +170,9 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     tide_.init(side_);
     std::fill(std::begin(specKey_), std::end(specKey_), -1.0f);
     scaleChoice_ = -1;
+    mods_.reset(cfg_.seed ^ 0x6D6F647363ull);
+    phraseStart_ = false;
+    prevSounding_ = 0;
     readParams();
     refreshSpectrum();
     refreshScale();
@@ -299,7 +337,58 @@ void Engine::drainEvents()
 
 void Engine::readParams()
 {
-    auto g = [this](ParamId id) { return param(id); };
+    // The modulation: the sources advance by a block, then every row adds its depth times its
+    // source to its target in the target's normalised domain (Modulation.h).
+    {
+        ModInputs in;
+        for (int i = 0; i < 4; ++i) {
+            in.lfoShape[i] = static_cast<int>(std::lround(param(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Shape) + 2 * i))));
+            in.lfoRate[i] = param(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Rate) + 2 * i));
+        }
+        for (int e = 0; e < 2; ++e) {
+            in.envShape[e] = static_cast<int>(std::lround(param(static_cast<ParamId>(static_cast<int>(ParamId::Env1Shape) + 2 * e))));
+            in.envRate[e] = param(static_cast<ParamId>(static_cast<int>(ParamId::Env1Rate) + 2 * e));
+        }
+        for (int m = 0; m < 4; ++m) in.macro[m] = param(static_cast<ParamId>(static_cast<int>(ParamId::Macro1) + m));
+        in.wheel = wheel_.load(std::memory_order_relaxed);
+        in.pressure = pressure_.load(std::memory_order_relaxed);
+        in.velocity = lastVelocity_;
+        in.phraseStart = phraseStart_;
+        phraseStart_ = false;
+        mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);
+        float offset[kNumParams] = {};
+        bool modded[kNumParams] = {};
+        for (int r = 0; r < kModRows; ++r) {
+            const ModRow row = unpackModRow(modRows_[static_cast<size_t>(r)].load(std::memory_order_relaxed));
+            if (row.source == ModSource::Off || row.target < 0 || row.target >= kNumParams || row.depth == 0.0f) continue;
+            offset[row.target] += row.depth * mods_.value(row.source);
+            modded[row.target] = true;
+        }
+        for (int i = 0; i < kNumParams; ++i) {
+            const ParamDesc& d = paramTable()[static_cast<size_t>(i)];
+            const float base = param(d.id);
+            if (!modded[i]) {
+                cur_[static_cast<size_t>(i)] = base;
+                played_[static_cast<size_t>(i)].store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
+                continue;
+            }
+            const float n = std::clamp(toNorm(d, base) + offset[i], 0.0f, 1.0f);
+            float v = fromNorm(d, n);
+            if (d.kind == ParamKind::Int) v = std::round(v);
+            cur_[static_cast<size_t>(i)] = v;
+            played_[static_cast<size_t>(i)].store(n, std::memory_order_relaxed);
+        }
+    }
+    // The family jam's energy: a follower opens and closes with the leader's section, by up to an
+    // octave of cutoff and 40 % of brightness (at 0.5, nothing).
+    {
+        const float e = std::clamp(jamEnergy_.load(std::memory_order_relaxed), 0.0f, 1.0f);
+        if (e != 0.5f) {
+            cur_[static_cast<size_t>(ParamId::Brightness)] = std::clamp(cur_[static_cast<size_t>(ParamId::Brightness)] * (0.6f + 0.8f * e), 0.0f, 1.0f);
+            cur_[static_cast<size_t>(ParamId::Cutoff)] = std::clamp(cur_[static_cast<size_t>(ParamId::Cutoff)] * std::exp2(2.0f * (e - 0.5f)), 40.0f, 18000.0f);
+        }
+    }
+    auto g = [this](ParamId id) { return cur(id); };
     blk_.master = dbToGain(g(ParamId::MasterGain));
     blk_.partials = static_cast<int>(std::lround(g(ParamId::Partials)));
     blk_.tilt = g(ParamId::Tilt);
@@ -435,6 +524,7 @@ float Engine::brainDistance()
 void Engine::beginOn(int i, int note, float velocity, float distance, int source, int onset)
 {
     Voice& v = voices_[static_cast<size_t>(i)];
+    lastVelocity_ = velocity;
     v.note = note;
     v.source = source;
     v.velocity = velocity;
@@ -529,14 +619,27 @@ void Engine::renderBlock()
     }
 
     // 2. The conductors. Step fires on the rising edge of its switch, or from autoplayStep().
-    const bool step = param(ParamId::AutoStep) >= 0.5f;
+    const bool step = cur(ParamId::AutoStep) >= 0.5f;
     if ((step && !stepWas_) | stepAsked_.exchange(false, std::memory_order_relaxed)) brain_.requestStep();
     stepWas_ = step;
+    if (fillAsked_.exchange(false, std::memory_order_relaxed)) {
+        if (bp_.on) brain_.requestFill();
+        if (blk_.brain2) brain2_.requestFill();
+    }
     auto freqOf = [this](int note) { return frequencyOf(note); };
     brain_.update(dt, bp_, -1, freqOf, [this](const BrainEvent& e) {
         if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, brainDistance(), 1, 0);
         else stopNote(e.note, 1);
     });
+    // The family jam: a follower's conductor keeps its root on the leader's pitch class, the nearest
+    // note of it (Noctuary's way: its tuning stays its own).
+    if (const int jr = jamRoot_.load(std::memory_order_relaxed); jr >= 0 && ((brain_.root() % 12) + 12) % 12 != jr) {
+        const int r = brain_.root();
+        int best = r, bestDist = 99;
+        for (int d = -6; d <= 6; ++d)
+            if ((((r + d) % 12) + 12) % 12 == jr && std::abs(d) < bestDist) { bestDist = std::abs(d); best = r + d; }
+        brain_.setRoot(std::clamp(best, 0, 127));
+    }
     brain2_.setRoot(std::clamp(brain_.root() + blk_.brain2Interval, 0, 127));
     brain2_.update(dt, bp2_, -1, freqOf, [this](const BrainEvent& e) {
         if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, blk_.brain2Depth * (0.85f + 0.15f * rng_.uniform()), 2, 0);
@@ -629,6 +732,8 @@ void Engine::renderBlock()
         ++by[std::clamp(v.source, 0, 2)];
     }
     sounding_.store(sounding, std::memory_order_relaxed);
+    if (prevSounding_ == 0 && sounding > 0) phraseStart_ = true;   // a note into silence: the envelopes' phrase begins
+    prevSounding_ = sounding;
     for (int s = 0; s < 3; ++s) soundingBy_[s].store(by[s], std::memory_order_relaxed);
     for (int i = 0; i < static_cast<int>(voices_.size()) && i < kMaxViewVoices; ++i) {
         const Voice& v = voices_[static_cast<size_t>(i)];
@@ -653,14 +758,14 @@ void Engine::renderBlock()
     }
 
     // 5. The far plane is heard only through the far reverb; the near plane stays dry.
-    far_.set(param(ParamId::FarSize), param(ParamId::FarDecay), param(ParamId::FarDamp), 20.0f, false, 1.0f);
+    far_.set(cur(ParamId::FarSize), cur(ParamId::FarDecay), cur(ParamId::FarDamp), 20.0f, false, 1.0f);
     far_.setSpace(0.5f, 9000.0f, 60.0f);
     far_.process(farL_.data(), farR_.data(), G);
     for (int s = 0; s < G; ++s) {
         nearL_[static_cast<size_t>(s)] += farL_[static_cast<size_t>(s)];
         nearR_[static_cast<size_t>(s)] += farR_[static_cast<size_t>(s)];
     }
-    midSide_.set(param(ParamId::BassMono), 0.0f, param(ParamId::StereoWidth));
+    midSide_.set(cur(ParamId::BassMono), 0.0f, cur(ParamId::StereoWidth));
     midSide_.process(nearL_.data(), nearR_.data(), G);
     for (int s = 0; s < G; ++s) {
         const size_t at = static_cast<size_t>((pos + s) & ringMask_) * 2;
