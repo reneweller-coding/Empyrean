@@ -216,7 +216,7 @@ air-formant-brain2).
 **Offen:** binaural pro Partial (Brown/Duda) mit der Quest; eigene Bilder und Aufnahmen als Landschaft brauchen den
 Dateidialog der GUI (Phase 3); Z-Plane und Strike als Modalsynthese.
 
-## Phase 3: die Oberfläche (gebaut, 13.10.2026)
+## Phase 3: die Oberfläche (gebaut, 12.10.2026)
 
 Auf dem Rahmen der Familie (`Plugin/Frame.h/.cpp`, unverändert aus Totality, in allen fünf Repos gleich):
 - **Skin** "Aurora bei Nacht" (Nachtblau, Türkis, Violett; Logo: ein Ring aus Partials), Fenster 1280 x 860.
