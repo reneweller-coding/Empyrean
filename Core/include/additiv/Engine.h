@@ -162,6 +162,24 @@ public:
     float playedNorm(ParamId id) const { return played_[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
 
     /**
+     * @brief A modulation source's value as the last block left it, for the panel. Any thread.
+     * @param s  the source
+     * @return   its value (-1 .. 1, or 0 .. 1 for a unipolar one)
+     */
+    float sourceValue(ModSource s) const
+    {
+        const int i = static_cast<int>(s);
+        return i > 0 && i < kNumModSources ? sourceLive_[static_cast<size_t>(i)].load(std::memory_order_relaxed) : 0.0f;
+    }
+
+    /**
+     * @brief The panel shows the sources: what is computed only for a row that reads it (the
+     *        reservoir) runs while they are watched. Any thread.
+     * @param on  watched
+     */
+    void setSourcesWatched(bool on) { sourcesWatched_.store(on, std::memory_order_relaxed); }
+
+    /**
      * @brief The family jam, following: the leader's root, which the conductor's root is held on (its
      *        nearest note of that pitch class), as Noctuary follows. Any thread.
      * @param pitchClass  0 .. 11, -1 when no leader is heard
@@ -365,6 +383,8 @@ private:
     Modulators mods_;                                  ///< the modulation sources
     std::array<std::atomic<std::uint64_t>, kModRows> modRows_{};   ///< the matrix, a packed row per word (packModRow)
     std::array<float, kNumParams> cur_{};              ///< every parameter's effective value this block
+    std::array<std::atomic<float>, kNumModSources> sourceLive_{};   ///< every source's value after the last block, for the panel
+    std::atomic<bool> sourcesWatched_{ false };        ///< the panel shows the sources (setSourcesWatched)
     std::array<std::atomic<float>, kNumParams> played_{};   ///< where each plays after the matrix, normalised (NaN: unmodulated)
     std::atomic<float> wheel_{ 0.0f };                 ///< the mod wheel
     std::atomic<float> pressure_{ 0.0f };              ///< channel pressure

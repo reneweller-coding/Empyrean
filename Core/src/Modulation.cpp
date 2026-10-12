@@ -194,6 +194,12 @@ void Modulators::reset(std::uint64_t seed)
     for (int k = 0; k < 4; ++k) leniaTarget_[k] = leniaOut_[k] = 0.0f;
     lorenz_[0] = 0.1; lorenz_[1] = 0.0; lorenz_[2] = 20.0;
     rossler_[0] = 1.0; rossler_[1] = 1.0; rossler_[2] = 1.0;
+    // Warmed up, so that a row reading them moves from the first second: the attractors run 25 of
+    // Lorenz's time units (and 100 of Roessler's) onto their attractors, Lenia twenty generations at
+    // the default growth -- the same every time.
+    stepChaos(25.0f / 1.5f, 1.0f);
+    for (int g = 0; g < 20; ++g) stepLenia(1.0f, 1.0f, 0.15f);
+    for (int k = 0; k < 4; ++k) leniaOut_[k] = leniaTarget_[k];
     for (int k = 0; k < 4; ++k) kuraPhase_[k] = kTwoPi * static_cast<float>(k) * 0.25f;
     beatHz_ = 0.0f;
     beatPhase_ = 0.0f;

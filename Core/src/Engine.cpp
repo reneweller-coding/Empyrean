@@ -457,6 +457,8 @@ void Engine::readParams()
         }
         phraseStart_ = false;
         mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);
+        for (int s = 1; s < kNumModSources; ++s)
+            sourceLive_[static_cast<size_t>(s)].store(mods_.value(static_cast<ModSource>(s)), std::memory_order_relaxed);
         float offset[kNumParams] = {};
         bool modded[kNumParams] = {};
         for (int r = 0; r < kModRows; ++r) {
@@ -1192,6 +1194,7 @@ void Engine::renderBlock()
             auto isRes = [](ModSource s) { return s >= ModSource::Reservoir1 && s <= ModSource::Reservoir4; };
             if (row.target >= 0 && row.depth != 0.0f && (isRes(row.source) || isRes(row.via))) R.on = 1;
         }
+        if (sourcesWatched_.load(std::memory_order_relaxed)) R.on = 1;
         R.chaos = cur(ParamId::ReservoirChaos);
         R.leak = 1.0f - std::exp(-dtf / std::max(cur(ParamId::ReservoirMemory), 0.05f));
         R.input = cur(ParamId::ReservoirInput);

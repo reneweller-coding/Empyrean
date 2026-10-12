@@ -77,6 +77,8 @@ Four sources are what the instrument hears of itself: Loudness, Heard Brightness
 
 The reservoir is a small network of 2048 neurons on the graphics card, coupled at random, listening to what the instrument hears and plays (its loudness, brightness, change and roughness, the Beat, the note, the conductor's excitement, Lenia) -- each measured against its last half minute, so it hears what changes. Its four readouts, Reservoir 1-4, are smooth curves that never repeat and remember what was played. Chaos is how strongly its neurons drive each other: below 1 it forgets and follows the music, about 1 it rings on at the edge of chaos, above it runs on by itself. Memory is how slowly it moves, Input how closely it listens. It is only computed while a row of the matrix reads it.
 
+Above the matrix every source draws its last four seconds, live, coloured by its kind: the LFOs, envelopes, macros and the keyboard's; fields and chaos; the piece; what the instrument hears; the reservoir. So you can see which one breathes slowly, which one jumps and which one listens before you route it. While the window is open the reservoir runs even when no row reads it.
+
 Every row of the matrix can have a via source: the depth is scaled by its amount, 0 to 1 -- an LFO that only moves the filter as far as the mod wheel allows, a Lorenz wander that opens with Root Age.
 
 == Presets | all | ==

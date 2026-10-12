@@ -5,6 +5,7 @@
 #include "PluginEditor.h"
 
 #include "AdditivData.h"
+#include "SourcesView.h"
 
 #include "additiv/Landscape.h"
 #include "additiv/Presets.h"
@@ -39,7 +40,7 @@ private:
     std::function<int(int)> heightFor_;     ///< its height at a width
 };
 
-/** @brief The Modulation page: the sources' knobs above, the matrix below. */
+/** @brief The Modulation page: the sources' knobs above, the sources live, the matrix below. */
 class ModPage final : public juce::Component {
 public:
     /**
@@ -58,25 +59,28 @@ public:
                                                                    ParamId::LeniaGrowth, ParamId::ChaosPeriod } },
                     { "Reservoir", frame::Family::Envelope, { ParamId::ReservoirChaos, ParamId::ReservoirMemory, ParamId::ReservoirInput } } },
                   live),
-          matrix_(proc)
+          sources_(proc), matrix_(proc)
     {
         addAndMakeVisible(params_);
+        addAndMakeVisible(sources_);
         addAndMakeVisible(matrix_);
     }
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
-    int heightFor(int w) const { return params_.heightFor(w) + MatrixView::idealHeight() + 10; }
-    /** @brief The knobs above, the matrix below. */
+    int heightFor(int w) const { return params_.heightFor(w) + SourcesView::heightFor(w - 20) + 10 + MatrixView::idealHeight() + 10; }
+    /** @brief The knobs above, the sources live, the matrix below. */
     void resized() override
     {
-        const int top = params_.heightFor(getWidth());
+        const int top = params_.heightFor(getWidth()), mid = SourcesView::heightFor(getWidth() - 20);
         params_.setBounds(0, 0, getWidth(), top);
-        matrix_.setBounds(10, top, getWidth() - 20, MatrixView::idealHeight());
+        sources_.setBounds(10, top, getWidth() - 20, mid);
+        matrix_.setBounds(10, top + mid + 10, getWidth() - 20, MatrixView::idealHeight());
     }
     /** @brief The page in words. @return the text */
     juce::String describe() const { return params_.describe() + matrix_.describe(); }
 
 private:
     ParamPage params_;     ///< the sources' knobs
+    SourcesView sources_;  ///< the sources, live
     MatrixView matrix_;    ///< the matrix
 };
 
