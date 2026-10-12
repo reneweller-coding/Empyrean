@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    AdditivAmbientSynth -- builds a release: binaries, tests, manual, staging, checksums, portable zip, setup.
+    Empyrean -- builds a release: binaries, tests, manual, staging, checksums, portable zip, setup.
 
 .DESCRIPTION
     After Totality's Deploy\build_release.ps1, for an instrument that needs CUDA (so: MSVC and nvcc, no icx).
@@ -10,7 +10,7 @@
       2. run the tests (ctest: doccheck, the engine's and the probe's self-tests, pluginval at strictness 10), unless
          -SkipTests; then pluginval twice more with seeds of its own (a parameter missing from the state can pass
          one seed by coincidence)
-      3. the manual: Tools\manual\make_shots.py with the release's standalone, make_manual.py with its additiv_render
+      3. the manual: Tools\manual\make_shots.py with the release's standalone, make_manual.py with its empy_render
       4. stage what is installed under dist\stage, and nothing else
       5. check the stage: every file there, the binaries without a DLL dependency on the MSVC or the CUDA runtime
          (nvcuda.dll, the driver's, is loaded at run time and is the only thing the card needs)
@@ -31,7 +31,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $deploy = Join-Path $root "Deploy"
 $build = Join-Path $root "build\release"
-$product = "AdditivAmbientSynth"
+$product = "Empyrean"
 
 $project = Get-Content (Join-Path $root "CMakeLists.txt") -Raw
 if ($project -notmatch 'project\(\s*\w+\s+VERSION\s+([0-9.]+)') { throw "no version in CMakeLists.txt" }
@@ -46,7 +46,7 @@ try {
     & cmake --build --preset release --parallel
     if ($LASTEXITCODE -ne 0) { throw "build failed" }
 } finally { Pop-Location }
-$render = Join-Path $build "Release\additiv_render.exe"
+$render = Join-Path $build "Release\empy_render.exe"
 $art = Join-Path $build "Plugin\$($product)_artefacts\Release"
 $standalone = Join-Path $art "Standalone\$product.exe"
 $vst3 = Join-Path $art "VST3\$product.vst3"
@@ -85,16 +85,16 @@ Copy-Item $standalone $stage
 Copy-Item -Recurse $vst3 $stage
 Copy-Item $render $stage
 Copy-Item $manual $stage
-Copy-Item (Join-Path $deploy "additiv.ico") $stage
+Copy-Item (Join-Path $deploy "empyrean.ico") $stage
 Copy-Item (Join-Path $root "LICENSE") (Join-Path $stage "LICENSE.txt")
 Copy-Item (Join-Path $root "README.md") (Join-Path $stage "README.txt")
 
 # 5. Check: the files, and no dependency on the dynamic MSVC runtime or on a CUDA runtime DLL.
-$expected = @("$product.exe", "additiv_render.exe", "$product.vst3", "$product-Manual.pdf", "additiv.ico", "LICENSE.txt", "README.txt")
+$expected = @("$product.exe", "empy_render.exe", "$product.vst3", "$product-Manual.pdf", "empyrean.ico", "LICENSE.txt", "README.txt")
 foreach ($f in $expected) { if (-not (Test-Path (Join-Path $stage $f))) { throw "missing in the stage: $f" } }
 $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($dumpbin) {
-    $binaries = @((Join-Path $stage "$product.exe"), (Join-Path $stage "additiv_render.exe")) +
+    $binaries = @((Join-Path $stage "$product.exe"), (Join-Path $stage "empy_render.exe")) +
                 @(Get-ChildItem -Recurse (Join-Path $stage "$product.vst3") -Filter *.vst3 -File | ForEach-Object { $_.FullName })
     foreach ($b in $binaries) {
         $deps = & $dumpbin.FullName /DEPENDENTS $b | Select-String -Pattern "(?i)((vcruntime|msvcp)\d+.*|cudart\w*|cublas\w*|nvrtc\w*)\.dll"

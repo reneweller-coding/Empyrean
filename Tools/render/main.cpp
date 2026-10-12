@@ -1,11 +1,11 @@
 /**
  * @file main.cpp
- * @brief additiv_render: the instrument offline, without a window -- the conductor alone for minutes
+ * @brief empy_render: the instrument offline, without a window -- the conductor alone for minutes
  *        or hours, or a chord played and held -- into a 24-bit WAV, with a line every ten seconds.
  *
- *     additiv_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
+ *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain]
- *     additiv_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
+ *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 1023) with its matrix; --set takes any
  * key of the parameter table (Core/include/additiv/Params.h) after it; a choice takes its index or its
@@ -191,8 +191,8 @@ int main(int argc, char** argv)
                 p = c + 1;
             }
         } else {
-            std::fprintf(stderr, "additiv_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
-                                 "additiv_render --dump-params\n");
+            std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
+                                 "empy_render --dump-params\n");
             return 1;
         }
     }
@@ -201,11 +201,11 @@ int main(int argc, char** argv)
     e.setRealtime(false);
     if (!presetName.empty()) {
         const int index = applyPreset(e, presetName);
-        if (index < 0) { std::fprintf(stderr, "additiv_render: no preset %s\n", presetName.c_str()); return 1; }
+        if (index < 0) { std::fprintf(stderr, "empy_render: no preset %s\n", presetName.c_str()); return 1; }
         std::printf("preset %d: %s (%s)\n", index, preset(index).name, kPresetGroupNames[preset(index).group]);
     }
     for (const std::string& s : sets)
-        if (!applySet(e, s)) { std::fprintf(stderr, "additiv_render: cannot apply --set %s\n", s.c_str()); return 1; }
+        if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
     if (!brain) e.setParam(ParamId::BrainOn, 0.0f);
     EngineConfig c;
     c.sampleRate = 48000.0;
@@ -213,7 +213,7 @@ int main(int argc, char** argv)
     c.realtimeGpuClass = false;
     c.seed = seed;
     std::string error;
-    if (!e.prepare(c, &error)) { std::fprintf(stderr, "additiv_render: %s\n", error.c_str()); return 1; }
+    if (!e.prepare(c, &error)) { std::fprintf(stderr, "empy_render: %s\n", error.c_str()); return 1; }
     std::printf("%s, latency %d samples, scale %s, motion %s, autoplay %s, %.0f s\n", e.deviceName().c_str(), e.latencySamples(),
                 kScaleNames[static_cast<int>(e.param(ParamId::Scale))], kMotionNames[static_cast<int>(e.param(ParamId::Motion))],
                 e.param(ParamId::BrainOn) >= 0.5f ? kBrainModeNames[static_cast<int>(e.param(ParamId::AutoMode))] : "off", seconds);
@@ -253,7 +253,7 @@ int main(int argc, char** argv)
     }
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     fs::create_directories(out.parent_path());
-    if (!writeWav24(out, lr, static_cast<int>(c.sampleRate))) { std::fprintf(stderr, "additiv_render: cannot write %s\n", out.string().c_str()); return 1; }
+    if (!writeWav24(out, lr, static_cast<int>(c.sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", out.string().c_str()); return 1; }
     std::printf("%.0f s in %.1f s (%.0fx real time), late notes %llu -> %s\n", seconds, took, seconds / std::max(took, 1e-9),
                 static_cast<unsigned long long>(e.lateEvents()), out.string().c_str());
     return 0;

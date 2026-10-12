@@ -110,7 +110,7 @@ void AdditivProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     c.realtimeGpuClass = wrapperType == wrapperType_Standalone;
     engine_.setRealtime(!isNonRealtime());
     std::string error;
-    if (!engine_.prepare(c, &error)) { DBG("AdditivAmbientSynth: the engine did not open: " << error); }
+    if (!engine_.prepare(c, &error)) { DBG("Empyrean: the engine did not open: " << error); }
     {
         const std::lock_guard<std::mutex> lock(errorLock_);
         engineError_ = engine_.prepared() ? std::string() : error;

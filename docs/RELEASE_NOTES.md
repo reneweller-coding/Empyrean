@@ -2,7 +2,7 @@
 
 ## 0.6.0 (12.10.2026, not released)
 
-The whole instrument, release-ready but for its name.
+The whole instrument, and its name: **Empyrean** (the working name was AdditivAmbientSynth; the code keeps it).
 
 - **The GPU engine:** 16 voices x 20,000 partials on an NVIDIA GeForce RTX card, every partial with envelopes of
   its own (loudness, pitch, place), 0.03 to 0.08 ms of GPU time per block of 2.7 ms. The standalone takes Windows'
@@ -18,7 +18,7 @@ The whole instrument, release-ready but for its name.
 - **1024 presets** in sixteen groups, levelled by their loudest second to -20 dBFS (measured -30 .. -4 before).
 - **The family:** the window frame, keys, the family jam (follow the leader's root and section energy, or lead) and
   the Meta Quest app's hands in bridge mode.
-- **The release:** VST3, standalone, `additiv_render` (now with `--preset` and `--dump-params`), the manual built out
+- **The release:** VST3, standalone, `empy_render` (now with `--preset` and `--dump-params`), the manual built out
   of the program, a setup and a portable zip (`Deploy/build_release.ps1`).
 
 Found on the way: the preset generator wrote whole numbers that ended in zero without it (a cutoff of 180 Hz became

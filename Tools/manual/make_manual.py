@@ -4,7 +4,7 @@
     python Tools/manual/make_manual.py [--render EXE]      -> docs/manual/<product>-Manual.html (and .pdf)
 
 The prose is the help's: Plugin/Resources/chapters.txt, the text the program shows under the question mark, so the
-two never disagree. The parameter tables are not written down here: `additiv_render --dump-params` writes every row
+two never disagree. The parameter tables are not written down here: `empy_render --dump-params` writes every row
 of the engine's table (Core/src/Params.cpp), and each lands under the chapter of the tab that shows it. A section of
 the table that no chapter takes is a hole, and the manual is not printed until it is placed (--allow-holes prints
 anyway). The appendix -- MIDI, the presets, what the instrument needs -- is generated too.
@@ -24,8 +24,8 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
-PRODUCT = "AdditivAmbientSynth"
-TITLE = "Additiv Ambient Synth"   # the cover's (a working name, as the product's)
+PRODUCT = "Empyrean"
+TITLE = "Empyrean"   # the cover's
 
 # The sections of the parameter table on each tab (Plugin/PluginEditor.cpp builds the tabs).
 TABS = {
@@ -147,7 +147,7 @@ APPENDIX_NEEDS = [
     ("Graphics card", "NVIDIA GeForce RTX 20 or newer (Turing and later) with a current driver; the instrument computes every "
                       "partial there and is silent without one, saying so in the status line"),
     ("System", "Windows 10 or 11, 64-bit, a processor with AVX2"),
-    ("Formats", "standalone application and VST3 plug-in; the offline renderer additiv_render for the command line"),
+    ("Formats", "standalone application and VST3 plug-in; the offline renderer empy_render for the command line"),
     ("Latency", "two audio blocks and ten milliseconds, reported to the host, which compensates for it"),
 ]
 
@@ -163,7 +163,7 @@ def find_browser():
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--render", default=os.path.join(ROOT, "build", "msvc", "Release", "additiv_render.exe"))
+    ap.add_argument("--render", default=os.path.join(ROOT, "build", "msvc", "Release", "empy_render.exe"))
     ap.add_argument("--out", default=os.path.join(ROOT, "docs", "manual", PRODUCT + "-Manual.html"))
     ap.add_argument("--allow-holes", action="store_true")
     ap.add_argument("--no-pdf", action="store_true")
@@ -198,7 +198,7 @@ def main():
     parts.append("<div class='cover'><img class='logo' src='%s'><h1>%s</h1>"
                  "<p class='sub'>An additive ambient synthesizer: twenty thousand partials per voice, on the graphics card</p>"
                  "<p class='facts'>Version %s &middot; %d parameters &middot; %d presets &middot; manual built %s</p>%s</div>"
-                 % (rel(os.path.join(ROOT, "Deploy", "additiv_512.png")), html.escape(TITLE.upper()), version(), len(params),
+                 % (rel(os.path.join(ROOT, "Deploy", "empyrean_512.png")), html.escape(TITLE.upper()), version(), len(params),
                     sum(len(n) for _, n in presets()), time.strftime("%d.%m.%Y"),
                     ("<img class='front' src='%s'>" % rel(front)) if os.path.exists(front) else ""))
     appendix = ["MIDI", "The presets", "What it needs", "License"]

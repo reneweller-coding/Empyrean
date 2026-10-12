@@ -1,7 +1,7 @@
 """The icon: the panel's logo (Plugin/Theme.cpp, drawLogo) -- twenty-four partials round a ring, their sizes from a
 fixed die, lit from the top, green turning violet, a small light in the centre -- on the night's blue.
 
-    python Deploy/make_icon.py      -> Deploy/additiv.ico (16 .. 256 px), additiv.png (256), additiv_512.png
+    python Deploy/make_icon.py      -> Deploy/empyrean.ico (16 .. 256 px), empyrean.png (256), empyrean_512.png
 
 The .ico stays committed so the release build needs no Python.
 """
@@ -46,10 +46,10 @@ def draw(size):
 def main():
     sizes = [16, 24, 32, 48, 64, 128, 256]
     images = [draw(n) for n in sizes]
-    images[-1].save(ROOT / "additiv.ico", sizes=[(n, n) for n in sizes], append_images=images[:-1])
-    images[-1].save(ROOT / "additiv.png")
-    draw(512).save(ROOT / "additiv_512.png")
-    print("Deploy/additiv.ico, additiv.png, additiv_512.png")
+    images[-1].save(ROOT / "empyrean.ico", sizes=[(n, n) for n in sizes], append_images=images[:-1])
+    images[-1].save(ROOT / "empyrean.png")
+    draw(512).save(ROOT / "empyrean_512.png")
+    print("Deploy/empyrean.ico, empyrean.png, empyrean_512.png")
 
 
 if __name__ == "__main__":

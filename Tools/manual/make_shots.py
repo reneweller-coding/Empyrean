@@ -1,6 +1,6 @@
 """The manual's screenshots: every tab as a whole page, from the standalone, muted.
 
-    python Tools/manual/make_shots.py [path\\to\\AdditivAmbientSynth.exe]   -> docs/screenshots/page-N-<tab>.png
+    python Tools/manual/make_shots.py [path\\to\\Empyrean.exe]   -> docs/screenshots/page-N-<tab>.png
 
 One run of the standalone in the screenshot mode (Plugin/PluginEditor.cpp, shootStep): the preset PRESET loaded,
 SETTLE seconds for the clouds to sound, then every tab on its own tick, the window grown until nothing of the page
@@ -14,7 +14,7 @@ import subprocess
 import sys
 
 ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-PRODUCT = "AdditivAmbientSynth"
+PRODUCT = "Empyrean"
 PRESET = "Velvet Dreaming"   # Sleep Concert: the conductor, Breathe, the far reverb
 SETTLE = 8                   # seconds: the preset fills its chord at speed (Engine::requestFill), the attack rises
 

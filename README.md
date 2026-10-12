@@ -1,6 +1,6 @@
-<img src="Deploy/additiv.png" width="96" align="left" alt="AdditivAmbientSynth" />
+<img src="Deploy/empyrean.png" width="96" align="left" alt="Empyrean" />
 
-# AdditivAmbientSynth
+# Empyrean
 
 An additive ambient synthesizer: every voice is **twenty thousand sine waves**, computed on the graphics card. Each
 harmonic of a note is not one sine but a cloud of slightly detuned ones, every partial with envelopes of its own --
@@ -9,7 +9,7 @@ stands still. It plays by itself, after Noctuary's conductor: a chord in just in
 time, minutes apart, in the spirit of Robert Rich's sleep concerts.
 
 **VST3 plugin and standalone application** for Windows (x64) with an **NVIDIA GeForce RTX** card (20 series or newer),
-and a command-line renderer. Licence: AGPL-3.0. *AdditivAmbientSynth* is a working name.
+and a command-line renderer. Licence: AGPL-3.0. The empyrean is the highest heaven, the one made of light.
 
 <br clear="left" />
 
@@ -70,8 +70,8 @@ stages, checks and packs it into `dist/`.
 ## Render
 
 ```
-additiv_render --seconds 600 --preset "Velvet Dreaming" --out night.wav
-additiv_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=Aurora
+empy_render --seconds 600 --preset "Velvet Dreaming" --out night.wav
+empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=Aurora
 ```
 
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).

@@ -13,7 +13,7 @@ using additiv::ParamId;
 
 namespace {
 
-constexpr const char* kApp = "AdditivAmbientSynth";   ///< the settings' name (application data/<name>)
+constexpr const char* kApp = "Empyrean";   ///< the settings' name (application data/<name>)
 
 /** @brief A page in a viewport: it scrolls only where the window is smaller than the page. */
 class ScrollPage final : public juce::Viewport {

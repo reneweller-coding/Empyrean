@@ -1,17 +1,18 @@
-# AdditivAmbientSynth: the additive ambient synth with 20,000 partials per voice, on the GPU (docs/PLAN.md).
+# Empyrean: the additive ambient synth with 20,000 partials per voice, on the GPU (docs/PLAN.md). The code keeps
+# the folder's working name (namespace additiv, ADDITIV_ options and variables), as Noctuary's keeps `ambient`.
 #
 # Layout:
 #   Core/          the engine (static library AdditivCore): the GPU cloud (CUDA), the instrument around it, and the
 #                  modules copied from Noctuary (tuning, conductor, effects); no JUCE
 #   Tools/probe    probe: real-time measurements, the listening comparisons, the motion scenes
-#   Tools/render   additiv_render: the instrument offline, for a night without a window
+#   Tools/render   empy_render: the instrument offline, for a night without a window
 #   Tests/         additiv_selftest
 #   Plugin/        JUCE VST3 + Standalone
 #
 # Built with CUDA 13.4 for the RTX 5090 (Blackwell, sm_120); the presets select CUDA 13.4 by its folder, whatever
 # CUDA_PATH or the nvcc on the PATH say. Windows only for now; no macOS path (user, 11.10.2026).
 cmake_minimum_required(VERSION 3.30)
-project(AdditivAmbientSynth VERSION 0.6.0 LANGUAGES C CXX CUDA)
+project(Empyrean VERSION 0.6.0 LANGUAGES C CXX CUDA)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake (the same file in
 # every repository of the family), CMakePresets.json and build.ps1.
@@ -27,7 +28,7 @@ if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
 endif()
 add_compile_definitions(ADDITIV_VERSION="${PROJECT_VERSION}")
 
-option(ADDITIV_BUILD_TOOLS "Build probe, additiv_render and the tests" ON)
+option(ADDITIV_BUILD_TOOLS "Build probe, empy_render and the tests" ON)
 option(ADDITIV_BUILD_PLUGIN "Build the JUCE plugin (VST3 + Standalone)" ON)
 option(ADDITIV_AVX2 "Build the C++ of the core with AVX2 + FMA (the effects' vector paths)" ON)
 option(ADDITIV_STATIC_RUNTIME "Link the MSVC runtime statically (the release: no redistributable, no DLL beside the program)" OFF)
@@ -75,11 +76,11 @@ if(ADDITIV_BUILD_TOOLS)
     target_link_libraries(probe PRIVATE AdditivCore avrt winmm)
     family_bin(probe)
 
-    # additiv_render: the instrument offline -- the conductor alone for minutes or hours, or a chord.
-    add_executable(additiv_render Tools/render/main.cpp)
-    target_compile_options(additiv_render PRIVATE /W4 /permissive-)
-    target_link_libraries(additiv_render PRIVATE AdditivCore)
-    family_bin(additiv_render)
+    # empy_render: the instrument offline -- the conductor alone for minutes or hours, or a chord.
+    add_executable(empy_render Tools/render/main.cpp)
+    target_compile_options(empy_render PRIVATE /W4 /permissive-)
+    target_link_libraries(empy_render PRIVATE AdditivCore)
+    family_bin(empy_render)
 
     # additiv_presets: every factory preset's level, for make_presets.py to bring the bank to one level.
     add_executable(additiv_presets Tools/presets/main.cpp)
@@ -108,7 +109,7 @@ if(ADDITIV_BUILD_PLUGIN)
         endif()
         if(EXISTS "${ADDITIV_PLUGINVAL}")
             add_test(NAME pluginval COMMAND "${ADDITIV_PLUGINVAL}" --strictness-level 10 --timeout-ms 900000
-                     --validate "$<TARGET_FILE_DIR:AdditivAmbientSynth_VST3>/../..")
+                     --validate "$<TARGET_FILE_DIR:Empyrean_VST3>/../..")
             set_tests_properties(pluginval PROPERTIES LABELS "audio;slow")
         endif()
     endif()

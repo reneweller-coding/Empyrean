@@ -105,7 +105,7 @@ public:
     juce::String engineError() const { const std::lock_guard<std::mutex> lock(errorLock_); return juce::String(engineError_); }
     /** @brief The hands arriving from a Quest app in bridge mode. @return the headset */
     frame::Headset& headset() { return headset_; }
-    static constexpr const char* kApp = "AdditivAmbientSynth";   ///< the settings' and the jam's name
+    static constexpr const char* kApp = "Empyrean";   ///< the settings' and the jam's name
 
 private:
     additiv::Engine engine_;                               ///< the instrument

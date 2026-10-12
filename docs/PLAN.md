@@ -1,4 +1,4 @@
-# AdditivAmbientSynth: Plan für den additiven GPU-Synth
+# Empyrean: Plan für den additiven GPU-Synth (Arbeitsname AdditivAmbientSynth)
 
 Stand 11.10.2026, Phase 0 (Messprogramm) gebaut. Repo `G:\Tools\VRAudio\AdditivAmbientSynth` (eigenes Projekt neben
 Noctuary), Namensraum vorläufig `additiv::`; der Name in der Familie der Himmels- und Lichtwörter ist offen. Code-Kommentare
@@ -276,15 +276,20 @@ der Ring stand dann bei 448. Der Vorlauf deckt jetzt zwei Hostblöcke plus 10 ms
   in `CloudEngine::open`); das Setup fragt nach, wenn `nvcuda.dll` fehlt oder AVX2.
 - `Deploy/build_release.ps1`: Build, ctest, pluginval mit zwei weiteren Seeds, Bildschirmfotos (`Tools/manual/
   make_shots.py`, stumm über `ADDITIV_MUTE`, `ADDITIV_PRESET`, `ADDITIV_SHOT_FULL`), Handbuch (`make_manual.py`: Text
-  aus `chapters.txt`, Tabellen aus `additiv_render --dump-params`, Anhang MIDI/Presets/Anforderungen), Stage,
+  aus `chapters.txt`, Tabellen aus `empy_render --dump-params`, Anhang MIDI/Presets/Anforderungen), Stage,
   dumpbin-Prüfung (keine MSVC- oder CUDA-Laufzeit-DLL), SHA256SUMS, Zip, Inno-Setup 7. Unsigniert.
 - `README.md`, `docs/RELEASE_NOTES.md`, Version 0.6.0.
 
-**Offen:** der Name (Aurora ist besetzt: NI/iZotope, UVI; Vorschläge Nacreous, Irisation, Zodiacal, Empyrean), dann
-Umbenennung (Produkt, Plugin-Codes, Einstellungsname, Headset-Port, Bewegung/Landschaft "Aurora" bleibt Begriff);
-AGPL und die statisch gelinkte CUDA-Laufzeit klären; ein einzelner Unterlauf beim Start des Standalone (in 2 von 6
-Bildschirmfoto-Läufen, mit Log nicht nachgestellt; der Ring fällt beim Start durch zwei WASAPI-Callbacks direkt
-hintereinander auf 576 von 1536); Hören auf älteren Karten (nur RTX 5090 gemessen); Linux optional.
+**Der Name (12.10.2026): Empyrean**, der höchste Himmel, der aus Licht (Aurora war besetzt: NI/iZotope, UVI;
+deutsche Namen mag der Nutzer nicht). Gefunden nur ein Zebra-Soundset, EmpyreanFX (Gitarren-Patches) und Empyrealm
+(Kontakt). Was ausgeliefert wird, heißt so: `Empyrean.exe`, `Empyrean.vst3` (Code `Empy`, `com.reneweller.empyrean`),
+`empy_render`, `Empyrean-Manual.pdf`, `empyrean.ico`, Einstellungen und Jam unter "Empyrean", Headset-Port **9105**
+(`portOf` in allen sechs Kopien von `Frame.cpp`). Der Code behält den Arbeitsnamen des Ordners (Namensraum `additiv`,
+`ADDITIV_`-Optionen und -Variablen, `additiv_presets`, `additiv_selftest`), wie Noctuarys Code `ambient` heißt.
+
+**Offen:** AGPL und die statisch gelinkte CUDA-Laufzeit klären; ein einzelner Unterlauf beim Start des Standalone
+(in 2 von 6 Bildschirmfoto-Läufen, mit Log nicht nachgestellt; der Ring fällt beim Start durch zwei WASAPI-Callbacks
+direkt hintereinander auf 576 von 1536); Hören auf älteren Karten (nur RTX 5090 gemessen); Linux optional.
 
 ## Phasen (Vorschlag)
 

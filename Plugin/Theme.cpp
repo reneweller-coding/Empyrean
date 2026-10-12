@@ -31,7 +31,7 @@ const frame::Skin& skin()
 {
     static const frame::Skin s = [] {
         frame::Skin k;
-        k.name = "Additiv Ambient";
+        k.name = "Empyrean";
         k.bg = colour::bg; k.panel = colour::panel; k.group = colour::group; k.raised = colour::raised; k.edge = colour::edge;
         k.ink = colour::ink; k.dim = colour::dim; k.faint = colour::faint; k.accent = colour::accent; k.onset = colour::onset;
         k.good = colour::good; k.bad = colour::bad;
