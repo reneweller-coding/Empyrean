@@ -975,6 +975,44 @@ int main()
               "modulation: a via source scales the depth", fmt("swing %.3f at Macro 1 = 0, %.3f at 1; text '%s'", swing[0], swing[1], back.c_str()));
     }
 
+    // 37. The living landscapes: Lenia and the Turing field live (the field at 6 s is not the field
+    //     at 3 s), keep the level within 2 dB of no field, and the same seed plays the same.
+    {
+        std::string report;
+        bool good = true;
+        double level0 = 0.0;
+        for (int mode = 0; mode < 3; ++mode) {
+            auto play = [&](std::vector<float>& f3, std::vector<float>& f6) {
+                Engine e;
+                quietEffects(e);
+                e.setParam(ParamId::Attack, 0.5f);
+                e.setParam(ParamId::LifeMode, static_cast<float>(mode));
+                e.setParam(ParamId::LifeDepth, 0.8f);
+                e.setParam(ParamId::LifeRate, 0.5f);
+                if (!openOffline(e, false, 107)) return std::vector<float>();
+                for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+                std::vector<float> lr = render(e, 3.0);
+                e.lifeSnapshot(f3);
+                const std::vector<float> rest = render(e, 3.0);
+                e.lifeSnapshot(f6);
+                lr.insert(lr.end(), rest.begin(), rest.end());
+                return lr;
+            };
+            std::vector<float> a3, a6, b3, b6;
+            const std::vector<float> a = play(a3, a6), b = play(b3, b6);
+            if (a.empty()) return 1;
+            const double level = rmsDb(a, 3 * 48000, 6 * 48000);
+            if (mode == 0) { level0 = level; continue; }
+            double moved = 0.0;
+            for (size_t i = 0; i < a3.size() && i < a6.size(); ++i) moved += std::fabs(a6[i] - a3[i]);
+            moved /= std::max<size_t>(1, a3.size());
+            const bool ok = a3.size() == static_cast<size_t>(kLifeW * kLifeH) && moved > 0.01 && std::fabs(level - level0) < 2.0 && a == b;
+            good = good && ok;
+            report += fmt("%s: moved %.3f a cell, %.1f dBFS (free %.1f)%s; ", kLifeModeNames[mode], moved, level, level0, a == b ? "" : ", NOT identical");
+        }
+        check(good, "life: Lenia and Turing live, keep the level, repeat", report);
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

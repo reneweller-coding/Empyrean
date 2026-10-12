@@ -42,6 +42,10 @@ constexpr int kEchoN = 1024;                 ///< the spectral echo's FFT size
 constexpr int kEchoBins = kEchoN / 2 + 1;    ///< its bands, 0 .. N/2
 constexpr int kEchoSlots = 2048;             ///< blocks each band's delay line holds (5.4 s at 128)
 constexpr int kEchoThreads = kEchoN / 2;     ///< threads of its one CUDA block: one butterfly each
+constexpr int kLifeCells = kLifeW * kLifeH;  ///< cells of the living field
+static_assert((kLifeW & (kLifeW - 1)) == 0 && (kLifeH & (kLifeH - 1)) == 0, "the torus wraps by masks");
+/** @brief Lenia's ring kernel, normalised, set once at open(). */
+__constant__ float cLeniaKernel[(2 * kLifeRadius + 1) * (2 * kLifeRadius + 1)];
 constexpr float kAirShare = 0.2f;    ///< the share of a voice's partials that become its air band when Air is up
 
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
@@ -62,6 +66,11 @@ struct BlockHeader {
     SpectralField field;   ///< the field and the dispersion for this block
     Binaural binaural;     ///< the binaural placement for this block
     SpectralEcho echo;     ///< the spectral echo for this block
+    LifeField life;        ///< the living landscape for this block
+    std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
+    std::int32_t lpad0;        ///< keeps the header 16-byte aligned
+    std::int32_t lpad1;        ///< likewise
+    std::int32_t lpad2;        ///< likewise
 };
 static_assert(sizeof(BlockHeader) % 16 == 0, "the voices behind the header stay 16-byte aligned");
 static_assert(sizeof(CloudVoice) % 16 == 0, "CloudVoice is uploaded as an array");
@@ -420,6 +429,157 @@ __device__ void earGains(const Binaural& B, float place, float u, float f, float
 }
 
 /**
+ * @brief What a partial reads from a cell of the living field, 0 .. 1: Lenia's value, or the
+ *        Turing field's second chemical (V, which lives under 0.4) scaled up.
+ * @param mode  the field's mode
+ * @param c     the cell (Lenia: x; Turing: U, V)
+ * @return      0 .. 1
+ */
+__device__ __forceinline__ float lifeValue(LifeMode mode, float2 c)
+{
+    return mode == LifeMode::Turing ? fminf(c.y * 3.0f, 1.0f) : c.x;
+}
+
+/** @brief The field buffer that holds the field after this block's steps. @param hdr the header @param a buffer A @param b buffer B @return the current one */
+__device__ __forceinline__ const float2* lifeCurrent(const BlockHeader* hdr, const float2* a, const float2* b)
+{
+    return ((hdr->lifeParity + hdr->life.steps) & 1) ? b : a;
+}
+
+/**
+ * @brief Seeds the living field when asked (hdr->life.reseed): Lenia a few patches of noise, the
+ *        Turing field U = 1, V = 0 with a few squares of V -- from a hash of the cell and the salt.
+ * @param hdr  the header
+ * @param a    buffer A
+ * @param b    buffer B (the one before the steps is seeded)
+ */
+__global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
+{
+    const LifeField& L = hdr->life;
+    if (!L.reseed || L.mode == LifeMode::Off) return;
+    const int i = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= kLifeCells) return;
+    float2* dst = (hdr->lifeParity & 1) ? b : a;
+    const int x = i & (kLifeW - 1), y = i >> 8;
+    const std::uint32_t salt = static_cast<std::uint32_t>(L.salt) * 0x9E3779B9U;
+    float2 c = L.mode == LifeMode::Turing ? make_float2(1.0f, 0.0f) : make_float2(0.0f, 0.0f);
+    // Turing dense (eighty small squares: a sparse field is uneven where the partials read it --
+    // measured 3 dB over while it grew from fourteen), Lenia a few large patches of noise.
+    const int patches = L.mode == LifeMode::Turing ? 80 : 8;
+    for (int k = 0; k < patches; ++k) {
+        const std::uint32_t h = hash32(salt + 7919U * static_cast<std::uint32_t>(k));
+        const int cx = static_cast<int>(h & (kLifeW - 1)), cy = static_cast<int>((h >> 8) & (kLifeH - 1));
+        const int r = L.mode == LifeMode::Turing ? 3 + static_cast<int>((h >> 16) % 5U) : 10 + static_cast<int>((h >> 16) % 9U);
+        int dx = abs(x - cx), dy = abs(y - cy);
+        dx = min(dx, kLifeW - dx);
+        dy = min(dy, kLifeH - dy);
+        if (dx > r || dy > r) continue;
+        const float noise = static_cast<float>(hash32(salt ^ static_cast<std::uint32_t>(i) * 2654435761U) >> 8) * (1.0f / 16777216.0f);
+        if (L.mode == LifeMode::Turing) c = make_float2(0.5f, 0.25f + 0.05f * noise);
+        else c.x = fmaxf(c.x, noise);
+    }
+    dst[i] = c;
+}
+
+/**
+ * @brief One step of the living field, cell by cell, from one buffer into the other (which one by
+ *        the parity and the step's number); a step this block does not have does nothing.
+ *
+ * Lenia (Chan 2019): the ring kernel's weighted sum u of the neighbourhood, the growth
+ * 2 exp(-(u - mu)^2 / 2 sigma^2) - 1, a tenth of it added. Gray-Scott (Pearson 1993):
+ * dU = Du lap U - U V^2 + F (1 - U), dV = Dv lap V + U V^2 - (F + k) V, Du 0.2097, Dv 0.105, one
+ * unit of time a step, the five-point Laplacian.
+ * @param hdr   the header
+ * @param node  this step's number in the block, 0 or 1
+ * @param a     buffer A
+ * @param b     buffer B
+ */
+__global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, float2* b)
+{
+    const LifeField& L = hdr->life;
+    if (L.mode == LifeMode::Off || node >= L.steps) return;
+    const int i = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= kLifeCells) return;
+    const bool fromB = ((hdr->lifeParity + node) & 1) != 0;
+    const float2* src = fromB ? b : a;
+    float2* dst = fromB ? a : b;
+    const int x = i & (kLifeW - 1), y = i >> 8;
+    if (L.mode == LifeMode::Lenia) {
+        constexpr int R = kLifeRadius, K = 2 * kLifeRadius + 1;
+        float u = 0.0f;
+        for (int dy = -R; dy <= R; ++dy) {
+            const float2* row = src + static_cast<size_t>((y + dy) & (kLifeH - 1)) * kLifeW;
+            for (int dx = -R; dx <= R; ++dx) {
+                const float k = cLeniaKernel[(dy + R) * K + (dx + R)];
+                if (k != 0.0f) u += k * row[(x + dx) & (kLifeW - 1)].x;
+            }
+        }
+        const float d = (u - L.lenMu) / fmaxf(L.lenSigma, 1.0e-4f);
+        const float g = 2.0f * __expf(-0.5f * d * d) - 1.0f;
+        dst[i] = make_float2(fminf(fmaxf(src[i].x + 0.1f * g, 0.0f), 1.0f), 0.0f);
+    } else {
+        const float2 c = src[i];
+        const float2 l = src[y * kLifeW + ((x - 1) & (kLifeW - 1))], r = src[y * kLifeW + ((x + 1) & (kLifeW - 1))];
+        const float2 u = src[((y - 1) & (kLifeH - 1)) * kLifeW + x], d = src[((y + 1) & (kLifeH - 1)) * kLifeW + x];
+        const float lapU = l.x + r.x + u.x + d.x - 4.0f * c.x, lapV = l.y + r.y + u.y + d.y - 4.0f * c.y;
+        const float uvv = c.x * c.y * c.y;
+        dst[i] = make_float2(fminf(fmaxf(c.x + 0.2097f * lapU - uvv + L.feed * (1.0f - c.x), 0.0f), 1.0f),
+                             fminf(fmaxf(c.y + 0.105f * lapV + uvv - (L.feed + L.kill) * c.y, 0.0f), 1.0f));
+    }
+}
+
+/**
+ * @brief The living field's mean and mean square of what the partials read, in one CUDA block, in
+ *        a fixed order (bit-identical runs).
+ * @param hdr    the header
+ * @param a      buffer A
+ * @param b      buffer B
+ * @param stats  receives mean, mean square
+ */
+__global__ void lifeStatsKernel(const BlockHeader* hdr, const float2* a, const float2* b, float* stats)
+{
+    __shared__ float s1[256], s2[256];
+    const LifeField& L = hdr->life;
+    const int t = static_cast<int>(threadIdx.x);
+    float m = 0.0f, q = 0.0f;
+    if (L.mode != LifeMode::Off) {
+        const float2* cur = lifeCurrent(hdr, a, b);
+        for (int i = t; i < kLifeCells; i += 256) {
+            const float v = lifeValue(L.mode, cur[i]);
+            m += v;
+            q += v * v;
+        }
+    }
+    s1[t] = m;
+    s2[t] = q;
+    __syncthreads();
+    for (int s = 128; s > 0; s >>= 1) {
+        if (t < s) { s1[t] += s1[t + s]; s2[t] += s2[t + s]; }
+        __syncthreads();
+    }
+    if (t == 0) { stats[0] = s1[0] / kLifeCells; stats[1] = s2[0] / kLifeCells; }
+}
+
+/**
+ * @brief The living field at a place, read bilinearly on the torus.
+ * @param hdr  the header
+ * @param cur  the current buffer
+ * @param fx   across, cells (wraps)
+ * @param fy   along, cells (wraps)
+ * @return     what the partial reads, 0 .. 1
+ */
+__device__ float lifeAt(const BlockHeader* hdr, const float2* cur, float fx, float fy)
+{
+    const int x0 = static_cast<int>(floorf(fx)), y0 = static_cast<int>(floorf(fy));
+    const float ax = fx - static_cast<float>(x0), ay = fy - static_cast<float>(y0);
+    const LifeMode mode = hdr->life.mode;
+    auto at = [&](int x, int y) { return lifeValue(mode, cur[(y & (kLifeH - 1)) * kLifeW + (x & (kLifeW - 1))]); };
+    const float top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * ax;
+    const float bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * ax;
+    return top + (bottom - top) * ay;
+}
+
+/**
  * @brief The ring of the voices' levels: this block's level of every voice written where the
  *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
  *        partial of the new note never hears the old one's level).
@@ -471,10 +631,12 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param ring    per voice kGainRing levels (gainRingKernel), for the dispersion
  * @param ampQ    per partial the near plane's cosine parts the last block ended on
  * @param snap    every kSnapStride-th partial's frequency and amplitude, for the picture
+ * @param lifeA   the living field, buffer A
+ * @param lifeB   buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
-                             float2* snap)
+                             float2* snap, const float2* lifeA, const float2* lifeB)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -513,9 +675,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         // Who the partial is: a member of harmonic h's cloud, or one of the air band's partials.
         int h = 1;
         float z = 0.0f, centre, amp0, sh, drift;
+        float slot = 0.5f;   // the partial's place among its cloud's members, evenly 0 .. 1 (the living field's rows)
         if (!isAir) {
             h = p / K + 1;
             const int k = p - (h - 1) * K;
+            slot = (static_cast<float>(k) + 0.5f) / static_cast<float>(K);
             // The member's place in its harmonic's cloud: stratified over the bell curve, so K members
             // always cover it evenly and only jitter within their own slice.
             if (K > 1) z = normcdfinvf((static_cast<float>(k) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(K));
@@ -533,6 +697,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             // a band are heard as its noise.
             const int A = cv.partials - HP;
             const int a = p - HP;
+            slot = (static_cast<float>(a) + 0.5f) / static_cast<float>(max(A, 1));
             if (A > 1) z = normcdfinvf((static_cast<float>(a) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(A));
             centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f));
             const float j = cv.airJitter;
@@ -572,6 +737,14 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             const float e = laneValue(cv.amp, c, 30, false, depth);
             depth = fminf(fmaxf(depth, 0.0f), 1.0f);
             env = 1.0f - depth + depth * e;
+        }
+        // The living landscape: the field at this partial's frequency and its place in its cloud.
+        if (hdr->life.mode != LifeMode::Off && hdr->life.depth > 0.0f) {
+            const LifeField& L = hdr->life;
+            // Along: the member's slot, evenly over the rows -- what the field's measure assumes (the
+            // bell-shaped member position read the middle rows only: 2.6 dB off while a Turing field grew).
+            const float v = lifeAt(hdr, lifeCurrent(hdr, lifeA, lifeB), c.src[1] * L.zoom * static_cast<float>(kLifeW), slot * static_cast<float>(kLifeH));
+            env *= 1.0f - L.depth + L.depth * v * L.makeup;
         }
         float cents = drift;
         if (cv.pitch.amount != 0.0f) cents += laneValue(cv.pitch, c, 40, true, depth) * depth;
@@ -1145,6 +1318,15 @@ struct CloudEngine::Impl {
     float* dEchoAcc = nullptr;        ///< device: its overlap, two rings of kEchoN
     float2* dEchoRing = nullptr;      ///< device: its delay lines, per ear and band kEchoSlots spectra
     int* dEchoState = nullptr;        ///< device: its history index and frame count
+    float2* dLifeA = nullptr;         ///< device: the living field, buffer A
+    float2* dLifeB = nullptr;         ///< device: buffer B
+    float* dLifeStats = nullptr;      ///< device: its mean and mean square
+    float* hLifeStats = nullptr;      ///< pinned host: the same, brought down every block
+    float2* hLife = nullptr;          ///< pinned host: the field brought down with a snapshot
+    std::vector<float> lifeCells;     ///< the field as the partials read it, for the picture
+    bool lifeShown = false;           ///< lifeCells holds a field
+    LifeField life;                   ///< the host's copy of the living landscape's settings
+    int lifeParity = 0;               ///< which buffer holds the field before the next block's steps
     float2* dSnap = nullptr;          ///< device: the picture's snapshot, every kSnapStride-th partial (Hz, amplitude)
     float2* hSnap = nullptr;          ///< pinned host: the snapshot brought down
     bool snapAsked = false;           ///< the next launch brings it down
@@ -1178,11 +1360,14 @@ struct CloudEngine::Impl {
         if (hUpload) cudaFreeHost(hUpload);
         if (hOut) cudaFreeHost(hOut);
         if (hSnap) cudaFreeHost(hSnap);
+        if (hLifeStats) cudaFreeHost(hLifeStats);
+        if (hLife) cudaFreeHost(hLife);
         for (void* p : { static_cast<void*>(dUpload), static_cast<void*>(dOut), static_cast<void*>(dScratch), static_cast<void*>(dRun),
                          static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand),
                          static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing),
                          static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
-                         static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap) })
+                         static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap),
+                         static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -1190,6 +1375,7 @@ struct CloudEngine::Impl {
         dModal = nullptr; dModalScratch = nullptr; dGainRing = nullptr;
         dAmpQ = nullptr; dEchoHist = nullptr; dEchoAcc = nullptr; dEchoRing = nullptr; dEchoState = nullptr;
         dSnap = nullptr; hSnap = nullptr;
+        dLifeA = dLifeB = nullptr; dLifeStats = nullptr; hLifeStats = nullptr; hLife = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1304,6 +1490,11 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dEchoState, sizeof(int) * 2), "cudaMalloc echo state", error)
                 && ok(cudaMalloc(&m.dSnap, sizeof(float2) * (partialsTotal / kSnapStride)), "cudaMalloc snapshot", error)
                 && ok(cudaHostAlloc(&m.hSnap, sizeof(float2) * (partialsTotal / kSnapStride), cudaHostAllocDefault), "cudaHostAlloc snapshot", error)
+                && ok(cudaMalloc(&m.dLifeA, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
+                && ok(cudaMalloc(&m.dLifeB, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
+                && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 2), "cudaMalloc life stats", error)
+                && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 2, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
+                && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
                 && ok(cudaMalloc(&m.dModal, sizeof(float2) * kModalModes), "cudaMalloc modal", error)
@@ -1321,11 +1512,31 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dEchoRing, 0, sizeof(float2) * 2 * kEchoBins * static_cast<size_t>(kEchoSlots), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dEchoState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dSnap, 0, sizeof(float2) * (partialsTotal / kSnapStride), m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dLifeA, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dLifeB, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 2, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dGainRing, 0, sizeof(float) * kGainRing * static_cast<size_t>(config.voices), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaStreamSynchronize(m.stream), "cudaStreamSynchronize", error);
+    if (good) {
+        // Lenia's ring kernel: a bell around half the radius, normalised (Noctuary's, on a larger torus).
+        constexpr int R = kLifeRadius, K = 2 * kLifeRadius + 1;
+        float kernel[K * K];
+        float sum = 0.0f;
+        for (int dy = -R; dy <= R; ++dy)
+            for (int dx = -R; dx <= R; ++dx) {
+                const float r = std::sqrt(static_cast<float>(dx * dx + dy * dy)) / static_cast<float>(R);
+                const float d = (r - 0.5f) / 0.15f;
+                const float k = r <= 1.0f ? std::exp(-0.5f * d * d) : 0.0f;
+                kernel[(dy + R) * K + (dx + R)] = k;
+                sum += k;
+            }
+        for (float& k : kernel) k /= sum;
+        good = ok(cudaMemcpyToSymbol(cLeniaKernel, kernel, sizeof(kernel)), "cudaMemcpyToSymbol lenia", error);
+        m.lifeCells.assign(static_cast<size_t>(kLifeCells), 0.0f);
+    }
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
         std::memset(m.hOut, 0, sizeof(float) * kCloudOutChannels * n);
@@ -1337,9 +1548,15 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
         good = ok(cudaStreamBeginCapture(m.stream, cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture", error);
         if (good) {
             cudaMemcpyAsync(m.dUpload, m.hUpload, m.uploadBytes(), cudaMemcpyHostToDevice, m.stream);
+            constexpr unsigned lifeGrid = (kLifeCells + 255) / 256;
+            lifeSeedKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB);
+            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dLifeA, m.dLifeB);
+            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB);
+            lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
+            cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 2, cudaMemcpyDeviceToHost, m.stream);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
@@ -1403,6 +1620,16 @@ SpectralEcho& CloudEngine::spectralEcho() { return impl_->echo; }
 
 void CloudEngine::requestSnapshot() { impl_->snapAsked = true; }
 
+LifeField& CloudEngine::life() { return impl_->life; }
+
+void CloudEngine::lifeStats(float& mean, float& meanSq) const
+{
+    mean = impl_->hLifeStats[0];
+    meanSq = impl_->hLifeStats[1];
+}
+
+const float* CloudEngine::lifePicture() const { return impl_->lifeShown ? impl_->lifeCells.data() : nullptr; }
+
 bool CloudEngine::takeSnapshot(const float*& dots, int& perVoice)
 {
     Impl& m = *impl_;
@@ -1435,6 +1662,11 @@ void CloudEngine::launch()
     hdr->binaural = m.binaural;
     hdr->echo = m.echo;
     m.echo.clear = 0;   // asked for once
+    hdr->life = m.life;
+    hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);
+    hdr->lifeParity = m.lifeParity;
+    m.lifeParity = (m.lifeParity + hdr->life.steps) & 1;   // where the field is after this block
+    m.life.reseed = 0;   // asked for once
     auto* up = reinterpret_cast<CloudVoice*>(m.hUpload + sizeof(BlockHeader));
     const float dt = static_cast<float>(n / m.cfg.sampleRate);
     for (int i = 0; i < m.cfg.voices; ++i) {
@@ -1455,6 +1687,8 @@ void CloudEngine::launch()
     m.snapInFlight = m.snapAsked;
     if (m.snapAsked) {   // the picture's snapshot behind the block, before the event wait() waits for
         cudaMemcpyAsync(m.hSnap, m.dSnap, sizeof(float2) * (static_cast<size_t>(m.cfg.voices) * m.pcap / kSnapStride), cudaMemcpyDeviceToHost, m.stream);
+        if (m.life.mode != LifeMode::Off)   // and the living field, as it stands after this block's steps
+            cudaMemcpyAsync(m.hLife, m.lifeParity ? m.dLifeB : m.dLifeA, sizeof(float2) * kLifeCells, cudaMemcpyDeviceToHost, m.stream);
         m.snapAsked = false;
     }
     cudaEventRecord(m.evStop, m.stream);
@@ -1478,7 +1712,14 @@ const float* CloudEngine::wait()
         }
         cudaEventElapsedTime(&m.gpuMs, m.evStart, m.evStop);
         m.launched = false;
-        if (m.snapInFlight) { m.snapReady = true; m.snapInFlight = false; }
+        if (m.snapInFlight) {
+            m.snapReady = true;
+            m.snapInFlight = false;
+            m.lifeShown = m.life.mode != LifeMode::Off;
+            if (m.lifeShown)
+                for (int i = 0; i < kLifeCells; ++i)
+                    m.lifeCells[static_cast<size_t>(i)] = m.life.mode == LifeMode::Turing ? std::min(m.hLife[i].y * 3.0f, 1.0f) : m.hLife[i].x;
+        }
     }
     return m.hOut;
 }

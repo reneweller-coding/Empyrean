@@ -256,6 +256,44 @@ struct SpectralEcho {
 static_assert(sizeof(SpectralEcho) % 16 == 0, "SpectralEcho rides in the block header");
 
 constexpr int kSnapStride = 8;       ///< every eighth partial of every voice is in the picture's snapshot
+constexpr int kLifeW = 256;          ///< the living field's width, cells (across the spectrum)
+constexpr int kLifeH = 128;          ///< its height, cells (across a cloud's members)
+constexpr int kLifeRadius = 10;      ///< Lenia's ring kernel radius, cells
+
+/** @brief What lives in the field: the LifeMode parameter's choices. */
+enum class LifeMode : std::int32_t {
+    Off = 0,   ///< no field
+    Lenia,     ///< Lenia (Chan 2019): Conway's Life made continuous -- blobs that drift, pulse, split, die
+    Turing,    ///< Gray-Scott reaction-diffusion (Pearson 1993): spots, mitosis, coral, worms, mazes
+    Count      ///< number of modes
+};
+
+/**
+ * @brief The living landscape: a field on a torus the GPU steps every block, and every partial reads.
+ *
+ * Where the landscapes are pictures that loop, this one lives: a Lenia field or a Gray-Scott
+ * field of kLifeW x kLifeH cells, stepped up to twice a block in the graph before the partials are
+ * updated. Each partial reads it at its frequency (across, log, `zoom` of the field spanning the
+ * range) and at its place in its cloud (along), so every harmonic is a slice through the living
+ * pattern and the pattern's motion is the partials' loudness. Made up by the field's own power
+ * (`makeup`, from the GPU's measure of the last block), so a sparse field changes the colour, not
+ * the level; a field that died or filled up is seeded again.
+ */
+struct LifeField {
+    LifeMode mode = LifeMode::Off;   ///< what lives in it
+    int   steps = 0;                 ///< steps this block, 0 .. 2
+    int   reseed = 0;                ///< 1 for one block: seeded again first (the engine asks)
+    int   salt = 0;                  ///< the seeding's dice, counted up at every seeding
+    float depth = 0.0f;              ///< 0 .. 1: how far the partials' loudness follows the field
+    float zoom = 1.0f;               ///< 0.25 .. 1: how much of the field's width the range spans
+    float makeup = 1.0f;             ///< one over the field's RMS (the engine's, from lifeStats)
+    float lenMu = 0.15f;             ///< Lenia: the growth bell's centre
+    float lenSigma = 0.015f;         ///< Lenia: its width
+    float feed = 0.035f;             ///< Turing: the feed rate F
+    float kill = 0.065f;             ///< Turing: the kill rate k
+    float pad0 = 0.0f;               ///< keeps the table 16-byte aligned
+};
+static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
@@ -375,6 +413,24 @@ public:
 
     /** @brief The host's copy of the spectral echo's settings, edited between wait() and the next launch(). @return the settings */
     SpectralEcho& spectralEcho();
+
+    /** @brief The host's copy of the living landscape's settings, edited between wait() and the next launch(). @return the settings */
+    LifeField& life();
+
+    /**
+     * @brief The living field's mean and mean square (of what the partials read, 0 .. 1), measured by
+     *        the GPU in the last block.
+     * @param mean    receives the mean
+     * @param meanSq  receives the mean of the squares
+     */
+    void lifeStats(float& mean, float& meanSq) const;
+
+    /**
+     * @brief The living field as the last snapshot brought it down: kLifeW x kLifeH cells, each the value
+     *        the partials read (0 .. 1), row after row. Valid after takeSnapshot() returned true.
+     * @return  the cells, or null when the field is off
+     */
+    const float* lifePicture() const;
 
     /** @brief The next launch() also brings the partials' snapshot down (every kSnapStride-th partial's frequency and amplitude). */
     void requestSnapshot();

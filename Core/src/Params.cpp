@@ -41,6 +41,7 @@ const char* const kKeyMapNames[2] = { "Snap to 12 keys", "Consecutive degrees" }
 const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
+const char* const kLifeModeNames[kNumLifeModes] = { "Off", "Lenia", "Turing" };
 const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter" };
 const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
@@ -289,6 +290,12 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::LeniaGrowth,    "lenia_growth",    "Lenia Growth", "Modulation", 0.08f, 0.3f, 0.15f, 1.f,  ""),
     F(ParamId::ChaosPeriod,    "chaos_period",    "Chaos Period", "Modulation", 10.f, 1800.f, 120.f, 0.4f, "s"),
     F(ParamId::BrainCascade,   "brain_cascade",   "Cascade",      "Conductor", 0.f,  1.f,   0.f,   1.f,  ""),
+
+    C(ParamId::LifeMode,       "life_mode",       "Life",         "Life", kLifeModeNames, kNumLifeModes, 0),
+    F(ParamId::LifeDepth,      "life_depth",      "Life Depth",   "Life", 0.f,   1.f,   0.6f,  1.f,  ""),
+    F(ParamId::LifeRate,       "life_rate",       "Life Rate",    "Life", 0.f,   1.f,   0.3f,  1.f,  ""),
+    F(ParamId::LifeCharacter,  "life_character",  "Character",    "Life", 0.f,   1.f,   0.3f,  1.f,  ""),
+    F(ParamId::LifeZoom,       "life_zoom",       "Zoom",         "Life", 0.25f, 1.f,   1.f,   1.f,  ""),
 } };
 
 } // namespace

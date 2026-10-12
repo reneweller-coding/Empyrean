@@ -151,7 +151,9 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape } },
                      { "Field", F::Motion, Ids{ ParamId::FieldMode, ParamId::FieldStrength, ParamId::FieldRadius, ParamId::FieldSpring,
                                                 ParamId::FieldRate, ParamId::FieldCount } },
-                     { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } } });
+                     { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } },
+                     { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
+                                                           ParamId::LifeZoom } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
@@ -304,6 +306,15 @@ void AdditivEditor::shootStep()
             if (want == additiv::preset(i).name) index = i;
         if (index < 0 && want.containsOnly("0123456789") && want.isNotEmpty()) index = want.getIntValue();
         if (index >= 0) proc_.applyPreset(index);
+        // ADDITIV_SET ("key=value;key=value"): parameters after the preset, a choice by its name or its index.
+        for (const juce::String& item : juce::StringArray::fromTokens(juce::SystemStats::getEnvironmentVariable("ADDITIV_SET", {}), ";", ""))
+            if (const additiv::ParamDesc* d = additiv::findParam(item.upToFirstOccurrenceOf("=", false, false).trim().toRawUTF8())) {
+                const juce::String val = item.fromFirstOccurrenceOf("=", false, false).trim();
+                float v = val.getFloatValue();
+                for (int c = 0; c < d->numChoices; ++c)
+                    if (val == d->choices[c]) v = static_cast<float>(c);
+                proc_.setValue(static_cast<int>(d->id), v);
+            }
     }
     if (shotPrefix_.isEmpty() || ++shotTick_ < start || (shotTick_ - start) % 3 != 0) return;
     const int t = (shotTick_ - start) / 3;

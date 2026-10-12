@@ -672,6 +672,12 @@ void Engine::stopNote(int note, int source)
     }
 }
 
+void Engine::lifeSnapshot(std::vector<float>& cells)
+{
+    const std::lock_guard<std::mutex> lock(snapLock_);
+    cells = snapLife_;
+}
+
 bool Engine::partialSnapshot(std::vector<float>& dots, int& perVoice)
 {
     const std::lock_guard<std::mutex> lock(snapLock_);
@@ -1035,6 +1041,52 @@ void Engine::renderBlock()
         }
     }
 
+    // The living landscape: its mode (a change seeds it), its steps (up to two a block: Lenia 2 to 40
+    // a second, the Turing field 20 to 750, by Life Rate), its character (Lenia's growth; the
+    // Turing field along spots, mitosis, coral, worms, mazes in Pearson's map), the make-up from
+    // the field's measured power, and a new seeding when it has died or filled up.
+    {
+        LifeField& L = cloud_.life();
+        const int mode = std::clamp(static_cast<int>(std::lround(cur(ParamId::LifeMode))), 0, kNumLifeModes - 1);
+        L.mode = static_cast<LifeMode>(mode);
+        lifeQuiet_ += dtf;
+        if (mode != lifeModeWas_ && mode != 0) { L.reseed = 1; ++L.salt; lifeAcc_ = 0.0f; lifeQuiet_ = 0.0f; lifeMakeup_ = 1.0f; }
+        lifeModeWas_ = mode;
+        if (mode != 0) {
+            const float rate = cur(ParamId::LifeRate);
+            lifeAcc_ += (L.mode == LifeMode::Lenia ? 2.0f + 38.0f * rate : 20.0f + 730.0f * rate) * dtf;
+            const int steps = std::min(2, static_cast<int>(lifeAcc_));
+            lifeAcc_ = std::min(lifeAcc_ - static_cast<float>(steps), 2.0f);
+            L.steps = steps;
+            const float ch = std::clamp(cur(ParamId::LifeCharacter), 0.0f, 1.0f);
+            L.lenMu = 0.12f + 0.08f * ch;
+            L.lenSigma = 0.012f + 0.012f * ch;
+            static const float kF[5] = { 0.035f, 0.0367f, 0.0545f, 0.078f, 0.029f }, kK[5] = { 0.065f, 0.0649f, 0.062f, 0.061f, 0.057f };
+            const float at = ch * 4.0f;
+            const int seg = std::min(3, static_cast<int>(at));
+            const float fr = at - static_cast<float>(seg);
+            L.feed = kF[seg] + (kF[seg + 1] - kF[seg]) * fr;
+            L.kill = kK[seg] + (kK[seg + 1] - kK[seg]) * fr;
+            L.depth = cur(ParamId::LifeDepth);
+            L.zoom = cur(ParamId::LifeZoom);
+            float mean = 0.0f, meanSq = 0.0f;
+            cloud_.lifeStats(mean, meanSq);
+            // The make-up m that keeps the partials' power: E[(1 - d + d v m)^2] = 1, a quadratic in m
+            // (one over the RMS is right only at full depth; below it the steady share is mixed in).
+            {
+                const double d = std::clamp(static_cast<double>(L.depth), 0.0, 1.0), e = mean, q = std::max(static_cast<double>(meanSq), 1.0 / 4096.0);
+                const double A = d * d * q, B = 2.0 * (1.0 - d) * d * e, C = (1.0 - d) * (1.0 - d) - 1.0;
+                const double m = A > 1.0e-12 ? (-B + std::sqrt(std::max(B * B - 4.0 * A * C, 0.0))) / (2.0 * A) : 1.0;
+                lifeMakeup_ += (1.0f - std::exp(-dtf / 0.5f)) * (static_cast<float>(std::clamp(m, 0.0, 8.0)) - lifeMakeup_);
+                L.makeup = lifeMakeup_;
+            }
+            const bool dead = mean < 0.002f, full = L.mode == LifeMode::Lenia && mean > 0.85f;
+            if ((dead || full) && lifeQuiet_ > 2.0f && L.reseed == 0) { L.reseed = 1; ++L.salt; lifeQuiet_ = 0.0f; }
+        } else {
+            L.steps = 0;
+        }
+    }
+
     // The binaural cloud (its orbit turns the whole of it) and the spectral echo (its lines
     // cleared when it is switched on; its delay less the 1024 - G samples its window adds).
     {
@@ -1079,6 +1131,8 @@ void Engine::renderBlock()
                 if (snap_.size() != count) snap_.resize(count);   // once: the size stays
                 std::memcpy(snap_.data(), dots, count * sizeof(float));
                 snapPer_ = per;
+                if (const float* cells = cloud_.lifePicture()) snapLife_.assign(cells, cells + kLifeW * kLifeH);
+                else snapLife_.clear();
                 ++snapSeq_;
             }
         }

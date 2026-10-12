@@ -42,7 +42,18 @@ void CloudView::refresh()
 {
     for (int i = 0; i < additiv::kMaxViewVoices; ++i) views_[static_cast<size_t>(i)] = proc_.engine().voiceView(i);
     refreshLandscape();
-    if (proc_.engine().partialSnapshot(snap_, snapPer_)) {}
+    if (proc_.engine().partialSnapshot(snap_, snapPer_)) {
+        proc_.engine().lifeSnapshot(lifeCells_);
+        if (lifeCells_.size() == static_cast<size_t>(additiv::kLifeW * additiv::kLifeH)) {
+            // The living field as a picture: across the spectrum (left low), along a cloud's members (up).
+            if (!life_.isValid()) life_ = juce::Image(juce::Image::RGB, additiv::kLifeW, additiv::kLifeH, false);
+            const juce::Colour lo = additivui::colour::bg, hi = additivui::colour::violet;
+            const juce::Image::BitmapData px(life_, juce::Image::BitmapData::writeOnly);
+            for (int y = 0; y < additiv::kLifeH; ++y)
+                for (int x = 0; x < additiv::kLifeW; ++x)
+                    px.setPixelColour(x, additiv::kLifeH - 1 - y, lo.interpolatedWith(hi, std::sqrt(lifeCells_[static_cast<size_t>(y) * additiv::kLifeW + x])));
+        }
+    }
     if (!dotsArea_.isEmpty()) plotDots(dotsArea_.getWidth(), dotsArea_.getHeight());
     repaint();
 }
@@ -125,7 +136,10 @@ void CloudView::paint(juce::Graphics& g)
 
     // The landscape, and where the voices are in its loop (when the Aurora motion reads it).
     const bool reading = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(proc_.value(static_cast<int>(ParamId::Motion)))));
-    if (land_.isValid()) {
+    const bool living = !lifeCells_.empty() && life_.isValid();
+    if (living) {   // the living landscape takes the panel while it lives
+        g.drawImage(life_, landArea, juce::RectanglePlacement::stretchToFit);
+    } else if (land_.isValid()) {
         g.setOpacity(reading ? 1.0f : 0.35f);
         g.drawImage(land_, landArea, juce::RectanglePlacement::stretchToFit);
         g.setOpacity(1.0f);
@@ -133,9 +147,13 @@ void CloudView::paint(juce::Graphics& g)
     g.setColour(skin.edge);
     g.drawRect(landArea, 1.0f);
     g.setColour(skin.dim);
-    g.drawText(juce::String(additiv::kLandscapeNames[std::max(landChoice_, 0)]) + (reading ? "" : "  (Motion: Aurora reads it)"),
+    const int lifeMode = juce::roundToInt(proc_.value(static_cast<int>(ParamId::LifeMode)));
+    if (living)
+        g.drawText(juce::String("Living landscape: ") + additiv::kLifeModeNames[juce::jlimit(0, additiv::kNumLifeModes - 1, lifeMode)],
+                   landArea.withHeight(14.0f).translated(0.0f, -1.0f), juce::Justification::centredLeft);
+    else g.drawText(juce::String(additiv::kLandscapeNames[std::max(landChoice_, 0)]) + (reading ? "" : "  (Motion: Aurora reads it)"),
                landArea.withHeight(14.0f).translated(0.0f, -1.0f), juce::Justification::centredLeft);
-    if (reading && firstTime >= 0.0f) {
+    if (reading && !living && firstTime >= 0.0f) {
         const float rate = proc_.value(static_cast<int>(ParamId::MotionRate));
         float u = firstTime * rate / std::max(landLoop_, 0.1f);
         u -= std::floor(u);

@@ -40,4 +40,6 @@ private:
     std::vector<float> glow_;                                           ///< the trails: red, green, blue per pixel, fading
     juce::Image dots_;                                                  ///< the trails as a picture
     juce::Rectangle<int> dotsArea_;                                     ///< where the points are drawn (the spectrum's area)
+    std::vector<float> lifeCells_;                                      ///< the living field of the last snapshot, empty when off
+    juce::Image life_;                                                  ///< its picture
 };

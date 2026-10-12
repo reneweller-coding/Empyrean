@@ -190,6 +190,12 @@ enum class ParamId : int {
     LeniaGrowth,    ///< Lenia's growth centre (mu)
     ChaosPeriod,    ///< s: about a Lorenz lobe change and a Roessler turn
     BrainCascade,   ///< 0 .. 1: the conductor's events breed events (a Hawkes clock)
+    // Phase 10b: the living landscape
+    LifeMode,       ///< kLifeModeNames
+    LifeDepth,      ///< 0 .. 1: how far the partials' loudness follows the field
+    LifeRate,       ///< 0 .. 1: how fast it lives
+    LifeCharacter,  ///< 0 .. 1: Lenia's growth; the Turing field's way from spots to mazes
+    LifeZoom,       ///< 0.25 .. 1: how much of the field's width the range spans
     Count           ///< number of parameters
 };
 
@@ -245,6 +251,8 @@ constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven table
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
+constexpr int kNumLifeModes = 3;    ///< entries of kLifeModeNames
+extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing" (Cloud.h LifeMode)
 constexpr int kNumFieldModes = 4;   ///< entries of kFieldModeNames
 extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames

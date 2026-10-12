@@ -232,6 +232,11 @@ public:
      * @return          true when there was a new snapshot since the last call
      */
     bool partialSnapshot(std::vector<float>& dots, int& perVoice);
+    /**
+     * @brief The living field as the last snapshot brought it (kLifeW x kLifeH cells, 0 .. 1). Message thread.
+     * @param cells  receives the cells, emptied when the field is off
+     */
+    void lifeSnapshot(std::vector<float>& cells);
 
     /** @brief The slowest block the renderer took since the last call, and starts over (diagnostics). @return milliseconds */
     float takeWorstBlockMs() { return worstBlockUs_.exchange(0, std::memory_order_relaxed) * 0.001f; }
@@ -428,6 +433,11 @@ private:
     std::uint64_t snapSeq_ = 0;                        ///< snapshots published (under snapLock_)
     std::uint64_t snapSeen_ = 0;                       ///< the last one the picture took (message thread)
     int snapCountdown_ = 0;                            ///< blocks until the next snapshot is asked for
+    std::vector<float> snapLife_;                      ///< the living field of the last snapshot, empty when off
+    int lifeModeWas_ = 0;                              ///< the living field's mode in the last block (a change seeds it)
+    float lifeAcc_ = 0.0f;                             ///< its steps owed, carried between blocks
+    float lifeQuiet_ = 0.0f;                           ///< seconds since it was last seeded (it is not seeded again sooner than 2 s)
+    float lifeMakeup_ = 1.0f;                          ///< the make-up as it glides (half a second), so a seeding does not jump
     /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */
     void captureGhost(int i);
 
