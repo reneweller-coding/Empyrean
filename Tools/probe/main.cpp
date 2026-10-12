@@ -28,6 +28,7 @@
 
 #include "additiv/Cloud.h"
 #include "additiv/Landscape.h"
+#include "additiv/Motion.h"
 #include "additiv/Shapes.h"
 
 #include <algorithm>
@@ -201,14 +202,14 @@ void printOver(const std::vector<double>& v, const char* label)
     std::printf("\n");
 }
 
-/** @brief The repository root: the first folder above the program that holds CMakeLists.txt and Gpu. @return the root (the working directory as a fallback) */
+/** @brief The repository root: the first folder above the program that holds CMakeLists.txt and Core. @return the root (the working directory as a fallback) */
 fs::path repoRoot()
 {
     wchar_t buf[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, buf, MAX_PATH);
     fs::path p = fs::path(buf).parent_path();
     for (int up = 0; up < 5 && !p.empty(); ++up) {
-        if (fs::exists(p / "CMakeLists.txt") && fs::exists(p / "Gpu")) return p;
+        if (fs::exists(p / "CMakeLists.txt") && fs::exists(p / "Core")) return p;
         p = p.parent_path();
     }
     return fs::current_path();
@@ -217,99 +218,54 @@ fs::path repoRoot()
 /** @brief MIDI note to Hz. @param note MIDI note number @return Hz */
 float noteHz(int note) { return 440.0f * std::exp2((static_cast<float>(note) - 69.0f) / 12.0f); }
 
+/**
+ * @brief The GPU's four channels (near L, near R, far L, far R) as stereo: near and far added.
+ * @param q   n frames of kCloudChannels
+ * @param n   frames
+ * @param lr  receives n interleaved stereo frames
+ */
+void mixToStereo(const float* q, int n, float* lr)
+{
+    for (int i = 0; i < n; ++i) {
+        lr[2 * i] = q[kCloudChannels * i] + q[kCloudChannels * i + 2];
+        lr[2 * i + 1] = q[kCloudChannels * i + 1] + q[kCloudChannels * i + 3];
+    }
+}
+
+/**
+ * @brief Appends a GPU block to an interleaved stereo buffer, near and far added.
+ * @param lr  the buffer
+ * @param q   n frames of kCloudChannels
+ * @param n   frames
+ */
+void appendStereo(std::vector<float>& lr, const float* q, int n)
+{
+    const size_t at = lr.size();
+    lr.resize(at + static_cast<size_t>(n) * 2);
+    mixToStereo(q, n, lr.data() + at);
+}
+
 // ---------------------------------------------------------------------------------------------
-// Scenes: what the envelope lanes can do, each on every voice.
+// Scenes: the core's motions (Motion.h), plus the recording as a landscape.
 
-/** @brief No envelopes: the cloud alone, for comparison. @param v the voice */
-void sceneNone(CloudVoice& v) { (void)v; }
-
-/** @brief Every partial for itself: four shapes at random, random rates and phases. @param v the voice */
-void sceneRandom(CloudVoice& v)
-{
-    v.amp.amount = 1.0f;
-    v.amp.shape = kSwell;
-    v.amp.shapeSpread = 4;
-    v.amp.shapeBy = MapSource::Random;
-    v.amp.chaos = 1.0f;
-}
-
-/** @brief A wave climbing through the spectrum: the loop phase falls with pitch; the attack sweeps upwards. @param v the voice */
-void sceneWave(CloudVoice& v)
-{
-    v.amp.amount = 1.0f;
-    v.amp.shape = kSwell;
-    v.amp.phase = -2.0f;
-    v.amp.phaseBy = MapSource::Pitch;
-    v.amp.delay = 3.0f;
-    v.amp.delayBy = MapSource::Pitch;
-    v.amp.chaos = 0.03f;
-}
-
-/** @brief A pendulum wave: every harmonic pulses a little faster than the one below; they start together and fan out. @param v the voice */
-void scenePendulum(CloudVoice& v)
-{
-    v.amp.amount = 1.0f;
-    v.amp.shape = kPulse;
-    v.amp.rate = 0.5f;
-    v.amp.rateSpread = 6.0f;
-    v.amp.rateBy = MapSource::Harmonic;
-}
-
-/** @brief The clouds breathe: loudness and place in the field travel through each cloud's members; a slight waver of pitch. @param v the voice */
-void sceneBreathe(CloudVoice& v)
-{
-    v.amp.amount = 0.8f;
-    v.amp.shape = kSwell;
-    v.amp.rate = 0.7f;
-    v.amp.phase = 1.0f;
-    v.amp.phaseBy = MapSource::Member;
-    v.pan.amount = 0.8f;
-    v.pan.shape = kWobble;
-    v.pan.rate = 0.5f;
-    v.pan.phase = 1.0f;
-    v.pan.phaseBy = MapSource::Member;
-    v.pitch.amount = 6.0f;
-    v.pitch.shape = kWobble;
-    v.pitch.chaos = 1.0f;
-}
-
-/** @brief Glissando: every partial starts up to 15 semitones away, above or below, and glides into the chord. @param v the voice */
-void sceneDeepNote(CloudVoice& v)
-{
-    v.pitch.amount = 1500.0f;
-    v.pitch.shape = kRiseIn;
-    v.pitch.shapeSpread = 2;
-    v.pitch.shapeBy = MapSource::Random;
-    v.pitch.depthTilt = 1.0f;
-    v.pitch.depthBy = MapSource::Random;
-    v.pitch.chaos = 0.35f;
-}
-
-/** @brief The amplitude lane reads the landscape (generated or from a file). @param v the voice */
-void sceneLandscape(CloudVoice& v)
-{
-    v.amp.amount = 1.0f;
-    v.amp.landscape = 1;
-}
-
-/** @brief A scene: its name, one line about it, and what it sets on a voice. */
+/** @brief A scene: its name, one line about it, its motion and where its landscape comes from. */
 struct Scene {
-    const char* name;              ///< the --scene name
-    const char* what;              ///< one line for the log
-    int landscape;                 ///< 0 none, 1 the generated aurora (or --landscape), 2 a recording (or --landscape)
-    void (*apply)(CloudVoice&);    ///< sets the voice's lanes
+    const char* name;      ///< the --scene name
+    const char* what;      ///< one line for the log
+    int landscape;         ///< 0 none, 1 the generated aurora (or --landscape), 2 a recording (or --landscape)
+    MotionKind motion;     ///< what it sets on a voice's lanes
 };
 
 /** @brief Every scene, in the order `probe scenes` renders them. */
 const Scene kScenes[] = {
-    { "none", "the cloud alone, no envelopes", 0, sceneNone },
-    { "random", "every partial for itself: random shape, rate and phase", 0, sceneRandom },
-    { "wave", "a wave climbing through the spectrum", 0, sceneWave },
-    { "pendulum", "a pendulum wave across the harmonics", 0, scenePendulum },
-    { "breathe", "loudness, place and pitch travelling through each cloud", 0, sceneBreathe },
-    { "deepnote", "every partial glides into the chord from up to 15 semitones away", 0, sceneDeepNote },
-    { "aurora", "the amplitude lane reads a painted landscape", 1, sceneLandscape },
-    { "recording", "the amplitude lane reads a recording's spectrum (sea)", 2, sceneLandscape },
+    { "none", "the cloud alone, no envelopes", 0, MotionKind::None },
+    { "random", "every partial for itself: random shape, rate and phase", 0, MotionKind::Random },
+    { "wave", "a wave climbing through the spectrum", 0, MotionKind::Wave },
+    { "pendulum", "a pendulum wave across the harmonics, over a bass that stays", 0, MotionKind::Pendulum },
+    { "breathe", "loudness, place and pitch travelling through each cloud", 0, MotionKind::Breathe },
+    { "deepnote", "every partial glides into the chord from up to 15 semitones away", 0, MotionKind::Glissando },
+    { "aurora", "the amplitude lane reads a painted landscape", 1, MotionKind::Aurora },
+    { "recording", "the amplitude lane reads a recording's spectrum (sea)", 2, MotionKind::Aurora },
 };
 
 /** @brief A scene by name. @param name the --scene name @return the scene, null when unknown */
@@ -397,7 +353,7 @@ void setNote(CloudVoice& v, float hz, int partials, std::uint32_t seed, const Op
     v.gain = 1.0f;
     v.active = 1;
     v.restart = 1;
-    if (const Scene* s = findScene(o.scene)) s->apply(v);
+    if (const Scene* s = findScene(o.scene)) applyMotion(s->motion, v, 1.0f, 1.0f);
 }
 
 /**
@@ -584,7 +540,7 @@ int cmdAhead(const Options& o)
                 const std::int64_t t0 = qpc();
                 e.launch();
                 const float* block = e.wait();
-                std::memcpy(&slots[(w % ring) * frames], block, sizeof(float) * frames);
+                mixToStereo(block, o.block, &slots[(w % ring) * frames]);
                 workerUs.push_back(toUs(qpc() - t0));
                 written.store(w + 1, std::memory_order_release);
             } else {
@@ -705,7 +661,7 @@ bool renderChord(CloudEngine& e, int partials, const Options& o, double seconds,
         }
         e.launch();
         const float* block = e.wait();
-        lr.insert(lr.end(), block, block + n * 2);
+        appendStereo(lr, block, n);
     }
     const double renderS = toUs(qpc() - t0) * 1.0e-6;
     double sq = 0.0;
@@ -786,7 +742,7 @@ std::vector<float> renderBlocks(CloudEngine& e, int blocks)
     for (int b = 0; b < blocks; ++b) {
         e.launch();
         const float* block = e.wait();
-        lr.insert(lr.end(), block, block + n * 2);
+        appendStereo(lr, block, n);
     }
     return lr;
 }

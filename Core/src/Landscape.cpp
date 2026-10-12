@@ -14,7 +14,9 @@
 
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_STDIO
+#pragma warning(push, 0)   // a vendored decoder, not held to this project's /W4
 #include "dr_flac.h"
+#pragma warning(pop)
 
 #include <algorithm>
 #include <cmath>
@@ -263,7 +265,7 @@ Landscape landscapeAurora(float loopSeconds, float rangeDb, int columns, int row
     return l;
 }
 
-bool landscapeFromImage(const fs::path& path, float loopSeconds, float rangeDb, Landscape& out, std::string* error)
+bool landscapeFromImage(const std::filesystem::path& path, float loopSeconds, float rangeDb, Landscape& out, std::string* error)
 {
     const HRESULT init = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     std::vector<unsigned char> grey;
@@ -296,7 +298,7 @@ bool landscapeFromImage(const fs::path& path, float loopSeconds, float rangeDb, 
     return true;
 }
 
-bool landscapeFromAudio(const fs::path& path, float rangeDb, float whiten, float seamless, float smooth,
+bool landscapeFromAudio(const std::filesystem::path& path, float rangeDb, float whiten, float seamless, float smooth,
                         Landscape& out, std::string* error)
 {
     std::vector<float> mono;
@@ -413,7 +415,7 @@ void makeSeamless(Landscape& l, float fraction)
     l.amps.resize(static_cast<size_t>(keep) * l.columns);
 }
 
-bool writeLandscapeBmp(const Landscape& l, const fs::path& path, float rangeDb, std::string* error)
+bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, float rangeDb, std::string* error)
 {
     if (l.columns < 1 || l.rows < 1) return fail(error, "empty landscape");
     const std::uint32_t width = static_cast<std::uint32_t>(l.rows), height = static_cast<std::uint32_t>(l.columns);

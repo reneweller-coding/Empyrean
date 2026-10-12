@@ -26,7 +26,7 @@ Entscheidungen des Nutzers (11.10.2026): CUDA; der neueste nvcc (13.4); kein mac
 
 ## Phase 0: das Messprogramm `probe` (gebaut)
 
-`Gpu/` ist der Kern der späteren Engine: `CloudVoice` (die wenigen Zahlen einer Stimme), `CloudEngine` (Tabellen,
+`Core/` (bis 12.10.2026 `Gpu/`) ist der Kern der Engine: `CloudVoice` (die wenigen Zahlen einer Stimme), `CloudEngine` (Tabellen,
 Kernel, ein CUDA-Graph pro Block). Pro Block laufen drei Kernel: **update** (ein Thread pro Partial: Frequenz,
 Amplitudenrampe und Startphase aus den Stimmparametern), **render** (ein CUDA-Block pro 512 Partials, ein Thread pro
 Sample, Partials im Shared Memory) und **reduce** (die Teilsummen immer in derselben Reihenfolge, also bitgleich).
@@ -57,6 +57,11 @@ Offen: dieselben Läufe unter **Grafiklast** (Spiel, Quest Link, Browser-Video),
 
 ### Hörvergleich
 
+`probe render --partials 200,2000,20000` schreibt `work/renders/cloud/cloud-<n>.wav`: Akkord A2 E3 B3 C4 E4, 30 s,
+alle auf −20 dBFS RMS. Bei 200 Partials hat jede Harmonische 1 bis 3 Partials (fast Noctuarys Bank), bei 2.000 sind es
+11 bis 33, bei 20.000 110 bis 333. Stellschrauben: `--width` (Cent, 25), `--slope` (0,3), `--drift` (Cent, 3),
+`--shimmer` (0,4).
+
 **Urteil des Nutzers (11.10.2026):** Zwischen 2.000 und 20.000 ist der Unterschied schwer zu hören; weil die Leistung
 gleich ist (16 Stimmen: 40 gegen 47 µs GPU pro Block [M], 0,3 % des Budgets), gilt **20.000 Partials pro Stimme**.
 Die nächste Frage des Nutzers: eine eigene, loopbare, komplexe Hüllkurve für jeden Sinus (Phase 0b).
@@ -70,7 +75,7 @@ Der Nutzer: "Könnten wir eigentlich auch jedem Sinus eine eigene (loopbare) kom
 sich weg; die Harmonische schwankt dann nur noch um etwa 1/√K. Das Spektrogramm der Szene `random` bestätigt es [M]: kaum
 von `none` zu unterscheiden. Hörbare Struktur entsteht nur, wenn die Hüllkurven der Partials **zusammenhängen**.
 
-**Modell** (`Gpu/include/additiv/Cloud.h`):
+**Modell** (`Core/include/additiv/Cloud.h`):
 - Eine **Bank** von bis zu 64 Formen (`EnvShape`): bis zu 16 Punkte mit Kurve, ein Loop, nach dem Loop ein Release-Schwanz
   (beim Loslassen verlässt die Form ihren Loop dort, wo sie gerade ist). Acht Werksformen in `Shapes.cpp`.
 - Drei **Spuren** pro Stimme (`EnvLane`): Lautstärke, Tonhöhe (Cent), Ort im Stereofeld. Jede Spur sagt, wie die
@@ -96,17 +101,17 @@ Echtzeit. Selbsttest: Dreieck auf der Lautstärkespur auf 0,03 % genau, Glissand
 Spektrogramm die stärkste Wirkung), `breathe` (Lautstärke, Ort und Tonhöhe wandern durch jede Wolke), `deepnote`
 (jeder Partial gleitet aus bis zu 15 Halbtönen in den Akkord), `aurora` (gemalte Landschaft), `recording`
 (Meeresaufnahme aus Noctuarys FieldRecordings als Landschaft). **Hörurteil des Nutzers (12.10.2026):** "klingt alles
-schon mal sehr interessant und ziemlich anders als was man von normalen Synthesizern so kennt"; ein Urteil über einzelne
-Szenen steht aus.
+schon mal sehr interessant und ziemlich anders als was man von normalen Synthesizern so kennt"; **Aurora gefällt besser
+als Pendulum, das zwischendurch eher dünn wird.**
+
+Warum Pendulum dünn wird [A]: Die Form Pulse fällt nach 0,25 s Anstieg wie (1−x)^4 und liegt rund 70 % ihrer Zeit nahe
+null, die Tiefe ist 1. Die tiefen Harmonischen haben fast dieselbe Rate und sind deshalb periodisch gemeinsam leise:
+Der Bass fällt aus (im Spektrogramm dunkle senkrechte Lücken unten bei etwa 10, 20, 29 und 37 s). Aurora dagegen setzt
+seine Bänder auf einen Boden bei −30 dB; die Wolke ist nie leer. Folgerung: Bewegung soll auf einem tragenden Klang
+liegen, nicht ihn ersetzen; Landschaften sind ein Kernstück (Bibliothek, Editor in der GUI).
 
 Beobachtet: Landschaften senken den Pegel stark (aurora −42 dBFS roh, weil der Boden bei −30 dB liegt); im Synth
 braucht die Landschaft eine Pegelkorrektur.
-
-
-`probe render --partials 200,2000,20000` schreibt `work/renders/cloud/cloud-<n>.wav`: Akkord A2 E3 B3 C4 E4, 30 s,
-alle auf −20 dBFS RMS. Bei 200 Partials hat jede Harmonische 1 bis 3 Partials (fast Noctuarys Bank), bei 2.000 sind es
-11 bis 33, bei 20.000 110 bis 333. Stellschrauben: `--width` (Cent, 25), `--slope` (0,3), `--drift` (Cent, 3),
-`--shimmer` (0,4).
 
 ## Folgerungen für die Architektur [I]
 
@@ -119,13 +124,84 @@ alle auf −20 dBFS RMS. Bei 200 Partials hat jede Harmonische 1 bis 3 Partials 
    der Familie auf diesen Zahlen.
 4. Eine CPU-Referenz nur für Tests und CI (GitHub-Runner haben keine GPU), kein macOS.
 
+## Was von Noctuary kommt, und wo es läuft (Entscheidung 12.10.2026)
+
+Der Nutzer fragte, wie viel wir von Noctuary übernehmen, ob die Robert-Rich-Idee passt ("JA absolut"), ob der Autoplay
+mitkommt (ja) und ob die entscheidenden Module auf die GPU können. Die Regel: **Was pro Stimme oder pro Partial im
+Spektrum wirkt, rechnet die GPU** (dort wird es fast kostenlos und genauer: für einen Sinus ist jedes lineare Filter ein
+Faktor und eine Phase pro Ohr); **was rekursiv auf der Summe läuft, bleibt auf der CPU** (jedes Sample hängt am
+vorigen; ein GPU-Thread wäre langsamer als ein Kern, und die ganze Effektkette kostet in Noctuary 1 % eines Kerns).
+
+| Noctuary | hier | wo |
+|---|---|---|
+| Tuning (reine Skalen, Scala, Purity), ClusterBrain (Free, Autoplay/Chords, Brain 2, Arc), Clock, Dsp | Kopie mit Herkunftsvermerk | CPU |
+| Raummodell: nah/fern, Luftdämpfung, Presence, Breath, Doppler, Tide, Phase Width, Externalise | pro **Partial** statt pro Stimme; später binaural (Brown/Duda) | GPU |
+| Filter: Z-Plane, Formant, lineare Antwort der Circuit-Filter | Frequenzgang am Partial ausgewertet | GPU |
+| Air, Ghost | breite, schnell driftende Wolken | GPU |
+| Strike | Modalsynthese aus abklingenden Partials | GPU |
+| Rückkopplung "To Pitch" | letzter GPU-Block moduliert den nächsten | GPU |
+| Far-Reverb (FDN), Delays, Convolution-Room, Body, Mid/Side, Patina, Soft Clip | Kopie | CPU |
+| Klangquellen (Harmonic, FM, Wavetable, Texture, Bow, Spectral, ...) | ersetzt durch die Wolke | -- |
+| Near-Layer, Cosmos, GrainCloud, Presets | vorerst nicht | -- |
+
+Rich passt: Das Atmen der Partials ist hier das Grundprinzip; die Konsonanz nach Sethares (`BrainSpectrum`,
+`makeTimbreScale`) kann am exakt bekannten Spektrum der Wolke messen; "Raum ist eine Landschaft" wird pro Partial möglich.
+**Haken:** reine Intervalle rasten nur ein, wenn die Wolken schmaler sind als der Abstand rein/temperiert (große Terz
+14 Cent, Wolke 25 Cent): *Purity* soll die Wolken mit verengen. Identität: Rich ist der musikalische Rahmen, die eigene
+Stimme sind Wolken, Hüllkurven pro Partial und Landschaften.
+
+## Phase 1: das spielbare Instrument (gebaut, 12.10.2026)
+
+**Aus Noctuary kopiert** (d263f54, Herkunftsvermerk im Kopf jeder Datei, Namensraum `additiv`, Makros `ADDITIV_`):
+`Dsp.h`, `Simd.h`, `Oversample.h`, `Effects.h/.cpp`, `Tuning.h/.cpp` mit `HarmonicEntropy.inc`, `ClusterBrain.h`;
+`cmake/Family.cmake` unverändert aus Totality. `Gpu/` heißt jetzt `Core/` (Familienlayout, Doccheck).
+
+**Neu:** `Params.h/.cpp` (eine Tabelle, 45 Parameter, Noctuarys Standardwerte; Autoplay startet in *Chords*, die
+Bewegung in *Breathe*), `Motion.h/.cpp` (die Szenen aus Phase 0b als Wahl des Instruments), `Engine.h/.cpp`:
+- Ein **Worker** (MMCSS Pro Audio) rendert GPU-Blöcke von 128 Samples in einen Ring und hält ihn um Hostblock plus
+  10 ms voraus; der Callback stempelt Noten (Offset + Latenz) und kopiert nur. Ein Ton beginnt exakt auf seinem Sample
+  (`CloudVoice::onset`, Rampe ab dem Einsatz). Offline rendert `process()` dieselbe Zeitlinie selbst. Latenz an den
+  Host: 768 Samples (16 ms) bei Block 256, 1024 bei 512.
+- **Stimmen:** 16, Hüllkurve aus Noctuarys `Envelope` mit Blockrate, Stehlen mit einem Block Ausblenden, Release,
+  Frequenzen gleiten bei Stimmungswechseln (0,3 s).
+- **Stimmung:** Noctuarys Skalen, Purity mischt 12-TET und Skala; **Purity verengt die Wolken** (bei 1 auf 40 %).
+- **Dirigent:** `ClusterBrain` (Free, Chords = Autoplay), `BrainSpectrum` aus dem Spektrum der Wolke; seine Töne
+  stehen bimodal nah/fern wie in Noctuary (40 % nah, 60 % tief).
+- **GPU:** vier Kanäle (nah L/R, fern L/R); pro Partial `cos/sin(d·π/2)`, −6 dB je Einheit und Luftdämpfung
+  (Tiefpass erster Ordnung, Ecke ab 16 kHz bis fünf Oktaven tiefer, relativ zur Entfernung 0, also am Ohr neutral).
+- **Mischung:** fern nur über den Far-Reverb (Noctuarys FDN, 100 % nass), nah trocken, dann Mid/Side, Master,
+  Soft Clip. **GPU-Klasse REALTIME** im Standalone; das Plugin lässt seinen Host vorerst in Ruhe.
+
+**Werkzeuge:** `additiv_render` (Nacht ohne Fenster, `--set key=value`), Plugin `AdditivAmbientSynth` (VST3 und
+Standalone, JUCEs generische Oberfläche nach Abschnitten gruppiert; Arbeitsname bis zum eigentlichen Namen).
+
+**Gemessen [M]:** Selbsttest 10/10 (Tabelle, reine Quinte 1,5 exakt, Stille bitgenau, Einsatz auf dem Sample,
+Determinismus mit Dirigent, Autoplay füllt, Stehlen, Release, 6 s Echtzeit mit kommenden und gehenden Noten:
+0 Unterläufe, 0 verspätet); Probe-Selbsttest 12/12; Doccheck grün; **pluginval Stufe 10 bestanden**. Autoplay,
+240 s mit Every 20 s: −22 dBFS RMS, Spitzen −8 dBFS (Noctuarys Bereich −21 bis −28), 0,05 ms GPU pro Block,
+37-fache Echtzeit offline. Der Standalone startet und läuft (239 MB).
+
+**Pendulum nach dem Urteil des Nutzers:** Die Tiefe wächst jetzt mit der Tonhöhe (ein Viertel bei 110 Hz, die Hälfte
+bei 1 kHz). Nach der Nummer der Harmonischen war es zuerst versucht: Dann bekamen die starken tiefen Harmonischen nur
+ein Fünftel der Tiefe, und die Pendelwelle verschwand fast.
+
+**Offen aus Phase 1:** Brain 2, Scala- und Timbre-Skala (bis dahin 12-TET in diesen Slots), ein Step-Knopf und
+Clock-Sync für den Autoplay, MPE und Controller, Pegelausgleich der Landschaft (Aurora), die Frage der GPU-Klasse im
+Plugin, der Name.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut
    aufgenommen (12.10.2026).
-1. Engine: Stimmverwaltung, Hüllkurven, Ring und Worker, REALTIME-Klasse, Parameterglättung, Selbsttests.
+1. **Das spielbare Instrument** (erweitert 12.10.2026; **gebaut**, siehe oben): Stimmverwaltung (Note an/aus, Stehlen mit Ausblenden,
+   Anschlag = Nähe), Hüllkurve pro Stimme, Vorausrendern (Worker, Ring, Zeitstempel, Einsatz samplegenau im GPU-Block,
+   Latenz an den Host), REALTIME-Klasse; **reine Stimmung** und **Dirigent mit Autoplay** aus Noctuary; die GPU liefert
+   **nah und fern** (4 Kanäle), die Entfernung ist eine Eigenschaft des Partials; Far-Reverb, Mid/Side und Soft Clip aus
+   Noctuary; Parametertabelle; ein schlichter Standalone und VST3 (JUCE, generische Oberfläche); ein Renderer für die
+   Nacht ohne Oberfläche; Selbsttests.
 2. Klangmodell: Noctuarys Spektralformel (Tilt, Brightness, Odd/Even, Inharmonic, Match auf die Skala) mal Wolke
-   (Breite, Steigung, Dichte), Drift, Shimmer, Ort pro Partial; Rauschanteile.
+   (Breite, Steigung, Dichte), Drift, Shimmer; Raummodell und Filter pro Partial auf der GPU; Landschaften als
+   Kernstück (Bibliothek, Pegelausgleich); Werksformen nach "Bewegung auf tragendem Klang"; Rauschanteile.
 3. Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.
 4. Modulation und Presets (rund 1024 wie die Geschwister).
 5. Familie: Jam, Keyboard-Spiel, Quest.

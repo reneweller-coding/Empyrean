@@ -250,11 +250,11 @@ __device__ float laneValue(const EnvLane& L, const LaneContext& c, std::uint32_t
  * @param shapes  the envelope bank
  * @param land    the landscape
  * @param run     per partial: start phase, phase step, its change per sample, unused (state and render input)
- * @param amp     per partial: the left and right amplitudes the last block ended on
- * @param gains   per partial: left start, left step, right start, right step for the render kernel
+ * @param amp     per partial: the near left, near right, far left and far right amplitudes the last block ended on
+ * @param gains   per partial two entries: near (left start, left step, right start, right step), then far
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
-                             const float* land, uint4* run, float2* amp, float4* gains)
+                             const float* land, uint4* run, float4* amp, float4* gains)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -264,7 +264,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     if (!cv.active || p >= cv.partials) {
         // Beyond the voice's partials (or a silent voice): the render kernel skips whole chunks, the
         // tail of the last chunk it covers must be silent.
-        if (cv.active) { gains[gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f); amp[gid] = make_float2(0.0f, 0.0f); }
+        if (cv.active) {
+            gains[2 * gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            gains[2 * gid + 1] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            amp[gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+        }
         return;
     }
     const float fs = hdr->sampleRate;
@@ -325,18 +329,28 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         f = cv.hz * static_cast<float>(h) * exp2f(cents * (1.0f / 1200.0f));
         // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist.
         const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f);
-        target = cv.scale * __powf(static_cast<float>(h), -cv.tilt) * sh * fade * env * cv.gain;
+        // Distance (Noctuary's planes): 6 dB per unit, and the air's low pass -- a first-order
+        // corner falling from 16 kHz by up to five octaves per unit -- read at this partial's
+        // frequency, where in a filter it would have been a whole filter. Taken relative to the
+        // corner at the ear, so a partial at distance 0 keeps exactly its level (as in Noctuary).
+        const float dist = fminf(fmaxf(cv.distance, 0.0f), 1.0f);
+        const float x0 = f * (1.0f / 16000.0f);
+        const float x = x0 / exp2f(-5.0f * dist * cv.airAbsorb);
+        const float air = sqrtf((1.0f + x0 * x0) / (1.0f + x * x));
+        target = cv.scale * __powf(static_cast<float>(h), -cv.tilt) * sh * fade * env * cv.gain * exp2f(-dist) * air;
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>(fminf(f / fs, 0.49f) * 4294967296.0f);
 
     // Phase and glide: the step moves linearly from where the last block left it to this block's
     // target, so the phase is quadratic in the sample and pitch envelopes never step.
     std::uint32_t ph, inc0, dinc = 0;
-    float2 a0;
+    float4 a0;
+    int onset = 0;
     if (cv.restart) {
         ph = hash32(seed ^ hash32(up + 0x51ED270BU));   // a random phase
         inc0 = incTarget;
-        a0 = make_float2(0.0f, 0.0f);
+        a0 = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+        onset = min(max(cv.onset, 0), n - 1);           // the ramp starts where the note does
     } else {
         const uint4 r = run[gid];
         const std::uint32_t np = static_cast<std::uint32_t>(hdr->nPrev);
@@ -348,53 +362,59 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         a0 = amp[gid];
     }
 
-    // Equal-power pan: the partial's place in the field.
-    float gl, gr;
+    // Equal-power pan: the partial's place in the field; equal-power planes: near cos, far sin.
+    float gl, gr, gn, gf;
     __sincosf(0.78539816f * (1.0f + place), &gr, &gl);
-    const float tl = target * gl, tr = target * gr;
-    const float inv = 1.0f / static_cast<float>(n);
-    gains[gid] = make_float4(a0.x, (tl - a0.x) * inv, a0.y, (tr - a0.y) * inv);
-    amp[gid] = make_float2(tl, tr);
+    __sincosf(1.57079633f * fminf(fmaxf(cv.distance, 0.0f), 1.0f), &gf, &gn);
+    const float4 t4 = make_float4(target * gl * gn, target * gr * gn, target * gl * gf, target * gr * gf);
+    const float inv = 1.0f / static_cast<float>(n - onset);
+    gains[2 * gid] = make_float4(a0.x, (t4.x - a0.x) * inv, a0.y, (t4.y - a0.y) * inv);
+    gains[2 * gid + 1] = make_float4(a0.z, (t4.z - a0.z) * inv, a0.w, (t4.w - a0.w) * inv);
+    amp[gid] = t4;
     run[gid] = make_uint4(ph, inc0, dinc, 0u);
 }
 
 /**
- * @brief The render kernel: one chunk of partials summed into its own stereo block of scratch.
+ * @brief The render kernel: one chunk of partials summed into its own four-channel block of scratch.
  * @param hdr      the block header
  * @param voices   the voices
  * @param pcap     partials per voice in the tables
  * @param run      per partial: start phase, phase step, its change per sample
- * @param gains    per partial: left start, left step, right start, right step
- * @param scratch  per chunk: maxN left samples, then maxN right samples
+ * @param gains    per partial two entries: near (left start, left step, right start, right step), then far
+ * @param scratch  per chunk: maxN samples of near left, near right, far left, far right
  * @param maxN     the engine's block size (the scratch stride)
  */
 __global__ void __launch_bounds__(kThreads)
 renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
              const uint4* run, const float4* gains, float* scratch, int maxN)
 {
-    __shared__ float4 sg[kChunk];         // the chunk's amplitude ramps
-    __shared__ uint4  sp[kChunk];         // the chunk's start phases, steps and glides
-    __shared__ float  red[2][kThreads];   // the groups' sums when the block is shorter than kThreads
+    __shared__ float4 sgn[kChunk];        // the chunk's near amplitude ramps
+    __shared__ float4 sgf[kChunk];        // and its far ones
+    __shared__ uint4  sp[kChunk];         // its start phases, steps and glides
+    __shared__ float  red[kCloudChannels][kThreads];   // the groups' sums when the block is shorter than kThreads
 
     const int chunk = blockIdx.x;
     const int chunksPerVoice = pcap / kChunk;
     const int v = chunk / chunksPerVoice;
     const int first = (chunk - v * chunksPerVoice) * kChunk;
     const int n = hdr->n;
-    float* outL = scratch + static_cast<size_t>(chunk) * 2 * maxN;
-    float* outR = outL + maxN;
+    float* out = scratch + static_cast<size_t>(chunk) * kCloudChannels * maxN;
 
     const CloudVoice& cv = voices[v];
     if (v >= hdr->voices || !cv.active || first >= cv.partials) {
-        for (int s = threadIdx.x; s < n; s += kThreads) { outL[s] = 0.0f; outR[s] = 0.0f; }
+        for (int s = threadIdx.x; s < n; s += kThreads)
+            for (int c = 0; c < kCloudChannels; ++c) out[c * maxN + s] = 0.0f;
         return;
     }
     const int count = min(kChunk, cv.partials - first);
     const int base = v * pcap + first;
     for (int j = threadIdx.x; j < count; j += kThreads) {
-        sg[j] = gains[base + j];
+        sgn[j] = gains[2 * (base + j)];
+        sgf[j] = gains[2 * (base + j) + 1];
         sp[j] = run[base + j];
     }
+    // A note that begins in this block begins at its onset: before it every ramp holds at its start.
+    const int onset = cv.restart ? min(max(cv.onset, 0), n - 1) : 0;
     __syncthreads();
 
     // One thread per sample; a block shorter than kThreads splits the partials among groups.
@@ -406,36 +426,47 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
         const int s = s0 + lane;
         const std::uint32_t su = static_cast<std::uint32_t>(s);
         const std::uint32_t tri = su * (su - 1u) / 2u;   // the glide's share: sum of 0 .. s-1
-        const float sf = static_cast<float>(s);
-        float L = 0.0f, R = 0.0f;
+        const float sa = static_cast<float>(max(s - onset, 0));
+        float nl = 0.0f, nr = 0.0f, fl = 0.0f, fr = 0.0f;
         for (int j = g; j < count; j += groups) {
             const uint4 pi = sp[j];
-            const float4 a = sg[j];
+            const float4 a = sgn[j];
+            const float4 b = sgf[j];
             // The phase as a signed fraction of a turn: -pi .. pi, where __sinf is most accurate.
             const std::uint32_t ph = pi.x + su * pi.y + tri * pi.z;
             const float x = __sinf(static_cast<float>(static_cast<std::int32_t>(ph)) * 1.46291808e-9f);
-            L = fmaf(fmaf(a.y, sf, a.x), x, L);
-            R = fmaf(fmaf(a.w, sf, a.z), x, R);
+            nl = fmaf(fmaf(a.y, sa, a.x), x, nl);
+            nr = fmaf(fmaf(a.w, sa, a.z), x, nr);
+            fl = fmaf(fmaf(b.y, sa, b.x), x, fl);
+            fr = fmaf(fmaf(b.w, sa, b.z), x, fr);
         }
         if (groups > 1) {
-            red[0][threadIdx.x] = L;
-            red[1][threadIdx.x] = R;
+            red[0][threadIdx.x] = nl;
+            red[1][threadIdx.x] = nr;
+            red[2][threadIdx.x] = fl;
+            red[3][threadIdx.x] = fr;
             __syncthreads();
             if (g == 0)
-                for (int q = 1; q < groups; ++q) { L += red[0][lane + q * lanes]; R += red[1][lane + q * lanes]; }
+                for (int q = 1; q < groups; ++q) {
+                    nl += red[0][lane + q * lanes];
+                    nr += red[1][lane + q * lanes];
+                    fl += red[2][lane + q * lanes];
+                    fr += red[3][lane + q * lanes];
+                }
             __syncthreads();
         }
-        if (g == 0) { outL[s] = L; outR[s] = R; }
+        if (g == 0) { out[s] = nl; out[maxN + s] = nr; out[2 * maxN + s] = fl; out[3 * maxN + s] = fr; }
     }
 }
 
 /**
- * @brief The reduce kernel: the chunks' sums added sample by sample into interleaved stereo.
+ * @brief The reduce kernel: the chunks' sums added sample by sample into interleaved frames of
+ *        kCloudChannels (near L, near R, far L, far R).
  * @param hdr      the block header
  * @param scratch  the render kernel's per-chunk blocks
  * @param chunks   how many chunks
  * @param maxN     the scratch stride
- * @param out      n interleaved stereo frames
+ * @param out      n frames of kCloudChannels
  */
 __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int chunks, int maxN, float* out)
 {
@@ -444,15 +475,15 @@ __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int c
     const int t = blockIdx.x * kReduceLanes + threadIdx.x;   // channel-major, as the scratch is laid out
     const int c = t / maxN;
     const int s = t - c * maxN;
-    const bool live = c < 2 && s < n;
+    const bool live = c < kCloudChannels && s < n;
     float acc = 0.0f;
     if (live)
-        for (int k = threadIdx.y; k < chunks; k += kReduceGroups) acc += scratch[static_cast<size_t>(k) * 2 * maxN + t];
+        for (int k = threadIdx.y; k < chunks; k += kReduceGroups) acc += scratch[static_cast<size_t>(k) * kCloudChannels * maxN + t];
     part[threadIdx.y][threadIdx.x] = acc;
     __syncthreads();
     if (threadIdx.y == 0 && live) {
         for (int q = 1; q < kReduceGroups; ++q) acc += part[q][threadIdx.x];
-        out[s * 2 + c] = acc;
+        out[s * kCloudChannels + c] = acc;
     }
 }
 
@@ -499,8 +530,8 @@ struct CloudEngine::Impl {
     float* dOut = nullptr;            ///< device: the finished block
     float* dScratch = nullptr;        ///< device: per chunk a stereo block
     uint4* dRun = nullptr;            ///< device: per partial start phase, step, glide
-    float2* dAmp = nullptr;           ///< device: per partial the left/right amplitudes the last block ended on
-    float4* dGains = nullptr;         ///< device: per partial the amplitude ramps of this block
+    float4* dAmp = nullptr;           ///< device: per partial the four amplitudes (near L/R, far L/R) the last block ended on
+    float4* dGains = nullptr;         ///< device: per partial two entries, the near and the far amplitude ramps of this block
     EnvShape* dShapes = nullptr;      ///< device: the envelope bank, kEnvShapes
     float* dLand = nullptr;           ///< device: the landscape, room for kLandMaxColumns * kLandMaxRows
     float gpuMs = 0.0f;               ///< GPU time of the last finished block
@@ -602,28 +633,28 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     const size_t partialsTotal = static_cast<size_t>(config.voices) * m.pcap;
     const size_t landFloats = static_cast<size_t>(kLandMaxColumns) * kLandMaxRows;
     good = good && ok(cudaHostAlloc(&m.hUpload, m.uploadBytes(), cudaHostAllocDefault), "cudaHostAlloc upload", error)
-                && ok(cudaHostAlloc(&m.hOut, sizeof(float) * 2 * n, cudaHostAllocDefault), "cudaHostAlloc out", error)
+                && ok(cudaHostAlloc(&m.hOut, sizeof(float) * kCloudChannels * n, cudaHostAllocDefault), "cudaHostAlloc out", error)
                 && ok(cudaMalloc(&m.dUpload, m.uploadBytes()), "cudaMalloc upload", error)
-                && ok(cudaMalloc(&m.dOut, sizeof(float) * 2 * n), "cudaMalloc out", error)
-                && ok(cudaMalloc(&m.dScratch, sizeof(float) * 2 * n * static_cast<size_t>(m.chunks)), "cudaMalloc scratch", error)
+                && ok(cudaMalloc(&m.dOut, sizeof(float) * kCloudChannels * n), "cudaMalloc out", error)
+                && ok(cudaMalloc(&m.dScratch, sizeof(float) * kCloudChannels * n * static_cast<size_t>(m.chunks)), "cudaMalloc scratch", error)
                 && ok(cudaMalloc(&m.dRun, sizeof(uint4) * partialsTotal), "cudaMalloc run", error)
-                && ok(cudaMalloc(&m.dAmp, sizeof(float2) * partialsTotal), "cudaMalloc amp", error)
-                && ok(cudaMalloc(&m.dGains, sizeof(float4) * partialsTotal), "cudaMalloc gains", error)
+                && ok(cudaMalloc(&m.dAmp, sizeof(float4) * partialsTotal), "cudaMalloc amp", error)
+                && ok(cudaMalloc(&m.dGains, sizeof(float4) * 2 * partialsTotal), "cudaMalloc gains", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error);
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
     good = good && ok(cudaMemsetAsync(m.dRun, 0, sizeof(uint4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dAmp, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dGains, 0, sizeof(float4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dAmp, 0, sizeof(float4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dGains, 0, sizeof(float4) * 2 * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaStreamSynchronize(m.stream), "cudaStreamSynchronize", error);
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
-        std::memset(m.hOut, 0, sizeof(float) * 2 * n);
-        // The block as one graph: voices up, three kernels, the block down.
+        std::memset(m.hOut, 0, sizeof(float) * kCloudChannels * n);
+        // The block as one graph: voices up, three kernels, the block (four channels) down.
         const auto* hdr = reinterpret_cast<const BlockHeader*>(m.dUpload);
         const auto* voices = reinterpret_cast<const CloudVoice*>(m.dUpload + sizeof(BlockHeader));
         good = ok(cudaStreamBeginCapture(m.stream, cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture", error);
@@ -633,9 +664,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
-            reduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
+            reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dScratch, m.chunks, n, m.dOut);
-            cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * 2 * n, cudaMemcpyDeviceToHost, m.stream);
+            cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudChannels * n, cudaMemcpyDeviceToHost, m.stream);
             good = ok(cudaStreamEndCapture(m.stream, &m.graph), "cudaStreamEndCapture", error)
                 && ok(cudaGraphInstantiate(&m.exec, m.graph, 0), "cudaGraphInstantiate", error);
         }

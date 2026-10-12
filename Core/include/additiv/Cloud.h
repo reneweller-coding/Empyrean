@@ -8,8 +8,9 @@
  * widens towards the top, and every partial's own slow pitch drift, amplitude shimmer and place in
  * the stereo field. The host only fills CloudVoice; the GPU expands it into partials each block
  * (update kernel), sums them sample by sample (render kernel) and folds the chunks into one
- * stereo block (reduce kernel). The three kernels and the two copies around them are one CUDA
- * graph, so a block costs one launch.
+ * block of four channels -- near and far, left and right, the two planes of Noctuary's spatial
+ * model -- (reduce kernel). The three kernels and the two copies around them are one CUDA graph,
+ * so a block costs one launch.
  *
  * Every partial also has its own envelopes, on three lanes: amplitude, pitch and place in the
  * stereo field. A lane does not store 20,000 envelopes; it says how the partials share a bank of
@@ -119,11 +120,22 @@ struct CloudVoice {
     EnvLane amp;                  ///< the amplitude lane
     EnvLane pitch;                ///< the pitch lane, in cents
     EnvLane pan;                  ///< the stereo lane, added to each partial's place
+    /**
+     * @brief Where the voice stands, 0 at the ear .. 1 deep in the background (Noctuary's planes,
+     *        after Robert Rich). Every partial splits between the near and the far output by
+     *        cos/sin(d pi/2), loses 6 dB per unit and is darkened by the air (see airAbsorb).
+     */
+    float distance = 0.0f;
+    float airAbsorb = 1.0f;       ///< 0 .. 1: how far distance darkens -- at 1 a partial's corner falls 5 octaves per unit from 16 kHz
+    int   onset = 0;              ///< with restart: samples into the block at which the note begins (sample-accurate starts)
     // Filled by the engine at launch(), read by the GPU.
     int   harmonics = 0;          ///< harmonics below the cutoff, at most `partials`
     int   members = 0;            ///< partials per harmonic: partials / harmonics
     float scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
+    float pad = 0.0f;             ///< keeps the struct a multiple of 16 bytes
 };
+
+constexpr int kCloudChannels = 4;   ///< the GPU's output per frame: near left, near right, far left, far right
 
 /** @brief How an engine is laid out; fixed between open() and close(). */
 struct CloudConfig {
@@ -198,7 +210,7 @@ public:
 
     /**
      * @brief Waits for the launched block.
-     * @return  blockSize interleaved stereo frames, valid until the next launch()
+     * @return  blockSize frames of kCloudChannels (near L, near R, far L, far R), valid until the next launch()
      */
     const float* wait();
 
