@@ -712,6 +712,64 @@ bool Engine::partialSnapshot(std::vector<float>& dots, int& perVoice)
     return true;
 }
 
+void Engine::stepRipple(float dt)
+{
+    Ripple& R = cloud_.ripple();
+    R.depth = cur(ParamId::RippleDepth);
+    const int strikes = rippleStrikeCount_;
+    rippleStrikeCount_ = 0;
+    if (R.depth <= 0.0f) {   // at rest: the string is let go, so it starts quiet when it is turned up
+        std::fill(std::begin(rippleNow_), std::end(rippleNow_), 0.0f);
+        std::fill(std::begin(ripplePrev_), std::end(ripplePrev_), 0.0f);
+        std::fill(std::begin(R.u), std::end(R.u), 0.0f);
+        R.makeup = 1.0f;
+        return;
+    }
+    constexpr float kCellsPerOctave = static_cast<float>(kRippleCells - 1) / 9.96578428f;
+    // Strikes: every note that started this block, at its first eight harmonics, the stronger the
+    // lower the harmonic -- a pebble into the spectrum where the note lands. The shape is a Ricker
+    // wavelet (a "Mexican hat", zero in sum) about a quarter octave wide, so a passing wave makes a
+    // partial louder and then softer rather than louder on the whole; and it goes into both the now
+    // and the step before, a displacement at rest, which parts into two halves running up and down
+    // (a struck velocity would leave a standing plateau behind in one dimension: measured, 3 dB
+    // louder where the notes are and no motion).
+    for (int s = 0; s < strikes; ++s) {
+        for (int h = 1; h <= 8; ++h) {
+            const float pos = std::log2(std::max(rippleStrikes_[s] * h, 20.0f) / 20.0f) * kCellsPerOctave;
+            for (int c = std::max(0, static_cast<int>(pos) - 24); c <= std::min(kRippleCells - 1, static_cast<int>(pos) + 24); ++c) {
+                const float d = (static_cast<float>(c) - pos) / 5.0f;
+                // 6/h: a passing half-wave of the fundamental's strike takes the loudness from near silence
+                // to twice (tanh saturates); at 2/h it moved a harmonic by a dB or two, too tame to hear.
+                const float bump = (6.0f / static_cast<float>(h)) * (1.0f - d * d) * std::exp(-0.5f * d * d);
+                rippleNow_[c] += bump;
+                ripplePrev_[c] += bump;
+            }
+        }
+    }
+    // The damped wave, u_tt = c^2 u_xx - g u_t, by leapfrog; the ends reflect.
+    const float c = std::max(cur(ParamId::RippleSpeed), 0.01f) * kCellsPerOctave;   // cells a second
+    const float g = 2.0f / std::max(cur(ParamId::RippleDecay), 0.1f);
+    const int steps = std::max(1, static_cast<int>(std::ceil(c * dt / 0.9f)));
+    const float h = dt / static_cast<float>(steps), r2 = (c * h) * (c * h), damp = g * h * 0.5f;
+    float next[kRippleCells];
+    for (int s = 0; s < steps; ++s) {
+        for (int i = 0; i < kRippleCells; ++i) {
+            const float l = rippleNow_[i > 0 ? i - 1 : 1], rr = rippleNow_[i < kRippleCells - 1 ? i + 1 : kRippleCells - 2];
+            next[i] = (2.0f * rippleNow_[i] - (1.0f - damp) * ripplePrev_[i] + r2 * (l - 2.0f * rippleNow_[i] + rr)) / (1.0f + damp);
+        }
+        std::copy(std::begin(rippleNow_), std::end(rippleNow_), std::begin(ripplePrev_));
+        std::copy(std::begin(next), std::end(next), std::begin(rippleNow_));
+    }
+    double mean2 = 0.0;
+    for (int i = 0; i < kRippleCells; ++i) {
+        if (!std::isfinite(rippleNow_[i])) rippleNow_[i] = 0.0f;
+        R.u[i] = rippleNow_[i];
+        const double t = std::tanh(static_cast<double>(rippleNow_[i]));
+        mean2 += t * t;
+    }
+    R.makeup = static_cast<float>(1.0 / std::sqrt(1.0 + static_cast<double>(R.depth) * R.depth * mean2 / kRippleCells));
+}
+
 void Engine::captureGhost(int i)
 {
     size_t slot = 0;
@@ -919,6 +977,7 @@ void Engine::renderBlock()
         cv.seed = v.seed;
         cv.active = 1;
         cv.restart = v.restart ? 1 : 0;
+        if (v.restart && rippleStrikeCount_ < 64) rippleStrikes_[rippleStrikeCount_++] = static_cast<float>(v.hz);
         cv.onset = v.restart ? v.onset : 0;
         applyMotion(motion, cv, blk_.motionRate, blk_.motionDepth);
         v.restart = false;
@@ -1116,6 +1175,8 @@ void Engine::renderBlock()
             L.steps = 0;
         }
     }
+
+    stepRipple(dtf);
 
     // Partial sync: the coupling in units of the oscillators' own spread of rates -- 2.5 times it at
     // full Coupling, well past the critical strength (for a uniform spread about 1.3 times it).

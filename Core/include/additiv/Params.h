@@ -201,6 +201,10 @@ enum class ParamId : int {
     SyncCoupling,   ///< 0 .. 1: how strongly the members of a harmonic pull each other into step
     SyncRate,       ///< Hz: the oscillators' middle rate
     SyncSpread,     ///< 0 .. 1: how far their own rates scatter
+    // Phase 10f: the ripple
+    RippleDepth,    ///< 0 .. 1: how far the partials' loudness follows the wave
+    RippleSpeed,    ///< octaves a second the wave runs along the spectrum
+    RippleDecay,    ///< s: how long a strike rings on the string
     Count           ///< number of parameters
 };
 

@@ -68,6 +68,7 @@ struct BlockHeader {
     SpectralEcho echo;     ///< the spectral echo for this block
     LifeField life;        ///< the living landscape for this block
     PartialSync sync;      ///< the partial sync for this block
+    Ripple ripple;         ///< the ripple for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -876,6 +877,13 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             theta[gid] = th;
             env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(th)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
         }
+        // The ripple: the wave along the spectrum at this partial's frequency.
+        if (hdr->ripple.depth > 0.0f) {
+            const float x = c.src[1] * static_cast<float>(kRippleCells - 1);
+            const int x0 = min(static_cast<int>(x), kRippleCells - 2);
+            const float u = hdr->ripple.u[x0] + (hdr->ripple.u[x0 + 1] - hdr->ripple.u[x0]) * (x - static_cast<float>(x0));
+            env *= fmaxf(0.0f, 1.0f + hdr->ripple.depth * tanhf(u)) * hdr->ripple.makeup;
+        }
         // The living landscape: the field at this partial's frequency and its place in its cloud.
         if (hdr->life.mode != LifeMode::Off && hdr->life.depth > 0.0f) {
             const LifeField& L = hdr->life;
@@ -1550,6 +1558,7 @@ struct CloudEngine::Impl {
     float* dSyncTheta = nullptr;      ///< device: per partial the sync's phase
     float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasor
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
+    Ripple ripple;                    ///< the host's copy of the ripple
     float2* dLifeA = nullptr;         ///< device: the living field, buffer A
     float2* dLifeB = nullptr;         ///< device: buffer B
     float* dLifeStats = nullptr;      ///< device: its mean and mean square, then what was heard (level, centroid, flux)
@@ -1879,6 +1888,8 @@ LifeField& CloudEngine::life() { return impl_->life; }
 
 PartialSync& CloudEngine::sync() { return impl_->sync; }
 
+Ripple& CloudEngine::ripple() { return impl_->ripple; }
+
 void CloudEngine::lifeStats(float& mean, float& meanSq) const
 {
     mean = impl_->hLifeStats[0];
@@ -1927,6 +1938,7 @@ void CloudEngine::launch()
     hdr->echo = m.echo;
     m.echo.clear = 0;   // asked for once
     hdr->sync = m.sync;
+    hdr->ripple = m.ripple;
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);
     hdr->lifeParity = m.lifeParity;

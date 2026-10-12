@@ -30,7 +30,7 @@ TITLE = "Empyrean"   # the cover's
 # The sections of the parameter table on each tab (Plugin/PluginEditor.cpp builds the tabs).
 TABS = {
     "Cloud": ["Cloud", "Air"],
-    "Motion": ["Motion", "Field", "Life", "Sync"],
+    "Motion": ["Motion", "Field", "Life", "Sync", "Ripple"],
     "Filter": ["Filter", "Envelope"],
     "Tuning": ["Tuning"],
     "Conductor": ["Conductor"],

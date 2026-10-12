@@ -154,7 +154,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                      { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } },
                      { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
                                                            ParamId::LifeZoom } },
-                     { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread } } });
+                     { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread } },
+                     { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });

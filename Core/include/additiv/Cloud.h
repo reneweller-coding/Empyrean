@@ -314,6 +314,22 @@ struct PartialSync {
 };
 static_assert(sizeof(PartialSync) % 16 == 0, "PartialSync rides in the block header");
 
+constexpr int kRippleCells = 256;   ///< the ripple's string: cells over the range, log (20 Hz .. 20 kHz)
+
+/**
+ * @brief The ripple: a damped wave along the spectrum, its displacement read by every partial at its
+ *        frequency as a share of its loudness. The engine runs the string (Engine::stepRipple) and sends
+ *        it up with the voices.
+ */
+struct Ripple {
+    float depth = 0.0f;                   ///< 0 .. 1: (1 + depth tanh u) times the make-up (0: nothing read)
+    float makeup = 1.0f;                  ///< one over the root of (1 + depth^2 mean tanh^2 u)
+    float pad0 = 0.0f;                    ///< keeps the table 16-byte aligned
+    float pad1 = 0.0f;                    ///< likewise
+    float u[kRippleCells] = {};           ///< the string's displacement, cell by cell
+};
+static_assert(sizeof(Ripple) % 16 == 0, "Ripple rides in the block header");
+
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
 constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
@@ -439,6 +455,9 @@ public:
 
     /** @brief The host's copy of the partial sync's settings, edited between wait() and the next launch(). @return the settings */
     PartialSync& sync();
+
+    /** @brief The host's copy of the ripple, edited between wait() and the next launch(). @return the ripple */
+    Ripple& ripple();
 
     /**
      * @brief The living field's mean and mean square (of what the partials read, 0 .. 1), measured by

@@ -404,6 +404,17 @@ private:
     float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
     double lorenz_[kFieldAttractors][3] = {};          ///< the field's attractors: eight Lorenz systems (x, y, z), wandering always
     bool flockWas_ = false;                            ///< the last block's field was the flock (else its state is taken afresh)
+    float rippleNow_[kRippleCells] = {};               ///< the ripple's string now
+    float ripplePrev_[kRippleCells] = {};              ///< and a step before (the wave equation's leapfrog)
+    float rippleStrikes_[64] = {};                     ///< the fundamentals of the notes that started this block
+    int rippleStrikeCount_ = 0;                        ///< how many
+    /**
+     * @brief One block of the ripple's string: struck at the harmonics of every note that started this
+     *        block (rippleStrikes_, gathered by the voice loop, which clears the restart flags), then the damped wave equation stepped (leapfrog, reflecting ends, as many substeps
+     *        as the speed needs to stay stable), and the make-up worked out.
+     * @param dt  the block's length, seconds
+     */
+    void stepRipple(float dt);
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost {

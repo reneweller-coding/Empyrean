@@ -301,6 +301,10 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::SyncCoupling,   "sync_coupling",   "Coupling",     "Sync", 0.f,   1.f,   0.5f,  1.f,  ""),
     F(ParamId::SyncRate,       "sync_rate",       "Sync Rate",    "Sync", 0.05f, 6.f,   0.5f,  0.4f, "Hz"),
     F(ParamId::SyncSpread,     "sync_spread",     "Spread",       "Sync", 0.f,   1.f,   0.3f,  1.f,  ""),
+
+    F(ParamId::RippleDepth,    "ripple_depth",    "Ripple",       "Ripple", 0.f,  1.f,   0.f,   1.f,  ""),
+    F(ParamId::RippleSpeed,    "ripple_speed",    "Ripple Speed", "Ripple", 0.1f, 4.f,   0.8f,  0.5f, "oct/s"),
+    F(ParamId::RippleDecay,    "ripple_decay",    "Ripple Decay", "Ripple", 0.5f, 30.f,  6.f,   0.5f, "s"),
 } };
 
 } // namespace

@@ -1133,6 +1133,48 @@ int main()
                   moved[1], moved[0], spread[1], spread[0], level[1], level[0]));
     }
 
+    // 41. The ripple: notes struck one after another send waves along the spectrum, and a high
+    //     harmonic's loudness rides them -- it swings far more than without -- at the same level.
+    {
+        double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::CloudWidth, 0.0f);   // one steady sine per harmonic: whatever moves is the ripple
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::RippleDepth, static_cast<float>(k));
+            e.setParam(ParamId::RippleSpeed, 1.5f);
+            e.setParam(ParamId::RippleDecay, 8.0f);
+            if (!openOffline(e, false, 131)) return 1;
+            e.noteOn(50, 0.8f, 0);
+            std::vector<float> lr = render(e, 1.0);
+            const double f4 = 4.0 * soundingHz(e);
+            for (int note : { 57, 62, 66 }) {   // more strikes, a second apart
+                e.noteOn(note, 0.8f, 0);
+                const std::vector<float> part = render(e, 1.0);
+                lr.insert(lr.end(), part.begin(), part.end());
+            }
+            const std::vector<float> rest = render(e, 4.0);
+            lr.insert(lr.end(), rest.begin(), rest.end());
+            // Quarter seconds: a passing wave takes about that long; the cloud's own beating, shorter, averages out.
+            double s = 0.0, s2 = 0.0;
+            const int windows = 24;
+            for (int w = 0; w < windows; ++w) {
+                const size_t a = static_cast<size_t>(1 * 48000 + w * 12000);
+                const double db = toneDb(lr, a, a + 12000, f4);
+                s += db;
+                s2 += db * db;
+            }
+            sd[k] = std::sqrt(std::max(0.0, s2 / windows - (s / windows) * (s / windows)));
+            level[k] = rmsDb(lr, 4 * 48000, 8 * 48000);
+        }
+        check(sd[1] > sd[0] + 1.5 && std::fabs(level[1] - level[0]) < 1.5, "ripple: the strikes' waves move the partials",
+              fmt("4th harmonic of the first note swings %.1f dB still, %.1f dB on the ripple; level %.1f / %.1f dBFS", sd[0], sd[1], level[0], level[1]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }
