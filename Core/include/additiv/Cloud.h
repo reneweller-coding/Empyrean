@@ -151,7 +151,11 @@ struct CloudVoice {
     float scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
     float airScale = 0.0f;        ///< amplitude of every air partial
     float filterMix = 1.0f;       ///< 0 .. 1: the filter's gain raised to this (a morph fades one filter out and another in)
-    float pad1 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float stretch = 1.0f;         ///< harmonic h at h^stretch (partialRatio)
+    float shift = 0.0f;           ///< Hz added to every partial (below 20 Hz they fade out)
+    float pad4 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float pad2 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float pad3 = 0.0f;            ///< likewise
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */

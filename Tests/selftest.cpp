@@ -1406,6 +1406,43 @@ int main()
                   numBuiltinJourneys(), steps, bad, unknown, same ? "agree" : "DIFFER", begun, reached, p.passes()));
     }
 
+    // 47. Stretch and Shift: stretched by 60 cents an octave, the 4th harmonic sits at 4^1.05 of the
+    //     fundamental, not at 4; shifted by 50 Hz, the fundamental sits 50 Hz up.
+    {
+        double stretched[2] = { 0.0, 0.0 }, shifted[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::CloudWidth, 4.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::Scale, 0.0f);
+            e.setParam(ParamId::Stretch, k == 0 ? 1200.0f : 1260.0f);
+            if (!openOffline(e, false, 151)) return 1;
+            e.noteOn(48, 0.8f, 0);
+            const std::vector<float> lr = render(e, 2.0);
+            const double f0 = soundingHz(e);
+            stretched[k] = toneDb(lr, 48000, 96000, f0 * std::pow(4.0, 1.05)) - toneDb(lr, 48000, 96000, 4.0 * f0);
+        }
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::CloudWidth, 4.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::Scale, 0.0f);
+            e.setParam(ParamId::Shift, k == 0 ? 0.0f : 50.0f);
+            if (!openOffline(e, false, 153)) return 1;
+            e.noteOn(48, 0.8f, 0);
+            const std::vector<float> lr = render(e, 2.0);
+            const double f0 = soundingHz(e);
+            shifted[k] = toneDb(lr, 48000, 96000, f0 + 50.0) - toneDb(lr, 48000, 96000, f0);
+        }
+        check(stretched[1] > 10.0 && stretched[0] < -10.0 && shifted[1] > 10.0 && shifted[0] < -10.0, "spectrum: Stretch and Shift move the partials",
+              fmt("4th harmonic at 4^1.05 against 4: %.1f dB harmonic, %.1f dB stretched; fundamental +50 Hz against itself: %.1f dB, %.1f dB shifted",
+                  stretched[0], stretched[1], shifted[0], shifted[1]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

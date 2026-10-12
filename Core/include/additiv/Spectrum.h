@@ -81,6 +81,21 @@ ADDITIV_HD inline float stretchOf(int h, float B)
 }
 
 /**
+ * @brief Where harmonic h of a voice lies, as a multiple of its fundamental: h stretched to
+ *        h^s (Stretch: an octave of s times 1200 cents, Sethares' stretched timbres) and then by
+ *        the stiff string.
+ * @param h  the harmonic
+ * @param B  the inharmonicity
+ * @param s  the stretch's exponent (1: harmonic)
+ * @return   h^s sqrt(1 + B h^2)
+ */
+ADDITIV_HD inline float partialRatio(int h, float B, float s)
+{
+    const float hf = static_cast<float>(h);
+    return (s == 1.0f ? hf : exp2f(s * log2f(hf))) * stretchOf(h, B);
+}
+
+/**
  * @brief The Inharmonic knob as the stiff string's B. Noctuary's 0.02 i^2 was made for 32
  *        harmonics; over a few hundred it would throw the top far past Nyquist, so here the same
  *        knob reaches the same stretch at harmonic 32 and grows like a string above it.

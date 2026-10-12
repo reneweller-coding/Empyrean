@@ -218,6 +218,9 @@ enum class ParamId : int {
     MorphActive,    ///< the sound is the blend of the morph's slots A and B (Morph.h)
     MorphPos,       ///< 0 (A) .. 1 (B): where between them
     PresetGlide,    ///< s: a preset chosen glides from the sound before it (0: it comes at once)
+    // Phase 13: the partials' ratios
+    Stretch,        ///< cents an octave of the harmonics spans (1200: harmonic; Sethares' stretched timbres)
+    Shift,          ///< Hz every partial is moved by (a frequency shifter: harmonic ratios become inharmonic)
     Count           ///< number of parameters
 };
 

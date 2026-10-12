@@ -318,6 +318,9 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     B(ParamId::MorphActive,     "morph_active",     "Morph",      "Morph", false),
     F(ParamId::MorphPos,        "morph_pos",        "A - B",      "Morph", 0.f,   1.f,  0.f,  1.f,  ""),
     F(ParamId::PresetGlide,     "preset_glide",     "Glide",      "Morph", 0.f,   600.f, 0.f, 0.4f, "s"),
+
+    F(ParamId::Stretch,         "stretch",          "Stretch",    "Cloud", 1080.f, 1320.f, 1200.f, 1.f, "ct/oct"),
+    F(ParamId::Shift,           "shift",            "Shift",      "Cloud", -200.f, 200.f, 0.f,   1.f,  "Hz"),
 } };
 
 } // namespace

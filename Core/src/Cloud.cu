@@ -807,8 +807,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             groupCount = K;
             member = k;
             sigmaCents = sigma;
-            const float stretch = stretchOf(h, cv.inharmonic);
-            centre = cv.hz * static_cast<float>(h) * stretch * exp2f(z * sigma * (1.0f / 1200.0f));
+            centre = cv.hz * partialRatio(h, cv.inharmonic, cv.stretch) * exp2f(z * sigma * (1.0f / 1200.0f)) + cv.shift;
             drift = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
                               + 0.35f * slowSine(cv.driftRate * (1.2f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
             sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
@@ -826,7 +825,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             groupCount = A;
             member = a;
             sigmaCents = 0.5f * cv.airWidth;
-            centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f));
+            centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f)) + cv.shift;
             const float j = cv.airJitter;
             drift = 40.0f * (0.6f * slowSine(j * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
                            + 0.4f * slowSine(j * (1.3f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
@@ -837,6 +836,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
 
         // The envelope lanes, read against this partial's sources.
         LaneContext c;
+        centre = fmaxf(centre, 1.0f);   // a partial the shift took below nothing (it is faded out)
         const float pitchPos = log2f(fmaxf(centre, kLandLowHz) * (1.0f / kLandLowHz)) * (1.0f / 9.96578428f);   // log2(1000)
         c.src[0] = 0.0f;
         c.src[1] = fminf(fmaxf(pitchPos, 0.0f), 1.0f);
@@ -914,8 +914,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
                                  z * (2.0f / 1200.0f));
         }
         f = home * exp2f(fieldOff * (1.0f / 1200.0f));
-        // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist.
-        const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f);
+        // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist; a
+        // partial the shift took down fades out between 20 and 5 Hz (and never runs below 1).
+        const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f) * fminf(fmaxf((f - 5.0f) * (1.0f / 15.0f), 0.0f), 1.0f);
+        f = fmaxf(f, 1.0f);
         // Distance (Noctuary's planes): 6 dB per unit, and the air's low pass -- a first-order
         // corner falling from 16 kHz by up to five octaves per unit -- read at this partial's
         // frequency, where in a filter it would have been a whole filter. Taken relative to the
@@ -942,7 +944,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     float2 q0 = make_float2(0.0f, 0.0f);
     int onset = 0;
     if (cv.restart) {
-        ph = hash32(seed ^ hash32(up + 0x51ED270BU));   // a random phase
+        // A random phase. (Never aligned: a harmonic's hundreds of members lie within cents of each
+        // other, so in phase they add in amplitude -- measured 19 dB louder for half a second, and
+        // a plain sine rather than a pulse. The cloud's level assumes they add in power.)
+        ph = hash32(seed ^ hash32(up + 0x51ED270BU));
         inc0 = incTarget;
         a0 = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
         onset = min(max(cv.onset, 0), n - 1);           // the ramp starts where the note does
@@ -1854,11 +1859,14 @@ struct CloudEngine::Impl {
         float presenceDb = 0.0f;   ///< presence bell
         float distance = 0.0f;     ///< the presence's distance
         float lowCut = 0.0f;       ///< pad low cut
+        float stretch = 1.0f;      ///< the harmonics' stretch exponent
+        float shift = 0.0f;        ///< the partials' shift, Hz
         /** @brief Equal in every field. @param o the other key @return true when the sum can be reused */
         bool operator==(const ShapeKey& o) const
         {
             return hz == o.hz && harmonics == o.harmonics && tilt == o.tilt && oddEven == o.oddEven && brightness == o.brightness
-                && inharmonic == o.inharmonic && presenceDb == o.presenceDb && distance == o.distance && lowCut == o.lowCut;
+                && inharmonic == o.inharmonic && presenceDb == o.presenceDb && distance == o.distance && lowCut == o.lowCut
+                && stretch == o.stretch && shift == o.shift;
         }
     };
     std::vector<ShapeKey> shapeKey;   ///< per voice: what powerSum was made for
@@ -2004,19 +2012,26 @@ struct CloudEngine::Impl {
         const int airPartials = (v.air > 0.0f && partials >= 2) ? std::clamp(static_cast<int>(std::lround(partials * kAirShare)), 1, partials - 1) : 0;
         const int HP = partials - airPartials;
         const float hz = std::max(v.hz, 1.0f);
-        // Harmonics below the cutoff: h f0 sqrt(1 + B h^2) < cutoff, solved for h.
-        const double c = cutoff / hz;
-        const double B = std::max(0.0f, v.inharmonic);
-        const double hmax = B > 0.0 ? std::sqrt((-1.0 + std::sqrt(1.0 + 4.0 * B * c * c)) / (2.0 * B)) : c;
-        const int H = std::clamp(static_cast<int>(hmax), 1, HP);
+        // Harmonics below the cutoff: f0 h^s sqrt(1 + B h^2) + shift < cutoff -- rising in h, so the
+        // last one below is found by halving.
+        const float s = std::clamp(v.stretch, 0.5f, 2.0f);
+        int lo = 1, hi = HP;
+        auto below = [&](int h) { return hz * partialRatio(h, std::max(0.0f, v.inharmonic), s) + v.shift < cutoff; };
+        if (below(hi)) lo = hi;
+        else
+            while (hi - lo > 1) {
+                const int mid = (lo + hi) / 2;
+                (below(mid) ? lo : hi) = mid;
+            }
+        const int H = std::clamp(lo, 1, HP);
         v.harmonics = H;
         v.members = HP / H;
         v.harmonicPartials = HP;
-        const ShapeKey key{ hz, H, v.tilt, v.oddEven, v.brightness, v.inharmonic, v.presenceDb, std::clamp(v.distance, 0.0f, 1.0f), v.lowCut };
+        const ShapeKey key{ hz, H, v.tilt, v.oddEven, v.brightness, v.inharmonic, v.presenceDb, std::clamp(v.distance, 0.0f, 1.0f), v.lowCut, s, v.shift };
         if (!(shapeKey[i] == key)) {
             double sum = 0.0;
             for (int h = 1; h <= H; ++h) {
-                const float fh = hz * static_cast<float>(h) * stretchOf(h, v.inharmonic);
+                const float fh = std::max(hz * partialRatio(h, v.inharmonic, s) + v.shift, 1.0f);
                 const double a = static_cast<double>(harmonicShape(h, v.tilt, v.oddEven, v.brightness))
                                * presenceGain(fh, v.presenceDb, key.distance) * lowCutGain(fh, v.lowCut);
                 sum += a * a;

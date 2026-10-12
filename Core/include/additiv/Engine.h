@@ -428,7 +428,7 @@ private:
     ClusterBrain brain2_;                              ///< the second conductor, in the background (Noctuary's Brain 2)
     BrainParams bp2_;                                  ///< its knobs
     BrainSpectrum brainSpec_;                          ///< the cloud's spectrum for its Timbre judgement
-    float specKey_[4] = { -1.0f, 0.0f, 0.0f, 0.0f };   ///< tilt, odd/even, brightness, inharmonic the spectrum was built for
+    float specKey_[5] = { -1.0f, 0.0f, 0.0f, 0.0f, 1.0f };   ///< tilt, odd/even, brightness, inharmonic, stretch the spectrum was built for
     Rng rng_;                                          ///< the engine's dice (seeds, distances)
     Rng side_;                                         ///< a side stream for the drifters, so switching them on never moves the notes' dice
     Drifter tide_;                                     ///< the whole instrument's slow lean (Tide)
@@ -590,6 +590,8 @@ private:
         float brightness = 1.0f; ///< brightness window
         float oddEven = 0.0f;    ///< odd/even
         float inharmonicB = 0.0f;///< the stiff string's B
+        float stretch = 1.0f;    ///< the harmonics' stretch exponent (Stretch / 1200)
+        float shift = 0.0f;      ///< Hz every partial is moved by
         float air = 0.0f;        ///< air band level
         float airCenter = 3.0f;  ///< its centre, times f0
         float airWidth = 600.0f; ///< its width, cents

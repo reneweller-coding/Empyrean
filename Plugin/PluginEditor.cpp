@@ -150,7 +150,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([p] { return p->describe(); });
         tabs_.addTab(name, additivui::skin().panel, new ScrollPage(p, [p](int w) { return p->heightFor(w); }), true);
     };
-    page("Cloud", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic } },
+    page("Cloud", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic,
+                                                         ParamId::Stretch, ParamId::Shift } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
                                                ParamId::ShimmerRate, ParamId::Stereo } },
                     { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter } } });

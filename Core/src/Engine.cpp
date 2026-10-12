@@ -546,7 +546,8 @@ void Engine::readParams()
                     if (vb.note < 0 || vb.lastGain <= 0.0f) continue;
                     for (int ha = 1; ha <= 8; ++ha)
                         for (int hb = 1; hb <= 8; ++hb) {
-                            const double fa = va.hz * ha, fb = vb.hz * hb;
+                            const double fa = va.hz * partialRatio(ha, blk_.inharmonicB, blk_.stretch) + blk_.shift;
+                            const double fb = vb.hz * partialRatio(hb, blk_.inharmonicB, blk_.stretch) + blk_.shift;
                             const double s = 0.24 / (0.021 * std::min(fa, fb) + 19.0), d = std::fabs(fb - fa) * s;
                             const double w = static_cast<double>(va.lastGain) * vb.lastGain / (ha * hb);
                             rough += w * (std::exp(-3.5 * d) - std::exp(-5.75 * d));
@@ -604,6 +605,8 @@ void Engine::readParams()
     blk_.brightness = g(ParamId::Brightness);
     blk_.oddEven = g(ParamId::OddEven);
     blk_.inharmonicB = inharmonicB(g(ParamId::Inharmonic));
+    blk_.stretch = g(ParamId::Stretch) / 1200.0f;
+    blk_.shift = g(ParamId::Shift);
     blk_.purity = g(ParamId::Purity);
     blk_.width = g(ParamId::CloudWidth) * (1.0f - kPurityNarrowing * blk_.purity);
     blk_.widthSlope = g(ParamId::WidthSlope);
@@ -676,13 +679,14 @@ void Engine::readParams()
 
 void Engine::refreshSpectrum()
 {
-    const float key[4] = { blk_.tilt, blk_.oddEven, blk_.brightness, blk_.inharmonicB };
+    const float key[5] = { blk_.tilt, blk_.oddEven, blk_.brightness, blk_.inharmonicB, blk_.stretch };
     if (std::equal(std::begin(key), std::end(key), std::begin(specKey_))) return;
     std::copy(std::begin(key), std::end(key), std::begin(specKey_));
-    // The conductors judge timbre against the voice's own harmonic spectrum, stretch included.
+    // The conductors judge timbre against the voice's own harmonic spectrum, both stretches included
+    // (so the Timbre scale of a stretched spectrum is the stretched scale that makes it consonant).
     brainSpec_.count = BrainSpectrum::kMax;
     for (int h = 1; h <= BrainSpectrum::kMax; ++h) {
-        brainSpec_.ratio[h - 1] = static_cast<double>(h) * stretchOf(h, blk_.inharmonicB);
+        brainSpec_.ratio[h - 1] = static_cast<double>(partialRatio(h, blk_.inharmonicB, blk_.stretch));
         brainSpec_.amp[h - 1] = harmonicShape(h, blk_.tilt, blk_.oddEven, blk_.brightness);
     }
     if (scaleChoice_ == kTimbreScaleIndex) scaleChoice_ = -1;   // the Timbre scale follows the spectrum
@@ -973,7 +977,8 @@ void Engine::renderBlock()
         const float grav = cur(ParamId::TuneGravity), reach = std::max(1.0f, cur(ParamId::TuneReach)), anchor = cur(ParamId::TuneAnchor);
         const int nv = static_cast<int>(voices_.size());
         if (grav > 0.0f) {
-            static const float kLogH[9] = { 0.0f, 0.0f, 1.0f, 1.5849625f, 2.0f, 2.3219281f, 2.5849625f, 2.8073549f, 3.0f };
+            float kLogH[9] = { 0.0f };   // log2 of where harmonics 1 .. 8 lie (both stretches)
+            for (int h = 1; h <= 8; ++h) kLogH[h] = std::log2(partialRatio(h, blk_.inharmonicB, blk_.stretch));
             std::array<float, 64> lb{}, moved{};
             for (int a = 0; a < nv && a < 64; ++a) {
                 const Voice& v = voices_[static_cast<size_t>(a)];
@@ -1065,6 +1070,8 @@ void Engine::renderBlock()
         cv.brightness = blk_.brightness;
         cv.oddEven = blk_.oddEven;
         cv.inharmonic = blk_.inharmonicB;
+        cv.stretch = blk_.stretch;
+        cv.shift = blk_.shift;
         cv.presenceDb = blk_.presence;
         cv.lowCut = blk_.padLowCut;
         cv.filterModel = static_cast<int>(model);
