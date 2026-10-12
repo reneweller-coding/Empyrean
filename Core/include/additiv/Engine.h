@@ -364,6 +364,7 @@ private:
     bool prepared_ = false;                            ///< prepare() succeeded
     bool realtime_ = true;                             ///< worker mode
     int latency_ = 0;                                  ///< samples the timeline runs ahead
+    int startReserve_ = 0;                             ///< samples rendered beyond it before the first callback, used up over as many
     std::array<std::atomic<float>, kNumParams> params_; ///< the parameters, any thread
 
     CloudEngine cloud_;                                ///< the GPU
@@ -454,6 +455,8 @@ private:
     Rng ghostRng_;                                     ///< the ghosts' dice: their own stream, so the memory never moves the conductor
     Rng noteRng_;                                      ///< the Random per Note source's dice (its own stream)
     float randomNote_ = 0.0f;                          ///< the last note's draw, -1 .. 1
+    float roughness_ = 0.0f;                           ///< the chord's roughness as last worked out
+    int roughTick_ = 0;                                ///< blocks until it is worked out again
     std::vector<float> specL_;                         ///< the spectral echo's block from the GPU, left
     std::vector<float> specR_;                         ///< and right
     float prevSpecMix_ = 0.0f;                         ///< the spectral echo's level at the end of the last block

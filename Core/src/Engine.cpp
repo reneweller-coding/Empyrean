@@ -211,6 +211,8 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     ghostRng_ = Rng(cfg_.seed ^ 0x47686F7374ull);
     noteRng_ = Rng(cfg_.seed ^ 0x4E6F7465ull);
     randomNote_ = 0.0f;
+    roughness_ = 0.0f;
+    roughTick_ = 0;
     prevSpecMix_ = prevSpecToFar_ = 0.0f;
     specWasOn_ = false;
     prevMeltMix_ = prevMeltToFar_ = 0.0f;
@@ -238,7 +240,12 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     // render between them.
     const int ahead = 2 * cfg_.maxHostBlock + static_cast<int>(std::ceil(cfg_.lookaheadMs * 0.001 * cfg_.sampleRate));
     latency_ = (ahead + G - 1) / G * G;
-    const std::int64_t frames = nextPow2(static_cast<std::int64_t>(latency_) + cfg_.maxHostBlock + 2 * G);
+    // The start reserve: as much again rendered before the first callback and not replaced while it
+    // is used up, so the first callbacks may come in a burst (a device starting fills its buffer at
+    // once: the standalone's ring fell to 224 of 1536 in its first second, with an underrun) while
+    // the first GPU blocks are still slow. The latency the host is told stays.
+    startReserve_ = latency_;
+    const std::int64_t frames = nextPow2(static_cast<std::int64_t>(latency_) + startReserve_ + cfg_.maxHostBlock + 2 * G);
     ring_.assign(static_cast<size_t>(frames) * 2, 0.0f);
     ringMask_ = frames - 1;
     renderPos_.store(0);
@@ -251,7 +258,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
         startWorker();
         // The first callback must find the ring full: the first blocks are the slowest (the GPU's
         // module loads on its first launch), and the host may call at once.
-        for (int waited = 0; waited < 500 && renderPos_.load(std::memory_order_acquire) + G <= latency_; ++waited) Sleep(1);
+        for (int waited = 0; waited < 500 && renderPos_.load(std::memory_order_acquire) + G <= latency_ + startReserve_; ++waited) Sleep(1);
     }
     return true;
 }
@@ -296,7 +303,10 @@ void Engine::workerLoop()
         const std::int64_t out = outPos_.load(std::memory_order_acquire);
         std::int64_t r = renderPos_.load(std::memory_order_relaxed);
         if (r < out) { r = out; renderPos_.store(r, std::memory_order_release); }   // after an underrun: catch up
-        if (r + G <= out + latency_) { renderBlock(); continue; }
+        // Ahead by the latency, and at the start by the reserve not used up yet (out + its rest
+        // stays at its end until the callbacks have taken it).
+        const std::int64_t reserve = std::max<std::int64_t>(0, startReserve_ - out);
+        if (r + G <= out + latency_ + reserve) { renderBlock(); continue; }
         if (timer) {
             LARGE_INTEGER due;
             due.QuadPart = -5000;   // 0.5 ms
@@ -431,10 +441,13 @@ void Engine::readParams()
             in.distance = loud ? loud->distance : 0.5f;
             // What was heard in the last block (the GPU's), and the chord's roughness: Sethares'
             // dissonance curve (after Plomp and Levelt) over the first eight harmonics of every pair of
-            // sounding voices, weighted by their loudness and 1/h, over its own weight.
+            // sounding voices, weighted by their loudness and 1/h, over its own weight -- every eighth
+            // block (up to 15,000 exponentials; the source is smoothed over a second anyway).
             if (prepared_) cloud_.heard(in.heardDb, in.heardCentroid, in.heardFlux);
             double rough = 0.0, weight = 0.0;
-            for (size_t a = 0; a < voices_.size(); ++a) {
+            const bool roughNow = --roughTick_ <= 0;
+            if (roughNow) roughTick_ = 8;
+            for (size_t a = 0; roughNow && a < voices_.size(); ++a) {
                 const Voice& va = voices_[a];
                 if (va.note < 0 || va.lastGain <= 0.0f) continue;
                 for (size_t b = a + 1; b < voices_.size(); ++b) {
@@ -452,7 +465,8 @@ void Engine::readParams()
             }
             // Scaled so that a minor second, the roughest common interval, reads about 0.55 and a pure
             // fifth under 0.1 (most of the 64 pairs lie far apart and add nothing to the mean).
-            in.roughness = weight > 1.0e-12 ? static_cast<float>(16.0 * rough / weight) : 0.0f;
+            if (roughNow) roughness_ = weight > 1.0e-12 ? static_cast<float>(16.0 * rough / weight) : 0.0f;
+            in.roughness = roughness_;
             if (prepared_) cloud_.reservoirOut(in.reservoir);
         }
         phraseStart_ = false;
