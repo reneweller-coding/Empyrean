@@ -220,22 +220,22 @@ float noteHz(int note) { return 440.0f * std::exp2((static_cast<float>(note) - 6
 
 /**
  * @brief The GPU's four channels (near L, near R, far L, far R) as stereo: near and far added.
- * @param q   n frames of kCloudChannels
+ * @param q   n frames of kCloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
  * @param n   frames
  * @param lr  receives n interleaved stereo frames
  */
 void mixToStereo(const float* q, int n, float* lr)
 {
     for (int i = 0; i < n; ++i) {
-        lr[2 * i] = q[kCloudChannels * i] + q[kCloudChannels * i + 2];
-        lr[2 * i + 1] = q[kCloudChannels * i + 1] + q[kCloudChannels * i + 3];
+        lr[2 * i] = q[kCloudOutChannels * i] + q[kCloudOutChannels * i + 2];
+        lr[2 * i + 1] = q[kCloudOutChannels * i + 1] + q[kCloudOutChannels * i + 3];
     }
 }
 
 /**
  * @brief Appends a GPU block to an interleaved stereo buffer, near and far added.
  * @param lr  the buffer
- * @param q   n frames of kCloudChannels
+ * @param q   n frames of kCloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
  * @param n   frames
  */
 void appendStereo(std::vector<float>& lr, const float* q, int n)

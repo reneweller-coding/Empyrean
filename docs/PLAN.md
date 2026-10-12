@@ -291,6 +291,32 @@ deutsche Namen mag der Nutzer nicht). Gefunden nur ein Zebra-Soundset, EmpyreanF
 (in 2 von 6 Bildschirmfoto-Läufen, mit Log nicht nachgestellt; der Ring fällt beim Start durch zwei WASAPI-Callbacks
 direkt hintereinander auf 576 von 1536); Hören auf älteren Karten (nur RTX 5090 gemessen); Linux optional.
 
+## Phase 7: Echos, Räume und der modale Hall (gebaut, 12.10.2026)
+
+Auf die Frage des Nutzers, ob Delays und Reverbs schon drin seien: Nur der Far-Reverb war es. Jetzt:
+- **CPU, aus Noctuarys `Effects.h`** (schon kopiert, bisher nicht verdrahtet): zwei `StereoDelay` in Serie auf der
+  nahen Ebene (Mix und To Far je Block über den Block gerampt), `EarlyRoom` aus den trockenen Stimmen (Quelle: mittlere
+  Entfernung nach Lautstärke) und ein kleiner `Reverb` als Near-Reverb; vor dem Far-Reverb der `Diffuser`, danach
+  `Unmask` (Seitenkette: die nahe Ebene); Far Mode (Standard Colourless), Pre-Delay, Freeze.
+- **GPU: der modale Hall** (`Cloud.cu`, `modalKernel` und `modalReduceKernel` im selben Graphen hinter der Reduktion,
+  Eingang: der fertige Block der Stimmen auf der Karte, Ausgang: Kanäle 5 und 6 des Blocks). 65.536 komplexe
+  Einpoler, ein Thread je Mode, 128 Samples sequentiell, Summe pro Sample über Warp-Shuffles und dann die acht Warps in
+  fester Reihenfolge (bitgleich). Jede Mode errechnet Ort, Abklingen und Phasen jeden Block aus einem Hash und dem
+  Kopf: gleichmäßig in Hz zwischen Lowest und 16 kHz, oder (Anteil Tuned) auf einer der Tonhöhen der Skala (bis 128,
+  vom Engine aus `frequencyOf` mit Tide) mit Dreiecksstreuung. Drift: eigene Sinusrate k/1000 Hz, die Uhr springt bei
+  1000 s ohne Sprung. T60 unter 250 Hz = Decay, jede Oktave darüber 2^Damping schneller. Gewicht sqrt(2(1-r²)/N):
+  weißes Rauschen kommt mit seiner Leistung heraus; gestimmte Moden zusätzlich mal sqrt(Band der Tonhöhen / Bereich),
+  höchstens 2. Freeze: r = 1 − 1,2e-7 (24 Minuten auf −60 dB), Eingang zu. Ruht (on = 0), sobald der Pegel einen
+  ganzen Block 0 war: dann gelöscht, kaum GPU-Zeit.
+- Seite **Effects** (Echo, Echo 2, Room, Modal Hall), Far-Gruppe auf Space erweitert; Kapitel in der Hilfe.
+- Presets: Effekt-Profil je Gruppe in `make_presets.py` (`FX`), gewürfelt nach dem Rezept, damit die Klänge bleiben.
+
+**Gemessen [M]:** GPU 0,06 → 0,085 ms pro Block mit Hall (1 % des Budgets). Akkord 50/57/62/66, Hall auf 1: Tuned 0
+und 1 innerhalb 1 dB (die Dichte-Gewichtung trägt), Decay 40 s nicht lauter als 8 s, nur länger. Selbsttest 24/24:
+Abklingen 29,4 dB in 1 s bei Decay 2 s (Soll 30), gestimmt 15 Cent neben der 4. Harmonischen −69,5 dB gegen −19,0 dB
+ungestimmt, Freeze hält auf 0,8 dB, das Echo kommt nach 0,5 s, alles zugleich endlich und vernünftig. Der LFO-Test
+misst jetzt ohne Effekte (Raum und Hall glätten die Pegelschwankung, die er prüft).
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut

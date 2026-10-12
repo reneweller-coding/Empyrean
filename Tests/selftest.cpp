@@ -2,8 +2,8 @@
  * @file selftest.cpp
  * @brief additiv_selftest: the instrument around the cloud -- the parameter table, the tuning, notes
  *        that begin on their sample, silence, determinism, the conductor's Autoplay, stealing,
- *        release, and the real-time path without underruns. Needs the GPU; the cloud's own
- *        measurements are probe's selftest.
+ *        release, the real-time path without underruns, the echoes and the modal hall. Needs the
+ *        GPU; the cloud's own measurements are probe's selftest.
  */
 #include "additiv/Engine.h"
 #include "additiv/Presets.h"
@@ -107,6 +107,64 @@ double rmsDb(const std::vector<float>& lr, size_t from, size_t to)
     for (size_t i = from * 2; i < to * 2; ++i) sq += static_cast<double>(lr[i]) * lr[i];
     const double rms = std::sqrt(sq / std::max<double>(1.0, static_cast<double>((to - from) * 2)));
     return 20.0 * std::log10(std::max(rms, 1e-12));
+}
+
+/**
+ * @brief Every effect off: what is heard is the voices alone.
+ * @param e  the engine (before or after prepare)
+ */
+void noEffects(Engine& e)
+{
+    for (ParamId id : { ParamId::FarLevel, ParamId::EarlyLevel, ParamId::NearMix, ParamId::DelayMix, ParamId::DelayToFar,
+                        ParamId::Delay2Mix, ParamId::Delay2ToFar, ParamId::ModalLevel, ParamId::FarUnmask })
+        e.setParam(id, 0.0f);
+}
+
+/**
+ * @brief Every effect off, and a short envelope: what is heard is the voice and then only what a test opens.
+ * @param e  the engine (before or after prepare)
+ */
+void quietEffects(Engine& e)
+{
+    noEffects(e);
+    e.setParam(ParamId::Attack, 0.01f);
+    e.setParam(ParamId::Release, 0.05f);
+    e.setParam(ParamId::Sustain, 1.0f);
+}
+
+/**
+ * @brief The level of one frequency in a stretch of the mono sum (a Goertzel filter under a Hann window).
+ * @param lr    interleaved stereo
+ * @param from  first frame
+ * @param to    one past the last frame
+ * @param hz    the frequency
+ * @return      its level in dB (relative; only differences mean anything)
+ */
+double toneDb(const std::vector<float>& lr, size_t from, size_t to, double hz)
+{
+    const double w = 2.0 * 3.14159265358979 * hz / 48000.0, c = 2.0 * std::cos(w);
+    double s1 = 0.0, s2 = 0.0;
+    const size_t len = to - from;
+    for (size_t i = 0; i < len; ++i) {
+        const double win = 0.5 - 0.5 * std::cos(2.0 * 3.14159265358979 * static_cast<double>(i) / static_cast<double>(len));
+        const double x = win * (lr[2 * (from + i)] + lr[2 * (from + i) + 1]);
+        const double s = x + c * s1 - s2;
+        s2 = s1;
+        s1 = s;
+    }
+    return 10.0 * std::log10(std::max(s1 * s1 + s2 * s2 - c * s1 * s2, 1e-30));
+}
+
+/**
+ * @brief The frequency of the first sounding voice.
+ * @param e  the engine
+ * @return   Hz, 0 when none sounds
+ */
+double soundingHz(const Engine& e)
+{
+    for (int i = 0; i < 16; ++i)
+        if (e.voiceView(i).hz > 0.0f) return e.voiceView(i).hz;
+    return 0.0;
 }
 
 } // namespace
@@ -368,6 +426,7 @@ int main()
         auto swing = [](bool modulated, float* played) {
             Engine e;
             if (!openOffline(e, false)) return 0.0;
+            noEffects(e);   // the level's swing as the voices make it: a room or a hall would smooth it
             e.setParam(ParamId::FilterModel, 2.0f);   // LP 12
             e.setParam(ParamId::Cutoff, 400.0f);
             e.setParam(ParamId::KeyTrack, 0.0f);
@@ -473,6 +532,101 @@ int main()
         int slow = 0, filled = 0;
         if (!conducted(false, slow) || !conducted(true, filled)) return 1;
         check(slow <= 2 && filled >= 5, "preset change: the chord fills within seconds", fmt("%d notes alone, %d filled, after 5 s", slow, filled));
+    }
+
+    // 20. The modal hall decays at its time: with a decay of 2 s and no damping, 30 dB in a second.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::ModalLevel, 1.0f);
+        e.setParam(ParamId::ModalDecay, 2.0f);
+        e.setParam(ParamId::ModalDamp, 0.0f);
+        e.setParam(ParamId::ModalTune, 0.0f);
+        e.setParam(ParamId::ModalDrift, 0.0f);
+        if (!openOffline(e, false, 31)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        render(e, 1.0);
+        e.noteOff(62, 0);
+        const std::vector<float> lr = render(e, 2.0);
+        const double a = rmsDb(lr, 14400, 24000), b = rmsDb(lr, 62400, 72000);
+        check(a - b > 22.0 && a - b < 38.0, "modal hall: it dies at its decay time", fmt("%.1f dB in 1 s at 2 s to -60 dB (30 expected); tail at %.1f dBFS", a - b, a));
+    }
+
+    // 21. Tuned, it rings on the scale: 15 cents beside the voice's fourth harmonic the tail is
+    //     far quieter than on it -- spread over the range it is not.
+    {
+        double ratio[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::ModalLevel, 1.0f);
+            e.setParam(ParamId::ModalDecay, 4.0f);
+            e.setParam(ParamId::ModalDamp, 0.0f);
+            e.setParam(ParamId::ModalTune, static_cast<float>(k));
+            e.setParam(ParamId::ModalSpread, 0.0f);
+            e.setParam(ParamId::ModalDrift, 0.0f);
+            if (!openOffline(e, false, 37)) return 1;
+            e.noteOn(62, 0.8f, 0);
+            render(e, 1.5);
+            const double f4 = 4.0 * soundingHz(e);
+            e.noteOff(62, 0);
+            const std::vector<float> lr = render(e, 1.5);
+            ratio[k] = toneDb(lr, 9600, 57600, f4 * std::pow(2.0, 15.0 / 1200.0)) - toneDb(lr, 9600, 57600, f4);
+        }
+        check(ratio[1] < ratio[0] - 10.0, "modal hall: tuned, it rings on the scale",
+              fmt("15 ct beside the 4th harmonic: %.1f dB spread, %.1f dB tuned", ratio[0], ratio[1]));
+    }
+
+    // 22. Frozen, it holds: the level three seconds on within 1.5 dB of where it was.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::ModalLevel, 1.0f);
+        e.setParam(ParamId::ModalDecay, 3.0f);
+        e.setParam(ParamId::ModalDrift, 0.0f);
+        if (!openOffline(e, false, 41)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        render(e, 1.0);
+        e.noteOff(62, 0);
+        e.setParam(ParamId::ModalFreeze, 1.0f);
+        const std::vector<float> lr = render(e, 4.0);
+        const double a = rmsDb(lr, 24000, 48000), b = rmsDb(lr, 168000, 192000);
+        check(std::fabs(a - b) < 1.5 && a > -80.0, "modal hall: frozen, it holds", fmt("%.1f dBFS after 0.5 s, %.1f dBFS after 3.5 s", a, b));
+    }
+
+    // 23. The echo arrives at its time: a tenth of a second of a note, then half a second of
+    //     delay; the window around the echo is far louder than the gap before it.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.005f);
+        e.setParam(ParamId::Release, 0.03f);
+        e.setParam(ParamId::DelayMix, 1.0f);
+        e.setParam(ParamId::DelayTimeL, 0.5f);
+        e.setParam(ParamId::DelayTimeR, 0.5f);
+        e.setParam(ParamId::DelayFeedback, 0.0f);
+        if (!openOffline(e, false, 43)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        const std::vector<float> on = render(e, 0.1);
+        e.noteOff(62, 0);
+        const std::vector<float> lr = render(e, 1.0);
+        const double gap = rmsDb(lr, 9600, 16800), echo = rmsDb(lr, 19200, 26400);
+        check(echo > gap + 10.0, "echo: it arrives at its time", fmt("%.1f dBFS in the gap, %.1f dBFS half a second after the note", gap, echo));
+    }
+
+    // 24. Everything at once, with the conductor: finite, inside the rails, at a sane level.
+    {
+        Engine e;
+        for (const auto& [id, v] : std::initializer_list<std::pair<ParamId, float>>{
+                 { ParamId::DelayMix, 0.4f }, { ParamId::Delay2Mix, 0.3f }, { ParamId::DelayFeedback, 0.7f }, { ParamId::EarlyLevel, 0.5f },
+                 { ParamId::NearMix, 0.4f }, { ParamId::FarDiffuse, 0.8f }, { ParamId::FarUnmask, 0.6f }, { ParamId::FarMode, 3.0f },
+                 { ParamId::ModalLevel, 0.6f }, { ParamId::ModalTune, 0.7f }, { ParamId::ModalDecay, 30.0f }, { ParamId::AutoRate, 6.0f } })
+            e.setParam(id, v);
+        if (!openOffline(e, true, 47)) return 1;
+        const std::vector<float> lr = render(e, 30.0);
+        const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
+        const double db = rmsDb(lr, 10 * 48000, 30 * 48000);
+        check(finite && db > -45.0 && db < -6.0, "effects: everything at once is finite and sane", fmt("%.1f dBFS RMS over 10-30 s, GPU %.3f ms/block", db, e.lastGpuMs()));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

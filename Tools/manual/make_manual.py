@@ -35,6 +35,7 @@ TABS = {
     "Tuning": ["Tuning"],
     "Conductor": ["Conductor"],
     "Space": ["Space", "Master"],
+    "Effects": ["Echo", "Room", "Modal"],
     "Modulation": ["Modulation"],
 }
 

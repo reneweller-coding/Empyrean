@@ -1,5 +1,22 @@
 # Release notes
 
+## 0.7.0 (12.10.2026, not released)
+
+Echoes, rooms and a hall of its own.
+
+- **The modal hall**, on the GPU in the same graph as the voices: 65,536 resonances, each a sine that dies away,
+  woken by everything the voices play (near and far). Decay (0.5 to 60 s), Damping (the upper octaves die sooner),
+  Tuned (the share of the resonances on the scale's pitches: the hall rings in key and retunes with the scale),
+  Spread, Drift, Width, Lowest and Freeze. It costs about 0.025 ms of GPU time per block. White noise comes out at the
+  level it went in, whatever the decay; tuned resonances are weighted by how close they stand, so Tuned colours the
+  hall rather than making it louder (measured within 1 dB).
+- **Echoes** (Noctuary's): two asymmetric delays in series, with Cross, Damping, Absorb, Duck and To Far.
+- **The near room**: early reflections from a room that follows where the voices stand, and a small reverb.
+- **The far hall** gains Noctuary's Diffusion, Pre-Delay, Unmask, its four networks (Colourless by default) and Freeze.
+- A new page, *Effects*; every effect knob is a target of the modulation matrix (the switches and Far Mode are not).
+  The factory presets have each group's echoes, room and hall (804 of 1024 a modal hall), and the bank is levelled
+  again with them.
+
 ## 0.6.0 (12.10.2026, not released)
 
 The whole instrument, and its name: **Empyrean** (the working name was AdditivAmbientSynth; the code keeps it).

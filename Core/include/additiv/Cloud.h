@@ -169,7 +169,41 @@ enum class FilterModel : int {
 };
 constexpr int kNumFilterModels = static_cast<int>(FilterModel::Count);   ///< entries of kFilterModelNames
 
-constexpr int kCloudChannels = 4;   ///< the GPU's output per frame: near left, near right, far left, far right
+constexpr int kCloudChannels = 4;      ///< the voices' channels on the GPU: near left, near right, far left, far right
+constexpr int kCloudOutChannels = 6;   ///< a finished frame: the four voice channels, then the modal hall's left and right
+constexpr int kModalModes = 65536;     ///< the modal hall's resonances
+constexpr int kModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
+
+/**
+ * @brief The modal hall's settings for the next block: the host's copy, sent up with the voices.
+ *
+ * A reverb made the way the instrument is made: kModalModes resonances, each a complex one-pole
+ * (a damped sine) driven by the voices of the block -- near and far, left and right -- and heard
+ * through a phase of its own in each ear. Its tail is a sum of decaying sines, as the voices are a
+ * sum of sustained ones (Abel, Coffin and Spratt 2014, a modal architecture for artificial
+ * reverberation). Where the modes stand is the instrument's choice: spread evenly over the range
+ * they are a hall; a share `tune` of them on the pitches of the scale and the hall rings in key,
+ * like the sympathetic strings of a viola d'amore. Every mode's weight is set so that white noise
+ * comes out at the level it went in, whatever the decay; tuned modes are weighted down by how much
+ * closer they stand together than spread ones, so turning `tune` colours the hall rather than
+ * making it louder.
+ */
+struct ModalHall {
+    int   on = 0;           ///< 0: the hall rests -- silent, its modes cleared, almost no GPU time
+    int   freeze = 0;       ///< 1: the modes ring on (about 24 minutes to -60 dB) with the input shut
+    int   tunedCount = 0;   ///< pitches in `tuned`
+    int   pad = 0;          ///< keeps what follows 16-byte aligned
+    float decay = 8.0f;     ///< seconds to -60 dB at and below 250 Hz
+    float damp = 0.35f;     ///< 0 .. 1: every octave above 250 Hz dies 2^damp times faster
+    float tune = 0.5f;      ///< 0 .. 1: the share of the modes on the scale's pitches
+    float spread = 6.0f;    ///< cents a tuned mode may lie from its pitch (a triangle)
+    float drift = 4.0f;     ///< cents of every mode's slow wander (0.02 .. 0.12 Hz)
+    float width = 1.0f;     ///< 0: both ears hear the same phase of every mode (mono) .. 1: each its own
+    float low = 80.0f;      ///< Hz: the lowest mode of the spread ones
+    float time = 0.0f;      ///< seconds: the drift's clock, wrapped at 1000 s (every drift rate is a whole number of cycles in 1000 s)
+    float tuned[kModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
+};
+static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header");
 
 /** @brief How an engine is laid out; fixed between open() and close(). */
 struct CloudConfig {
@@ -233,6 +267,9 @@ public:
      */
     CloudVoice& voice(int i);
 
+    /** @brief The host's copy of the modal hall's settings, edited between wait() and the next launch(). @return the settings */
+    ModalHall& modal();
+
     /**
      * @brief Sends the voices up and starts one block on the GPU; returns at once. Clears every
      *        voice's restart flag and advances the active voices' time by one block.
@@ -244,7 +281,7 @@ public:
 
     /**
      * @brief Waits for the launched block.
-     * @return  blockSize frames of kCloudChannels (near L, near R, far L, far R), valid until the next launch()
+     * @return  blockSize frames of kCloudOutChannels (near L, near R, far L, far R, modal hall L, R), valid until the next launch()
      */
     const float* wait();
 

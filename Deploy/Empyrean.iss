@@ -4,14 +4,14 @@
 ; compiler. Nothing in here reaches into a build tree: what is in the staging folder is exactly what gets
 ; installed, so the payload can be looked at before the setup is made.
 ;
-;   ISCC.exe /DVersion=0.6.0 Deploy\Empyrean.iss
+;   ISCC.exe /DVersion=0.7.0 Deploy\Empyrean.iss
 ;
 ; The binaries are linked against the static MSVC runtime and the static CUDA runtime: no redistributable, no DLL
 ; beside the executable. What the graphics card needs is NVIDIA's driver (its nvcuda.dll), which the setup looks
 ; for and does not bring. Every sound is synthesised: nothing is downloaded, the VST3 needs no data files.
 
 #ifndef Version
-  #define Version "0.6.0"
+  #define Version "0.7.0"
 #endif
 #define AppName "Empyrean"
 #define Publisher "Rene Weller"

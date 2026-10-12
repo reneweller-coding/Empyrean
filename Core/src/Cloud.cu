@@ -34,6 +34,10 @@ constexpr int kChunk = 512;     ///< partials per CUDA block of the render kerne
 constexpr int kThreads = 256;   ///< threads per CUDA block of the update and render kernels
 constexpr int kReduceLanes = 32;    ///< samples per CUDA block of the reduce kernel
 constexpr int kReduceGroups = 16;   ///< threads per sample in the reduce kernel, each summing every 16th chunk
+constexpr int kModalThreads = 256;                          ///< modes per CUDA block of the modal kernel
+constexpr int kModalBlocks = kModalModes / kModalThreads;   ///< CUDA blocks of the modal kernel
+constexpr int kModalTile = 128;                             ///< samples the modal kernel sums per pass
+static_assert(kModalModes % kModalThreads == 0, "the modes fill whole CUDA blocks");
 constexpr float kAirShare = 0.2f;    ///< the share of a voice's partials that become its air band when Air is up
 
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
@@ -46,6 +50,7 @@ struct BlockHeader {
     int   landColumns;     ///< the landscape's frequency columns (0 = none)
     int   landRows;        ///< its time rows
     float landRowSeconds;  ///< how long one row lasts
+    ModalHall modal;       ///< the modal hall's settings for this block
 };
 static_assert(sizeof(BlockHeader) % 16 == 0, "the voices behind the header stay 16-byte aligned");
 static_assert(sizeof(CloudVoice) % 16 == 0, "CloudVoice is uploaded as an array");
@@ -549,13 +554,13 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
 }
 
 /**
- * @brief The reduce kernel: the chunks' sums added sample by sample into interleaved frames of
- *        kCloudChannels (near L, near R, far L, far R).
+ * @brief The reduce kernel: the chunks' sums added sample by sample into the first kCloudChannels
+ *        (near L, near R, far L, far R) of interleaved frames of kCloudOutChannels.
  * @param hdr      the block header
  * @param scratch  the render kernel's per-chunk blocks
  * @param chunks   how many chunks
  * @param maxN     the scratch stride
- * @param out      n frames of kCloudChannels
+ * @param out      n frames of kCloudOutChannels
  */
 __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int chunks, int maxN, float* out)
 {
@@ -572,7 +577,152 @@ __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int c
     __syncthreads();
     if (threadIdx.y == 0 && live) {
         for (int q = 1; q < kReduceGroups; ++q) acc += part[q][threadIdx.x];
-        out[s * kCloudChannels + c] = acc;
+        out[s * kCloudOutChannels + c] = acc;
+    }
+}
+
+/**
+ * @brief A uniform number in [0, 1) for one mode of the modal hall.
+ * @param mode  the mode
+ * @param salt  which of its numbers
+ * @return      the number
+ */
+__device__ __forceinline__ float modalUni(int mode, std::uint32_t salt)
+{
+    return static_cast<float>(hash32(static_cast<std::uint32_t>(mode) * 0x9E3779B9U ^ (salt * 0x85EBCA6BU)) >> 8) * (1.0f / 16777216.0f);
+}
+
+/**
+ * @brief The modal hall: one thread per mode, a complex one-pole driven by the block the voices
+ *        just made, summed per sample over the CUDA block (warp shuffles, then the warps in order).
+ *
+ * Each mode works out where it stands and how fast it dies from the header, every block -- a
+ * hash gives it its place, its pitch if it is tuned, its drift and its two output phases -- so a
+ * change of key, decay or tuning reaches it at the next block, and a ringing mode retunes without
+ * a click (its state is kept; only the rotation changes). The input is the near and the far plane
+ * together: the hall is a space both stand in.
+ * @param hdr      the block header (its `modal` settings)
+ * @param in       the block's frames, kCloudOutChannels each; the four voice channels are read
+ * @param state    per mode its complex state, carried from block to block
+ * @param scratch  per CUDA block two channels of maxN sums
+ * @param maxN     the scratch stride
+ */
+__global__ void __launch_bounds__(kModalThreads)
+modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN)
+{
+    __shared__ float sIn[2][kModalTile];
+    __shared__ float sAcc[kModalThreads / 32][2][kModalTile];
+    const ModalHall& mh = hdr->modal;
+    const int n = hdr->n;
+    const int mode = static_cast<int>(blockIdx.x) * kModalThreads + static_cast<int>(threadIdx.x);
+    float* out = scratch + static_cast<size_t>(blockIdx.x) * 2 * maxN;
+    if (!mh.on) {   // resting: silent, and cleared so that it starts from silence when it is opened again
+        state[mode] = make_float2(0.0f, 0.0f);
+        for (int s = threadIdx.x; s < n; s += kModalThreads) { out[s] = 0.0f; out[maxN + s] = 0.0f; }
+        return;
+    }
+    const float fs = hdr->sampleRate;
+    const float lo = fmaxf(mh.low, 20.0f);
+    const float hi = fminf(16000.0f, 0.45f * fs);
+    // Where it stands: on one of the scale's pitches (the share `tune` of the modes), or anywhere
+    // between the lowest mode and 16 kHz, evenly in hertz (so the hall is as dense at the top as
+    // at the bottom, where a decaying mode is as wide).
+    float f = lo + (hi - lo) * modalUni(mode, 4);
+    float weight = 1.0f;
+    if (mh.tunedCount > 0 && modalUni(mode, 1) < mh.tune) {
+        const int k = static_cast<int>(hash32(static_cast<std::uint32_t>(mode) ^ 0xA511E9B3U) % static_cast<std::uint32_t>(mh.tunedCount));
+        const float p = mh.tuned[k];
+        f = p * exp2f(mh.spread * (modalUni(mode, 2) + modalUni(mode, 3) - 1.0f) * (1.0f / 1200.0f));
+        // Tuned modes stand closer together than spread ones -- all of them within a few cents of a
+        // few dozen pitches -- and a sound on those pitches would wake them all: weighted down by
+        // that density (the pitches' band against the whole range), the tuned share colours the
+        // hall instead of making it louder.
+        const float cents = fmaxf(mh.spread + mh.drift, 1.0f);
+        const float bandHz = static_cast<float>(mh.tunedCount) * p * cents * (2.0f * 0.000577623f);   // ln 2 / 1200
+        weight = sqrtf(fminf(4.0f, bandHz / (hi - lo)));
+    }
+    // The drift: a slow sine of its own; every rate a whole number of cycles in 1000 s, the clock's wrap.
+    const float rate = (20.0f + static_cast<float>(hash32(static_cast<std::uint32_t>(mode) ^ 0x5BD1E995U) % 100U)) * 0.001f;
+    float ph = rate * mh.time + modalUni(mode, 6);
+    ph -= floorf(ph);
+    f *= exp2f(mh.drift * (1.0f / 1200.0f) * __sinf(6.2831853f * ph));
+    const bool silent = f < 10.0f || f >= 0.49f * fs;
+    // How fast it dies: the decay at and below 250 Hz, each octave above 2^damp times faster.
+    const float T = fmaxf(0.05f, mh.decay * exp2f(-mh.damp * fmaxf(0.0f, log2f(f * (1.0f / 250.0f)))));
+    const float r = mh.freeze ? 0.99999988f : __expf(-6.9077553f / (T * fs));
+    float sw, cw;
+    sincosf(6.2831853f * f / fs, &sw, &cw);
+    const float ar = r * cw, ai = r * sw;
+    // Driven with sqrt(2 (1 - r^2) / N): white noise in, white noise of the same power out, whatever the decay.
+    const float g = (silent || mh.freeze) ? 0.0f : sqrtf(2.0f * fmaxf(1.0f - r * r, 0.0f) / static_cast<float>(kModalModes)) * weight;
+    float inR, inL;
+    __sincosf(1.5707963f * modalUni(mode, 7), &inR, &inL);   // its share of the left and the right input
+    const float phL = 6.2831853f * modalUni(mode, 8);
+    const float phR = phL + mh.width * 3.1415927f * (2.0f * modalUni(mode, 9) - 1.0f);
+    float oLs, oLc, oRs, oRc;
+    __sincosf(phL, &oLs, &oLc);
+    __sincosf(phR, &oRs, &oRc);
+    if (silent) { oLs = oLc = oRs = oRc = 0.0f; }
+    float2 y = state[mode];
+    const int lane = static_cast<int>(threadIdx.x) & 31, warp = static_cast<int>(threadIdx.x) >> 5;
+    for (int t0 = 0; t0 < n; t0 += kModalTile) {
+        const int tn = min(kModalTile, n - t0);
+        for (int s = threadIdx.x; s < tn; s += kModalThreads) {
+            const float* fr = in + static_cast<size_t>(t0 + s) * kCloudOutChannels;
+            sIn[0][s] = fr[0] + fr[2];
+            sIn[1][s] = fr[1] + fr[3];
+        }
+        __syncthreads();
+        for (int i = 0; i < tn; ++i) {
+            const float x = g * (inL * sIn[0][i] + inR * sIn[1][i]);
+            const float yr = fmaf(ar, y.x, fmaf(-ai, y.y, x));
+            const float yi = fmaf(ar, y.y, ai * y.x);
+            y.x = yr;
+            y.y = yi;
+            float cL = yr * oLc - yi * oLs;
+            float cR = yr * oRc - yi * oRs;
+            for (int off = 16; off > 0; off >>= 1) {
+                cL += __shfl_down_sync(0xFFFFFFFFU, cL, off);
+                cR += __shfl_down_sync(0xFFFFFFFFU, cR, off);
+            }
+            if (lane == 0) { sAcc[warp][0][i] = cL; sAcc[warp][1][i] = cR; }
+        }
+        __syncthreads();
+        for (int s = threadIdx.x; s < 2 * tn; s += kModalThreads) {
+            const int c = s / tn, i = s - c * tn;
+            float a = 0.0f;
+            for (int w = 0; w < kModalThreads / 32; ++w) a += sAcc[w][c][i];
+            out[c * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    state[mode] = y;
+}
+
+/**
+ * @brief The modal hall's reduce: the CUDA blocks' sums added sample by sample, in a fixed order,
+ *        into the frames' last two channels.
+ * @param hdr      the block header
+ * @param scratch  the modal kernel's per-block sums
+ * @param maxN     the scratch stride
+ * @param out      n frames of kCloudOutChannels; channels 4 and 5 are written
+ */
+__global__ void modalReduceKernel(const BlockHeader* hdr, const float* scratch, int maxN, float* out)
+{
+    __shared__ float part[kReduceGroups][kReduceLanes + 1];
+    const int n = hdr->n;
+    const int t = static_cast<int>(blockIdx.x) * kReduceLanes + static_cast<int>(threadIdx.x);   // channel-major, as the scratch is laid out
+    const int c = t / maxN;
+    const int s = t - c * maxN;
+    const bool live = c < 2 && s < n;
+    float acc = 0.0f;
+    if (live)
+        for (int k = threadIdx.y; k < kModalBlocks; k += kReduceGroups) acc += scratch[static_cast<size_t>(k) * 2 * maxN + t];
+    part[threadIdx.y][threadIdx.x] = acc;
+    __syncthreads();
+    if (threadIdx.y == 0 && live) {
+        for (int q = 1; q < kReduceGroups; ++q) acc += part[q][threadIdx.x];
+        out[s * kCloudOutChannels + kCloudChannels + c] = acc;
     }
 }
 
@@ -640,6 +790,9 @@ struct CloudEngine::Impl {
     float4* dGains = nullptr;         ///< device: per partial two entries, the near and the far amplitude ramps of this block
     EnvShape* dShapes = nullptr;      ///< device: the envelope bank, kEnvShapes
     float* dLand = nullptr;           ///< device: the landscape, room for kLandMaxColumns * kLandMaxRows
+    float2* dModal = nullptr;         ///< device: the modal hall's states, kModalModes
+    float* dModalScratch = nullptr;   ///< device: per modal CUDA block two channels of sums
+    ModalHall modal;                  ///< the host's copy of the modal hall's settings
     float gpuMs = 0.0f;               ///< GPU time of the last finished block
     bool launched = false;            ///< a block is in flight
 
@@ -658,11 +811,13 @@ struct CloudEngine::Impl {
         if (hUpload) cudaFreeHost(hUpload);
         if (hOut) cudaFreeHost(hOut);
         for (void* p : { static_cast<void*>(dUpload), static_cast<void*>(dOut), static_cast<void*>(dScratch), static_cast<void*>(dRun),
-                         static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand) })
+                         static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand),
+                         static_cast<void*>(dModal), static_cast<void*>(dModalScratch) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
         dRun = nullptr; dAmp = nullptr; dGains = nullptr; dShapes = nullptr;
+        dModal = nullptr; dModalScratch = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -763,15 +918,17 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     const size_t partialsTotal = static_cast<size_t>(config.voices) * m.pcap;
     const size_t landFloats = static_cast<size_t>(kLandMaxColumns) * kLandMaxRows;
     good = good && ok(cudaHostAlloc(&m.hUpload, m.uploadBytes(), cudaHostAllocDefault), "cudaHostAlloc upload", error)
-                && ok(cudaHostAlloc(&m.hOut, sizeof(float) * kCloudChannels * n, cudaHostAllocDefault), "cudaHostAlloc out", error)
+                && ok(cudaHostAlloc(&m.hOut, sizeof(float) * kCloudOutChannels * n, cudaHostAllocDefault), "cudaHostAlloc out", error)
                 && ok(cudaMalloc(&m.dUpload, m.uploadBytes()), "cudaMalloc upload", error)
-                && ok(cudaMalloc(&m.dOut, sizeof(float) * kCloudChannels * n), "cudaMalloc out", error)
+                && ok(cudaMalloc(&m.dOut, sizeof(float) * kCloudOutChannels * n), "cudaMalloc out", error)
                 && ok(cudaMalloc(&m.dScratch, sizeof(float) * kCloudChannels * n * static_cast<size_t>(m.chunks)), "cudaMalloc scratch", error)
                 && ok(cudaMalloc(&m.dRun, sizeof(uint4) * partialsTotal), "cudaMalloc run", error)
                 && ok(cudaMalloc(&m.dAmp, sizeof(float4) * partialsTotal), "cudaMalloc amp", error)
                 && ok(cudaMalloc(&m.dGains, sizeof(float4) * 2 * partialsTotal), "cudaMalloc gains", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
-                && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error);
+                && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
+                && ok(cudaMalloc(&m.dModal, sizeof(float2) * kModalModes), "cudaMalloc modal", error)
+                && ok(cudaMalloc(&m.dModalScratch, sizeof(float) * 2 * n * static_cast<size_t>(kModalBlocks)), "cudaMalloc modal scratch", error);
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -780,11 +937,13 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dGains, 0, sizeof(float4) * 2 * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaStreamSynchronize(m.stream), "cudaStreamSynchronize", error);
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
-        std::memset(m.hOut, 0, sizeof(float) * kCloudChannels * n);
-        // The block as one graph: voices up, three kernels, the block (four channels) down.
+        std::memset(m.hOut, 0, sizeof(float) * kCloudOutChannels * n);
+        // The block as one graph: voices up, three kernels for the voices, two for the modal hall
+        // (which hears the voices' block on the card), the block (six channels) down.
         const auto* hdr = reinterpret_cast<const BlockHeader*>(m.dUpload);
         const auto* voices = reinterpret_cast<const CloudVoice*>(m.dUpload + sizeof(BlockHeader));
         good = ok(cudaStreamBeginCapture(m.stream, cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture", error);
@@ -796,7 +955,10 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dScratch, m.chunks, n, m.dOut);
-            cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudChannels * n, cudaMemcpyDeviceToHost, m.stream);
+            modalKernel<<<static_cast<unsigned>(kModalBlocks), kModalThreads, 0, m.stream>>>(hdr, m.dOut, m.dModal, m.dModalScratch, n);
+            modalReduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
+                hdr, m.dModalScratch, n, m.dOut);
+            cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudOutChannels * n, cudaMemcpyDeviceToHost, m.stream);
             good = ok(cudaStreamEndCapture(m.stream, &m.graph), "cudaStreamEndCapture", error)
                 && ok(cudaGraphInstantiate(&m.exec, m.graph, 0), "cudaGraphInstantiate", error);
         }
@@ -841,6 +1003,8 @@ bool CloudEngine::setLandscape(const float* amps, int columns, int rows, float r
 
 CloudVoice& CloudEngine::voice(int i) { return impl_->voices[std::clamp(i, 0, impl_->cfg.voices - 1)]; }
 
+ModalHall& CloudEngine::modal() { return impl_->modal; }
+
 void CloudEngine::launch()
 {
     Impl& m = *impl_;
@@ -854,6 +1018,8 @@ void CloudEngine::launch()
     hdr->landColumns = m.landColumns;
     hdr->landRows = m.landRows;
     hdr->landRowSeconds = m.landRowSeconds;
+    hdr->modal = m.modal;
+    hdr->modal.tunedCount = std::clamp(m.modal.tunedCount, 0, kModalTuned);
     auto* up = reinterpret_cast<CloudVoice*>(m.hUpload + sizeof(BlockHeader));
     const float dt = static_cast<float>(n / m.cfg.sampleRate);
     for (int i = 0; i < m.cfg.voices; ++i) {

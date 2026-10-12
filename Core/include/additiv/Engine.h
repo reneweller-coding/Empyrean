@@ -346,11 +346,30 @@ private:
     int rootPc_ = 0;                                   ///< the scale's root, a pitch class
     bool snapKeys_ = true;                             ///< key mapping
     Reverb far_;                                       ///< the far plane's reverb (Noctuary's FDN)
+    Diffuser diffuser_;                                ///< the swell in front of the far reverb
+    Unmask unmask_;                                    ///< the far hall stepping aside for the near plane
+    StereoDelay delay_;                                ///< the first echo (Noctuary's)
+    StereoDelay delay2_;                               ///< the second, in series after the first
+    EarlyRoom early_;                                  ///< the near plane's early reflections
+    Reverb nearRev_;                                   ///< the near plane's small reverb
     MidSide midSide_;                                  ///< bass mono and width
     std::vector<float> nearL_;                         ///< one GPU block's near plane, left (then the whole mix)
     std::vector<float> nearR_;                         ///< its near plane, right (then the whole mix)
     std::vector<float> farL_;                          ///< its far plane, left (then the far reverb)
     std::vector<float> farR_;                          ///< its far plane, right
+    std::vector<float> dryL_;                          ///< the near plane before the echoes, left: the early reflections' input
+    std::vector<float> dryR_;                          ///< and right
+    std::vector<float> wetL_;                          ///< an echo's output, left
+    std::vector<float> wetR_;                          ///< and right
+    std::vector<float> modalL_;                        ///< the modal hall's block from the GPU, left
+    std::vector<float> modalR_;                        ///< and right
+    float prevDelayMix_ = 0.0f;                        ///< the first echo's level at the end of the last block (ramped across the next)
+    float prevDelayToFar_ = 0.0f;                      ///< its send into the far plane, likewise
+    float prevDelay2Mix_ = 0.0f;                       ///< the second echo's level, likewise
+    float prevDelay2ToFar_ = 0.0f;                     ///< its send into the far plane, likewise
+    float prevModalLevel_ = 0.0f;                      ///< the modal hall's level, likewise
+    float modalTime_ = 0.0f;                           ///< the modal hall's drift clock, seconds, wrapped at 1000
+    float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
 
     /** @brief The parameter values one block works with. */
     struct Block {

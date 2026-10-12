@@ -35,7 +35,14 @@ Brain 2 is a second conductor in the background: its root follows the first one'
 == Space | Space | ==
 Every note stands on a plane between the ear (0) and the far background (1): the conductor puts some notes near and most deep (Depth), played notes stand at Keys Depth. A far note is quieter, darker and heard only through the far reverb. Breath lets every voice's plane wander; Doppler raises a voice that comes closer. Presence lifts the 2-5 kHz band on the near plane; Pad Low Cut leaves the bottom free.
 
-The far reverb (Level, Size, Decay, Damping) is Noctuary's. Master: the level, the bass made mono below Bass Mono, and the width.
+The far reverb (Level, Size, Decay, Damping) is Noctuary's, with its Diffusion (the swell before the hall), Pre-Delay, Unmask (the hall steps aside, band by band, wherever the near plane sounds), its four networks (Far Mode: Colourless rings least, Rotating lets the tail drift) and Freeze. Master: the level, the bass made mono below Bass Mono, and the width.
+
+== Echoes, rooms and the modal hall | Effects | ==
+Echo is Noctuary's: two delays whose times glide and wander, a little different in each ear. Cross takes each side's feedback partly from the other, Damping darkens the loop, Absorb narrows it to a band as the feedback rises (so long echoes drown in fog instead of merely getting quieter), and Duck darkens it while the voices are loud, so a new note does not have to fight the last one's tail. To Far sends the echoes into the far plane, where they recede into the far reverb. Echo 2 runs after the first and hears its echoes: longer chains.
+
+Room gives the near plane a place to stand: the early reflections of a room (Room Size, Absorb), arriving from where the voices stand, and a small reverb (Near Reverb, Near Decay, Near Damping).
+
+The modal hall is a reverb made the way the instrument is made: sixty-five thousand resonances on the graphics card, each a sine that dies away, woken by everything the voices play. Decay is the time it takes to fall silent (60 dB) in the low range; Damping lets the upper octaves die sooner. Tuned puts that share of the resonances on the pitches of the scale, and Spread scatters them a few cents around their notes: with Tuned up, the hall rings in key, like the sympathetic strings of a viola d'amore, and retunes without a click when the scale or its root changes. Drift lets every resonance wander by a few cents, Width gives each its own place in each ear, Lowest keeps the bottom free. Freeze holds the hall as it is, its input shut: a chord left hanging in the air.
 
 == Modulation | Modulation | ==
 Four LFOs, two envelopes and four macros move the instrument's knobs through a matrix of sixteen rows: a source, a target, a depth. The LFOs are slow by default (their rates step by the golden ratio, so they never line up) and have no hard edges: Square and Ramp glide through their jumps in a few percent of a cycle, Random is a drifting curve, Steps glides from one value to the next. The envelopes are shapes from the motions' bank, played from the start whenever a note arrives into silence; Rate sets how fast they run.

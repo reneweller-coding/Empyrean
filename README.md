@@ -25,14 +25,15 @@ offline renderer and the manual, and a portable zip.
 - **The GPU** (`Core/src/Cloud.cu`, CUDA 13.4): 16 voices x 20,000 partials. Per block of 128 samples one CUDA graph:
   an update kernel per partial (its frequency and glide, four amplitude ramps, its three envelopes, the filter's
   response at its frequency, its distance), a render kernel (a thread per sample, 512 partials per chunk, phases in
-  32-bit fixed point), a reduction in a fixed order (bit-identical renders). 0.05 to 0.08 ms of GPU time per block of
-  2.7 ms on an RTX 5090.
+  32-bit fixed point), a reduction in a fixed order (bit-identical renders); then, in the same graph, the **modal
+  hall**: 65,536 decaying resonances, a thread each, fed by the block the voices just made, summed with warp shuffles.
+  0.06 to 0.09 ms of GPU time per block of 2.7 ms on an RTX 5090, the hall included.
 - **The real-time path** (`Core/src/Engine.cpp`): a worker thread (MMCSS Pro Audio) renders ahead into a ring by two
   host blocks and ten milliseconds; the audio callback stamps notes and copies. A note begins on its exact sample. The
   standalone puts the process into Windows' REALTIME GPU priority class: without it another program's graphics could
   hold the card for 20 ms.
-- **On the CPU**, what works on the sum: the far reverb, the bass made mono, mid/side, the soft clip -- and the
-  conductor, the modulation, the tuning.
+- **On the CPU**, what works on the sum: Noctuary's echoes, near room, diffusion, far reverb and unmask, the bass
+  made mono, mid/side, the soft clip -- and the conductor, the modulation, the tuning.
 
 ## The sound
 
@@ -46,7 +47,13 @@ offline renderer and the manual, and a portable zip.
 - **Tuning:** equal temperament, the just scales, the harmonic series, slendro, Bohlen-Pierce, and Timbre -- the scale
   the cloud's own spectrum asks for (Sethares). Purity narrows the clouds so that just intervals can lock.
 - **Space** (Noctuary's): every note on a plane between the ear and the far background, quieter, darker and heard only
-  through the far reverb the farther it stands; Breath, Doppler.
+  through the far reverb the farther it stands; Breath, Doppler. The far reverb with Noctuary's diffusion, pre-delay,
+  unmask, its four networks and freeze.
+- **Echoes and rooms** (Noctuary's): two asymmetric delays in series, receding into the far plane; early reflections
+  and a small reverb for the near plane.
+- **The modal hall:** a reverb made the way the instrument is made, sixty-five thousand resonances that die away, on
+  the GPU. Tuned, a share of them stands on the pitches of the scale and the hall rings in key, like sympathetic
+  strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Freeze.
 - **The conductor:** Free or Chords (Autoplay), Step, and Brain 2, a second conductor deep in the background.
 - **Modulation:** four LFOs without hard edges, two envelopes, four macros, mod wheel, pressure, velocity and a random
   curve, through a matrix of sixteen rows.

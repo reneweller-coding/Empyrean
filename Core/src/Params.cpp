@@ -41,6 +41,7 @@ const char* const kKeyMapNames[2] = { "Snap to 12 keys", "Consecutive degrees" }
 const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
+const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
 const char* const kEnvShapeNames[kFactoryShapeCount] = { "Swell", "Pulse", "Bloom", "Flicker", "Wobble", "Rise In", "Fall In", "Saw Up" };
 
@@ -207,6 +208,45 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::Macro2,      "macro2",       "Macro 2",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
     F(ParamId::Macro3,      "macro3",       "Macro 3",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
     F(ParamId::Macro4,      "macro4",       "Macro 4",       "Modulation", 0.f,   1.f,  0.f,   1.f,  ""),
+
+    F(ParamId::DelayMix,       "delay_mix",       "Echo",         "Echo",  0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::DelayTimeL,     "delay_time_l",    "Time L",       "Echo",  0.02f, 4.f,   0.75f, 0.5f, "s"),
+    F(ParamId::DelayTimeR,     "delay_time_r",    "Time R",       "Echo",  0.02f, 4.f,   1.13f, 0.5f, "s"),
+    F(ParamId::DelayFeedback,  "delay_feedback",  "Feedback",     "Echo",  0.f,   0.95f, 0.45f, 1.f,  ""),
+    F(ParamId::DelayCross,     "delay_cross",     "Cross",        "Echo",  0.f,   1.f,   0.35f, 1.f,  ""),
+    F(ParamId::DelayDamp,      "delay_damp",      "Damping",      "Echo",  0.f,   1.f,   0.45f, 1.f,  ""),
+    F(ParamId::DelayAbsorb,    "delay_absorb",    "Absorb",       "Echo",  0.f,   1.f,   0.3f,  1.f,  ""),
+    F(ParamId::DelayDuck,      "delay_duck",      "Duck",         "Echo",  0.f,   1.f,   0.3f,  1.f,  ""),
+    F(ParamId::DelayToFar,     "delay_to_far",    "To Far",       "Echo",  0.f,   1.f,   0.4f,  1.f,  ""),
+    F(ParamId::Delay2Mix,      "delay2_mix",      "Echo 2",       "Echo",  0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::Delay2TimeL,    "delay2_time_l",   "Time L 2",     "Echo",  0.05f, 4.f,   2.4f,  0.5f, "s"),
+    F(ParamId::Delay2TimeR,    "delay2_time_r",   "Time R 2",     "Echo",  0.05f, 4.f,   3.1f,  0.5f, "s"),
+    F(ParamId::Delay2Feedback, "delay2_feedback", "Feedback 2",   "Echo",  0.f,   0.95f, 0.55f, 1.f,  ""),
+    F(ParamId::Delay2Damp,     "delay2_damp",     "Damping 2",    "Echo",  0.f,   1.f,   0.6f,  1.f,  ""),
+    F(ParamId::Delay2ToFar,    "delay2_to_far",   "To Far 2",     "Echo",  0.f,   1.f,   0.6f,  1.f,  ""),
+
+    F(ParamId::EarlyLevel,     "early_level",     "Early",        "Room",  0.f,   1.f,   0.2f,  1.f,  ""),
+    F(ParamId::EarlySize,      "early_size",      "Room Size",    "Room",  2.f,   40.f,  14.f,  0.5f, "m"),
+    F(ParamId::EarlyAbsorb,    "early_absorb",    "Absorb",       "Room",  0.f,   1.f,   0.4f,  1.f,  ""),
+    F(ParamId::NearMix,        "near_mix",        "Near Reverb",  "Room",  0.f,   1.f,   0.1f,  1.f,  ""),
+    F(ParamId::NearDecay,      "near_decay",      "Near Decay",   "Room",  0.2f,  8.f,   1.8f,  0.5f, "s"),
+    F(ParamId::NearDamp,       "near_damp",       "Near Damping", "Room",  0.f,   1.f,   0.5f,  1.f,  ""),
+
+    F(ParamId::FarDiffuse,     "far_diffuse",     "Diffusion",    "Space", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::FarPreDelay,    "far_predelay",    "Pre-Delay",    "Space", 0.f,   500.f, 20.f,  0.5f, "ms"),
+    F(ParamId::FarUnmask,      "far_unmask",      "Unmask",       "Space", 0.f,   1.f,   0.3f,  1.f,  ""),
+    C(ParamId::FarMode,        "far_mode",        "Far Mode",     "Space", kFarModeNames, kNumFarModes, 2),
+    B(ParamId::FarFreeze,      "far_freeze",      "Far Freeze",   "Space", false),
+
+    F(ParamId::ModalLevel,     "modal_level",     "Modal Hall",   "Modal", 0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::ModalDecay,     "modal_decay",     "Decay",        "Modal", 0.5f,  60.f,  8.f,   0.4f, "s"),
+    F(ParamId::ModalDamp,      "modal_damp",      "Damping",      "Modal", 0.f,   1.f,   0.35f, 1.f,  ""),
+    F(ParamId::ModalTune,      "modal_tune",      "Tuned",        "Modal", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::ModalSpread,    "modal_spread",    "Spread",       "Modal", 0.f,   50.f,  6.f,   0.5f, "ct"),
+    F(ParamId::ModalDrift,     "modal_drift",     "Drift",        "Modal", 0.f,   30.f,  4.f,   0.5f, "ct"),
+    F(ParamId::ModalWidth,     "modal_width",     "Width",        "Modal", 0.f,   1.f,   1.f,   1.f,  ""),
+    F(ParamId::ModalLow,       "modal_low",       "Lowest",       "Modal", 30.f,  400.f, 80.f,  0.5f, "Hz"),
+    B(ParamId::ModalFreeze,    "modal_freeze",    "Freeze",       "Modal", false),
 } };
 
 } // namespace

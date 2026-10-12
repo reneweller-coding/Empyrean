@@ -161,8 +161,17 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                        ParamId::Brain2Depth } } });
     page("Space", { { "Planes", F::Space, Ids{ ParamId::Depth, ParamId::KeysDepth, ParamId::Breath, ParamId::BreathRate, ParamId::Doppler } },
                     { "Near", F::Space, Ids{ ParamId::Presence, ParamId::PadLowCut } },
-                    { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp } },
+                    { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp, ParamId::FarDiffuse,
+                                                   ParamId::FarPreDelay, ParamId::FarUnmask, ParamId::FarMode, ParamId::FarFreeze } },
                     { "Master", F::Space, Ids{ ParamId::MasterGain, ParamId::BassMono, ParamId::StereoWidth } } });
+    page("Effects", { { "Echo", F::Space, Ids{ ParamId::DelayMix, ParamId::DelayTimeL, ParamId::DelayTimeR, ParamId::DelayFeedback, ParamId::DelayCross,
+                                               ParamId::DelayDamp, ParamId::DelayAbsorb, ParamId::DelayDuck, ParamId::DelayToFar } },
+                      { "Echo 2", F::Space, Ids{ ParamId::Delay2Mix, ParamId::Delay2TimeL, ParamId::Delay2TimeR, ParamId::Delay2Feedback,
+                                                 ParamId::Delay2Damp, ParamId::Delay2ToFar } },
+                      { "Room", F::Envelope, Ids{ ParamId::EarlyLevel, ParamId::EarlySize, ParamId::EarlyAbsorb, ParamId::NearMix, ParamId::NearDecay,
+                                                  ParamId::NearDamp } },
+                      { "Modal Hall", F::Motion, Ids{ ParamId::ModalLevel, ParamId::ModalDecay, ParamId::ModalDamp, ParamId::ModalTune, ParamId::ModalSpread,
+                                                      ParamId::ModalDrift, ParamId::ModalWidth, ParamId::ModalLow, ParamId::ModalFreeze } } });
     {
         auto* m = new ModPage(proc_, actions_, &live_);
         describe_.push_back([m] { return m->describe(); });

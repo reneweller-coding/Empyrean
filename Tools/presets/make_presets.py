@@ -383,6 +383,90 @@ RECIPES = [g_sleep, g_choirs, g_glass, g_bells, g_strings, g_organs, g_air, g_sp
            g_gliss, g_pendulum, g_waves, g_shepard, g_shimmer, g_dark, g_micro, g_keys]
 
 
+# The effects per group (12.10.2026): each entry a probability and ranges. echo: Noctuary's first
+# delay (level, left time in s, feedback; the right time 1.2 .. 1.6 times the left); echo2: the
+# second, in series; room: early reflections, room size, near reverb, its decay; modal: the modal
+# hall on the GPU (level, decay, damping, tuned share, spread in cents); far: diffusion and the
+# network (2 Colourless, 3 Rotating). What a group leaves out keeps the table's default.
+FX = {
+    "Sleep Concert":   dict(echo=(0.6, (0.10, 0.25), (1.2, 3.0), (0.35, 0.60)), echo2=(0.3, (0.08, 0.18)),
+                            room=((0.10, 0.25), (10, 25), (0.05, 0.15), (1.5, 3.0)),
+                            modal=(0.8, (0.15, 0.35), (10, 25), (0.3, 0.5), (0.3, 0.8), (3, 10)), far=((0.4, 0.8), (2, 3))),
+    "Choirs":          dict(echo=(0.3, (0.08, 0.15), (0.8, 2.0), (0.30, 0.50)),
+                            room=((0.20, 0.40), (18, 35), (0.15, 0.30), (1.5, 3.5)),
+                            modal=(0.6, (0.10, 0.25), (6, 14), (0.3, 0.5), (0.2, 0.6), (4, 12))),
+    "Glass":           dict(echo=(0.7, (0.15, 0.30), (0.25, 0.9), (0.40, 0.70)),
+                            modal=(0.9, (0.25, 0.45), (8, 20), (0.1, 0.3), (0.6, 1.0), (0, 4))),
+    "Bells":           dict(echo=(0.5, (0.10, 0.25), (0.6, 1.8), (0.30, 0.55)),
+                            modal=(1.0, (0.25, 0.45), (15, 40), (0.2, 0.4), (0.7, 1.0), (2, 8))),
+    "Strings":         dict(echo=(0.3, (0.08, 0.15), (0.6, 1.5), (0.30, 0.50)),
+                            room=((0.25, 0.45), (15, 30), (0.15, 0.30), (1.8, 3.5)),
+                            modal=(0.5, (0.10, 0.20), (5, 12), (0.3, 0.5), (0.2, 0.5), (4, 12))),
+    "Organs":          dict(room=((0.30, 0.50), (25, 40), (0.20, 0.35), (2.5, 5.0)),
+                            modal=(0.6, (0.15, 0.30), (8, 18), (0.3, 0.5), (0.0, 0.3), (4, 12))),
+    "Air & Noise":     dict(echo=(0.5, (0.10, 0.25), (0.4, 1.6), (0.35, 0.60)),
+                            modal=(0.8, (0.20, 0.40), (6, 20), (0.4, 0.7), (0.0, 0.2), (6, 15))),
+    "Deep Space":      dict(echo=(0.8, (0.15, 0.30), (1.5, 4.0), (0.50, 0.75)), echo2=(0.5, (0.10, 0.20)),
+                            modal=(0.9, (0.25, 0.45), (25, 60), (0.4, 0.7), (0.3, 0.7), (4, 12)), far=((0.6, 0.9), (3, 3))),
+    "Glissandi":       dict(echo=(0.5, (0.10, 0.20), (0.5, 1.5), (0.35, 0.55)),
+                            modal=(0.7, (0.15, 0.30), (8, 20), (0.3, 0.5), (0.0, 0.4), (4, 12))),
+    "Pendulums":       dict(echo=(0.8, (0.15, 0.30), (0.3, 1.2), (0.30, 0.60)),
+                            modal=(0.5, (0.10, 0.25), (6, 15), (0.3, 0.5), (0.3, 0.7), (3, 10))),
+    "Waves":           dict(echo=(0.5, (0.10, 0.20), (0.8, 2.5), (0.35, 0.60)),
+                            modal=(0.8, (0.20, 0.35), (10, 25), (0.3, 0.5), (0.3, 0.7), (3, 10))),
+    "Shepard & Tides": dict(echo=(0.4, (0.10, 0.20), (1.0, 2.5), (0.35, 0.60)),
+                            modal=(0.9, (0.25, 0.40), (12, 30), (0.3, 0.5), (0.7, 1.0), (2, 8))),
+    "Shimmer":         dict(echo=(0.8, (0.15, 0.30), (0.2, 0.8), (0.40, 0.70)),
+                            modal=(0.8, (0.20, 0.40), (10, 25), (0.1, 0.3), (0.5, 0.9), (2, 8))),
+    "Dark Drones":     dict(echo=(0.4, (0.10, 0.20), (2.0, 4.0), (0.40, 0.65)),
+                            modal=(1.0, (0.25, 0.45), (30, 60), (0.5, 0.8), (0.2, 0.6), (4, 12)), far=((0.7, 0.9), (3, 3))),
+    "Microtonal":      dict(echo=(0.4, (0.10, 0.20), (0.6, 2.0), (0.30, 0.55)),
+                            modal=(1.0, (0.25, 0.45), (10, 30), (0.2, 0.5), (0.8, 1.0), (0, 5))),
+    "Keys":            dict(echo=(0.4, (0.10, 0.20), (0.3, 0.9), (0.30, 0.50)),
+                            room=((0.20, 0.35), (8, 18), (0.15, 0.25), (1.2, 2.5)),
+                            modal=(0.5, (0.10, 0.25), (5, 12), (0.3, 0.5), (0.4, 0.8), (3, 10))),
+}
+
+
+def effects(r, group):
+    """The group's echoes, room, modal hall and far network, drawn after its recipe."""
+    fx = FX[group]
+    if "echo" in fx:
+        p, mix, time, fb = fx["echo"]
+        if r.rng.random() < p:
+            tl = r.lg(*time)
+            r.set("delay_mix", f(r.u(*mix), 3))
+            r.set("delay_time_l", f(tl, 3))
+            r.set("delay_time_r", f(min(4.0, tl * r.u(1.2, 1.6)), 3))
+            r.set("delay_feedback", f(r.u(*fb), 2))
+            r.set("delay_to_far", f(r.u(0.3, 0.8), 2))
+    if "echo2" in fx:
+        p, mix = fx["echo2"]
+        if r.rng.random() < p:
+            r.set("delay2_mix", f(r.u(*mix), 3))
+            r.set("delay2_time_l", f(r.lg(1.8, 3.2), 3))
+            r.set("delay2_time_r", f(r.lg(2.4, 4.0), 3))
+    if "room" in fx:
+        early, size, near, decay = fx["room"]
+        r.set("early_level", f(r.u(*early), 2))
+        r.set("early_size", f(r.u(*size), 1))
+        r.set("near_mix", f(r.u(*near), 2))
+        r.set("near_decay", f(r.u(*decay), 2))
+    if "modal" in fx:
+        p, level, decay, damp, tune, spread = fx["modal"]
+        if r.rng.random() < p:
+            r.set("modal_level", f(r.u(*level), 3))
+            r.set("modal_decay", f(r.lg(*decay), 1))
+            r.set("modal_damp", f(r.u(*damp), 2))
+            r.set("modal_tune", f(r.u(*tune), 2))
+            r.set("modal_spread", f(r.u(*spread), 1))
+            r.set("modal_drift", f(r.u(1.0, 8.0), 1))
+    if "far" in fx:
+        diffuse, mode = fx["far"]
+        r.set("far_diffuse", f(r.u(*diffuse), 2))
+        r.set("far_mode", r.rng.randint(*mode))
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -394,6 +478,7 @@ def build():
         for i in range(64):
             r = Recipe(random.Random(g * 1000 + i))
             recipe(r)
+            effects(r, group)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
                 r.set("master_gain", f(max(-18.0, min(12.0, TARGET_DB - levels[name])), 2))

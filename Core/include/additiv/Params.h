@@ -114,6 +114,45 @@ enum class ParamId : int {
     Macro2,         ///< 0 .. 1
     Macro3,         ///< 0 .. 1
     Macro4,         ///< 0 .. 1
+    // Echo: Noctuary's two asymmetric delays, the second in series after the first (12.10.2026)
+    DelayMix,       ///< the echoes on the near plane, 0 .. 1
+    DelayTimeL,     ///< s
+    DelayTimeR,     ///< s
+    DelayFeedback,  ///< 0 .. 0.95
+    DelayCross,     ///< 0 .. 1: how much of each side's feedback comes from the other
+    DelayDamp,      ///< 0 .. 1: the loop's low pass
+    DelayAbsorb,    ///< 0 .. 1: the loop narrows to a band as the feedback rises
+    DelayDuck,      ///< 0 .. 1: the loop darkens while the input is loud
+    DelayToFar,     ///< 0 .. 1: the echoes receding into the far plane
+    Delay2Mix,      ///< the second echo, 0 .. 1
+    Delay2TimeL,    ///< s
+    Delay2TimeR,    ///< s
+    Delay2Feedback, ///< 0 .. 0.95
+    Delay2Damp,     ///< 0 .. 1
+    Delay2ToFar,    ///< 0 .. 1
+    // Room: the near plane's early reflections and small reverb
+    EarlyLevel,     ///< 0 .. 1
+    EarlySize,      ///< m
+    EarlyAbsorb,    ///< 0 .. 1
+    NearMix,        ///< the near reverb, 0 .. 1 wet
+    NearDecay,      ///< s
+    NearDamp,       ///< 0 .. 1
+    // The far hall, more of Noctuary's
+    FarDiffuse,     ///< 0 .. 1: the swell in front of the far reverb
+    FarPreDelay,    ///< ms
+    FarUnmask,      ///< 0 .. 1: the far hall steps aside for the near plane, band by band
+    FarMode,        ///< kFarModeNames
+    FarFreeze,      ///< the far hall held
+    // The modal hall: tens of thousands of decaying resonances on the GPU
+    ModalLevel,     ///< 0 .. 1
+    ModalDecay,     ///< s to -60 dB, at and below 250 Hz
+    ModalDamp,      ///< 0 .. 1: how much faster the upper octaves die
+    ModalTune,      ///< 0 .. 1: the share of the modes tuned to the scale
+    ModalSpread,    ///< ct: how far a tuned mode lies from its note
+    ModalDrift,     ///< ct: every mode's slow wander
+    ModalWidth,     ///< 0 .. 1: mono .. every mode its own place
+    ModalLow,       ///< Hz: the lowest mode
+    ModalFreeze,    ///< the modal hall held, its input shut
     Count           ///< number of parameters
 };
 
@@ -169,6 +208,8 @@ constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven table
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
+constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames
+extern const char* const kFarModeNames[kNumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
 extern const char* const kRootNames[12];                  ///< "C" .. "B"
 extern const char* const kKeyMapNames[2];                 ///< "Snap to 12 keys", "Consecutive degrees"
 

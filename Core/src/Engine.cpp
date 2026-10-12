@@ -181,11 +181,18 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     brain2_.reset(side_.fork(), 36 + rootPc_);   // its own stream: switching it on never moves the first
     stepWas_ = param(ParamId::AutoStep) >= 0.5f;
     far_.prepare(cfg_.sampleRate);
+    diffuser_.prepare(cfg_.sampleRate);
+    unmask_.prepare(cfg_.sampleRate);
+    delay_.prepare(cfg_.sampleRate);
+    delay2_.prepare(cfg_.sampleRate);
+    early_.prepare(cfg_.sampleRate);
+    nearRev_.prepare(cfg_.sampleRate);
     midSide_.prepare(cfg_.sampleRate);
-    nearL_.assign(static_cast<size_t>(G), 0.0f);
-    nearR_.assign(static_cast<size_t>(G), 0.0f);
-    farL_.assign(static_cast<size_t>(G), 0.0f);
-    farR_.assign(static_cast<size_t>(G), 0.0f);
+    for (std::vector<float>* b : { &nearL_, &nearR_, &farL_, &farR_, &dryL_, &dryR_, &wetL_, &wetR_, &modalL_, &modalR_ })
+        b->assign(static_cast<size_t>(G), 0.0f);
+    prevDelayMix_ = prevDelayToFar_ = prevDelay2Mix_ = prevDelay2ToFar_ = prevModalLevel_ = 0.0f;
+    modalTime_ = 0.0f;
+    srcDistance_ = 0.3f;
 
     queue_.assign(kQueueSize, Event{});
     qHead_.store(0);
@@ -657,6 +664,7 @@ void Engine::renderBlock()
     if (motionUsesLandscape(motion)) landMakeup = 1.0f / std::max(0.125f, 1.0f - blk_.motionDepth + blk_.motionDepth * landRms_);
     int sounding = 0;
     int by[3] = { 0, 0, 0 };
+    float srcW = 0.0f, srcD = 0.0f;   // the near room's source: the voices' distance, weighted by loudness
     for (int i = 0; i < static_cast<int>(voices_.size()); ++i) {
         Voice& v = voices_[static_cast<size_t>(i)];
         CloudVoice& cv = cloud_.voice(i);
@@ -719,6 +727,8 @@ void Engine::renderBlock()
         cv.stereo = blk_.stereo;
         cv.partials = blk_.partials;
         cv.distance = v.distance;
+        srcW += gain * level;
+        srcD += gain * level * v.distance;
         cv.airAbsorb = 1.0f;
         cv.seed = v.seed;
         cv.active = 1;
@@ -732,6 +742,7 @@ void Engine::renderBlock()
         ++by[std::clamp(v.source, 0, 2)];
     }
     sounding_.store(sounding, std::memory_order_relaxed);
+    if (srcW > 1.0e-6f) srcDistance_ = srcD / srcW;
     if (prevSounding_ == 0 && sounding > 0) phraseStart_ = true;   // a note into silence: the envelopes' phrase begins
     prevSounding_ = sounding;
     for (int s = 0; s < 3; ++s) soundingBy_[s].store(by[s], std::memory_order_relaxed);
@@ -746,24 +757,114 @@ void Engine::renderBlock()
         viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
     }
 
-    // 4. The GPU: near and far, left and right.
+    // 4. The modal hall's settings: it runs on the GPU in the same graph, hearing the voices' block
+    //    there. The level is applied here, so the hall rests (on = 0) only once the level has been
+    //    at 0 for a whole block; its pitches are the scale's, from its lowest mode to 16 kHz.
+    {
+        ModalHall& mh = cloud_.modal();
+        const float level = cur(ParamId::ModalLevel);
+        mh.on = (level > 0.0f || prevModalLevel_ > 0.0f) ? 1 : 0;
+        mh.freeze = cur(ParamId::ModalFreeze) >= 0.5f ? 1 : 0;
+        mh.decay = cur(ParamId::ModalDecay);
+        mh.damp = cur(ParamId::ModalDamp);
+        mh.tune = cur(ParamId::ModalTune);
+        mh.spread = cur(ParamId::ModalSpread);
+        mh.drift = cur(ParamId::ModalDrift);
+        mh.width = cur(ParamId::ModalWidth);
+        mh.low = cur(ParamId::ModalLow);
+        mh.time = modalTime_;
+        int count = 0;
+        if (mh.on)
+            for (int note = 0; note < 128 && count < kModalTuned; ++note) {
+                const double f = frequencyOf(note) * tideMul;
+                if (f >= mh.low && f <= 16000.0) mh.tuned[count++] = static_cast<float>(f);
+            }
+        mh.tunedCount = count;
+        modalTime_ += dtf;
+        if (modalTime_ >= 1000.0f) modalTime_ -= 1000.0f;
+    }
+
+    // 5. The GPU: near and far, left and right, and the modal hall.
     cloud_.launch();
     const float* q = cloud_.wait();
     gpuMs_.store(cloud_.lastGpuMs(), std::memory_order_relaxed);
     for (int s = 0; s < G; ++s) {
-        nearL_[static_cast<size_t>(s)] = q[kCloudChannels * s];
-        nearR_[static_cast<size_t>(s)] = q[kCloudChannels * s + 1];
-        farL_[static_cast<size_t>(s)] = q[kCloudChannels * s + 2] * blk_.farLevel;
-        farR_[static_cast<size_t>(s)] = q[kCloudChannels * s + 3] * blk_.farLevel;
+        const float* f = q + static_cast<size_t>(kCloudOutChannels) * s;
+        const size_t k = static_cast<size_t>(s);
+        nearL_[k] = f[0];
+        nearR_[k] = f[1];
+        farL_[k] = f[2] * blk_.farLevel;
+        farR_[k] = f[3] * blk_.farLevel;
+        modalL_[k] = f[4];
+        modalR_[k] = f[5];
     }
+    // A level from the last block's to this one's, across the block (no zipper when it is modulated).
+    auto ramp = [G](float from, float to, int s) { return from + (to - from) * static_cast<float>(s + 1) / static_cast<float>(G); };
 
-    // 5. The far plane is heard only through the far reverb; the near plane stays dry.
-    far_.set(cur(ParamId::FarSize), cur(ParamId::FarDecay), cur(ParamId::FarDamp), 20.0f, false, 1.0f);
+    // 6. The near plane, as Noctuary's: two echoes, the second in series after the first, receding
+    //    partly into the far plane; a small reverb; the early reflections of a room, from the dry voices.
+    std::copy(nearL_.begin(), nearL_.end(), dryL_.begin());
+    std::copy(nearR_.begin(), nearR_.end(), dryR_.begin());
+    delay_.set(cur(ParamId::DelayTimeL), cur(ParamId::DelayTimeR), cur(ParamId::DelayFeedback), cur(ParamId::DelayCross),
+               cur(ParamId::DelayDamp), cur(ParamId::DelayAbsorb));
+    delay_.setDuck(cur(ParamId::DelayDuck));
+    delay_.process(nearL_.data(), nearR_.data(), wetL_.data(), wetR_.data(), G);
+    {
+        const float m1 = cur(ParamId::DelayMix), t1 = cur(ParamId::DelayToFar);
+        for (int s = 0; s < G; ++s) {
+            const size_t k = static_cast<size_t>(s);
+            const float m = ramp(prevDelayMix_, m1, s), tf = ramp(prevDelayToFar_, t1, s);
+            nearL_[k] += wetL_[k] * m;  nearR_[k] += wetR_[k] * m;
+            farL_[k] += wetL_[k] * tf;  farR_[k] += wetR_[k] * tf;
+        }
+        prevDelayMix_ = m1;
+        prevDelayToFar_ = t1;
+    }
+    delay2_.set(cur(ParamId::Delay2TimeL), cur(ParamId::Delay2TimeR), cur(ParamId::Delay2Feedback), cur(ParamId::DelayCross),
+                cur(ParamId::Delay2Damp), cur(ParamId::DelayAbsorb));
+    delay2_.setDuck(cur(ParamId::DelayDuck));
+    delay2_.process(nearL_.data(), nearR_.data(), wetL_.data(), wetR_.data(), G);
+    {
+        const float m2 = cur(ParamId::Delay2Mix), t2 = cur(ParamId::Delay2ToFar);
+        for (int s = 0; s < G; ++s) {
+            const size_t k = static_cast<size_t>(s);
+            const float m = ramp(prevDelay2Mix_, m2, s), tf = ramp(prevDelay2ToFar_, t2, s);
+            nearL_[k] += wetL_[k] * m;  nearR_[k] += wetR_[k] * m;
+            farL_[k] += wetL_[k] * tf;  farR_[k] += wetR_[k] * tf;
+        }
+        prevDelay2Mix_ = m2;
+        prevDelay2ToFar_ = t2;
+    }
+    nearRev_.setSpace(0.3f, 20000.0f, 80.0f);
+    nearRev_.set(0.6f, cur(ParamId::NearDecay), cur(ParamId::NearDamp), 5.0f, false, cur(ParamId::NearMix));
+    nearRev_.process(nearL_.data(), nearR_.data(), G);
+    early_.setRoom(cur(ParamId::EarlySize), cur(ParamId::EarlyAbsorb), 1.0f);
+    early_.setSource(0.0f, srcDistance_);
+    early_.setLevel(cur(ParamId::EarlyLevel));
+    if (early_.active()) early_.process(dryL_.data(), dryR_.data(), nearL_.data(), nearR_.data(), G);
+
+    // 7. The far plane is heard only through the far reverb: the swell of the diffusion first, the
+    //    hall stepping aside for the near plane band by band after (Unmask).
+    diffuser_.set(cur(ParamId::FarDiffuse));
+    diffuser_.process(farL_.data(), farR_.data(), G);
+    far_.setMode(std::clamp(static_cast<int>(std::lround(cur(ParamId::FarMode))), 0, kNumFarModes - 1));
+    far_.set(cur(ParamId::FarSize), cur(ParamId::FarDecay), cur(ParamId::FarDamp), cur(ParamId::FarPreDelay),
+             cur(ParamId::FarFreeze) >= 0.5f, 1.0f);
     far_.setSpace(0.5f, 9000.0f, 60.0f);
     far_.process(farL_.data(), farR_.data(), G);
-    for (int s = 0; s < G; ++s) {
-        nearL_[static_cast<size_t>(s)] += farL_[static_cast<size_t>(s)];
-        nearR_[static_cast<size_t>(s)] += farR_[static_cast<size_t>(s)];
+    unmask_.set(cur(ParamId::FarUnmask), 0.3f, 0.5f);
+    unmask_.process(nearL_.data(), nearR_.data(), farL_.data(), farR_.data(), G);
+
+    // 8. Together: the near plane, the far hall and the modal hall.
+    {
+        const float ml = cur(ParamId::ModalLevel);
+        for (int s = 0; s < G; ++s) {
+            const size_t k = static_cast<size_t>(s);
+            const float m = ramp(prevModalLevel_, ml, s);
+            nearL_[k] += farL_[k] + modalL_[k] * m;
+            nearR_[k] += farR_[k] + modalR_[k] * m;
+        }
+        prevModalLevel_ = ml;
     }
     midSide_.set(cur(ParamId::BassMono), 0.0f, cur(ParamId::StereoWidth));
     midSide_.process(nearL_.data(), nearR_.data(), G);
