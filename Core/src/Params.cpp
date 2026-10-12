@@ -257,6 +257,31 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::FieldRate,      "field_rate",      "Wander",       "Field", 0.005f, 1.f,  0.05f, 0.4f, ""),
     I(ParamId::FieldCount,     "field_count",     "Attractors",   "Field", 1.f,   8.f,   4.f),
     F(ParamId::Dispersion,     "dispersion",      "Dispersion",   "Motion", -1.5f, 1.5f, 0.f,   1.f,  "s"),
+
+    B(ParamId::Binaural,       "binaural",        "Binaural",     "Binaural", false),
+    F(ParamId::BinauralSpan,   "binaural_span",   "Surround",     "Binaural", 0.f,  1.f,   0.5f,  1.f,  ""),
+    F(ParamId::BinauralHeight, "binaural_height", "Height",       "Binaural", 0.f,  1.f,   0.3f,  1.f,  ""),
+    F(ParamId::BinauralOrbit,  "binaural_orbit",  "Orbit",        "Binaural", -0.5f, 0.5f, 0.f,   1.f,  "Hz"),
+
+    F(ParamId::MemoryLevel,    "memory_level",    "Memory",       "Memory", 0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::MemoryTime,     "memory_time",     "Memory Time",  "Memory", 10.f,  300.f, 60.f,  0.5f, "s"),
+    F(ParamId::MemoryBloom,    "memory_bloom",    "Bloom",        "Memory", 0.2f,  20.f,  4.f,   0.5f, "s"),
+    F(ParamId::MemoryBlur,     "memory_blur",     "Blur",         "Memory", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::MemorySink,     "memory_sink",     "Sink",         "Memory", 0.f,   1.f,   0.6f,  1.f,  ""),
+
+    F(ParamId::TuneGravity,    "tune_gravity",    "Self-Tune",    "Tuning", 0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::TuneReach,      "tune_reach",      "Reach",        "Tuning", 5.f,   60.f,  30.f,  1.f,  "ct"),
+    F(ParamId::TuneAnchor,     "tune_anchor",     "Anchor",       "Tuning", 0.f,   1.f,   0.2f,  1.f,  ""),
+
+    F(ParamId::ModalPaint,     "modal_paint",     "Paint",        "Modal", 0.f,   1.f,   0.f,   1.f,  ""),
+
+    F(ParamId::SpecMix,        "spec_mix",        "Spectral Echo", "Spectral Echo", 0.f,  1.f,   0.f,   1.f,  ""),
+    F(ParamId::SpecTime,       "spec_time",       "Time",         "Spectral Echo", 0.05f, 4.f,  0.8f,  0.5f, "s"),
+    F(ParamId::SpecTilt,       "spec_tilt",       "Tilt",         "Spectral Echo", -1.f, 1.f,   0.5f,  1.f,  ""),
+    F(ParamId::SpecScatter,    "spec_scatter",    "Scatter",      "Spectral Echo", 0.f,  1.f,   0.3f,  1.f,  ""),
+    F(ParamId::SpecFeedback,   "spec_feedback",   "Feedback",     "Spectral Echo", 0.f,  0.95f, 0.5f,  1.f,  ""),
+    F(ParamId::SpecDamp,       "spec_damp",       "Damping",      "Spectral Echo", 0.f,  1.f,   0.4f,  1.f,  ""),
+    F(ParamId::SpecToFar,      "spec_to_far",     "To Far",       "Spectral Echo", 0.f,  1.f,   0.4f,  1.f,  ""),
 } };
 
 } // namespace

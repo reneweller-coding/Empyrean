@@ -27,7 +27,8 @@ offline renderer and the manual, and a portable zip.
   response at its frequency, its distance), a render kernel (a thread per sample, 512 partials per chunk, phases in
   32-bit fixed point), a reduction in a fixed order (bit-identical renders); then, in the same graph, the **modal
   hall**: 65,536 decaying resonances, a thread each, fed by the block the voices just made, summed with warp shuffles.
-  0.06 to 0.09 ms of GPU time per block of 2.7 ms on an RTX 5090, the hall included.
+  The spectral echo, an FFT of its own in one CUDA block, runs after it. On an RTX 5090, with twelve voices and the
+  second conductor sounding: 0.10 ms of GPU time per block of 2.7 ms, and 0.17 ms with every effect on (6 %).
 - **The real-time path** (`Core/src/Engine.cpp`): a worker thread (MMCSS Pro Audio) renders ahead into a ring by two
   host blocks and ten milliseconds; the audio callback stamps notes and copies. A note begins on its exact sample. The
   standalone puts the process into Windows' REALTIME GPU priority class: without it another program's graphics could
@@ -56,7 +57,13 @@ offline renderer and the manual, and a portable zip.
   and a small reverb for the near plane.
 - **The modal hall:** a reverb made the way the instrument is made, sixty-five thousand resonances that die away, on
   the GPU. Tuned, a share of them stands on the pitches of the scale and the hall rings in key, like sympathetic
-  strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Breath (its colour moves), Freeze.
+  strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Breath (its colour moves), Paint (heard
+  through the landscape), Freeze.
+- **The spectral echo:** five hundred bands, each with a delay line of its own on the GPU: tilted, scattered, fed back.
+- **Memory:** every note let go leaves a ghost that blooms after it, fades over minutes, blurs and recedes.
+- **Binaural** (headphones): every partial of the near plane at a point of its own round the head -- head shadow,
+  pinna and the time round the head, worked out per partial; the whole cloud can orbit the listener.
+- **Self-Tune:** voices whose harmonics nearly meet pull together; an equal-tempered chord settles to just intervals.
 - **The conductor:** Free or Chords (Autoplay), Step, and Brain 2, a second conductor deep in the background.
 - **Modulation:** four LFOs without hard edges, two envelopes, four macros, mod wheel, pressure, velocity and a random
   curve, through a matrix of sixteen rows.

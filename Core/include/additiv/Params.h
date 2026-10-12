@@ -162,6 +162,27 @@ enum class ParamId : int {
     FieldRate,      ///< how fast the attractors wander (time of the Lorenz system per second)
     FieldCount,     ///< 1 .. 8 attractors
     Dispersion,     ///< s: the lowest partials' clock late (positive) or the highest (negative)
+    // Phase 9 (12.10.2026)
+    Binaural,       ///< the near plane placed round the head (headphones)
+    BinauralSpan,   ///< 0 .. 1: the places over the front half .. all round
+    BinauralHeight, ///< 0 .. 1: the elevations' spread
+    BinauralOrbit,  ///< Hz: the whole cloud turning round the head (negative: the other way)
+    MemoryLevel,    ///< 0 .. 1: the ghosts of the notes let go
+    MemoryTime,     ///< s: how long a ghost takes to fade by 60 dB
+    MemoryBloom,    ///< s: how long it takes to rise
+    MemoryBlur,     ///< 0 .. 1: how far it widens, drifts and darkens as it fades
+    MemorySink,     ///< 0 .. 1: how far it recedes into the far plane
+    TuneGravity,    ///< 0 .. 1: self-tuning: voices whose harmonics nearly meet pull together
+    TuneReach,      ///< ct: how near they must be
+    TuneAnchor,     ///< 0 .. 1: the pull back to the scale
+    ModalPaint,     ///< 0 .. 1: the modal hall heard through the landscape
+    SpecMix,        ///< 0 .. 1: the spectral echo on the near plane
+    SpecTime,       ///< s: its bands' middle delay
+    SpecTilt,       ///< -1 .. 1: the highs later (positive) or earlier
+    SpecScatter,    ///< 0 .. 1: each band a time of its own
+    SpecFeedback,   ///< 0 .. 0.95
+    SpecDamp,       ///< 0 .. 1: less feedback towards the top
+    SpecToFar,      ///< 0 .. 1: its share into the far plane
     Count           ///< number of parameters
 };
 

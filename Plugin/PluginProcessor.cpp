@@ -173,7 +173,8 @@ void AdditivProcessor::applyPreset(int index)
     float values[additiv::kNumParams];
     std::string mod;
     additiv::presetValues(index, values, &mod);
-    for (int i = 0; i < additiv::kNumParams; ++i) setValue(i, values[i]);
+    for (int i = 0; i < additiv::kNumParams; ++i)
+        if (!additiv::keptByPresets(static_cast<additiv::ParamId>(i))) setValue(i, values[i]);
     engine_.setModText(mod);
     engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way)
     current_.store(index, std::memory_order_relaxed);

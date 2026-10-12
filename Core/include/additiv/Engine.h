@@ -48,6 +48,7 @@ struct EngineConfig {
     int    maxHostBlock = 1024;       ///< the largest block process() is asked for
     int    gpuBlock = 128;            ///< samples per GPU block, a power of two
     int    voices = 16;               ///< voices
+    int    ghosts = 4;                ///< memory voices beside them: the ghosts of notes let go (MemoryLevel)
     int    partialsPerVoice = 20000;  ///< the most partials a voice can have
     float  lookaheadMs = 10.0f;       ///< how far beyond two host blocks the worker renders ahead
     bool   realtimeGpuClass = true;   ///< raise the process's GPU scheduling class to REALTIME (PLAN.md)
@@ -60,7 +61,7 @@ struct VoiceView {
     float gain = 0.0f;       ///< its envelope, 0 .. 1
     float distance = 0.0f;   ///< where it stands, 0 at the ear .. 1 far
     float time = 0.0f;       ///< seconds since it began (the motions' clock)
-    int source = 0;          ///< 0 played, 1 the conductor, 2 the second conductor
+    int source = 0;          ///< 0 played, 1 the conductor, 2 the second conductor, 3 a ghost of the memory
 };
 
 constexpr int kMaxViewVoices = 32;   ///< voices a picture can be given
@@ -224,6 +225,19 @@ public:
 
     /** @brief The slowest block the renderer took since the last call, and starts over (diagnostics). @return milliseconds */
     float takeWorstBlockMs() { return worstBlockUs_.exchange(0, std::memory_order_relaxed) * 0.001f; }
+    /**
+     * @brief The slowest of each part of a block since the last call, and starts over (diagnostics): the
+     *        preparation before the GPU is launched, the wait for it, the effects after.
+     * @param prepMs    receives the slowest preparation, milliseconds
+     * @param gpuMs     receives the longest wait for the GPU
+     * @param effectsMs receives the slowest effects
+     */
+    void takeWorstParts(float& prepMs, float& gpuMs, float& effectsMs)
+    {
+        prepMs = worstPrepUs_.exchange(0, std::memory_order_relaxed) * 0.001f;
+        gpuMs = worstWaitUs_.exchange(0, std::memory_order_relaxed) * 0.001f;
+        effectsMs = worstPostUs_.exchange(0, std::memory_order_relaxed) * 0.001f;
+    }
     /** @brief The emptiest the ring was when a callback came, since the last call, and starts over. @return samples, -1 if no callback came */
     int takeMinFill() { return minFill_.exchange(-1, std::memory_order_relaxed); }
     /** @brief The largest block a callback asked for since the last call, and starts over. @return samples */
@@ -259,6 +273,8 @@ private:
         bool released = false;     ///< noteOff has come
         int tailBlocks = 0;        ///< blocks it stays active after the envelope fell silent (ramps to zero)
         bool tailArmed = false;    ///< the tail was lengthened by the dispersion when the envelope fell silent
+        float tuneCents = 0.0f;    ///< self-tuning: how far the voice has moved from its pitch in the scale
+        float lastGain = 0.0f;     ///< its envelope in the last block (self-tuning weighs by it)
         double age = 0.0;          ///< seconds since it began, for stealing
         bool stealing = false;     ///< fading out before `next` begins
         int stealBlocks = 0;       ///< blocks of fading still to go
@@ -373,6 +389,30 @@ private:
     float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
     double lorenz_[kFieldAttractors][3] = {};          ///< the field's attractors: eight Lorenz systems (x, y, z), wandering always
 
+    /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
+    struct Ghost {
+        bool on = false;           ///< sounding
+        bool restart = true;       ///< its first block on the GPU is next
+        CloudVoice base;           ///< the voice as it was when it was let go
+        std::uint32_t seed = 1;    ///< its own dice (new phases: it does not add to the voice it came from)
+        float age = 0.0f;          ///< seconds since it formed
+        float life = 60.0f;        ///< its fade (60 dB), from Memory Time when it formed
+        float bloom = 4.0f;        ///< its rise, from Bloom when it formed
+        float env = 0.0f;          ///< its level now, 0 .. 1 (the weakest is replaced first)
+    };
+    std::vector<Ghost> ghosts_;                        ///< the memory's ghosts, on the GPU voices after voices_
+    Rng ghostRng_;                                     ///< the ghosts' dice: their own stream, so the memory never moves the conductor
+    std::vector<float> specL_;                         ///< the spectral echo's block from the GPU, left
+    std::vector<float> specR_;                         ///< and right
+    float prevSpecMix_ = 0.0f;                         ///< the spectral echo's level at the end of the last block
+    float prevSpecToFar_ = 0.0f;                       ///< its send into the far plane, likewise
+    bool specWasOn_ = false;                           ///< it ran in the last block (switching it on clears its lines)
+    float binAngle_ = 0.0f;                            ///< the binaural cloud's orbit, radians
+    float paintTime_ = 0.0f;                           ///< seconds into the landscape's loop, for the painted hall
+    float landLoop_ = 0.0f;                            ///< the landscape's loop, seconds
+    /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */
+    void captureGhost(int i);
+
     /** @brief The parameter values one block works with. */
     struct Block {
         float master = 1.0f;     ///< master gain, linear
@@ -443,6 +483,9 @@ private:
     std::atomic<std::uint64_t> late_{ 0 };             ///< notes applied after their stamp
     std::atomic<float> gpuMs_{ 0.0f };                 ///< GPU time of the last block
     std::atomic<int> worstBlockUs_{ 0 };               ///< the slowest renderBlock since takeWorstBlockMs(), microseconds
+    std::atomic<int> worstPrepUs_{ 0 };                ///< its slowest preparation before the GPU, microseconds
+    std::atomic<int> worstWaitUs_{ 0 };                ///< its longest wait for the GPU
+    std::atomic<int> worstPostUs_{ 0 };                ///< its slowest effects after the GPU
     std::atomic<int> minFill_{ -1 };                   ///< the emptiest ring a callback found since takeMinFill(), samples
     std::atomic<int> maxCallback_{ 0 };                ///< the largest callback since takeMaxCallback(), samples
     std::array<std::atomic<float>, kMaxViewVoices> viewHz_{};        ///< per voice its frequency for pictures (0 silent)

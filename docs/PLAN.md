@@ -341,6 +341,45 @@ große FDN nicht, denn der modale Hall ist schon eine Summe von Moden (Begründu
 −69,9 dB bei −30,6 / −30,0 dBFS; Swarm/Scatter −24,7 / −25,0 gegen −25,1 dBFS, gleicher Seed bitgleich; Dispersion 1 s:
 Grundton −35,7 → +46,7 dB, 8. Harmonische +19,4 → −51,2 dB zwischen 0,36–0,56 s und 0,66–0,86 s.
 
+## Phase 9: fünf Ideen für die GPU (gebaut, 12.10.2026)
+
+Meine Vorschläge, vom Nutzer alle angenommen ("Das klingt alles super, bitte baue es ein"):
+- **Binaurale Partialwolke** (`Binaural` in `Cloud.h`, `earGains` in `Cloud.cu`): pro Partial und Block je Ohr ein
+  komplexer Gain aus Kopfschatten (Brown/Duda: Pol und Nullstelle, α nach dem Einfallswinkel), Ohrmuschel (fünf
+  Reflexionen nach Azimut und Elevation, normiert auf ihre mittlere Leistung 2,625) und Woodworth-Laufzeit als Phase;
+  das Paar auf die Leistung des Pan-Gesetzes normiert. Gains jetzt drei `float4` pro Partial (der dritte: die
+  Kosinusanteile der nahen Ebene), `ampQ` für ihre Rampen; der Render-Kernel rechnet binaural `__sincosf` statt
+  `__sinf`. Azimut = Platz · (90° … 180°) + Orbit, Elevation aus dem Hash ±60° · Height. Die ferne Ebene bleibt
+  (Far-Reverb). Master: kein Mono-Bass, Breite 1. `keptByPresets`: Presets schalten Binaural nie.
+- **Gedächtnis**: vier Geisterstimmen hinter den 16 (`EngineConfig::ghosts`, GPU-Stimmen 20). `stopNote` fängt die
+  Stimme beim Loslassen (`captureGhost`: freier Platz oder der leiseste), eigener Seed und eigener Zufallsstrom.
+  Hüllkurve: Anstieg über Bloom, −60 dB über Memory Time; Breite ×(1 + 3 Blur x), Drift + 12 Blur x, Helligkeit
+  ×(1 − 0,7 Blur x), Entfernung gegen 1 mit Sink. Im Bild als vierte Farbe.
+- **Selbststimmung** (CPU): je Paar von Stimmen die Harmonischen 1–8 × 1–8, Abstand d in Cent unter Reach: Gewicht
+  Lautstärke · Glocke · 1/(ha·hb); jede Stimme geht die Hälfte des gewichteten Mittels (Rate 1 − e^(−2·Gravity·dt)),
+  Anchor zieht zurück. Der Ton beginnt auf der Skala.
+- **Gemalter Hall**: jede Mode durch die Landschaft bei ihrer Frequenz, eigene Uhr (gewickelt auf die Schleife der
+  Landschaft), Ausgleich 1/RMS der Landschaft.
+- **Spektrales Echo** (`spectralEchoKernel`, ein CUDA-Block mit 512 Threads): Verlauf und Overlap als Ringe auf
+  denselben Indizes, Hann-Fenster, eigene FFT (Bitumkehr, zehn Stufen, `sincospif`), links als Real-, rechts als
+  Imaginärteil, je Band und Ohr eine Verzögerungsleitung (2048 Blöcke) mit Rückkopplung; Overlap-Add mit
+  1/(N · 3/8 · N/n). Latenz 1024 − 128 Samples, von der Zeit abgezogen. Kanäle 7 und 8 des Blocks (jetzt 8).
+
+**Gemessen [M]:** Selbsttest 32/32 (Zahlen in den Release Notes). GPU mit vier Stimmen: binaural +0,005 ms,
+spektrales Echo +0,01 ms. Volle Last (60 s Dirigent mit 12 Stimmen und Brain 2): 0,097 ms pro Block, mit allem
+zugleich (binaural, Gedächtnis, spektrales Echo, gemalter Hall, Swarm, Self-Tune, Dispersion) 0,165 ms, 6 % des
+Blocks; die vier Geisterstimmen kosten wie vier Stimmen. Pegel: binaural 0,3 dB
+unter Stereo, gemalter Hall 0,1 dB, spektrales Echo bei Mix 0,6 +1 dB. Ein gelöster Akkord: 20 s danach −33,8 statt
+−49,4 dBFS mit Gedächtnis.
+
+**Der Startunterlauf, aufgeklärt [M]:** Das Log teilt den langsamsten Block jetzt in Vorbereitung, Warten auf die
+GPU und Effekte. Vorbereitung bis 1 ms, Effekte bis 0,65 ms, das **Warten auf die GPU bis 2,5 ms**, obwohl die Kernels
+0,1–0,17 ms rechnen: Die Karte war zu rund 50 % mit anderen Programmen belegt (Firefox, Teams u. a.; `nvidia-smi`),
+deren Grafikarbeit sich gröber unterbrechen lässt als die CUDA-Last aus Phase 0, auch gegen die REALTIME-Klasse. Im
+Betrieb hält der Ring (nie unter 960 von 1536), nur beim Start nach den zwei WASAPI-Callbacks wird es eng. Nebenbei:
+Denormals jetzt je Block aus (`NoDenormals`, FTZ und DAZ), denn der Worker ist nicht JUCEs Audio-Thread. **Offen:**
+mehr Vorlauf nur beim Start oder eine Einstellung für den Vorlauf (10/20/40 ms).
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut

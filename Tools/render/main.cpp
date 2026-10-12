@@ -149,7 +149,8 @@ int applyPreset(Engine& e, const std::string& what)
     float values[kNumParams] = {};
     std::string mod;
     presetValues(index, values, &mod);
-    for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+    for (int i = 0; i < kNumParams; ++i)
+        if (!keptByPresets(static_cast<ParamId>(i))) e.setParam(static_cast<ParamId>(i), values[i]);
     e.setModText(mod);
     return index;
 }

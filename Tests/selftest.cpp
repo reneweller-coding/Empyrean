@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -153,6 +154,41 @@ double toneDb(const std::vector<float>& lr, size_t from, size_t to, double hz)
         s1 = s;
     }
     return 10.0 * std::log10(std::max(s1 * s1 + s2 * s2 - c * s1 * s2, 1e-30));
+}
+
+/**
+ * @brief One frequency in one channel of a stretch, as a complex value (Goertzel under a Hann window).
+ * @param lr       interleaved stereo
+ * @param from     first frame
+ * @param to       one past the last frame
+ * @param hz       the frequency
+ * @param channel  0 left, 1 right
+ * @return         its complex amplitude (relative; the phase and the ratio between channels mean something)
+ */
+std::complex<double> toneAt(const std::vector<float>& lr, size_t from, size_t to, double hz, int channel)
+{
+    const double w = 2.0 * 3.14159265358979 * hz / 48000.0;
+    std::complex<double> acc(0.0, 0.0);
+    const size_t len = to - from;
+    for (size_t i = 0; i < len; ++i) {
+        const double win = 0.5 - 0.5 * std::cos(2.0 * 3.14159265358979 * static_cast<double>(i) / static_cast<double>(len));
+        acc += win * static_cast<double>(lr[2 * (from + i) + static_cast<size_t>(channel)]) * std::polar(1.0, -w * static_cast<double>(from + i));
+    }
+    return acc;
+}
+
+/**
+ * @brief The frequencies of the sounding voices, lowest first.
+ * @param e  the engine
+ * @return   Hz of each voice that sounds
+ */
+std::vector<double> soundingAll(const Engine& e)
+{
+    std::vector<double> hz;
+    for (int i = 0; i < 16; ++i)
+        if (e.voiceView(i).hz > 0.0f) hz.push_back(e.voiceView(i).hz);
+    std::sort(hz.begin(), hz.end());
+    return hz;
 }
 
 /**
@@ -697,6 +733,126 @@ int main()
         const double a8 = toneDb(lr, 17280, 26880, f8), b8 = toneDb(lr, 31680, 41280, f8);
         check(b1 > a1 + 15.0 && a8 > b8 + 15.0, "dispersion: the highs arrive first, the lows after",
               fmt("fundamental %.1f -> %.1f dB, 8th harmonic %.1f -> %.1f dB (0.36-0.56 s -> 0.66-0.86 s)", a1, b1, a8, b8));
+    }
+
+    // 28. Binaural: in front the ears hear the same; turned to the right (an orbit of a quarter turn
+    //     a second, a second on) the right ear hears the highs louder and everything sooner.
+    {
+        double ild[2] = { 0.0, 0.0 }, itdMs[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Stereo, 0.0f);
+            e.setParam(ParamId::Binaural, 1.0f);
+            e.setParam(ParamId::BinauralHeight, 0.0f);
+            e.setParam(ParamId::BinauralOrbit, k == 1 ? 0.25f : 0.0f);
+            if (!openOffline(e, false, 67)) return 1;
+            e.noteOn(62, 0.8f, 0);
+            const std::vector<float> lr = render(e, 1.2);
+            const double f1 = soundingHz(e), f8 = 8.0 * f1;
+            const size_t a = 43200, b = 52800;   // 0.9 .. 1.1 s
+            ild[k] = 20.0 * std::log10(std::abs(toneAt(lr, a, b, f8, 1)) / std::abs(toneAt(lr, a, b, f8, 0)));
+            itdMs[k] = std::arg(toneAt(lr, a, b, f1, 1) * std::conj(toneAt(lr, a, b, f1, 0))) / (2.0 * 3.14159265358979 * f1) * 1000.0;
+        }
+        check(std::fabs(ild[0]) < 1.0 && std::fabs(itdMs[0]) < 0.05 && ild[1] > 6.0 && itdMs[1] > 0.3 && itdMs[1] < 0.9,
+              "binaural: in front alike, to the right louder and sooner",
+              fmt("front: %.1f dB, %.2f ms; right: the 8th harmonic %.1f dB louder, the fundamental %.2f ms sooner", ild[0], itdMs[0], ild[1], itdMs[1]));
+    }
+
+    // 29. The memory: a released chord's ghosts rise over their bloom and are heard long after the
+    //     chord; at the moment of release they add almost nothing.
+    {
+        double early[2] = { 0.0, 0.0 }, late[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.5f);
+            e.setParam(ParamId::Release, 2.0f);
+            e.setParam(ParamId::MemoryLevel, k == 1 ? 0.8f : 0.0f);
+            e.setParam(ParamId::MemoryBloom, 4.0f);
+            e.setParam(ParamId::MemorySink, 0.0f);
+            if (!openOffline(e, false, 71)) return 1;
+            for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+            render(e, 4.0);
+            for (int note : { 50, 57, 62, 66 }) e.noteOff(note, 0);
+            const std::vector<float> lr = render(e, 12.0);
+            early[k] = rmsDb(lr, 0, 24000);
+            late[k] = rmsDb(lr, 9 * 48000, 11 * 48000);
+        }
+        check(early[1] - early[0] < 3.0 && late[1] - late[0] > 10.0, "memory: the ghosts bloom after the chord and linger",
+              fmt("first 0.5 s %.1f -> %.1f dBFS, 9-11 s after %.1f -> %.1f dBFS", early[0], early[1], late[0], late[1]));
+    }
+
+    // 30. Self-tuning: a C major triad in equal temperament settles towards just intervals -- the
+    //     third from 400 towards 386 cents, the fifth from 700 towards 702.
+    {
+        double third[2] = { 0.0, 0.0 }, fifth[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.3f);
+            e.setParam(ParamId::Scale, 0.0f);   // 12-TET
+            e.setParam(ParamId::TuneGravity, k == 1 ? 1.0f : 0.0f);
+            e.setParam(ParamId::TuneAnchor, 0.02f);
+            if (!openOffline(e, false, 73)) return 1;
+            for (int note : { 60, 64, 67 }) e.noteOn(note, 0.8f, 0);
+            render(e, 6.0);
+            const std::vector<double> hz = soundingAll(e);
+            if (hz.size() != 3) { check(false, "self-tune: three voices", fmt("%d sound", static_cast<int>(hz.size()))); break; }
+            third[k] = 1200.0 * std::log2(hz[1] / hz[0]);
+            fifth[k] = 1200.0 * std::log2(hz[2] / hz[0]);
+        }
+        check(std::fabs(third[0] - 400.0) < 0.5 && std::fabs(third[1] - 386.3) < 5.0 && std::fabs(fifth[1] - 702.0) < 3.0,
+              "self-tune: an equal-tempered triad finds just intervals",
+              fmt("third %.1f -> %.1f ct (386.3), fifth %.1f -> %.1f ct (702.0)", third[0], third[1], fifth[0], fifth[1]));
+    }
+
+    // 31. The spectral echo: its echo comes back at its time; tilted, the low band's echo comes
+    //     back before the high band's.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.005f);
+        e.setParam(ParamId::Release, 0.03f);
+        e.setParam(ParamId::SpecMix, 1.0f);
+        e.setParam(ParamId::SpecToFar, 0.0f);
+        e.setParam(ParamId::SpecTime, 0.6f);
+        e.setParam(ParamId::SpecTilt, 1.0f);
+        e.setParam(ParamId::SpecScatter, 0.0f);
+        e.setParam(ParamId::SpecFeedback, 0.0f);
+        if (!openOffline(e, false, 79)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        std::vector<float> lr = render(e, 0.1);
+        const double f1 = soundingHz(e), f8 = 8.0 * f1;
+        e.noteOff(62, 0);
+        const std::vector<float> rest = render(e, 1.4);
+        lr.insert(lr.end(), rest.begin(), rest.end());
+        // Tilted: the fundamental's band back after about 0.52 s, the 8th harmonic's after 0.77 s.
+        const double gap = rmsDb(lr, 12000, 20000);
+        const double a1 = toneDb(lr, 24480, 31680, f1), b1 = toneDb(lr, 37440, 45120, f1);
+        const double a8 = toneDb(lr, 24480, 31680, f8), b8 = toneDb(lr, 37440, 45120, f8);
+        check(a1 > b1 + 10.0 && b8 > a8 + 10.0 && rmsDb(lr, 24480, 45120) > gap + 10.0, "spectral echo: tilted, the lows come back first",
+              fmt("fundamental %.1f -> %.1f dB, 8th harmonic %.1f -> %.1f dB (0.51-0.66 s -> 0.78-0.94 s); gap %.1f dBFS", a1, b1, a8, b8, gap));
+    }
+
+    // 32. The painted hall keeps its level (within 3 dB of the unpainted one) while the landscape moves it.
+    {
+        double level[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.5f);
+            e.setParam(ParamId::ModalLevel, 1.0f);
+            e.setParam(ParamId::ModalPaint, static_cast<float>(k));
+            e.setParam(ParamId::Landscape, 0.0f);   // Aurora
+            if (!openOffline(e, false, 83)) return 1;
+            for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+            const std::vector<float> lr = render(e, 8.0);
+            level[k] = rmsDb(lr, 4 * 48000, 8 * 48000);
+        }
+        check(std::fabs(level[1] - level[0]) < 3.0, "modal hall: painted, it keeps its level", fmt("%.1f dBFS plain, %.1f painted", level[0], level[1]));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

@@ -170,7 +170,7 @@ enum class FilterModel : int {
 constexpr int kNumFilterModels = static_cast<int>(FilterModel::Count);   ///< entries of kFilterModelNames
 
 constexpr int kCloudChannels = 4;      ///< the voices' channels on the GPU: near left, near right, far left, far right
-constexpr int kCloudOutChannels = 6;   ///< a finished frame: the four voice channels, then the modal hall's left and right
+constexpr int kCloudOutChannels = 8;   ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right
 constexpr int kModalModes = 65536;     ///< the modal hall's resonances
 constexpr int kModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
 
@@ -202,12 +202,58 @@ struct ModalHall {
     float low = 80.0f;      ///< Hz: the lowest mode of the spread ones
     float time = 0.0f;      ///< seconds: the drift's clock, wrapped at 1000 s (every drift rate is a whole number of cycles in 1000 s)
     float breath = 0.0f;    ///< 0 .. 1: every mode's decay wanders by up to an octave either way, slowly, each on its own
-    float pad1 = 0.0f;      ///< keeps the table 16-byte aligned
-    float pad2 = 0.0f;      ///< likewise
-    float pad3 = 0.0f;      ///< likewise
+    float paint = 0.0f;     ///< 0 .. 1: every mode heard through the landscape at its frequency (the painted hall)
+    float paintNorm = 1.0f; ///< the landscape's make-up (one over its RMS), so the painted hall keeps its level
+    float paintTime = 0.0f; ///< seconds into the landscape's loop, for the painting
     float tuned[kModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
 };
 static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header");
+
+/**
+ * @brief The binaural partial cloud: every partial at its own place around the head.
+ *
+ * Because every partial is a sine, what a head does to it is one complex gain per ear at its
+ * frequency: the head's shadow (Brown and Duda 1998, a pole and a zero whose zero moves with the
+ * angle of incidence), the pinna's five reflections by azimuth and elevation (the same model), and
+ * the time the sound takes round the head (Woodworth) as a phase. No convolution: the update kernel
+ * works out the two gains per partial per block, the render kernel adds a cosine to the sine it
+ * already has. Only the near plane is placed so; the far plane goes into the far reverb, which is
+ * diffuse anyway. The two ears' power is kept where the stereo pan law had it, so switching changes
+ * the place, not the level.
+ */
+struct Binaural {
+    int   on = 0;          ///< 1: the near plane binaural (for headphones)
+    float span = 0.5f;     ///< 0: the partials' places spread over the front half (+-90 degrees) .. 1: all round (+-180)
+    float height = 0.3f;   ///< 0 .. 1: elevations spread over up to +-60 degrees
+    float angle = 0.0f;    ///< radians: the whole cloud turned (the orbit), 0 in front, positive to the right
+};
+static_assert(sizeof(Binaural) % 16 == 0, "Binaural rides in the block header");
+
+/**
+ * @brief The spectral echo: a delay line for every frequency band, on the GPU.
+ *
+ * The voices (near and far) are taken apart every block by a 1024-point FFT (a Hann window, the
+ * block as the hop), every band of each ear goes through a delay line of its own with feedback,
+ * and the bands are put back together and overlapped (output: kCloudOutChannels' last two, 896
+ * samples after the input at 128 a block). The bands' times follow `tilt` (positive: the highs
+ * later) and `scatter` (each band a time of its own), the feedback falls towards the top by
+ * `damp`. Echoes then come back as cascades rather than as copies.
+ */
+struct SpectralEcho {
+    int   on = 0;            ///< 1: running (0: silent, nothing computed)
+    int   clear = 0;         ///< 1 for one block: the lines emptied first (the engine asks when it switches on)
+    int   pad0 = 0;          ///< keeps the floats 16-byte aligned
+    int   pad1 = 0;          ///< likewise
+    float frames = 187.0f;   ///< the bands' middle delay, in blocks
+    float tilt = 0.0f;       ///< -1 .. 1: the delay times 2^(2 tilt (place - 0.5)), place 0 at 20 Hz .. 1 at 20 kHz
+    float scatter = 0.0f;    ///< 0 .. 1: each band's time scattered by up to +-75 %
+    float feedback = 0.0f;   ///< 0 .. 0.95
+    float damp = 0.0f;       ///< 0 .. 1: the feedback times (1 - damp place)
+    float pad2 = 0.0f;       ///< keeps the table 16-byte aligned
+    float pad3 = 0.0f;       ///< likewise
+    float pad4 = 0.0f;       ///< likewise
+};
+static_assert(sizeof(SpectralEcho) % 16 == 0, "SpectralEcho rides in the block header");
 
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
@@ -322,6 +368,12 @@ public:
     /** @brief The host's copy of the field and the dispersion, edited between wait() and the next launch(). @return the settings */
     SpectralField& field();
 
+    /** @brief The host's copy of the binaural placement, edited between wait() and the next launch(). @return the settings */
+    Binaural& binaural();
+
+    /** @brief The host's copy of the spectral echo's settings, edited between wait() and the next launch(). @return the settings */
+    SpectralEcho& spectralEcho();
+
     /**
      * @brief Sends the voices up and starts one block on the GPU; returns at once. Clears every
      *        voice's restart flag and advances the active voices' time by one block.
@@ -333,7 +385,7 @@ public:
 
     /**
      * @brief Waits for the launched block.
-     * @return  blockSize frames of kCloudOutChannels (near L, near R, far L, far R, modal hall L, R), valid until the next launch()
+     * @return  blockSize frames of kCloudOutChannels (near L, R, far L, R, modal hall L, R, spectral echo L, R), valid until the next launch()
      */
     const float* wait();
 

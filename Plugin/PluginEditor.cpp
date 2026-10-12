@@ -154,7 +154,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                  ParamId::FilterDrift } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
     page("Tuning", { { "Tuning", F::Motion, Ids{ ParamId::Scale, ParamId::RootNote, ParamId::KeyMap, ParamId::RefPitch, ParamId::Purity } },
-                     { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod } } });
+                     { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod } },
+                     { "Self-Tune", F::Motion, Ids{ ParamId::TuneGravity, ParamId::TuneReach, ParamId::TuneAnchor } } });
     page("Conductor", { { "Conductor", F::Motion, Ids{ ParamId::BrainOn, ParamId::AutoMode, ParamId::BrainRate, ParamId::AutoRate, ParamId::BrainDensity,
                                                        ParamId::BrainHoldMin, ParamId::BrainHoldMax } },
                         { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh } },
@@ -166,7 +167,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                     { "Near", F::Space, Ids{ ParamId::Presence, ParamId::PadLowCut } },
                     { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp, ParamId::FarDiffuse,
                                                    ParamId::FarPreDelay, ParamId::FarUnmask, ParamId::FarMode, ParamId::FarFreeze } },
-                    { "Master", F::Space, Ids{ ParamId::MasterGain, ParamId::BassMono, ParamId::StereoWidth } } });
+                    { "Master", F::Space, Ids{ ParamId::MasterGain, ParamId::BassMono, ParamId::StereoWidth } },
+                    { "Binaural", F::Space, Ids{ ParamId::Binaural, ParamId::BinauralSpan, ParamId::BinauralHeight, ParamId::BinauralOrbit } } });
     page("Effects", { { "Echo", F::Space, Ids{ ParamId::DelayMix, ParamId::DelayTimeL, ParamId::DelayTimeR, ParamId::DelayFeedback, ParamId::DelayCross,
                                                ParamId::DelayDamp, ParamId::DelayAbsorb, ParamId::DelayDuck, ParamId::DelayToFar } },
                       { "Echo 2", F::Space, Ids{ ParamId::Delay2Mix, ParamId::Delay2TimeL, ParamId::Delay2TimeR, ParamId::Delay2Feedback,
@@ -175,7 +177,11 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                   ParamId::NearDamp } },
                       { "Modal Hall", F::Motion, Ids{ ParamId::ModalLevel, ParamId::ModalDecay, ParamId::ModalDamp, ParamId::ModalTune, ParamId::ModalSpread,
                                                       ParamId::ModalDrift, ParamId::ModalWidth, ParamId::ModalLow, ParamId::ModalBreath,
-                                                      ParamId::ModalFreeze } } });
+                                                      ParamId::ModalPaint, ParamId::ModalFreeze } },
+                      { "Spectral Echo", F::Space, Ids{ ParamId::SpecMix, ParamId::SpecTime, ParamId::SpecTilt, ParamId::SpecScatter,
+                                                        ParamId::SpecFeedback, ParamId::SpecDamp, ParamId::SpecToFar } },
+                      { "Memory", F::Envelope, Ids{ ParamId::MemoryLevel, ParamId::MemoryTime, ParamId::MemoryBloom, ParamId::MemoryBlur,
+                                                    ParamId::MemorySink } } });
     {
         auto* m = new ModPage(proc_, actions_, &live_);
         describe_.push_back([m] { return m->describe(); });
@@ -268,13 +274,18 @@ void AdditivEditor::timerCallback()
     cloud_.refresh();
     shootStep();
     // ADDITIV_LOG: a line a second on the real-time path (the slowest block, the emptiest ring, the
-    // largest callback, the underruns so far), for finding what makes it stutter.
+    // largest callback, the underruns so far), for finding what makes it stutter; the slowest block
+    // is split into its preparation, its wait for the GPU and its effects (each its own slowest).
     if (++logTick_ % 15 == 0) {
         const juce::String path = juce::SystemStats::getEnvironmentVariable("ADDITIV_LOG", {});
-        if (path.isNotEmpty() && e.prepared())
-            juce::File(path).appendText(juce::String(logTick_ / 15) + " s: worst block " + juce::String(e.takeWorstBlockMs(), 3) + " ms, min fill "
+        if (path.isNotEmpty() && e.prepared()) {
+            float prep = 0.0f, gpu = 0.0f, fx = 0.0f;
+            e.takeWorstParts(prep, gpu, fx);
+            juce::File(path).appendText(juce::String(logTick_ / 15) + " s: worst block " + juce::String(e.takeWorstBlockMs(), 3) + " ms (prep "
+                                        + juce::String(prep, 3) + ", gpu " + juce::String(gpu, 3) + ", effects " + juce::String(fx, 3) + "), min fill "
                                         + juce::String(e.takeMinFill()) + " of " + juce::String(e.latencySamples()) + ", callback " + juce::String(e.takeMaxCallback())
                                         + ", underruns " + juce::String(static_cast<int>(e.underruns())) + "\n");
+        }
     }
 }
 

@@ -468,6 +468,61 @@ def motion_effects(r, group):
             r.set("modal_breath", f(r.u(*amount), 2))
 
 
+# Phase 9 per group (12.10.2026), drawn last: memory = (probability, level, time s, bloom s);
+# tune = (probability, self-tune); paint = (probability, paint), only where the preset has a modal
+# hall; spec = (probability, level, time s, tilt, scatter, feedback). Binaural is the listener's and
+# never set by a preset (Presets.h keptByPresets).
+P9_FX = {
+    "Sleep Concert":   dict(memory=(0.5, (0.3, 0.6), (60, 180), (3, 10)), paint=(0.3, (0.3, 0.7))),
+    "Choirs":          dict(memory=(0.3, (0.2, 0.5), (40, 120), (2, 6)), tune=(0.4, (0.3, 0.8))),
+    "Glass":           dict(spec=(0.4, (0.12, 0.25), (0.3, 1.2), (-0.5, 1.0), (0.1, 0.5), (0.3, 0.6))),
+    "Bells":           dict(spec=(0.3, (0.10, 0.20), (0.5, 1.5), (-1.0, 0.5), (0.1, 0.4), (0.3, 0.6))),
+    "Strings":         dict(memory=(0.3, (0.2, 0.4), (40, 120), (2, 6)), tune=(0.5, (0.3, 0.8))),
+    "Organs":          dict(memory=(0.3, (0.2, 0.4), (40, 100), (2, 5)), tune=(0.4, (0.3, 0.7))),
+    "Air & Noise":     dict(paint=(0.4, (0.3, 0.8)), spec=(0.3, (0.12, 0.25), (0.4, 1.5), (-0.5, 1.0), (0.3, 0.8), (0.3, 0.6))),
+    "Deep Space":      dict(memory=(0.5, (0.3, 0.6), (90, 240), (5, 15)), spec=(0.4, (0.12, 0.25), (1.5, 3.0), (0.0, 1.0), (0.2, 0.6), (0.4, 0.7))),
+    "Glissandi":       dict(spec=(0.4, (0.12, 0.25), (0.5, 1.5), (0.0, 1.0), (0.2, 0.6), (0.3, 0.6))),
+    "Pendulums":       dict(spec=(0.3, (0.12, 0.25), (0.3, 1.0), (-0.5, 0.5), (0.0, 0.3), (0.3, 0.6))),
+    "Waves":           dict(memory=(0.3, (0.2, 0.5), (60, 150), (3, 10)), paint=(0.4, (0.3, 0.8))),
+    "Shepard & Tides": dict(paint=(0.5, (0.4, 0.9))),
+    "Shimmer":         dict(spec=(0.5, (0.15, 0.30), (0.3, 1.2), (0.3, 1.0), (0.2, 0.6), (0.3, 0.7))),
+    "Dark Drones":     dict(memory=(0.4, (0.3, 0.6), (90, 240), (5, 15))),
+    "Microtonal":      dict(memory=(0.3, (0.2, 0.5), (60, 150), (3, 8))),
+    "Keys":            dict(tune=(0.3, (0.3, 0.7))),
+}
+
+
+def p9_effects(r, group):
+    """The group's memory, self-tuning, painted hall and spectral echo, drawn last."""
+    fx = P9_FX.get(group, {})
+    if "memory" in fx:
+        p, level, life, bloom = fx["memory"]
+        if r.rng.random() < p:
+            r.set("memory_level", f(r.u(*level), 2))
+            r.set("memory_time", f(r.lg(*life), 0))
+            r.set("memory_bloom", f(r.lg(*bloom), 1))
+            r.set("memory_blur", f(r.u(0.3, 0.8), 2))
+            r.set("memory_sink", f(r.u(0.4, 0.9), 2))
+    if "tune" in fx:
+        p, grav = fx["tune"]
+        if r.rng.random() < p:
+            r.set("tune_gravity", f(r.u(*grav), 2))
+            r.set("tune_anchor", f(r.u(0.05, 0.3), 2))
+    if "paint" in fx and "modal_level" in r.p:
+        p, amount = fx["paint"]
+        if r.rng.random() < p:
+            r.set("modal_paint", f(r.u(*amount), 2))
+    if "spec" in fx:
+        p, level, time, tilt, scatter, fb = fx["spec"]
+        if r.rng.random() < p:
+            r.set("spec_mix", f(r.u(*level), 3))
+            r.set("spec_time", f(r.lg(*time), 3))
+            r.set("spec_tilt", f(r.u(*tilt), 2))
+            r.set("spec_scatter", f(r.u(*scatter), 2))
+            r.set("spec_feedback", f(r.u(*fb), 2))
+            r.set("spec_to_far", f(r.u(0.2, 0.7), 2))
+
+
 def effects(r, group):
     """The group's echoes, room, modal hall and far network, drawn after its recipe."""
     fx = FX[group]
@@ -520,6 +575,7 @@ def build():
             recipe(r)
             effects(r, group)
             motion_effects(r, group)
+            p9_effects(r, group)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
                 r.set("master_gain", f(max(-18.0, min(12.0, TARGET_DB - levels[name])), 2))

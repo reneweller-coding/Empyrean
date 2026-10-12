@@ -42,6 +42,14 @@ const Preset& preset(int i);
  */
 int presetValues(int i, float* values, std::string* modText);
 
+/**
+ * @brief Whether a parameter belongs to the listener rather than to the sound: loading a preset
+ *        leaves it as it is (Binaural: headphones or speakers are the listener's, not the preset's).
+ * @param id  the parameter
+ * @return    true when a preset does not set it
+ */
+bool keptByPresets(ParamId id);
+
 /** @brief A preset's index within its group (for program change: bank = group, program = this). @param i the preset @return 0 .. */
 int presetIndexInGroup(int i);
 

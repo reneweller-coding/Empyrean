@@ -77,12 +77,13 @@ void CloudView::paint(juce::Graphics& g)
     const float width = proc_.value(static_cast<int>(ParamId::CloudWidth)) * (1.0f - 0.6f * proc_.value(static_cast<int>(ParamId::Purity)));
     const float slope = proc_.value(static_cast<int>(ParamId::WidthSlope));
     const float pxPerCent = spec.getWidth() / (1200.0f * std::log2(1000.0f));
-    const juce::Colour bySource[3] = { skin.accent, additivui::colour::violet, skin.family(frame::Family::Space) };
+    const juce::Colour bySource[4] = { skin.accent, additivui::colour::violet, skin.family(frame::Family::Space),
+                                       skin.family(frame::Family::Envelope).withMultipliedAlpha(0.7f) };   // played, conductor, Brain 2, memory
     float firstTime = -1.0f;
     for (const additiv::VoiceView& v : views_) {
         if (v.hz <= 0.0f || v.gain <= 0.0f) continue;
         if (firstTime < 0.0f) firstTime = v.time;
-        const juce::Colour c = bySource[juce::jlimit(0, 2, v.source)];
+        const juce::Colour c = bySource[juce::jlimit(0, 3, v.source)];
         const float strength = v.gain * (1.0f - 0.6f * v.distance);
         const int H = std::min(160, static_cast<int>(20000.0f / v.hz));
         for (int h = 1; h <= H; ++h) {

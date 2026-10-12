@@ -14,6 +14,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <avrt.h>
+#include <xmmintrin.h>
 
 #include <algorithm>
 #include <cmath>
@@ -29,6 +30,22 @@ constexpr double kGlideSeconds = 0.3;        ///< how fast a sounding voice foll
 constexpr float kPurityNarrowing = 0.6f;     ///< at Purity 1 the clouds are this much narrower, so pure intervals can lock (PLAN.md)
 constexpr float kMetresPerUnit = 20.0f;      ///< one unit of distance, for the doppler (Noctuary: about twenty metres)
 constexpr float kSpeedOfSound = 343.0f;      ///< m/s
+
+/**
+ * @brief Denormals off while it lives (flush to zero, denormals are zero), the old mode back after.
+ *
+ * The effects' tails -- reverbs, echoes, the far hall -- decay into numbers the CPU takes a
+ * hundred times longer over. JUCE's ScopedNoDenormals covers only the audio callback, and the
+ * blocks are rendered on the worker (or, offline, wherever process() is called). Measured before:
+ * the slowest block of a second at 2.5 ms of a block's 2.7 (and an underrun at a standalone's start).
+ */
+struct NoDenormals {
+    unsigned int csr = _mm_getcsr();                       ///< the mode it found
+    NoDenormals() { _mm_setcsr(csr | 0x8040u); }           ///< FTZ (bit 15) and DAZ (bit 6) on
+    ~NoDenormals() { _mm_setcsr(csr); }                    ///< the mode back
+    NoDenormals(const NoDenormals&) = delete;              ///< one per scope
+    NoDenormals& operator=(const NoDenormals&) = delete;   ///< one per scope
+};
 
 /**
  * @brief Raises this process's GPU scheduling class to REALTIME (PLAN.md, Phase 0: the only class
@@ -153,7 +170,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     CloudConfig cc;
     cc.sampleRate = cfg_.sampleRate;
     cc.blockSize = G;
-    cc.voices = cfg_.voices;
+    cc.voices = cfg_.voices + std::max(0, cfg_.ghosts);
     cc.partialsPerVoice = cfg_.partialsPerVoice;
     cc.spinWait = true;
     if (!cloud_.open(cc, error)) return false;
@@ -188,8 +205,14 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     early_.prepare(cfg_.sampleRate);
     nearRev_.prepare(cfg_.sampleRate);
     midSide_.prepare(cfg_.sampleRate);
-    for (std::vector<float>* b : { &nearL_, &nearR_, &farL_, &farR_, &dryL_, &dryR_, &wetL_, &wetR_, &modalL_, &modalR_ })
+    for (std::vector<float>* b : { &nearL_, &nearR_, &farL_, &farR_, &dryL_, &dryR_, &wetL_, &wetR_, &modalL_, &modalR_, &specL_, &specR_ })
         b->assign(static_cast<size_t>(G), 0.0f);
+    ghosts_.assign(static_cast<size_t>(std::max(0, cfg_.ghosts)), Ghost{});
+    ghostRng_ = Rng(cfg_.seed ^ 0x47686F7374ull);
+    prevSpecMix_ = prevSpecToFar_ = 0.0f;
+    specWasOn_ = false;
+    binAngle_ = 0.0f;
+    paintTime_ = 0.0f;
     prevDelayMix_ = prevDelayToFar_ = prevDelay2Mix_ = prevDelay2ToFar_ = prevModalLevel_ = 0.0f;
     modalTime_ = 0.0f;
     srcDistance_ = 0.3f;
@@ -512,6 +535,7 @@ void Engine::refreshLandscape()
     const Landscape& l = f.land[static_cast<size_t>(choice)];
     cloud_.setLandscape(l.amps.data(), l.columns, l.rows, l.rowSeconds);
     landRms_ = f.rms[static_cast<size_t>(choice)];
+    landLoop_ = static_cast<float>(l.rows) * l.rowSeconds;
     landChoice_ = choice;
 }
 
@@ -552,6 +576,8 @@ void Engine::beginOn(int i, int note, float velocity, float distance, int source
     v.released = false;
     v.tailBlocks = 1;
     v.tailArmed = false;
+    v.tuneCents = 0.0f;
+    v.lastGain = 0.0f;
     v.age = 0.0;
     v.stealing = false;
     v.stealBlocks = 0;
@@ -597,13 +623,34 @@ void Engine::stopNote(int note, int source)
             v.env.noteOff();
             CloudVoice& cv = cloud_.voice(static_cast<int>(i));
             cv.releaseAt = cv.time;   // the motion's release tails start here
+            if (cur(ParamId::MemoryLevel) > 0.0f && !ghosts_.empty()) captureGhost(static_cast<int>(i));
             return;
         }
     }
 }
 
+void Engine::captureGhost(int i)
+{
+    size_t slot = 0;
+    for (size_t g = 0; g < ghosts_.size(); ++g) {
+        if (!ghosts_[g].on) { slot = g; break; }
+        if (ghosts_[g].env < ghosts_[slot].env) slot = g;
+    }
+    Ghost& g = ghosts_[slot];
+    g.base = cloud_.voice(i);
+    g.base.releaseAt = -1.0f;   // a ghost is held: its motion loops on
+    g.on = true;
+    g.restart = true;
+    g.seed = static_cast<std::uint32_t>(ghostRng_.next()) | 1u;
+    g.age = 0.0f;
+    g.life = std::max(1.0f, cur(ParamId::MemoryTime));
+    g.bloom = std::max(0.05f, cur(ParamId::MemoryBloom));
+    g.env = 0.0f;
+}
+
 void Engine::renderBlock()
 {
+    const NoDenormals noDenormals;
     LARGE_INTEGER qpcStart;
     QueryPerformanceCounter(&qpcStart);
     const int G = cfg_.gpuBlock;
@@ -662,6 +709,50 @@ void Engine::renderBlock()
     // 3. The voices: envelope, place, frequency, colour, filter, air, motion.
     const double follow = 1.0 - std::exp(-dt / kGlideSeconds);
     const double tideMul = std::pow(2.0, blk_.tide * tide_.update(dtf, 1.0f / (blk_.tidePeriod * 60.0f), side_) / 1200.0);
+    // Self-tuning: where a harmonic of one voice nearly meets a harmonic of another (within Reach),
+    // the two pull together -- weighted by their loudness, by a bell over the distance and by how low
+    // the harmonics are (the beats of low ones are what is heard). Every voice moves half the way
+    // its weighted mismatch asks for, at the speed Self-Tune sets (the other moves the other half),
+    // and the anchor draws it back to its pitch in the scale. A chord in equal temperament settles
+    // towards just intervals and gives way again at the next change; a note starts on the scale.
+    {
+        const float grav = cur(ParamId::TuneGravity), reach = std::max(1.0f, cur(ParamId::TuneReach)), anchor = cur(ParamId::TuneAnchor);
+        const int nv = static_cast<int>(voices_.size());
+        if (grav > 0.0f) {
+            static const float kLogH[9] = { 0.0f, 0.0f, 1.0f, 1.5849625f, 2.0f, 2.3219281f, 2.5849625f, 2.8073549f, 3.0f };
+            std::array<float, 64> lb{}, moved{};
+            for (int a = 0; a < nv && a < 64; ++a) {
+                const Voice& v = voices_[static_cast<size_t>(a)];
+                lb[static_cast<size_t>(a)] = v.note >= 0 ? static_cast<float>(std::log2(frequencyOf(v.note) * tideMul)) + v.tuneCents / 1200.0f : 0.0f;
+            }
+            const float rate = 1.0f - std::exp(-2.0f * grav * dtf);
+            for (int a = 0; a < nv && a < 64; ++a) {
+                const Voice& va = voices_[static_cast<size_t>(a)];
+                if (va.note < 0 || va.stealing || va.lastGain <= 0.0f) continue;
+                double force = 0.0, wsum = 0.0;
+                for (int b = 0; b < nv && b < 64; ++b) {
+                    const Voice& vb = voices_[static_cast<size_t>(b)];
+                    if (b == a || vb.note < 0 || vb.stealing || vb.lastGain <= 0.0f) continue;
+                    for (int ha = 1; ha <= 8; ++ha)
+                        for (int hb = 1; hb <= 8; ++hb) {
+                            const float d = 1200.0f * (lb[static_cast<size_t>(b)] + kLogH[hb] - lb[static_cast<size_t>(a)] - kLogH[ha]);
+                            if (std::fabs(d) >= reach) continue;
+                            const double w = static_cast<double>(va.lastGain) * vb.lastGain * std::exp(-(d / reach) * (d / reach)) / (ha * hb);
+                            force += w * d;
+                            wsum += w;
+                        }
+                }
+                if (wsum > 1.0e-12) moved[static_cast<size_t>(a)] = static_cast<float>(0.5 * force / wsum) * rate;
+            }
+            const float back = std::exp(-2.0f * anchor * dtf);
+            for (int a = 0; a < nv && a < 64; ++a) {
+                Voice& v = voices_[static_cast<size_t>(a)];
+                v.tuneCents = std::clamp((v.tuneCents + moved[static_cast<size_t>(a)]) * back, -50.0f, 50.0f);
+            }
+        } else {
+            for (Voice& v : voices_) v.tuneCents *= std::exp(-2.0f * dtf);   // switched off: back to the scale
+        }
+    }
     const MotionKind motion = static_cast<MotionKind>(std::clamp(blk_.motion, 0, kNumMotions - 1));
     // A voice that reads the landscape is as much quieter as the landscape is dark: made up here
     // (at most 18 dB), so a dim landscape changes the motion, not the level.
@@ -682,6 +773,7 @@ void Engine::renderBlock()
         if (v.note < 0) { cv.active = 0; continue; }
         v.env.setTimes(blk_.attack, blk_.decay, blk_.sustain, blk_.release);
         const float gain = v.env.process();
+        v.lastGain = gain;
         if (!v.env.isActive()) {
             // With dispersion the late partials sound on after the envelope: the voice stays until
             // the latest of them has heard the end of it.
@@ -700,7 +792,7 @@ void Engine::renderBlock()
         const float velocity = (v.distance - v.prevDistance) / dtf * kMetresPerUnit;
         const double doppler = v.restart ? 1.0 : 1.0 - static_cast<double>(blk_.doppler * velocity / kSpeedOfSound);
         v.prevDistance = v.distance;
-        const double target = frequencyOf(v.note) * tideMul;
+        const double target = frequencyOf(v.note) * tideMul * std::exp2(static_cast<double>(v.tuneCents) / 1200.0);
         v.hz = v.restart ? target : v.hz * std::pow(target / v.hz, follow);
         // The filter's cutoff: key tracking, the envelope, and its own drift of up to an octave.
         const float oct = blk_.keyTrack * static_cast<float>(v.note - 60) / 12.0f + blk_.filterEnv * gain
@@ -757,6 +849,36 @@ void Engine::renderBlock()
     if (prevSounding_ == 0 && sounding > 0) phraseStart_ = true;   // a note into silence: the envelopes' phrase begins
     prevSounding_ = sounding;
     for (int s = 0; s < 3; ++s) soundingBy_[s].store(by[s], std::memory_order_relaxed);
+    // The memory's ghosts: each a released voice sounding on from where it was let go, rising over
+    // Bloom, fading by 60 dB over Memory Time, and as it fades widening, drifting, darkening and
+    // receding (Blur, Sink). New phases of its own, so it never adds to the voice it came from.
+    {
+        const float level = cur(ParamId::MemoryLevel), blur = cur(ParamId::MemoryBlur), sink = cur(ParamId::MemorySink);
+        const int first = static_cast<int>(voices_.size());
+        for (size_t gi = 0; gi < ghosts_.size(); ++gi) {
+            Ghost& g = ghosts_[gi];
+            CloudVoice& cv = cloud_.voice(first + static_cast<int>(gi));
+            if (!g.on) { cv.active = 0; continue; }
+            g.age += dtf;
+            g.env = std::min(1.0f, g.age / g.bloom) * std::exp(-6.9077553f * std::max(0.0f, g.age - g.bloom) / g.life);
+            if (g.age > g.bloom && g.env < 1.0e-4f) { g.on = false; cv.active = 0; continue; }
+            const float x = std::min(1.0f, g.age / g.life);
+            const float keepTime = cv.time;
+            cv = g.base;
+            cv.time = g.restart ? 0.0f : keepTime;
+            cv.restart = g.restart ? 1 : 0;
+            cv.onset = 0;
+            cv.seed = g.seed;
+            cv.active = 1;
+            cv.gain = g.env * level;
+            cv.width = g.base.width * (1.0f + 3.0f * blur * x);
+            cv.drift = g.base.drift + 12.0f * blur * x;
+            cv.brightness = g.base.brightness * (1.0f - 0.7f * blur * x);
+            cv.distance = g.base.distance + (1.0f - g.base.distance) * sink * std::min(1.0f, 2.0f * x);
+            g.restart = false;
+        }
+    }
+
     for (int i = 0; i < static_cast<int>(voices_.size()) && i < kMaxViewVoices; ++i) {
         const Voice& v = voices_[static_cast<size_t>(i)];
         const CloudVoice& cv = cloud_.voice(i);
@@ -766,6 +888,17 @@ void Engine::renderBlock()
         viewDistance_[static_cast<size_t>(i)].store(v.distance, std::memory_order_relaxed);
         viewTime_[static_cast<size_t>(i)].store(cv.time, std::memory_order_relaxed);
         viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
+    }
+    for (size_t gi = 0; gi < ghosts_.size(); ++gi) {   // the ghosts after the voices, as source 3
+        const size_t i = voices_.size() + gi;
+        if (i >= static_cast<size_t>(kMaxViewVoices)) break;
+        const CloudVoice& cv = cloud_.voice(static_cast<int>(i));
+        const bool on = ghosts_[gi].on && cv.active;
+        viewHz_[i].store(on ? cv.hz : 0.0f, std::memory_order_relaxed);
+        viewGain_[i].store(on ? cv.gain : 0.0f, std::memory_order_relaxed);
+        viewDistance_[i].store(cv.distance, std::memory_order_relaxed);
+        viewTime_[i].store(cv.time, std::memory_order_relaxed);
+        viewSource_[i].store(3, std::memory_order_relaxed);
     }
 
     // 4. The modal hall's settings: it runs on the GPU in the same graph, hearing the voices' block
@@ -785,6 +918,12 @@ void Engine::renderBlock()
         mh.low = cur(ParamId::ModalLow);
         mh.time = modalTime_;
         mh.breath = cur(ParamId::ModalBreath);
+        // The painted hall reads the landscape at its own clock, wrapped at the landscape's loop.
+        mh.paint = cur(ParamId::ModalPaint);
+        mh.paintNorm = 1.0f / std::max(0.125f, landRms_);
+        paintTime_ += dtf;
+        if (landLoop_ > 0.0f && paintTime_ >= landLoop_) paintTime_ -= landLoop_;
+        mh.paintTime = paintTime_;
         int count = 0;
         if (mh.on)
             for (int note = 0; note < 128 && count < kModalTuned; ++note) {
@@ -843,9 +982,35 @@ void Engine::renderBlock()
         }
     }
 
-    // 5. The GPU: near and far, left and right, and the modal hall.
+    // The binaural cloud (its orbit turns the whole of it) and the spectral echo (its lines
+    // cleared when it is switched on; its delay less the 1024 - G samples its window adds).
+    {
+        Binaural& b = cloud_.binaural();
+        b.on = cur(ParamId::Binaural) >= 0.5f ? 1 : 0;
+        b.span = cur(ParamId::BinauralSpan);
+        b.height = cur(ParamId::BinauralHeight);
+        binAngle_ += 6.2831853f * cur(ParamId::BinauralOrbit) * dtf;
+        if (binAngle_ > 3.14159265f) binAngle_ -= 6.2831853f;
+        if (binAngle_ < -3.14159265f) binAngle_ += 6.2831853f;
+        b.angle = binAngle_;
+        SpectralEcho& se = cloud_.spectralEcho();
+        const bool on = cur(ParamId::SpecMix) > 0.0f || cur(ParamId::SpecToFar) * cur(ParamId::SpecMix) > 0.0f || prevSpecMix_ > 0.0f;
+        if (on && !specWasOn_) se.clear = 1;
+        specWasOn_ = on;
+        se.on = on ? 1 : 0;
+        se.frames = std::max(1.0f, (cur(ParamId::SpecTime) * static_cast<float>(cfg_.sampleRate) - static_cast<float>(1024 - G)) / static_cast<float>(G));
+        se.tilt = cur(ParamId::SpecTilt);
+        se.scatter = cur(ParamId::SpecScatter);
+        se.feedback = cur(ParamId::SpecFeedback);
+        se.damp = cur(ParamId::SpecDamp);
+    }
+
+    // 5. The GPU: near and far, left and right, the modal hall and the spectral echo.
+    LARGE_INTEGER qpcLaunch, qpcBack;
+    QueryPerformanceCounter(&qpcLaunch);
     cloud_.launch();
     const float* q = cloud_.wait();
+    QueryPerformanceCounter(&qpcBack);
     gpuMs_.store(cloud_.lastGpuMs(), std::memory_order_relaxed);
     for (int s = 0; s < G; ++s) {
         const float* f = q + static_cast<size_t>(kCloudOutChannels) * s;
@@ -856,6 +1021,8 @@ void Engine::renderBlock()
         farR_[k] = f[3] * blk_.farLevel;
         modalL_[k] = f[4];
         modalR_[k] = f[5];
+        specL_[k] = f[6];
+        specR_[k] = f[7];
     }
     // A level from the last block's to this one's, across the block (no zipper when it is modulated).
     auto ramp = [G](float from, float to, int s) { return from + (to - from) * static_cast<float>(s + 1) / static_cast<float>(G); };
@@ -894,6 +1061,17 @@ void Engine::renderBlock()
         prevDelay2Mix_ = m2;
         prevDelay2ToFar_ = t2;
     }
+    {   // the spectral echo, from the GPU: onto the near plane and partly into the far
+        const float m3 = cur(ParamId::SpecMix), t3 = cur(ParamId::SpecToFar) * m3;
+        for (int s = 0; s < G; ++s) {
+            const size_t k = static_cast<size_t>(s);
+            const float m = ramp(prevSpecMix_, m3, s), tf = ramp(prevSpecToFar_, t3, s);
+            nearL_[k] += specL_[k] * m;  nearR_[k] += specR_[k] * m;
+            farL_[k] += specL_[k] * tf;  farR_[k] += specR_[k] * tf;
+        }
+        prevSpecMix_ = m3;
+        prevSpecToFar_ = t3;
+    }
     nearRev_.setSpace(0.3f, 20000.0f, 80.0f);
     nearRev_.set(0.6f, cur(ParamId::NearDecay), cur(ParamId::NearDamp), 5.0f, false, cur(ParamId::NearMix));
     nearRev_.process(nearL_.data(), nearR_.data(), G);
@@ -925,7 +1103,9 @@ void Engine::renderBlock()
         }
         prevModalLevel_ = ml;
     }
-    midSide_.set(cur(ParamId::BassMono), 0.0f, cur(ParamId::StereoWidth));
+    // Binaural: the master leaves the two ears alone (no mono bass, no width): both would undo the head.
+    if (cur(ParamId::Binaural) >= 0.5f) midSide_.set(20.0f, 0.0f, 1.0f);
+    else midSide_.set(cur(ParamId::BassMono), 0.0f, cur(ParamId::StereoWidth));
     midSide_.process(nearL_.data(), nearR_.data(), G);
     for (int s = 0; s < G; ++s) {
         const size_t at = static_cast<size_t>((pos + s) & ringMask_) * 2;
@@ -936,9 +1116,15 @@ void Engine::renderBlock()
     LARGE_INTEGER qpcEnd, qpcFreq;
     QueryPerformanceCounter(&qpcEnd);
     QueryPerformanceFrequency(&qpcFreq);
-    const int us = static_cast<int>((qpcEnd.QuadPart - qpcStart.QuadPart) * 1000000 / qpcFreq.QuadPart);
-    int worst = worstBlockUs_.load(std::memory_order_relaxed);
-    while (us > worst && !worstBlockUs_.compare_exchange_weak(worst, us, std::memory_order_relaxed)) {}
+    auto keepWorst = [&](std::atomic<int>& at, LONGLONG from, LONGLONG to) {
+        const int us = static_cast<int>((to - from) * 1000000 / qpcFreq.QuadPart);
+        int worst = at.load(std::memory_order_relaxed);
+        while (us > worst && !at.compare_exchange_weak(worst, us, std::memory_order_relaxed)) {}
+    };
+    keepWorst(worstBlockUs_, qpcStart.QuadPart, qpcEnd.QuadPart);
+    keepWorst(worstPrepUs_, qpcStart.QuadPart, qpcLaunch.QuadPart);
+    keepWorst(worstWaitUs_, qpcLaunch.QuadPart, qpcBack.QuadPart);
+    keepWorst(worstPostUs_, qpcBack.QuadPart, qpcEnd.QuadPart);
 }
 
 } // namespace additiv

@@ -20,6 +20,8 @@ namespace {
 constexpr int kCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));   ///< presets in the table
 } // namespace
 
+bool keptByPresets(ParamId id) { return id == ParamId::Binaural; }
+
 int numPresets() { return kCount; }
 
 const Preset& preset(int i) { return kPresets[std::clamp(i, 0, kCount - 1)]; }

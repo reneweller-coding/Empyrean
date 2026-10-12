@@ -38,6 +38,10 @@ constexpr int kModalThreads = 256;                          ///< modes per CUDA 
 constexpr int kModalBlocks = kModalModes / kModalThreads;   ///< CUDA blocks of the modal kernel
 constexpr int kModalTile = 128;                             ///< samples the modal kernel sums per pass
 static_assert(kModalModes % kModalThreads == 0, "the modes fill whole CUDA blocks");
+constexpr int kEchoN = 1024;                 ///< the spectral echo's FFT size
+constexpr int kEchoBins = kEchoN / 2 + 1;    ///< its bands, 0 .. N/2
+constexpr int kEchoSlots = 2048;             ///< blocks each band's delay line holds (5.4 s at 128)
+constexpr int kEchoThreads = kEchoN / 2;     ///< threads of its one CUDA block: one butterfly each
 constexpr float kAirShare = 0.2f;    ///< the share of a voice's partials that become its air band when Air is up
 
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
@@ -56,6 +60,8 @@ struct BlockHeader {
     std::uint32_t hpad2;        ///< likewise
     ModalHall modal;       ///< the modal hall's settings for this block
     SpectralField field;   ///< the field and the dispersion for this block
+    Binaural binaural;     ///< the binaural placement for this block
+    SpectralEcho echo;     ///< the spectral echo for this block
 };
 static_assert(sizeof(BlockHeader) % 16 == 0, "the voices behind the header stay 16-byte aligned");
 static_assert(sizeof(CloudVoice) % 16 == 0, "CloudVoice is uploaded as an array");
@@ -359,6 +365,61 @@ __device__ float fieldStep(const SpectralField& F, float logHz, float off, float
 }
 
 /**
+ * @brief One partial's complex gain at each ear: the head's shadow, the pinna and the time round
+ *        the head (Brown and Duda 1998; Woodworth), the pair normalised to the pan law's power.
+ * @param B      the binaural settings
+ * @param place  the partial's place, -1 .. 1 (its azimuth over the span, plus the orbit)
+ * @param u      its own die, 0 .. 1 (its elevation)
+ * @param f      its frequency, Hz
+ * @param gl     receives the left ear's gain (real, imaginary)
+ * @param gr     receives the right ear's gain
+ */
+__device__ void earGains(const Binaural& B, float place, float u, float f, float* gl, float* gr)
+{
+    const float az = place * 1.5707963f * (1.0f + fminf(fmaxf(B.span, 0.0f), 1.0f)) + B.angle;
+    const float el = fminf(fmaxf(B.height, 0.0f), 1.0f) * 1.0471976f * (2.0f * u - 1.0f);
+    float sa, ca, se, ce;
+    sincosf(az, &sa, &ca);
+    sincosf(el, &se, &ce);
+    // The pinna, the same at both ears here: five reflections whose times follow azimuth and
+    // elevation (samples at 44.1 kHz), normalised by its mean power (1 + sum of rho^2 = 2.625).
+    const float rho[5] = { 0.5f, -1.0f, 0.5f, -0.25f, 0.25f };
+    const float A[5] = { 1.0f, 5.0f, 5.0f, 5.0f, 5.0f };
+    const float Bn[5] = { 2.0f, 4.0f, 7.0f, 11.0f, 13.0f };
+    const float D[5] = { 1.0f, 0.5f, 0.5f, 0.5f, 0.5f };
+    const float half = fabsf(cosf(0.5f * az));
+    float pr = 1.0f, pim = 0.0f;
+    for (int k = 0; k < 5; ++k) {
+        const float tk = A[k] * half * sinf(D[k] * (1.5707963f - el)) + Bn[k];
+        float s, c;
+        sincosf(-6.2831853f * f * tk * (1.0f / 44100.0f), &s, &c);
+        pr += rho[k] * c;
+        pim += rho[k] * s;
+    }
+    pr *= 0.6172134f;
+    pim *= 0.6172134f;
+    const float x = sa * ce;   // towards the right ear
+    float g[2][2];
+    for (int e = 0; e < 2; ++e) {   // 0 left, 1 right
+        const float beta = acosf(fminf(fmaxf(e == 1 ? x : -x, -1.0f), 1.0f));   // 0 facing this ear .. pi behind the head from it
+        const float alpha = 1.05f + 0.95f * cosf(beta * (180.0f / 150.0f));
+        const float w = f * 8.0143e-4f;   // pi f a / c, a = 8.75 cm, c = 343 m/s
+        const float den = 1.0f / (1.0f + w * w);
+        const float hr = (1.0f + alpha * w * w) * den, hi = (alpha - 1.0f) * w * den;
+        const float tau = beta < 1.5707963f ? -2.551e-4f * cosf(beta) : 2.551e-4f * (beta - 1.5707963f);
+        float s, c;
+        sincosf(-6.2831853f * f * tau, &s, &c);
+        // head shadow x pinna x delay
+        const float r1 = hr * pr - hi * pim, i1 = hr * pim + hi * pr;
+        g[e][0] = r1 * c - i1 * s;
+        g[e][1] = r1 * s + i1 * c;
+    }
+    const float norm = rsqrtf(g[0][0] * g[0][0] + g[0][1] * g[0][1] + g[1][0] * g[1][0] + g[1][1] * g[1][1] + 1.0e-20f);
+    gl[0] = g[0][0] * norm; gl[1] = g[0][1] * norm;
+    gr[0] = g[1][0] * norm; gr[1] = g[1][1] * norm;
+}
+
+/**
  * @brief The ring of the voices' levels: this block's level of every voice written where the
  *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
  *        partial of the new note never hears the old one's level).
@@ -405,11 +466,13 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param land    the landscape
  * @param run     per partial: start phase, phase step, its change per sample, the field's offset in cents (as bits)
  * @param amp     per partial: the near left, near right, far left and far right amplitudes the last block ended on
- * @param gains   per partial two entries: near (left start, left step, right start, right step), then far
+ * @param gains   per partial three entries: near (left start, left step, right start, right step), far, and
+ *                the near plane's cosine parts (binaural: the ears' phases)
  * @param ring    per voice kGainRing levels (gainRingKernel), for the dispersion
+ * @param ampQ    per partial the near plane's cosine parts the last block ended on
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
-                             const float* land, uint4* run, float4* amp, float4* gains, const float* ring)
+                             const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -420,9 +483,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         // Beyond the voice's partials (or a silent voice): the render kernel skips whole chunks, the
         // tail of the last chunk it covers must be silent.
         if (cv.active) {
-            gains[2 * gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
-            gains[2 * gid + 1] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            gains[3 * gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            gains[3 * gid + 1] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            gains[3 * gid + 2] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
             amp[gid] = make_float4(0.0f, 0.0f, 0.0f, 0.0f);
+            ampQ[gid] = make_float2(0.0f, 0.0f);
         }
         return;
     }
@@ -536,6 +601,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     // target, so the phase is quadratic in the sample and pitch envelopes never step.
     std::uint32_t ph, inc0, dinc = 0;
     float4 a0;
+    float2 q0 = make_float2(0.0f, 0.0f);
     int onset = 0;
     if (cv.restart) {
         ph = hash32(seed ^ hash32(up + 0x51ED270BU));   // a random phase
@@ -551,17 +617,29 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         if (diff > -n && diff < n) inc0 = incTarget;   // close enough: land exactly (under a millihertz)
         else dinc = static_cast<std::uint32_t>(static_cast<std::int32_t>(diff / n));
         a0 = amp[gid];
+        q0 = ampQ[gid];
     }
 
     // Equal-power pan: the partial's place in the field; equal-power planes: near cos, far sin.
     float gl, gr, gn, gf;
     __sincosf(0.78539816f * (1.0f + place), &gr, &gl);
     __sincosf(1.57079633f * fminf(fmaxf(cv.distance, 0.0f), 1.0f), &gf, &gn);
-    const float4 t4 = make_float4(target * gl * gn, target * gr * gn, target * gl * gf, target * gr * gf);
+    float4 t4 = make_float4(target * gl * gn, target * gr * gn, target * gl * gf, target * gr * gf);
+    float2 tq = make_float2(0.0f, 0.0f);
+    if (hdr->binaural.on && target != 0.0f) {
+        // Binaural: the near plane's two ears as complex gains, a sine part and a cosine part each.
+        float el[2], er[2];
+        earGains(hdr->binaural, place, hash01(seed, up, 11), f, el, er);
+        t4.x = target * gn * el[0];
+        t4.y = target * gn * er[0];
+        tq = make_float2(target * gn * el[1], target * gn * er[1]);
+    }
     const float inv = 1.0f / static_cast<float>(n - onset);
-    gains[2 * gid] = make_float4(a0.x, (t4.x - a0.x) * inv, a0.y, (t4.y - a0.y) * inv);
-    gains[2 * gid + 1] = make_float4(a0.z, (t4.z - a0.z) * inv, a0.w, (t4.w - a0.w) * inv);
+    gains[3 * gid] = make_float4(a0.x, (t4.x - a0.x) * inv, a0.y, (t4.y - a0.y) * inv);
+    gains[3 * gid + 1] = make_float4(a0.z, (t4.z - a0.z) * inv, a0.w, (t4.w - a0.w) * inv);
+    gains[3 * gid + 2] = make_float4(q0.x, (tq.x - q0.x) * inv, q0.y, (tq.y - q0.y) * inv);
     amp[gid] = t4;
+    ampQ[gid] = tq;
     run[gid] = make_uint4(ph, inc0, dinc, __float_as_uint(fieldOff));
 }
 
@@ -571,7 +649,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
  * @param voices   the voices
  * @param pcap     partials per voice in the tables
  * @param run      per partial: start phase, phase step, its change per sample
- * @param gains    per partial two entries: near (left start, left step, right start, right step), then far
+ * @param gains    per partial three entries: near (left start, left step, right start, right step), far, near cosine parts
  * @param scratch  per chunk: maxN samples of near left, near right, far left, far right
  * @param maxN     the engine's block size (the scratch stride)
  */
@@ -581,6 +659,7 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
 {
     __shared__ float4 sgn[kChunk];        // the chunk's near amplitude ramps
     __shared__ float4 sgf[kChunk];        // and its far ones
+    __shared__ float4 sgq[kChunk];        // binaural: the near plane's cosine parts
     __shared__ uint4  sp[kChunk];         // its start phases, steps and glides
     __shared__ float  red[kCloudChannels][kThreads];   // the groups' sums when the block is shorter than kThreads
 
@@ -599,9 +678,11 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
     }
     const int count = min(kChunk, cv.partials - first);
     const int base = v * pcap + first;
+    const bool binaural = hdr->binaural.on != 0;
     for (int j = threadIdx.x; j < count; j += kThreads) {
-        sgn[j] = gains[2 * (base + j)];
-        sgf[j] = gains[2 * (base + j) + 1];
+        sgn[j] = gains[3 * (base + j)];
+        sgf[j] = gains[3 * (base + j) + 1];
+        if (binaural) sgq[j] = gains[3 * (base + j) + 2];
         sp[j] = run[base + j];
     }
     // A note that begins in this block begins at its onset: before it every ramp holds at its start.
@@ -619,17 +700,34 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
         const std::uint32_t tri = su * (su - 1u) / 2u;   // the glide's share: sum of 0 .. s-1
         const float sa = static_cast<float>(max(s - onset, 0));
         float nl = 0.0f, nr = 0.0f, fl = 0.0f, fr = 0.0f;
-        for (int j = g; j < count; j += groups) {
-            const uint4 pi = sp[j];
-            const float4 a = sgn[j];
-            const float4 b = sgf[j];
-            // The phase as a signed fraction of a turn: -pi .. pi, where __sinf is most accurate.
-            const std::uint32_t ph = pi.x + su * pi.y + tri * pi.z;
-            const float x = __sinf(static_cast<float>(static_cast<std::int32_t>(ph)) * 1.46291808e-9f);
-            nl = fmaf(fmaf(a.y, sa, a.x), x, nl);
-            nr = fmaf(fmaf(a.w, sa, a.z), x, nr);
-            fl = fmaf(fmaf(b.y, sa, b.x), x, fl);
-            fr = fmaf(fmaf(b.w, sa, b.z), x, fr);
+        if (!binaural) {
+            for (int j = g; j < count; j += groups) {
+                const uint4 pi = sp[j];
+                const float4 a = sgn[j];
+                const float4 b = sgf[j];
+                // The phase as a signed fraction of a turn: -pi .. pi, where __sinf is most accurate.
+                const std::uint32_t ph = pi.x + su * pi.y + tri * pi.z;
+                const float x = __sinf(static_cast<float>(static_cast<std::int32_t>(ph)) * 1.46291808e-9f);
+                nl = fmaf(fmaf(a.y, sa, a.x), x, nl);
+                nr = fmaf(fmaf(a.w, sa, a.z), x, nr);
+                fl = fmaf(fmaf(b.y, sa, b.x), x, fl);
+                fr = fmaf(fmaf(b.w, sa, b.z), x, fr);
+            }
+        } else {
+            // Binaural: each ear hears the partial at its own phase -- a sine part and a cosine part.
+            for (int j = g; j < count; j += groups) {
+                const uint4 pi = sp[j];
+                const float4 a = sgn[j];
+                const float4 b = sgf[j];
+                const float4 q = sgq[j];
+                const std::uint32_t ph = pi.x + su * pi.y + tri * pi.z;
+                float x, y;
+                __sincosf(static_cast<float>(static_cast<std::int32_t>(ph)) * 1.46291808e-9f, &x, &y);
+                nl = fmaf(fmaf(a.y, sa, a.x), x, fmaf(fmaf(q.y, sa, q.x), y, nl));
+                nr = fmaf(fmaf(a.w, sa, a.z), x, fmaf(fmaf(q.w, sa, q.z), y, nr));
+                fl = fmaf(fmaf(b.y, sa, b.x), x, fl);
+                fr = fmaf(fmaf(b.w, sa, b.z), x, fr);
+            }
         }
         if (groups > 1) {
             red[0][threadIdx.x] = nl;
@@ -703,9 +801,10 @@ __device__ __forceinline__ float modalUni(int mode, std::uint32_t salt)
  * @param state    per mode its complex state, carried from block to block
  * @param scratch  per CUDA block two channels of maxN sums
  * @param maxN     the scratch stride
+ * @param land     the landscape (the painted hall reads it)
  */
 __global__ void __launch_bounds__(kModalThreads)
-modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN)
+modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN, const float* land)
 {
     __shared__ float sIn[2][kModalTile];
     __shared__ float sAcc[kModalThreads / 32][2][kModalTile];
@@ -769,6 +868,23 @@ modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scrat
     __sincosf(phL, &oLs, &oLc);
     __sincosf(phR, &oRs, &oRc);
     if (silent) { oLs = oLc = oRs = oRc = 0.0f; }
+    // The painted hall: the mode heard through the landscape at its frequency, as the landscape
+    // moves on -- the tail draws the aurora, the rain, the tides. Made up by the landscape's RMS.
+    if (mh.paint > 0.0f && hdr->landColumns > 0 && hdr->landRows > 0) {
+        const float pos = fminf(fmaxf(log2f(fmaxf(f, kLandLowHz) * (1.0f / kLandLowHz)) * (1.0f / 9.96578428f), 0.0f), 1.0f);
+        const float col = pos * static_cast<float>(hdr->landColumns - 1);
+        const float rows = static_cast<float>(hdr->landRows);
+        float row = mh.paintTime / fmaxf(hdr->landRowSeconds, 1.0e-4f);
+        row -= floorf(row / rows) * rows;
+        const int r0 = min(static_cast<int>(row), hdr->landRows - 1), r1 = r0 + 1 == hdr->landRows ? 0 : r0 + 1;
+        const int c0 = min(static_cast<int>(col), hdr->landColumns - 1), c1 = min(c0 + 1, hdr->landColumns - 1);
+        const float fr = row - static_cast<float>(r0), fc = col - static_cast<float>(c0);
+        const float* a = land + static_cast<size_t>(r0) * hdr->landColumns;
+        const float* b = land + static_cast<size_t>(r1) * hdr->landColumns;
+        const float top = a[c0] + (a[c1] - a[c0]) * fc, bottom = b[c0] + (b[c1] - b[c0]) * fc;
+        const float k = 1.0f - mh.paint + mh.paint * (top + (bottom - top) * fr) * mh.paintNorm;
+        oLs *= k; oLc *= k; oRs *= k; oRc *= k;
+    }
     float2 y = state[mode];
     const int lane = static_cast<int>(threadIdx.x) & 31, warp = static_cast<int>(threadIdx.x) >> 5;
     for (int t0 = 0; t0 < n; t0 += kModalTile) {
@@ -833,6 +949,130 @@ __global__ void modalReduceKernel(const BlockHeader* hdr, const float* scratch, 
 }
 
 /**
+ * @brief A 1024-point complex FFT in shared memory, by every thread of a kEchoThreads block:
+ *        bit-reversed order, then ten stages of one butterfly per thread (unnormalised).
+ * @param a        the 1024 values, transformed in place
+ * @param inverse  true: the inverse transform (times 1024)
+ */
+__device__ void fft1024(float2* a, bool inverse)
+{
+    for (int i = threadIdx.x; i < kEchoN; i += kEchoThreads) {
+        const int j = static_cast<int>(__brev(static_cast<unsigned>(i)) >> 22);
+        if (j > i) { const float2 tmp = a[i]; a[i] = a[j]; a[j] = tmp; }
+    }
+    __syncthreads();
+    const int t = static_cast<int>(threadIdx.x);
+    for (int len = 2; len <= kEchoN; len <<= 1) {
+        const int half = len >> 1;
+        const int pos = t % half;
+        const int i0 = (t / half) * len + pos, i1 = i0 + half;
+        float sn, cs;
+        sincospif((inverse ? 2.0f : -2.0f) * static_cast<float>(pos) / static_cast<float>(len), &sn, &cs);
+        const float2 u = a[i0], v = a[i1];
+        const float2 w = make_float2(v.x * cs - v.y * sn, v.x * sn + v.y * cs);
+        a[i0] = make_float2(u.x + w.x, u.y + w.y);
+        a[i1] = make_float2(u.x - w.x, u.y - w.y);
+        __syncthreads();
+    }
+}
+
+/**
+ * @brief The spectral echo, one CUDA block: the block into the history, a Hann-windowed frame
+ *        through the FFT (left as the real part, right as the imaginary), every band of each ear
+ *        through its own delay line with feedback, back through the inverse FFT, overlapped into
+ *        the output; the oldest block of the overlap is finished and written to the frames' last
+ *        two channels.
+ * @param hdr   the block header (its `echo`)
+ * @param io    the block's frames, kCloudOutChannels each: the voices read, channels 6 and 7 written
+ * @param hist  the input history, two rings of kEchoN
+ * @param acc   the overlap, two rings of kEchoN on the history's indices
+ * @param ring  per ear and band kEchoSlots spectra: the delay lines
+ * @param st    the history's write index and the frame count
+ */
+__global__ void __launch_bounds__(kEchoThreads)
+spectralEchoKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, float2* ring, int* st)
+{
+    __shared__ float2 z[kEchoN];
+    const SpectralEcho& E = hdr->echo;
+    const int n = hdr->n;
+    const int t = static_cast<int>(threadIdx.x);
+    if (E.clear) {
+        for (int i = t; i < 2 * kEchoBins * kEchoSlots; i += kEchoThreads) ring[i] = make_float2(0.0f, 0.0f);
+        for (int i = t; i < 2 * kEchoN; i += kEchoThreads) { hist[i] = 0.0f; acc[i] = 0.0f; }
+        if (t == 0) { st[0] = 0; st[1] = 0; }
+        __syncthreads();
+    }
+    if (!E.on || n > kEchoN / 4) {   // off, or blocks too long for the window's overlap: silent
+        for (int s = t; s < n; s += kEchoThreads) { io[s * kCloudOutChannels + 6] = 0.0f; io[s * kCloudOutChannels + 7] = 0.0f; }
+        return;
+    }
+    const int w0 = st[0], frame = st[1];
+    for (int s = t; s < n; s += kEchoThreads) {   // the block over the history's oldest samples
+        const float* f = io + static_cast<size_t>(s) * kCloudOutChannels;
+        const int i = (w0 + s) & (kEchoN - 1);
+        hist[i] = f[0] + f[2];
+        hist[kEchoN + i] = f[1] + f[3];
+    }
+    __syncthreads();
+    const int start = (w0 + n) & (kEchoN - 1);   // the frame's oldest sample
+    for (int k = t; k < kEchoN; k += kEchoThreads) {
+        const int i = (start + k) & (kEchoN - 1);
+        const float win = 0.5f - 0.5f * cospif(2.0f * static_cast<float>(k) / static_cast<float>(kEchoN));
+        z[k] = make_float2(win * hist[i], win * hist[kEchoN + i]);
+    }
+    __syncthreads();
+    fft1024(z, false);
+    // Every band: the two ears' spectra apart, each through its line, the delayed ones kept.
+    const float fs = hdr->sampleRate;
+    float2 yl[2], yr[2];
+    const int bins = t == 0 ? 2 : 1;
+    for (int b = 0; b < bins; ++b) {
+        const int k = b == 0 ? t : kEchoN / 2;
+        const float2 Zk = z[k], Zm = z[(kEchoN - k) & (kEchoN - 1)];
+        const float2 xl = make_float2(0.5f * (Zk.x + Zm.x), 0.5f * (Zk.y - Zm.y));
+        const float2 xr = make_float2(0.5f * (Zk.y + Zm.y), -0.5f * (Zk.x - Zm.x));
+        const float fk = static_cast<float>(k) * fs / static_cast<float>(kEchoN);
+        const float place = fminf(fmaxf(log2f(fmaxf(fk, 20.0f) * (1.0f / 20.0f)) * (1.0f / 9.96578428f), 0.0f), 1.0f);
+        const float scatter = 1.0f + 0.75f * E.scatter * (2.0f * static_cast<float>(hash32(static_cast<std::uint32_t>(k) ^ 0x3C6EF372U) >> 8) * (1.0f / 16777216.0f) - 1.0f);
+        const float d = E.frames * exp2f(2.0f * E.tilt * (place - 0.5f)) * scatter;
+        const int di = min(max(static_cast<int>(lrintf(d)), 1), kEchoSlots - 1);
+        const float fb = E.feedback * (1.0f - E.damp * place);
+        const int slot = frame & (kEchoSlots - 1), back = (frame - di) & (kEchoSlots - 1);
+        float2* rl = ring + static_cast<size_t>(k) * kEchoSlots;
+        float2* rr = ring + static_cast<size_t>(kEchoBins + k) * kEchoSlots;
+        yl[b] = rl[back];
+        yr[b] = rr[back];
+        rl[slot] = make_float2(xl.x + fb * yl[b].x, xl.y + fb * yl[b].y);
+        rr[slot] = make_float2(xr.x + fb * yr[b].x, xr.y + fb * yr[b].y);
+    }
+    __syncthreads();
+    for (int b = 0; b < bins; ++b) {   // the two ears together again: left real, right imaginary
+        const int k = b == 0 ? t : kEchoN / 2;
+        z[k] = make_float2(yl[b].x - yr[b].y, yl[b].y + yr[b].x);
+        if (k > 0 && k < kEchoN / 2) z[kEchoN - k] = make_float2(yl[b].x + yr[b].y, -yl[b].y + yr[b].x);
+    }
+    __syncthreads();
+    fft1024(z, true);
+    // Overlap-add under the same window: Hann times Hann over N / n frames sums to 3/8 N / n.
+    const float norm = 1.0f / (static_cast<float>(kEchoN) * 0.375f * static_cast<float>(kEchoN) / static_cast<float>(n));
+    for (int k = t; k < kEchoN; k += kEchoThreads) {
+        const int i = (start + k) & (kEchoN - 1);
+        const float win = (0.5f - 0.5f * cospif(2.0f * static_cast<float>(k) / static_cast<float>(kEchoN))) * norm;
+        acc[i] += win * z[k].x;
+        acc[kEchoN + i] += win * z[k].y;
+    }
+    __syncthreads();
+    for (int s = t; s < n; s += kEchoThreads) {   // the oldest block is finished: out, and cleared for the next
+        const int i = (start + s) & (kEchoN - 1);
+        io[s * kCloudOutChannels + 6] = acc[i];
+        io[s * kCloudOutChannels + 7] = acc[kEchoN + i];
+        acc[i] = 0.0f;
+        acc[kEchoN + i] = 0.0f;
+    }
+    if (t == 0) { st[0] = (w0 + n) & (kEchoN - 1); st[1] = frame + 1; }
+}
+
+/**
  * @brief Writes a failed CUDA call into `error`.
  * @param e      the call's result
  * @param what   the call, for the message
@@ -893,7 +1133,14 @@ struct CloudEngine::Impl {
     float* dScratch = nullptr;        ///< device: per chunk a stereo block
     uint4* dRun = nullptr;            ///< device: per partial start phase, step, glide
     float4* dAmp = nullptr;           ///< device: per partial the four amplitudes (near L/R, far L/R) the last block ended on
-    float4* dGains = nullptr;         ///< device: per partial two entries, the near and the far amplitude ramps of this block
+    float4* dGains = nullptr;         ///< device: per partial three entries, the near, the far and the near cosine ramps of this block
+    float2* dAmpQ = nullptr;          ///< device: per partial the near plane's cosine parts the last block ended on (binaural)
+    float* dEchoHist = nullptr;       ///< device: the spectral echo's input history, two rings of kEchoN
+    float* dEchoAcc = nullptr;        ///< device: its overlap, two rings of kEchoN
+    float2* dEchoRing = nullptr;      ///< device: its delay lines, per ear and band kEchoSlots spectra
+    int* dEchoState = nullptr;        ///< device: its history index and frame count
+    Binaural binaural;                ///< the host's copy of the binaural placement
+    SpectralEcho echo;                ///< the host's copy of the spectral echo's settings
     EnvShape* dShapes = nullptr;      ///< device: the envelope bank, kEnvShapes
     float* dLand = nullptr;           ///< device: the landscape, room for kLandMaxColumns * kLandMaxRows
     float2* dModal = nullptr;         ///< device: the modal hall's states, kModalModes
@@ -921,12 +1168,15 @@ struct CloudEngine::Impl {
         if (hOut) cudaFreeHost(hOut);
         for (void* p : { static_cast<void*>(dUpload), static_cast<void*>(dOut), static_cast<void*>(dScratch), static_cast<void*>(dRun),
                          static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand),
-                         static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing) })
+                         static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing),
+                         static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
+                         static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
         dRun = nullptr; dAmp = nullptr; dGains = nullptr; dShapes = nullptr;
         dModal = nullptr; dModalScratch = nullptr; dGainRing = nullptr;
+        dAmpQ = nullptr; dEchoHist = nullptr; dEchoAcc = nullptr; dEchoRing = nullptr; dEchoState = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1033,7 +1283,12 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dScratch, sizeof(float) * kCloudChannels * n * static_cast<size_t>(m.chunks)), "cudaMalloc scratch", error)
                 && ok(cudaMalloc(&m.dRun, sizeof(uint4) * partialsTotal), "cudaMalloc run", error)
                 && ok(cudaMalloc(&m.dAmp, sizeof(float4) * partialsTotal), "cudaMalloc amp", error)
-                && ok(cudaMalloc(&m.dGains, sizeof(float4) * 2 * partialsTotal), "cudaMalloc gains", error)
+                && ok(cudaMalloc(&m.dGains, sizeof(float4) * 3 * partialsTotal), "cudaMalloc gains", error)
+                && ok(cudaMalloc(&m.dAmpQ, sizeof(float2) * partialsTotal), "cudaMalloc ampQ", error)
+                && ok(cudaMalloc(&m.dEchoHist, sizeof(float) * 2 * kEchoN), "cudaMalloc echo history", error)
+                && ok(cudaMalloc(&m.dEchoAcc, sizeof(float) * 2 * kEchoN), "cudaMalloc echo overlap", error)
+                && ok(cudaMalloc(&m.dEchoRing, sizeof(float2) * 2 * kEchoBins * static_cast<size_t>(kEchoSlots)), "cudaMalloc echo lines", error)
+                && ok(cudaMalloc(&m.dEchoState, sizeof(int) * 2), "cudaMalloc echo state", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
                 && ok(cudaMalloc(&m.dModal, sizeof(float2) * kModalModes), "cudaMalloc modal", error)
@@ -1044,7 +1299,12 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     // writes the same tables (it did: one render in three differed).
     good = good && ok(cudaMemsetAsync(m.dRun, 0, sizeof(uint4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dAmp, 0, sizeof(float4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dGains, 0, sizeof(float4) * 2 * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dGains, 0, sizeof(float4) * 3 * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dAmpQ, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dEchoHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dEchoAcc, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dEchoRing, 0, sizeof(float2) * 2 * kEchoBins * static_cast<size_t>(kEchoSlots), m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dEchoState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
@@ -1053,8 +1313,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
         std::memset(m.hOut, 0, sizeof(float) * kCloudOutChannels * n);
-        // The block as one graph: voices up, three kernels for the voices, two for the modal hall
-        // (which hears the voices' block on the card), the block (six channels) down.
+        // The block as one graph: voices up, the levels' ring, three kernels for the voices, two for
+        // the modal hall and one for the spectral echo (which hear the voices' block on the card),
+        // the block (eight channels) down.
         const auto* hdr = reinterpret_cast<const BlockHeader*>(m.dUpload);
         const auto* voices = reinterpret_cast<const CloudVoice*>(m.dUpload + sizeof(BlockHeader));
         good = ok(cudaStreamBeginCapture(m.stream, cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture", error);
@@ -1062,14 +1323,15 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             cudaMemcpyAsync(m.dUpload, m.hUpload, m.uploadBytes(), cudaMemcpyHostToDevice, m.stream);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dScratch, m.chunks, n, m.dOut);
-            modalKernel<<<static_cast<unsigned>(kModalBlocks), kModalThreads, 0, m.stream>>>(hdr, m.dOut, m.dModal, m.dModalScratch, n);
+            modalKernel<<<static_cast<unsigned>(kModalBlocks), kModalThreads, 0, m.stream>>>(hdr, m.dOut, m.dModal, m.dModalScratch, n, m.dLand);
             modalReduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dModalScratch, n, m.dOut);
+            spectralEchoKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dEchoHist, m.dEchoAcc, m.dEchoRing, m.dEchoState);
             cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudOutChannels * n, cudaMemcpyDeviceToHost, m.stream);
             good = ok(cudaStreamEndCapture(m.stream, &m.graph), "cudaStreamEndCapture", error)
                 && ok(cudaGraphInstantiate(&m.exec, m.graph, 0), "cudaGraphInstantiate", error);
@@ -1119,6 +1381,10 @@ ModalHall& CloudEngine::modal() { return impl_->modal; }
 
 SpectralField& CloudEngine::field() { return impl_->field; }
 
+Binaural& CloudEngine::binaural() { return impl_->binaural; }
+
+SpectralEcho& CloudEngine::spectralEcho() { return impl_->echo; }
+
 void CloudEngine::launch()
 {
     Impl& m = *impl_;
@@ -1138,6 +1404,9 @@ void CloudEngine::launch()
     hdr->field.count = std::clamp(m.field.count, 0, m.field.mode == FieldMode::Scale ? kFieldPoints : kFieldAttractors);
     hdr->field.dispersion = std::clamp(m.field.dispersion, -2.0f, 2.0f);
     hdr->blockIndex = m.blockIndex++;
+    hdr->binaural = m.binaural;
+    hdr->echo = m.echo;
+    m.echo.clear = 0;   // asked for once
     auto* up = reinterpret_cast<CloudVoice*>(m.hUpload + sizeof(BlockHeader));
     const float dt = static_cast<float>(n / m.cfg.sampleRate);
     for (int i = 0; i < m.cfg.voices; ++i) {

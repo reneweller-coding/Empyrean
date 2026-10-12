@@ -34,8 +34,8 @@ TABS = {
     "Filter": ["Filter", "Envelope"],
     "Tuning": ["Tuning"],
     "Conductor": ["Conductor"],
-    "Space": ["Space", "Master"],
-    "Effects": ["Echo", "Room", "Modal"],
+    "Space": ["Space", "Master", "Binaural"],
+    "Effects": ["Echo", "Room", "Modal", "Spectral Echo", "Memory"],
     "Modulation": ["Modulation"],
 }
 

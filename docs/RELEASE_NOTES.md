@@ -1,5 +1,26 @@
 # Release notes
 
+## 0.9.0 (12.10.2026, not released)
+
+Five ideas for the GPU.
+
+- **Binaural partial cloud** (Space page; headphones): every partial of the near plane at a place of its own round the
+  head. Being a sine, a partial needs only one complex gain per ear -- the head's shadow and the pinna (Brown and
+  Duda), the time round the head (Woodworth) as a phase -- so the render kernel adds a cosine to the sine it had.
+  Surround, Height, Orbit. Measured at 90 degrees: the 8th harmonic 13 dB louder at the near ear, the fundamental
+  0.85 ms sooner; in front 0.0 dB and 0.00 ms; the level as in stereo. Presets never switch it: it is the listener's.
+- **Memory** (Effects page): every note let go leaves a ghost on four extra GPU voices -- it rises over Bloom after the
+  note, fades over Memory Time, widens, drifts and darkens (Blur), recedes (Sink); its own phases and its own dice.
+- **Self-Tune** (Tuning page): voices whose harmonics nearly meet (Reach) pull together, weighted by loudness and by
+  how low the harmonics are; Anchor draws them back to the scale. An equal-tempered C major triad: third 400.0 ->
+  386.8 cents, fifth 700.0 -> 701.9.
+- **Painted hall**: the modal hall heard through the landscape at each mode's frequency (Paint).
+- **Spectral echo** (Effects page): a 1024-point FFT in one CUDA block (no cuFFT: it would have added some hundred
+  megabytes), every band of each ear through a delay line of its own with feedback; Time, Tilt, Scatter, Feedback,
+  Damping, To Far.
+- The presets use them where they fit (memory 189, spectral echo 181, self-tune 101, paint 94); the bank is levelled
+  again. GPU time with twelve voices and Brain 2 sounding: 0.10 ms per block of 2.7 ms, 0.17 ms with every effect on.
+
 ## 0.8.0 (12.10.2026, not released)
 
 Forces on the partials.
