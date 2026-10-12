@@ -1,0 +1,9 @@
+build/
+.vs/
+*.user
+*.wav
+# The family's layout: bin/<preset> what can be started, dist/ what is handed out,
+# work/ local data, renders and logs.
+bin/
+dist/
+work/
