@@ -183,6 +183,13 @@ enum class ParamId : int {
     SpecFeedback,   ///< 0 .. 0.95
     SpecDamp,       ///< 0 .. 1: less feedback towards the top
     SpecToFar,      ///< 0 .. 1: its share into the far plane
+    // Phase 10a: Noctuary's modulators
+    Coherence,      ///< 0 .. 1: the Kuramoto bank's coupling (free .. in step)
+    CoherenceRate,  ///< x: its speed (natural periods 23, 31, 41, 53 s)
+    LeniaRate,      ///< Hz: Lenia fields per second
+    LeniaGrowth,    ///< Lenia's growth centre (mu)
+    ChaosPeriod,    ///< s: about a Lorenz lobe change and a Roessler turn
+    BrainCascade,   ///< 0 .. 1: the conductor's events breed events (a Hawkes clock)
     Count           ///< number of parameters
 };
 

@@ -53,7 +53,9 @@ public:
                   { { "LFOs", frame::Family::Motion, { ParamId::Lfo1Shape, ParamId::Lfo1Rate, ParamId::Lfo2Shape, ParamId::Lfo2Rate,
                                                       ParamId::Lfo3Shape, ParamId::Lfo3Rate, ParamId::Lfo4Shape, ParamId::Lfo4Rate } },
                     { "Envelopes", frame::Family::Envelope, { ParamId::Env1Shape, ParamId::Env1Rate, ParamId::Env2Shape, ParamId::Env2Rate } },
-                    { "Macros", frame::Family::Source, { ParamId::Macro1, ParamId::Macro2, ParamId::Macro3, ParamId::Macro4 } } },
+                    { "Macros", frame::Family::Source, { ParamId::Macro1, ParamId::Macro2, ParamId::Macro3, ParamId::Macro4 } },
+                    { "Fields and Chaos", frame::Family::Motion, { ParamId::Coherence, ParamId::CoherenceRate, ParamId::LeniaRate,
+                                                                   ParamId::LeniaGrowth, ParamId::ChaosPeriod } } },
                   live),
           matrix_(proc)
     {
@@ -160,7 +162,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                        ParamId::BrainHoldMin, ParamId::BrainHoldMax } },
                         { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh } },
                         { "Harmony", F::Motion, Ids{ ParamId::BrainConsonance, ParamId::BrainWander, ParamId::AutoLead, ParamId::AutoTension,
-                                                     ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::AutoStep } },
+                                                     ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::AutoStep } },
                         { "Brain 2", F::Envelope, Ids{ ParamId::Brain2On, ParamId::Brain2Interval, ParamId::Brain2Density, ParamId::Brain2Rate,
                                                        ParamId::Brain2Depth } } });
     page("Space", { { "Planes", F::Space, Ids{ ParamId::Depth, ParamId::KeysDepth, ParamId::Breath, ParamId::BreathRate, ParamId::Doppler } },

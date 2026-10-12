@@ -63,6 +63,10 @@ The macros are knobs without a place of their own: they mean what the matrix say
 
 Depth is measured in the knob's own travel: 0.5 moves a knob by half its range up and down, whatever its unit. A knob that is modulated shows a ring around it where its value is now.
 
+Fields and chaos are Noctuary's. Lenia is a living field -- Conway's Life made continuous -- whose blobs drift, pulse, split and die, read at four places (Lenia Rate, Lenia Growth). Lorenz and Roessler are two strange attractors, never the same path twice (Chaos Period). Kura 1-4 are four slow oscillators coupled by Coherence: free at 0, falling into step towards 1, never quite as one. Three come from the piece itself: the Beat runs at the rate the lowest interval beats -- still when it is pure, quicker the further out of tune it drifts -- Cascade swells with the conductor's excitement (Cascade on the Conductor page lets its events breed events), Root Age climbs over ten minutes since the root last moved. Note, Distance and Random per Note follow the loudest voice and the last note.
+
+Every row of the matrix can have a via source: the depth is scaled by its amount, 0 to 1 -- an LFO that only moves the filter as far as the mod wheel allows, a Lorenz wander that opens with Root Age.
+
 == Presets | all | ==
 The bank holds 1024 presets in sixteen groups of 64: Sleep Concert, Choirs, Glass, Bells, Strings, Organs, Air & Noise, Deep Space, Glissandi, Pendulums, Waves, Shepard & Tides, Shimmer, Dark Drones, Microtonal and Keys. The arrows in the header step through them; a click on the name opens the list by group. Every preset was measured by its loudest second and brought to the same level, so stepping through them does not jump.
 

@@ -29,6 +29,7 @@ private:
     struct Row {
         juce::ComboBox source;   ///< where from
         juce::ComboBox target;   ///< what it moves
+        juce::ComboBox via;      ///< a second source scaling the depth (an amount 0 .. 1), "-" none
         juce::Slider depth;      ///< how far, -1 .. 1
     };
     /** @brief Reads the engine's rows into the controls (a preset or a state may have changed them). */

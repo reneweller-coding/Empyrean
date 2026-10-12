@@ -18,7 +18,12 @@ MatrixView::MatrixView(AdditivProcessor& proc) : proc_(proc)
         if (additiv::isModTarget(static_cast<ParamId>(i))) targets_.push_back(i);
     for (int i = 0; i < additiv::kModRows; ++i) {
         auto row = std::make_unique<Row>();
-        for (int s = 0; s < additiv::kNumModSources; ++s) row->source.addItem(additiv::kModSourceNames[s], s + 1);
+        for (int s = 0; s < additiv::kNumModSources; ++s) {
+            if (s == static_cast<int>(ModSource::Lenia1)) { row->source.addSectionHeading("Fields and chaos"); row->via.addSectionHeading("Fields and chaos"); }
+            if (s == static_cast<int>(ModSource::Beat)) { row->source.addSectionHeading("The piece"); row->via.addSectionHeading("The piece"); }
+            row->source.addItem(additiv::kModSourceNames[s], s + 1);
+            row->via.addItem(s == 0 ? juce::String("-") : juce::String(additiv::kModSourceNames[s]), s + 1);
+        }
         row->target.addItem("-", 1);
         juce::String section;
         for (size_t k = 0; k < targets_.size(); ++k) {
@@ -33,9 +38,12 @@ MatrixView::MatrixView(AdditivProcessor& proc) : proc_(proc)
         row->depth.setColour(juce::Slider::trackColourId, additivui::skin().family(frame::Family::Motion));
         row->source.onChange = [this, i] { push(i); };
         row->target.onChange = [this, i] { push(i); };
+        row->via.onChange = [this, i] { push(i); };
+        row->via.setTooltip("Via: a second source whose amount (0 .. 1) scales the depth");
         row->depth.onValueChange = [this, i] { push(i); };
         addAndMakeVisible(row->source);
         addAndMakeVisible(row->target);
+        addAndMakeVisible(row->via);
         addAndMakeVisible(row->depth);
         rows_.push_back(std::move(row));
     }
@@ -52,6 +60,7 @@ void MatrixView::push(int i)
     const int t = r.target.getSelectedId() - 2;
     m.target = t >= 0 && t < static_cast<int>(targets_.size()) ? targets_[static_cast<size_t>(t)] : -1;
     m.depth = static_cast<float>(r.depth.getValue());
+    m.via = static_cast<ModSource>(std::max(r.via.getSelectedId() - 1, 0));
     proc_.engine().setModRow(i, m);
 }
 
@@ -66,6 +75,7 @@ void MatrixView::timerCallback()
         for (size_t k = 0; k < targets_.size(); ++k)
             if (targets_[k] == m.target) item = static_cast<int>(k) + 2;
         r.target.setSelectedId(item, juce::dontSendNotification);
+        r.via.setSelectedId(static_cast<int>(m.via) + 1, juce::dontSendNotification);
         if (!r.depth.isMouseButtonDown()) r.depth.setValue(m.depth, juce::dontSendNotification);
     }
     updating_ = false;
@@ -78,9 +88,10 @@ void MatrixView::resized()
         Row& r = *rows_[static_cast<size_t>(i)];
         const int x = 10 + (i / 8) * (colW + 10) + 26, y = 28 + (i % 8) * 30;
         const int w = colW - 26;
-        r.source.setBounds(x, y, w * 26 / 100, 24);
-        r.target.setBounds(x + w * 27 / 100, y, w * 37 / 100, 24);
-        r.depth.setBounds(x + w * 65 / 100, y, w * 35 / 100, 24);
+        r.source.setBounds(x, y, w * 22 / 100, 24);
+        r.target.setBounds(x + w * 23 / 100, y, w * 31 / 100, 24);
+        r.via.setBounds(x + w * 55 / 100, y, w * 17 / 100, 24);
+        r.depth.setBounds(x + w * 73 / 100, y, w * 27 / 100, 24);
     }
 }
 
@@ -93,7 +104,7 @@ void MatrixView::paint(juce::Graphics& g)
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), skin.radius, 1.0f);
     g.setColour(skin.family(frame::Family::Motion));
     g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-    g.drawText("Matrix: source -> target x depth (of the target's range)", 18, 4, getWidth() - 30, 20, juce::Justification::centredLeft);
+    g.drawText("Matrix: source -> target x depth (of the target's range), scaled by a via source", 18, 4, getWidth() - 30, 20, juce::Justification::centredLeft);
     g.setColour(skin.dim);
     g.setFont(juce::FontOptions(11.0f));
     const int colW = (getWidth() - 30) / 2;
@@ -109,12 +120,17 @@ juce::String MatrixView::describe() const
         const ModRow m = proc_.engine().modRow(i);
         if (m.source == ModSource::Off || m.target < 0) continue;
         s << "    " << additiv::kModSourceNames[static_cast<int>(m.source)] << " -> " << additiv::paramDesc(static_cast<ParamId>(m.target)).name
-          << " x " << juce::String(m.depth, 2) << "\n";
+          << " x " << juce::String(m.depth, 2);
+        if (m.via != ModSource::Off) s << " via " << additiv::kModSourceNames[static_cast<int>(m.via)];
+        s << "\n";
         ++n;
     }
     if (n == 0) s << "    (none)\n";
     s << "\nA source moves its target by depth times its value, in the target's own range: LFOs and the random curve swing "
          "both ways, envelopes follow their shapes, macros, the mod wheel, pressure and velocity go from 0 to 1. The envelopes "
-         "start over when a note arrives into silence.\n";
+         "start over when a note arrives into silence. A via source scales the depth by its amount (0 .. 1). Lenia, Lorenz, "
+         "Roessler and the Kuramoto bank are Noctuary's: a living field, two strange attractors and four oscillators falling "
+         "into step; the Beat runs at the rate the lowest interval beats, Cascade with the conductor's excitement, Root Age "
+         "with how long the root has stood.\n";
     return s;
 }

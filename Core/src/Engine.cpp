@@ -209,6 +209,8 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
         b->assign(static_cast<size_t>(G), 0.0f);
     ghosts_.assign(static_cast<size_t>(std::max(0, cfg_.ghosts)), Ghost{});
     ghostRng_ = Rng(cfg_.seed ^ 0x47686F7374ull);
+    noteRng_ = Rng(cfg_.seed ^ 0x4E6F7465ull);
+    randomNote_ = 0.0f;
     prevSpecMix_ = prevSpecToFar_ = 0.0f;
     specWasOn_ = false;
     binAngle_ = 0.0f;
@@ -388,6 +390,44 @@ void Engine::readParams()
         in.pressure = pressure_.load(std::memory_order_relaxed);
         in.velocity = lastVelocity_;
         in.phraseStart = phraseStart_;
+        in.coherence = param(ParamId::Coherence);
+        in.coherenceRate = param(ParamId::CoherenceRate);
+        in.leniaRate = param(ParamId::LeniaRate);
+        in.leniaGrowth = param(ParamId::LeniaGrowth);
+        in.chaosPeriod = param(ParamId::ChaosPeriod);
+        in.excitation = static_cast<float>(brain_.excitation());
+        in.rootAge = static_cast<float>(brain_.rootAgeSeconds());
+        in.randomNote = randomNote_;
+        {
+            // The Beat (Noctuary's): the two lowest distinct pitches, the simplest ratio near their
+            // interval, and the difference of the harmonics that would meet if it were just.
+            double f1 = 0.0, f2 = 0.0;
+            for (const Voice& v : voices_)
+                if (v.note >= 0 && v.lastGain > 0.0f && (f1 <= 0.0 || v.hz < f1)) f1 = v.hz;
+            if (f1 > 0.0)
+                for (const Voice& v : voices_)
+                    if (v.note >= 0 && v.lastGain > 0.0f && v.hz / f1 > 1.003 && (f2 <= 0.0 || v.hz < f2)) f2 = v.hz;
+            float want = 0.0f;
+            if (f1 > 0.0 && f2 > 0.0) {
+                static const int kRatios[][2] = { {1,1}, {6,5}, {5,4}, {4,3}, {3,2}, {8,5}, {5,3}, {7,4}, {2,1}, {5,2}, {3,1}, {4,1} };
+                const double r = f2 / f1;
+                double bestErr = 1e30;
+                int bp = 1, bq = 1;
+                for (const auto& pq : kRatios) {
+                    const double err = std::fabs(std::log(r / (static_cast<double>(pq[0]) / pq[1])));
+                    if (err < bestErr) { bestErr = err; bp = pq[0]; bq = pq[1]; }
+                }
+                want = static_cast<float>(std::fabs(static_cast<double>(bq) * f2 - static_cast<double>(bp) * f1));
+                if (!(want == want) || want > 30.0f) want = 30.0f;
+            }
+            in.beatHz = want;
+            // Note and Distance: the loudest voice's, as Noctuary reads its per-voice sources for the matrix.
+            const Voice* loud = nullptr;
+            for (const Voice& v : voices_)
+                if (v.note >= 0 && (loud == nullptr || v.lastGain > loud->lastGain)) loud = &v;
+            in.note = loud ? (static_cast<float>(loud->note) - 24.0f) / 84.0f : 0.5f;
+            in.distance = loud ? loud->distance : 0.5f;
+        }
         phraseStart_ = false;
         mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);
         float offset[kNumParams] = {};
@@ -395,7 +435,8 @@ void Engine::readParams()
         for (int r = 0; r < kModRows; ++r) {
             const ModRow row = unpackModRow(modRows_[static_cast<size_t>(r)].load(std::memory_order_relaxed));
             if (row.source == ModSource::Off || row.target < 0 || row.target >= kNumParams || row.depth == 0.0f) continue;
-            offset[row.target] += row.depth * mods_.value(row.source);
+            const float amount = row.via == ModSource::Off ? 1.0f : viaAmount(row.via, mods_.value(row.via));
+            offset[row.target] += row.depth * amount * mods_.value(row.source);
             modded[row.target] = true;
         }
         for (int i = 0; i < kNumParams; ++i) {
@@ -474,6 +515,7 @@ void Engine::readParams()
     bp_.density = static_cast<int>(std::lround(g(ParamId::BrainDensity)));
     bp_.rateSeconds = bp_.mode == BrainMode::Chords ? g(ParamId::AutoRate) : g(ParamId::BrainRate);
     bp_.holdMin = g(ParamId::BrainHoldMin);
+    bp_.cascade = g(ParamId::BrainCascade);
     bp_.holdMax = g(ParamId::BrainHoldMax);
     bp_.low = static_cast<int>(std::lround(g(ParamId::BrainLow)));
     bp_.high = static_cast<int>(std::lround(g(ParamId::BrainHigh)));
@@ -578,6 +620,7 @@ void Engine::beginOn(int i, int note, float velocity, float distance, int source
     v.tailArmed = false;
     v.tuneCents = 0.0f;
     v.lastGain = 0.0f;
+    randomNote_ = noteRng_.bipolar();
     v.age = 0.0;
     v.stealing = false;
     v.stealBlocks = 0;

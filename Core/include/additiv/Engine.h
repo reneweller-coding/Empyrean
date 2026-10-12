@@ -412,6 +412,8 @@ private:
     };
     std::vector<Ghost> ghosts_;                        ///< the memory's ghosts, on the GPU voices after voices_
     Rng ghostRng_;                                     ///< the ghosts' dice: their own stream, so the memory never moves the conductor
+    Rng noteRng_;                                      ///< the Random per Note source's dice (its own stream)
+    float randomNote_ = 0.0f;                          ///< the last note's draw, -1 .. 1
     std::vector<float> specL_;                         ///< the spectral echo's block from the GPU, left
     std::vector<float> specR_;                         ///< and right
     float prevSpecMix_ = 0.0f;                         ///< the spectral echo's level at the end of the last block

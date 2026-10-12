@@ -282,6 +282,13 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::SpecFeedback,   "spec_feedback",   "Feedback",     "Spectral Echo", 0.f,  0.95f, 0.5f,  1.f,  ""),
     F(ParamId::SpecDamp,       "spec_damp",       "Damping",      "Spectral Echo", 0.f,  1.f,   0.4f,  1.f,  ""),
     F(ParamId::SpecToFar,      "spec_to_far",     "To Far",       "Spectral Echo", 0.f,  1.f,   0.4f,  1.f,  ""),
+
+    F(ParamId::Coherence,      "coherence",       "Coherence",    "Modulation", 0.f,  1.f,   0.3f,  1.f,  ""),
+    F(ParamId::CoherenceRate,  "coherence_rate",  "Coherence Rate", "Modulation", 0.2f, 5.f, 1.f,   0.5f, "x"),
+    F(ParamId::LeniaRate,      "lenia_rate",      "Lenia Rate",   "Modulation", 0.5f, 20.f,  4.f,   0.5f, "Hz"),
+    F(ParamId::LeniaGrowth,    "lenia_growth",    "Lenia Growth", "Modulation", 0.08f, 0.3f, 0.15f, 1.f,  ""),
+    F(ParamId::ChaosPeriod,    "chaos_period",    "Chaos Period", "Modulation", 10.f, 1800.f, 120.f, 0.4f, "s"),
+    F(ParamId::BrainCascade,   "brain_cascade",   "Cascade",      "Conductor", 0.f,  1.f,   0.f,   1.f,  ""),
 } };
 
 } // namespace

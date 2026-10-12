@@ -888,6 +888,93 @@ int main()
               fmt("%d of %d points of the sounding voice heard, %d at its harmonics; %d elsewhere", loud, per, onHarmonic, elsewhere));
     }
 
+    // 34. Noctuary's sources move and keep to their ranges: each routed to the brightness, its live
+    //     value sampled every half second over 40 s of the conductor.
+    {
+        const ModSource kSources[] = { ModSource::Lenia1, ModSource::LorenzX, ModSource::RosslerZ, ModSource::Kura1,
+                                       ModSource::RootAge, ModSource::Note, ModSource::RandomNote };
+        std::string still;
+        for (ModSource s : kSources) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::AutoRate, 5.0f);
+            e.setParam(ParamId::ChaosPeriod, 10.0f);
+            e.setParam(ParamId::Brightness, 0.5f);
+            e.setModRow(0, { s, static_cast<int>(ParamId::Brightness), 0.5f });
+            if (!openOffline(e, true, 97)) return 1;
+            float lo = 1e9f, hi = -1e9f;
+            bool sane = true;
+            for (int k = 0; k < 80; ++k) {
+                render(e, 0.5);
+                const float v = e.playedNorm(ParamId::Brightness);
+                if (!std::isfinite(v) || v < -0.001f || v > 1.001f) sane = false;
+                lo = std::min(lo, v);
+                hi = std::max(hi, v);
+            }
+            // Root Age climbs over ten minutes: in forty seconds a fifteenth of the way, at half depth 0.033.
+            const float need = s == ModSource::RootAge ? 0.02f : 0.05f;
+            if (!sane || hi - lo < need) still += std::string(kModSourceNames[static_cast<int>(s)]) + fmt(" (%.3f) ", hi - lo);
+        }
+        check(still.empty(), "modulation: Lenia, chaos, Kuramoto and the piece's sources move", still.empty() ? std::string("all seven swing, all inside the range") : still);
+    }
+
+    // 35. The Beat: in equal temperament a fifth beats and the source turns; in just intonation it stands.
+    {
+        float swing[2] = { 0.0f, 0.0f };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.1f);
+            e.setParam(ParamId::Scale, k == 0 ? 0.0f : 3.0f);   // 12-TET, JI 7-limit
+            e.setParam(ParamId::RootNote, 0.0f);                 // C: C and G a pure fifth in the just scale
+            e.setParam(ParamId::Purity, 1.0f);
+            e.setParam(ParamId::Brightness, 0.5f);
+            e.setModRow(0, { ModSource::Beat, static_cast<int>(ParamId::Brightness), 0.5f });
+            if (!openOffline(e, false, 101)) return 1;
+            e.noteOn(60, 0.8f, 0);
+            e.noteOn(67, 0.8f, 0);
+            render(e, 6.0);
+            float lo = 1e9f, hi = -1e9f;
+            for (int i = 0; i < 40; ++i) {
+                render(e, 0.1);
+                lo = std::min(lo, e.playedNorm(ParamId::Brightness));
+                hi = std::max(hi, e.playedNorm(ParamId::Brightness));
+            }
+            swing[k] = hi - lo;
+        }
+        check(swing[0] > 0.2f && swing[1] < 0.02f, "modulation: the Beat turns when the fifth beats, stands when it is pure",
+              fmt("swing %.3f in 12-TET, %.3f in just intonation", swing[0], swing[1]));
+    }
+
+    // 36. The via source scales the depth, and survives the text form.
+    {
+        float swing[2] = { 0.0f, 0.0f };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Lfo1Rate, 1.0f);
+            e.setParam(ParamId::Brightness, 0.5f);
+            e.setParam(ParamId::Macro1, static_cast<float>(k));
+            ModRow r{ ModSource::Lfo1, static_cast<int>(ParamId::Brightness), 0.5f };
+            r.via = ModSource::Macro1;
+            e.setModRow(0, r);
+            if (!openOffline(e, false, 103)) return 1;
+            float lo = 1e9f, hi = -1e9f;
+            for (int i = 0; i < 30; ++i) {
+                render(e, 0.1);
+                lo = std::min(lo, e.playedNorm(ParamId::Brightness));
+                hi = std::max(hi, e.playedNorm(ParamId::Brightness));
+            }
+            swing[k] = hi - lo;
+        }
+        ModRow rows[2];
+        modRowsFromText("lfo1>cutoff:0.35:lenia2;kura3>drift:-0.2", rows, 2);
+        const std::string back = modRowsToText(rows, 2);
+        check(swing[0] < 0.01f && swing[1] > 0.5f && rows[0].via == ModSource::Lenia2 && rows[1].via == ModSource::Off
+                  && back == "lfo1>cutoff:0.35:lenia2;kura3>drift:-0.2",
+              "modulation: a via source scales the depth", fmt("swing %.3f at Macro 1 = 0, %.3f at 1; text '%s'", swing[0], swing[1], back.c_str()));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }
