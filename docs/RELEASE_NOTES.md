@@ -1,5 +1,22 @@
 # Release notes
 
+## 0.8.0 (12.10.2026, not released)
+
+Forces on the partials.
+
+- **The field** (Motion page): every partial keeps an offset from its own place, moved each block by what pulls it
+  and drawn back by a spring. *Scale* gathers the cloud onto the scale's pitches (a wide or stretched cloud collapses
+  into the key, keeping a 2-cent shimmer around each pitch); *Swarm* lets up to eight attractors wander through the
+  spectrum on Lorenz paths and gathers the partials near them; *Scatter* pushes the partials away from them. Pull,
+  Radius, Spring, Wander, Attractors. The level stays (measured within 0.6 dB): partials that gather keep their
+  phases and a narrow spread, so they do not fuse into one sine of a frozen random level.
+- **Dispersion**: each partial's clock -- its envelopes, the landscape it reads and the voice's level, of which the GPU
+  keeps a history -- runs late by its pitch, up to 1.5 s. Attacks and the landscapes' glints fall as cascades from
+  the top (or rise, negative). A voice stays until its latest partial has heard the end of its envelope.
+- **The modal hall breathes**: every resonance's decay wanders slowly by up to an octave, so the hall's colour moves.
+- The factory presets use them where they fit (the field in 159, dispersion in 149, breath in 114), and the bank is
+  levelled again. Neither costs measurable GPU time.
+
 ## 0.7.0 (12.10.2026, not released)
 
 Echoes, rooms and a hall of its own.

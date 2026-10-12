@@ -41,6 +41,7 @@ const char* const kKeyMapNames[2] = { "Snap to 12 keys", "Consecutive degrees" }
 const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
+const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter" };
 const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
 const char* const kEnvShapeNames[kFactoryShapeCount] = { "Swell", "Pulse", "Bloom", "Flicker", "Wobble", "Rise In", "Fall In", "Saw Up" };
@@ -247,6 +248,15 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::ModalWidth,     "modal_width",     "Width",        "Modal", 0.f,   1.f,   1.f,   1.f,  ""),
     F(ParamId::ModalLow,       "modal_low",       "Lowest",       "Modal", 30.f,  400.f, 80.f,  0.5f, "Hz"),
     B(ParamId::ModalFreeze,    "modal_freeze",    "Freeze",       "Modal", false),
+    F(ParamId::ModalBreath,    "modal_breath",    "Breath",       "Modal", 0.f,   1.f,   0.f,   1.f,  ""),
+
+    C(ParamId::FieldMode,      "field_mode",      "Field",        "Field", kFieldModeNames, kNumFieldModes, 0),
+    F(ParamId::FieldStrength,  "field_strength",  "Pull",         "Field", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::FieldRadius,    "field_radius",    "Radius",       "Field", 5.f,   600.f, 60.f,  0.5f, "ct"),
+    F(ParamId::FieldSpring,    "field_spring",    "Spring",       "Field", 0.f,   1.f,   0.2f,  1.f,  ""),
+    F(ParamId::FieldRate,      "field_rate",      "Wander",       "Field", 0.005f, 1.f,  0.05f, 0.4f, ""),
+    I(ParamId::FieldCount,     "field_count",     "Attractors",   "Field", 1.f,   8.f,   4.f),
+    F(ParamId::Dispersion,     "dispersion",      "Dispersion",   "Motion", -1.5f, 1.5f, 0.f,   1.f,  "s"),
 } };
 
 } // namespace

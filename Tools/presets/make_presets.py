@@ -428,6 +428,46 @@ FX = {
 }
 
 
+# The field, the dispersion and the hall's breath per group (12.10.2026), drawn after the effects:
+# field = (probability, modes, pull, radius in cents, spring, wander); disp = (probability, seconds);
+# breath = (probability, amount). Modes: 1 Scale, 2 Swarm, 3 Scatter.
+MOTION_FX = {
+    "Sleep Concert":   dict(field=(0.2, (2,), (0.2, 0.4), (80, 300), (0.3, 0.6), (0.02, 0.08)), breath=(0.4, (0.2, 0.6))),
+    "Glass":           dict(disp=(0.6, (0.1, 0.8))),
+    "Bells":           dict(disp=(0.5, (0.1, 0.6))),
+    "Air & Noise":     dict(field=(0.3, (3,), (0.4, 0.8), (60, 250), (0.2, 0.5), (0.05, 0.3)), disp=(0.3, (0.2, 1.0))),
+    "Deep Space":      dict(field=(0.4, (2, 3), (0.3, 0.7), (100, 400), (0.1, 0.4), (0.02, 0.1)), breath=(0.6, (0.3, 0.8))),
+    "Glissandi":       dict(field=(0.4, (2,), (0.4, 0.8), (100, 400), (0.1, 0.4), (0.05, 0.2))),
+    "Waves":           dict(field=(0.3, (2,), (0.3, 0.6), (150, 500), (0.2, 0.5), (0.02, 0.08))),
+    "Shimmer":         dict(field=(0.4, (3,), (0.4, 0.8), (60, 250), (0.2, 0.5), (0.05, 0.3)), disp=(0.3, (0.1, 0.5))),
+    "Dark Drones":     dict(breath=(0.6, (0.3, 0.8))),
+    "Microtonal":      dict(field=(0.4, (1,), (0.3, 0.7), (20, 80), (0.0, 0.3), (0.05, 0.1))),
+    "Keys":            dict(disp=(0.4, (0.05, 0.4))),
+}
+
+
+def motion_effects(r, group):
+    """The group's field, dispersion and hall breath, drawn after its effects."""
+    fx = MOTION_FX.get(group, {})
+    if "field" in fx:
+        p, modes, pull, radius, spring, wander = fx["field"]
+        if r.rng.random() < p:
+            r.set("field_mode", r.pick(*modes))
+            r.set("field_strength", f(r.u(*pull), 2))
+            r.set("field_radius", f(r.u(*radius), 0))
+            r.set("field_spring", f(r.u(*spring), 2))
+            r.set("field_rate", f(r.lg(*wander), 3))
+            r.set("field_count", r.rng.randint(2, 6))
+    if "disp" in fx:
+        p, span = fx["disp"]
+        if r.rng.random() < p:
+            r.set("dispersion", f(r.u(*span) * (1 if r.rng.random() < 0.8 else -1), 2))
+    if "breath" in fx:
+        p, amount = fx["breath"]
+        if r.rng.random() < p:
+            r.set("modal_breath", f(r.u(*amount), 2))
+
+
 def effects(r, group):
     """The group's echoes, room, modal hall and far network, drawn after its recipe."""
     fx = FX[group]
@@ -479,6 +519,7 @@ def build():
             r = Recipe(random.Random(g * 1000 + i))
             recipe(r)
             effects(r, group)
+            motion_effects(r, group)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
                 r.set("master_gain", f(max(-18.0, min(12.0, TARGET_DB - levels[name])), 2))

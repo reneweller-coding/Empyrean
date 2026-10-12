@@ -317,6 +317,30 @@ Abklingen 29,4 dB in 1 s bei Decay 2 s (Soll 30), gestimmt 15 Cent neben der 4. 
 ungestimmt, Freeze hält auf 0,8 dB, das Echo kommt nach 0,5 s, alles zugleich endlich und vernünftig. Der LFO-Test
 misst jetzt ohne Effekte (Raum und Hall glätten die Pegelschwankung, die er prüft).
 
+## Phase 8: Kräfte auf den Partials (gebaut, 12.10.2026)
+
+Aus den Ideen des Nutzers (spektrale Attraktoren, große FDNs, Dispersion) die zwei, die zur Architektur passen; das
+große FDN nicht, denn der modale Hall ist schon eine Summe von Moden (Begründung im Gespräch).
+- **Feld** (`SpectralField` in `Cloud.h`, `fieldStep` in `Cloud.cu`): der Versatz jedes Partials in Cent liegt im bisher
+  freien `run.w`, bei einer neuen Note 0. Jeden Block bewegt er sich auf das zu, was zieht (Scale: der nächste Ton der
+  Skala per binärer Suche; Swarm/Scatter: bis zu acht Attraktoren, Glocke der Breite Radius), höchstens Pull Cent pro
+  Sekunde und nie darüber hinaus (Relaxation 1 − e^(−Pull/Radius·dt)); die Feder zieht mit e^(−Spring·dt) heim. Feld
+  aus: in etwa einer Sekunde heim. Attraktoren: acht Lorenz-Systeme auf dem Host (Mittelpunktregel, Schritte ≤ 0,002),
+  x über sieben Oktaven ab 60 Hz, z als Gewicht.
+- **Gefunden [M]:** Scale ließ den Pegel um 3 dB fallen und das Schimmern verschwinden: Die Mitglieder einer
+  Harmonischen fielen auf eine Frequenz und summierten sich zu einem Sinus mit eingefrorener Zufallsamplitude (im Mittel
+  gleich, aber die tiefen Harmonischen tragen fast alles). Jetzt behält jeder Partial seinen Platz in der Glocke,
+  gestaucht auf 2 Cent je Einheit: 0,3 dB Unterschied, die Wolke schwebt weiter.
+- **Dispersion**: die Uhr jedes Partials um D·(1 − Tonhöhenlage) Sekunden später (negativ: um |D|·Lage), für Lanes und
+  Landschaft über `c.t`, für den Pegel der Stimme über einen Ring auf der Karte (`gainRingKernel`, 1024 Blöcke je
+  Stimme, beim Notenstart gelöscht). Die Stimme bleibt nach dem Ende ihrer Hüllkurve |D| länger aktiv.
+- **Atmender Hall**: das T60 jeder Mode wandert um bis zu eine Oktave (Sinus k/1000 Hz).
+- Presets: `MOTION_FX` in `make_presets.py`. Hilfe: Absätze im Kapitel Motion, Breath im Kapitel Effects.
+
+**Gemessen [M]:** GPU unverändert 0,06 ms pro Block. Selbsttest 27/27: Scale 20 Cent neben der 4. Harmonischen −11,0 →
+−69,9 dB bei −30,6 / −30,0 dBFS; Swarm/Scatter −24,7 / −25,0 gegen −25,1 dBFS, gleicher Seed bitgleich; Dispersion 1 s:
+Grundton −35,7 → +46,7 dB, 8. Harmonische +19,4 → −51,2 dB zwischen 0,36–0,56 s und 0,66–0,86 s.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut

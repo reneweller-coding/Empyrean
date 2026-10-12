@@ -193,6 +193,10 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     prevDelayMix_ = prevDelayToFar_ = prevDelay2Mix_ = prevDelay2ToFar_ = prevModalLevel_ = 0.0f;
     modalTime_ = 0.0f;
     srcDistance_ = 0.3f;
+    {   // The attractors' Lorenz systems: each started near the butterfly from the seed, apart from the others.
+        Rng r(cfg_.seed ^ 0x4C6F72656Eull);
+        for (auto& s : lorenz_) { s[0] = 8.0 * r.bipolar(); s[1] = 8.0 * r.bipolar(); s[2] = 20.0 + 8.0 * r.bipolar(); }
+    }
 
     queue_.assign(kQueueSize, Event{});
     qHead_.store(0);
@@ -547,6 +551,7 @@ void Engine::beginOn(int i, int note, float velocity, float distance, int source
     v.onset = onset;
     v.released = false;
     v.tailBlocks = 1;
+    v.tailArmed = false;
     v.age = 0.0;
     v.stealing = false;
     v.stealBlocks = 0;
@@ -678,6 +683,12 @@ void Engine::renderBlock()
         v.env.setTimes(blk_.attack, blk_.decay, blk_.sustain, blk_.release);
         const float gain = v.env.process();
         if (!v.env.isActive()) {
+            // With dispersion the late partials sound on after the envelope: the voice stays until
+            // the latest of them has heard the end of it.
+            if (!v.tailArmed) {
+                v.tailArmed = true;
+                v.tailBlocks += static_cast<int>(std::ceil(std::fabs(cur(ParamId::Dispersion)) * cfg_.sampleRate / G));
+            }
             if (v.tailBlocks > 0) { --v.tailBlocks; cv.gain = 0.0f; ++sounding; continue; }
             v.note = -1;
             cv.active = 0;
@@ -773,6 +784,7 @@ void Engine::renderBlock()
         mh.width = cur(ParamId::ModalWidth);
         mh.low = cur(ParamId::ModalLow);
         mh.time = modalTime_;
+        mh.breath = cur(ParamId::ModalBreath);
         int count = 0;
         if (mh.on)
             for (int note = 0; note < 128 && count < kModalTuned; ++note) {
@@ -782,6 +794,53 @@ void Engine::renderBlock()
         mh.tunedCount = count;
         modalTime_ += dtf;
         if (modalTime_ >= 1000.0f) modalTime_ -= 1000.0f;
+    }
+
+    // The field on the partials and the dispersion of their clocks. Scale: the scale's pitches,
+    // ascending; Swarm and Scatter: eight Lorenz systems always wander (so the count can change
+    // without a jump), the first `count` are the attractors -- x across seven octaves from 60 Hz,
+    // z the weight, negative for Scatter.
+    {
+        SpectralField& F = cloud_.field();
+        const int mode = std::clamp(static_cast<int>(std::lround(cur(ParamId::FieldMode))), 0, kNumFieldModes - 1);
+        F.mode = static_cast<FieldMode>(mode);
+        const float pull = cur(ParamId::FieldStrength), spring = cur(ParamId::FieldSpring);
+        F.strength = 600.0f * pull * pull;
+        F.radius = cur(ParamId::FieldRadius);
+        F.spring = 4.0f * spring * spring;
+        F.dispersion = cur(ParamId::Dispersion);
+        const double span = static_cast<double>(cur(ParamId::FieldRate)) * dt;
+        const int steps = std::max(1, static_cast<int>(std::ceil(span / 0.002)));
+        const double h = span / steps;
+        for (auto& s : lorenz_)
+            for (int k = 0; k < steps; ++k) {   // the midpoint rule, small steps
+                auto d = [](const double* p, double* o) { o[0] = 10.0 * (p[1] - p[0]); o[1] = p[0] * (28.0 - p[2]) - p[1]; o[2] = p[0] * p[1] - (8.0 / 3.0) * p[2]; };
+                double k1[3], mid[3], k2[3];
+                d(s, k1);
+                for (int j = 0; j < 3; ++j) mid[j] = s[j] + 0.5 * h * k1[j];
+                d(mid, k2);
+                for (int j = 0; j < 3; ++j) s[j] += h * k2[j];
+            }
+        if (F.mode == FieldMode::Scale) {
+            int count = 0;
+            for (int note = 0; note < 128 && count < kFieldPoints; ++note) {
+                const float lf = static_cast<float>(std::log2(frequencyOf(note) * tideMul));
+                if (count == 0 || lf > F.pos[count - 1] + 1.0e-4f) F.pos[count++] = lf;
+            }
+            F.count = count;
+        } else if (F.mode != FieldMode::Off) {
+            const int count = std::clamp(static_cast<int>(std::lround(cur(ParamId::FieldCount))), 1, kFieldAttractors);
+            const float lo = std::log2(60.0f), octaves = std::log2(8000.0f / 60.0f);
+            for (int k = 0; k < count; ++k) {
+                const float u = std::clamp(static_cast<float>((lorenz_[k][0] + 22.0) / 44.0), 0.0f, 1.0f);
+                const float w = 0.4f + 0.8f * std::clamp(static_cast<float>(lorenz_[k][2] / 50.0), 0.0f, 1.0f);
+                F.pos[k] = lo + u * octaves;
+                F.mass[k] = F.mode == FieldMode::Scatter ? -w : w;
+            }
+            F.count = count;
+        } else {
+            F.count = 0;
+        }
     }
 
     // 5. The GPU: near and far, left and right, and the modal hall.

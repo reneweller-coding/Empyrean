@@ -258,6 +258,7 @@ private:
         int onset = 0;             ///< and at this sample of it
         bool released = false;     ///< noteOff has come
         int tailBlocks = 0;        ///< blocks it stays active after the envelope fell silent (ramps to zero)
+        bool tailArmed = false;    ///< the tail was lengthened by the dispersion when the envelope fell silent
         double age = 0.0;          ///< seconds since it began, for stealing
         bool stealing = false;     ///< fading out before `next` begins
         int stealBlocks = 0;       ///< blocks of fading still to go
@@ -370,6 +371,7 @@ private:
     float prevModalLevel_ = 0.0f;                      ///< the modal hall's level, likewise
     float modalTime_ = 0.0f;                           ///< the modal hall's drift clock, seconds, wrapped at 1000
     float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
+    double lorenz_[kFieldAttractors][3] = {};          ///< the field's attractors: eight Lorenz systems (x, y, z), wandering always
 
     /** @brief The parameter values one block works with. */
     struct Block {

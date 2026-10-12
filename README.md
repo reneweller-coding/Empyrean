@@ -43,6 +43,9 @@ offline renderer and the manual, and a portable zip.
   stereo field; **Air**, a band of flickering partials heard as noise.
 - **Motion:** Random, Wave, Pendulum, Breathe, Glissando, Aurora -- the partials' envelopes set all at once; Aurora
   reads a **landscape** (time against frequency): Aurora, Shepard, Tides, Rain, Choir.
+- **The field**, a force on every partial's frequency, carried from block to block on the GPU: Scale gathers the
+  cloud into the key, Swarm lets attractors on chaotic (Lorenz) paths gather the partials near them, Scatter parts
+  them like dust. **Dispersion** makes each partial's clock late by its pitch: attacks and glints fall as cascades.
 - **The filter** as an exact frequency response at every partial: LP 6/12/24, HP 12, BP 12, Notch, Peak, Formant.
 - **Tuning:** equal temperament, the just scales, the harmonic series, slendro, Bohlen-Pierce, and Timbre -- the scale
   the cloud's own spectrum asks for (Sethares). Purity narrows the clouds so that just intervals can lock.
@@ -53,7 +56,7 @@ offline renderer and the manual, and a portable zip.
   and a small reverb for the near plane.
 - **The modal hall:** a reverb made the way the instrument is made, sixty-five thousand resonances that die away, on
   the GPU. Tuned, a share of them stands on the pitches of the scale and the hall rings in key, like sympathetic
-  strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Freeze.
+  strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Breath (its colour moves), Freeze.
 - **The conductor:** Free or Chords (Autoplay), Step, and Brain 2, a second conductor deep in the background.
 - **Modulation:** four LFOs without hard edges, two envelopes, four macros, mod wheel, pressure, velocity and a random
   curve, through a matrix of sixteen rows.

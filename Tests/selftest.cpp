@@ -620,13 +620,83 @@ int main()
         for (const auto& [id, v] : std::initializer_list<std::pair<ParamId, float>>{
                  { ParamId::DelayMix, 0.4f }, { ParamId::Delay2Mix, 0.3f }, { ParamId::DelayFeedback, 0.7f }, { ParamId::EarlyLevel, 0.5f },
                  { ParamId::NearMix, 0.4f }, { ParamId::FarDiffuse, 0.8f }, { ParamId::FarUnmask, 0.6f }, { ParamId::FarMode, 3.0f },
-                 { ParamId::ModalLevel, 0.6f }, { ParamId::ModalTune, 0.7f }, { ParamId::ModalDecay, 30.0f }, { ParamId::AutoRate, 6.0f } })
+                 { ParamId::ModalLevel, 0.6f }, { ParamId::ModalTune, 0.7f }, { ParamId::ModalDecay, 30.0f }, { ParamId::AutoRate, 6.0f },
+                 { ParamId::ModalBreath, 0.7f }, { ParamId::FieldMode, 2.0f }, { ParamId::FieldStrength, 0.8f }, { ParamId::Dispersion, 0.4f } })
             e.setParam(id, v);
         if (!openOffline(e, true, 47)) return 1;
         const std::vector<float> lr = render(e, 30.0);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
         const double db = rmsDb(lr, 10 * 48000, 30 * 48000);
         check(finite && db > -45.0 && db < -6.0, "effects: everything at once is finite and sane", fmt("%.1f dBFS RMS over 10-30 s, GPU %.3f ms/block", db, e.lastGpuMs()));
+    }
+
+    // 25. The Scale field gathers the cloud onto the key: 20 cents beside the fourth harmonic (a
+    //     pitch of the scale) a wide cloud has energy, gathered it has far less -- at the same level.
+    {
+        double ratio[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.5f);
+            e.setParam(ParamId::CloudWidth, 60.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::FieldMode, k == 1 ? 1.0f : 0.0f);
+            e.setParam(ParamId::FieldStrength, 0.8f);
+            e.setParam(ParamId::FieldSpring, 0.0f);
+            if (!openOffline(e, false, 53)) return 1;
+            e.noteOn(62, 0.8f, 0);
+            const std::vector<float> lr = render(e, 4.0);
+            const double f4 = 4.0 * soundingHz(e);
+            ratio[k] = toneDb(lr, 96000, 192000, f4 * std::pow(2.0, 20.0 / 1200.0)) - toneDb(lr, 96000, 192000, f4);
+            level[k] = rmsDb(lr, 96000, 192000);
+        }
+        check(ratio[1] < ratio[0] - 8.0 && std::fabs(level[1] - level[0]) < 1.5, "field: Scale gathers the cloud onto the key",
+              fmt("20 ct beside the 4th harmonic: %.1f dB free, %.1f dB gathered; level %.1f / %.1f dBFS", ratio[0], ratio[1], level[0], level[1]));
+    }
+
+    // 26. Swarm and Scatter: the level stays where it was, and the same seed plays the same (the
+    //     attractors' Lorenz systems run on the host, from the seed).
+    {
+        auto play = [](int mode) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.5f);
+            e.setParam(ParamId::FieldMode, static_cast<float>(mode));
+            e.setParam(ParamId::FieldStrength, 0.9f);
+            e.setParam(ParamId::FieldRadius, 200.0f);
+            e.setParam(ParamId::FieldRate, 0.5f);
+            if (!openOffline(e, false, 59)) return std::vector<float>();
+            for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+            return render(e, 6.0);
+        };
+        const std::vector<float> off = play(0), swarm = play(2), again = play(2), scatter = play(3);
+        if (off.empty() || swarm.empty() || again.empty() || scatter.empty()) return 1;
+        const double l0 = rmsDb(off, 96000, 288000), l1 = rmsDb(swarm, 96000, 288000), l2 = rmsDb(scatter, 96000, 288000);
+        check(std::fabs(l1 - l0) < 2.0 && std::fabs(l2 - l0) < 2.0 && swarm == again && swarm != off,
+              "field: Swarm and Scatter keep the level, the seed decides",
+              fmt("%.1f dBFS free, %.1f swarm, %.1f scatter; the same seed %s", l0, l1, l2, swarm == again ? "identical" : "DIFFERENT"));
+    }
+
+    // 27. Dispersion: with a second of it the high partials arrive first and the low ones after --
+    //     the eighth harmonic sounds while the fundamental is still to come, and the other way round.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.005f);
+        e.setParam(ParamId::Release, 0.03f);
+        e.setParam(ParamId::Dispersion, 1.0f);
+        if (!openOffline(e, false, 61)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        std::vector<float> lr = render(e, 0.3);
+        const double f1 = soundingHz(e), f8 = 8.0 * f1;
+        e.noteOff(62, 0);
+        const std::vector<float> rest = render(e, 1.2);
+        lr.insert(lr.end(), rest.begin(), rest.end());
+        // Late by the share of the range above them: the 8th harmonic by about 0.31 s, the fundamental by 0.61 s.
+        const double a1 = toneDb(lr, 17280, 26880, f1), b1 = toneDb(lr, 31680, 41280, f1);
+        const double a8 = toneDb(lr, 17280, 26880, f8), b8 = toneDb(lr, 31680, 41280, f8);
+        check(b1 > a1 + 15.0 && a8 > b8 + 15.0, "dispersion: the highs arrive first, the lows after",
+              fmt("fundamental %.1f -> %.1f dB, 8th harmonic %.1f -> %.1f dB (0.36-0.56 s -> 0.66-0.86 s)", a1, b1, a8, b8));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

@@ -153,6 +153,15 @@ enum class ParamId : int {
     ModalWidth,     ///< 0 .. 1: mono .. every mode its own place
     ModalLow,       ///< Hz: the lowest mode
     ModalFreeze,    ///< the modal hall held, its input shut
+    ModalBreath,    ///< 0 .. 1: every mode's decay wanders, slowly
+    // The field on the partials and the dispersion of their clocks (Cloud.h SpectralField)
+    FieldMode,      ///< kFieldModeNames
+    FieldStrength,  ///< 0 .. 1: how fast the partials may move (600 x^2 cents a second)
+    FieldRadius,    ///< ct: an attractor's reach; the Scale field's stiffness
+    FieldSpring,    ///< 0 .. 1: the pull back home (4 x^2 per second)
+    FieldRate,      ///< how fast the attractors wander (time of the Lorenz system per second)
+    FieldCount,     ///< 1 .. 8 attractors
+    Dispersion,     ///< s: the lowest partials' clock late (positive) or the highest (negative)
     Count           ///< number of parameters
 };
 
@@ -208,6 +217,8 @@ constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven table
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
+constexpr int kNumFieldModes = 4;   ///< entries of kFieldModeNames
+extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames
 extern const char* const kFarModeNames[kNumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
 extern const char* const kRootNames[12];                  ///< "C" .. "B"

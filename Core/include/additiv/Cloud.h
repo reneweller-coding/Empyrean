@@ -201,9 +201,58 @@ struct ModalHall {
     float width = 1.0f;     ///< 0: both ears hear the same phase of every mode (mono) .. 1: each its own
     float low = 80.0f;      ///< Hz: the lowest mode of the spread ones
     float time = 0.0f;      ///< seconds: the drift's clock, wrapped at 1000 s (every drift rate is a whole number of cycles in 1000 s)
+    float breath = 0.0f;    ///< 0 .. 1: every mode's decay wanders by up to an octave either way, slowly, each on its own
+    float pad1 = 0.0f;      ///< keeps the table 16-byte aligned
+    float pad2 = 0.0f;      ///< likewise
+    float pad3 = 0.0f;      ///< likewise
     float tuned[kModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
 };
 static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header");
+
+constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
+constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
+constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
+
+/** @brief What the field does: the FieldMode parameter's choices. */
+enum class FieldMode : std::int32_t {
+    Off = 0,   ///< every partial at its own place (a field switched off lets them glide home)
+    Scale,     ///< every partial pulled towards the nearest pitch of the scale: the cloud collapses into the key
+    Swarm,     ///< a few attractors wander through the spectrum on chaotic paths and gather the partials near them
+    Scatter,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
+    Count      ///< number of modes
+};
+
+/**
+ * @brief Forces on the partials' frequencies, and the dispersion of their clocks: the host's copy,
+ *        sent up with the voices.
+ *
+ * The field. Every partial keeps an offset in cents from its own place (its harmonic, its member,
+ * its drift and pitch lane), carried from block to block on the GPU. Each block it moves towards
+ * what pulls it -- the nearest pitch of the scale, or the attractors near it, weighted by a bell
+ * of `radius` cents -- by at most `strength` cents a second and never past the attractor, and
+ * the spring draws it back towards its own place. So a cloud does not snap to a grid: it is
+ * gathered, it gives way, it is let go, at the speeds the knobs say. The mean level does not
+ * change: partials that meet keep their random phases, so their powers add as before.
+ *
+ * The dispersion. Each partial's clock runs `dispersion` seconds late at the bottom of the range
+ * (20 Hz) and on time at the top when it is positive, the other way round when negative -- its
+ * envelopes, the landscape it reads and the voice's level, which the GPU keeps a history of. An
+ * attack or a glint then reaches the ear as a cascade, the highs first and the lows after (a
+ * falling chirp, as in a dispersive medium -- a long spring, a stiff string, ice), or rising.
+ */
+struct SpectralField {
+    FieldMode mode = FieldMode::Off;   ///< what pulls the partials
+    int   count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`
+    int   pad0 = 0;                    ///< keeps the floats 16-byte aligned
+    int   pad1 = 0;                    ///< likewise
+    float strength = 0.0f;             ///< cents a second a partial may move at most
+    float radius = 60.0f;              ///< cents: an attractor's reach (the bell's width); the Scale field's stiffness
+    float spring = 0.3f;               ///< per second: how fast a partial is drawn back to its own place
+    float dispersion = 0.0f;           ///< seconds: the clock of the lowest partials late (positive) or of the highest (negative)
+    float pos[kFieldPoints] = {};      ///< log2 Hz: the scale's pitches ascending (Scale), or the attractors (Swarm, Scatter)
+    float mass[kFieldAttractors] = {}; ///< the attractors' weights; Scatter's are negative
+};
+static_assert(sizeof(SpectralField) % 16 == 0, "SpectralField rides in the block header");
 
 /** @brief How an engine is laid out; fixed between open() and close(). */
 struct CloudConfig {
@@ -269,6 +318,9 @@ public:
 
     /** @brief The host's copy of the modal hall's settings, edited between wait() and the next launch(). @return the settings */
     ModalHall& modal();
+
+    /** @brief The host's copy of the field and the dispersion, edited between wait() and the next launch(). @return the settings */
+    SpectralField& field();
 
     /**
      * @brief Sends the voices up and starts one block on the GPU; returns at once. Clears every

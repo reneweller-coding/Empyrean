@@ -50,7 +50,12 @@ struct BlockHeader {
     int   landColumns;     ///< the landscape's frequency columns (0 = none)
     int   landRows;        ///< its time rows
     float landRowSeconds;  ///< how long one row lasts
+    std::uint32_t blockIndex;   ///< blocks launched since open(): where this block's levels go in the ring
+    std::uint32_t hpad0;        ///< keeps what follows 16-byte aligned
+    std::uint32_t hpad1;        ///< likewise
+    std::uint32_t hpad2;        ///< likewise
     ModalHall modal;       ///< the modal hall's settings for this block
+    SpectralField field;   ///< the field and the dispersion for this block
 };
 static_assert(sizeof(BlockHeader) % 16 == 0, "the voices behind the header stay 16-byte aligned");
 static_assert(sizeof(CloudVoice) % 16 == 0, "CloudVoice is uploaded as an array");
@@ -312,18 +317,99 @@ __device__ float filterGain(int model, float f, float cutoff, float q, float vow
 }
 
 /**
+ * @brief One block of the field for one partial: its offset moved towards what pulls it and drawn back home.
+ * @param F       the field
+ * @param logHz   log2 of where the partial is now (its own place plus the offset)
+ * @param off     the offset, cents
+ * @param dt      the block's length, seconds
+ * @param keep    log2 offset the partial keeps from what pulls it: its place in its cloud's bell,
+ *                narrowed to 2 cents a unit -- partials gathered onto one pitch would add up to one
+ *                sine of a frozen random level (measured: 3 dB down, the shimmer gone), a narrow
+ *                cloud still beats and keeps its power
+ * @return        the new offset, cents (at most an octave)
+ */
+__device__ float fieldStep(const SpectralField& F, float logHz, float off, float dt, float keep)
+{
+    if (F.mode == FieldMode::Off || F.strength <= 0.0f || F.count <= 0)
+        return off * __expf(-fmaxf(F.spring, 1.0f) * dt);   // switched off: home within a second or so
+    const float R = fmaxf(F.radius, 1.0f);
+    const float maxStep = F.strength * dt;
+    const float relax = 1.0f - __expf(-(F.strength / R) * dt);   // towards an attractor, never past it
+    float step = 0.0f;
+    if (F.mode == FieldMode::Scale) {
+        // The nearest pitch of the scale (ascending): a binary search, then the neighbour.
+        int lo = 0, hi = F.count - 1;
+        while (hi - lo > 1) {
+            const int mid = (lo + hi) >> 1;
+            if (F.pos[mid] <= logHz) lo = mid; else hi = mid;
+        }
+        const float a = F.pos[lo], b = F.pos[hi];
+        const float q = fabsf(logHz - a) <= fabsf(b - logHz) ? a : b;
+        step = 1200.0f * (q + keep - logHz) * relax;
+    } else {
+        for (int k = 0; k < min(F.count, kFieldAttractors); ++k) {
+            const float d = 1200.0f * (F.pos[k] + keep - logHz);
+            const float u = d / R;
+            const float w = __expf(-0.5f * u * u);
+            step += F.mass[k] >= 0.0f ? F.mass[k] * w * d * relax : F.mass[k] * w * copysignf(maxStep, d);
+        }
+    }
+    step = fminf(fmaxf(step, -maxStep), maxStep);
+    return fminf(fmaxf((off + step) * __expf(-F.spring * dt), -1200.0f), 1200.0f);
+}
+
+/**
+ * @brief The ring of the voices' levels: this block's level of every voice written where the
+ *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
+ *        partial of the new note never hears the old one's level).
+ * @param hdr     the block header
+ * @param voices  the voices
+ * @param ring    per voice kGainRing levels
+ */
+__global__ void gainRingKernel(const BlockHeader* hdr, const CloudVoice* voices, float* ring)
+{
+    const int v = static_cast<int>(blockIdx.x);
+    if (v >= hdr->voices) return;
+    const CloudVoice& cv = voices[v];
+    float* row = ring + static_cast<size_t>(v) * kGainRing;
+    if (cv.restart)
+        for (int i = threadIdx.x; i < kGainRing; i += blockDim.x) row[i] = 0.0f;
+    __syncthreads();
+    if (threadIdx.x == 0) row[hdr->blockIndex % kGainRing] = cv.active ? cv.gain : 0.0f;
+}
+
+/**
+ * @brief A voice's level `blocks` blocks ago, read from the ring and interpolated.
+ * @param row     the voice's ring
+ * @param index   this block's index
+ * @param blocks  how far back, in blocks (fractional)
+ * @return        the level; 0 beyond the ring
+ */
+__device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
+{
+    if (blocks <= 0.0f) return row[index % kGainRing];
+    if (blocks >= static_cast<float>(kGainRing - 2)) return 0.0f;
+    const int b0 = static_cast<int>(blocks);
+    const float fr = blocks - static_cast<float>(b0);
+    const float g0 = row[(index - static_cast<std::uint32_t>(b0)) % kGainRing];
+    const float g1 = row[(index - static_cast<std::uint32_t>(b0 + 1)) % kGainRing];
+    return g0 + (g1 - g0) * fr;
+}
+
+/**
  * @brief The update kernel: every partial's frequency glide, amplitude ramps and start phase for this block.
  * @param hdr     the block header (device copy)
  * @param voices  the voices (device copy)
  * @param pcap    partials per voice in the tables (a multiple of kChunk)
  * @param shapes  the envelope bank
  * @param land    the landscape
- * @param run     per partial: start phase, phase step, its change per sample, unused (state and render input)
+ * @param run     per partial: start phase, phase step, its change per sample, the field's offset in cents (as bits)
  * @param amp     per partial: the near left, near right, far left and far right amplitudes the last block ended on
  * @param gains   per partial two entries: near (left start, left step, right start, right step), then far
+ * @param ring    per voice kGainRing levels (gainRingKernel), for the dispersion
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
-                             const float* land, uint4* run, float4* amp, float4* gains)
+                             const float* land, uint4* run, float4* amp, float4* gains, const float* ring)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -348,6 +434,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
 
     float target = 0.0f;
     float f = 0.0f;
+    float fieldOff = cv.restart ? 0.0f : __uint_as_float(run[gid].w);   // the field's offset, cents
     float place = cv.stereo * (2.0f * hash01(seed, up, 10) - 1.0f);   // -1 .. 1 across the field
     const int H = cv.harmonics, K = cv.members;
     const int HP = cv.harmonicPartials;
@@ -397,7 +484,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         c.src[5] = (isAir || (h & 1)) ? 0.0f : 1.0f;
         c.seed = seed;
         c.p = up;
-        c.t = t;
+        // The dispersion: this partial's clock late by its share of the dispersion, by its pitch.
+        const float D = hdr->field.dispersion;
+        const float lateBy = D >= 0.0f ? D * (1.0f - c.src[1]) : -D * c.src[1];
+        c.t = t - lateBy;
         c.releaseAt = cv.releaseAt;
         c.shapes = shapes;
         c.shapeCount = hdr->shapeCount;
@@ -417,7 +507,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         if (cv.pitch.amount != 0.0f) cents += laneValue(cv.pitch, c, 40, true, depth) * depth;
         if (cv.pan.amount != 0.0f) place = fminf(fmaxf(place + laneValue(cv.pan, c, 50, true, depth) * depth, -1.0f), 1.0f);
 
-        f = centre * exp2f(cents * (1.0f / 1200.0f));
+        // The field: the partial's offset moves towards what pulls it, from where it was.
+        const float home = centre * exp2f(cents * (1.0f / 1200.0f));
+        fieldOff = fieldStep(hdr->field, log2f(fmaxf(home, 1.0f)) + fieldOff * (1.0f / 1200.0f), fieldOff, static_cast<float>(n) / fs,
+                             z * (2.0f / 1200.0f));
+        f = home * exp2f(fieldOff * (1.0f / 1200.0f));
         // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist.
         const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f);
         // Distance (Noctuary's planes): 6 dB per unit, and the air's low pass -- a first-order
@@ -431,7 +525,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         // The voice's colour and filter, each read at this partial's frequency.
         float colour = filterGain(cv.filterModel, f, cv.cutoff, cv.filterQ, cv.vowel);
         if (!isAir) colour *= presenceGain(f, cv.presenceDb, dist) * lowCutGain(f, cv.lowCut);
-        target = amp0 * sh * fade * env * cv.gain * exp2f(-dist) * absorb * colour;
+        // The voice's level, as late as this partial's clock (the dispersion), from the ring.
+        const float level = lateBy > 0.0f ? gainAgo(ring + static_cast<size_t>(v) * kGainRing, hdr->blockIndex, lateBy * fs / static_cast<float>(n))
+                                          : cv.gain;
+        target = amp0 * sh * fade * env * level * exp2f(-dist) * absorb * colour;
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>(fminf(f / fs, 0.49f) * 4294967296.0f);
 
@@ -465,7 +562,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     gains[2 * gid] = make_float4(a0.x, (t4.x - a0.x) * inv, a0.y, (t4.y - a0.y) * inv);
     gains[2 * gid + 1] = make_float4(a0.z, (t4.z - a0.z) * inv, a0.w, (t4.w - a0.w) * inv);
     amp[gid] = t4;
-    run[gid] = make_uint4(ph, inc0, dinc, 0u);
+    run[gid] = make_uint4(ph, inc0, dinc, __float_as_uint(fieldOff));
 }
 
 /**
@@ -647,8 +744,17 @@ modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scrat
     ph -= floorf(ph);
     f *= exp2f(mh.drift * (1.0f / 1200.0f) * __sinf(6.2831853f * ph));
     const bool silent = f < 10.0f || f >= 0.49f * fs;
-    // How fast it dies: the decay at and below 250 Hz, each octave above 2^damp times faster.
-    const float T = fmaxf(0.05f, mh.decay * exp2f(-mh.damp * fmaxf(0.0f, log2f(f * (1.0f / 250.0f)))));
+    // How fast it dies: the decay at and below 250 Hz, each octave above 2^damp times faster; with
+    // breath, every mode's decay wanders by up to an octave on a slow sine of its own (again a whole
+    // number of cycles in 1000 s), so the hall's colour moves while it rings.
+    float breathe = 0.0f;
+    if (mh.breath > 0.0f) {
+        const float br = (10.0f + static_cast<float>(hash32(static_cast<std::uint32_t>(mode) ^ 0x27D4EB2FU) % 40U)) * 0.001f;
+        float bp = br * mh.time + modalUni(mode, 10);
+        bp -= floorf(bp);
+        breathe = mh.breath * __sinf(6.2831853f * bp);
+    }
+    const float T = fmaxf(0.05f, mh.decay * exp2f(breathe - mh.damp * fmaxf(0.0f, log2f(f * (1.0f / 250.0f)))));
     const float r = mh.freeze ? 0.99999988f : __expf(-6.9077553f / (T * fs));
     float sw, cw;
     sincosf(6.2831853f * f / fs, &sw, &cw);
@@ -791,6 +897,9 @@ struct CloudEngine::Impl {
     EnvShape* dShapes = nullptr;      ///< device: the envelope bank, kEnvShapes
     float* dLand = nullptr;           ///< device: the landscape, room for kLandMaxColumns * kLandMaxRows
     float2* dModal = nullptr;         ///< device: the modal hall's states, kModalModes
+    float* dGainRing = nullptr;       ///< device: per voice kGainRing levels, for the dispersion
+    SpectralField field;              ///< the host's copy of the field and the dispersion
+    std::uint32_t blockIndex = 0;     ///< blocks launched since open()
     float* dModalScratch = nullptr;   ///< device: per modal CUDA block two channels of sums
     ModalHall modal;                  ///< the host's copy of the modal hall's settings
     float gpuMs = 0.0f;               ///< GPU time of the last finished block
@@ -812,12 +921,12 @@ struct CloudEngine::Impl {
         if (hOut) cudaFreeHost(hOut);
         for (void* p : { static_cast<void*>(dUpload), static_cast<void*>(dOut), static_cast<void*>(dScratch), static_cast<void*>(dRun),
                          static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand),
-                         static_cast<void*>(dModal), static_cast<void*>(dModalScratch) })
+                         static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
         dRun = nullptr; dAmp = nullptr; dGains = nullptr; dShapes = nullptr;
-        dModal = nullptr; dModalScratch = nullptr;
+        dModal = nullptr; dModalScratch = nullptr; dGainRing = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -928,7 +1037,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
                 && ok(cudaMalloc(&m.dModal, sizeof(float2) * kModalModes), "cudaMalloc modal", error)
-                && ok(cudaMalloc(&m.dModalScratch, sizeof(float) * 2 * n * static_cast<size_t>(kModalBlocks)), "cudaMalloc modal scratch", error);
+                && ok(cudaMalloc(&m.dModalScratch, sizeof(float) * 2 * n * static_cast<size_t>(kModalBlocks)), "cudaMalloc modal scratch", error)
+                && ok(cudaMalloc(&m.dGainRing, sizeof(float) * kGainRing * static_cast<size_t>(config.voices)), "cudaMalloc gain ring", error);
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -938,6 +1048,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dGainRing, 0, sizeof(float) * kGainRing * static_cast<size_t>(config.voices), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaStreamSynchronize(m.stream), "cudaStreamSynchronize", error);
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
@@ -949,8 +1060,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
         good = ok(cudaStreamBeginCapture(m.stream, cudaStreamCaptureModeThreadLocal), "cudaStreamBeginCapture", error);
         if (good) {
             cudaMemcpyAsync(m.dUpload, m.hUpload, m.uploadBytes(), cudaMemcpyHostToDevice, m.stream);
+            gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
@@ -1005,6 +1117,8 @@ CloudVoice& CloudEngine::voice(int i) { return impl_->voices[std::clamp(i, 0, im
 
 ModalHall& CloudEngine::modal() { return impl_->modal; }
 
+SpectralField& CloudEngine::field() { return impl_->field; }
+
 void CloudEngine::launch()
 {
     Impl& m = *impl_;
@@ -1020,6 +1134,10 @@ void CloudEngine::launch()
     hdr->landRowSeconds = m.landRowSeconds;
     hdr->modal = m.modal;
     hdr->modal.tunedCount = std::clamp(m.modal.tunedCount, 0, kModalTuned);
+    hdr->field = m.field;
+    hdr->field.count = std::clamp(m.field.count, 0, m.field.mode == FieldMode::Scale ? kFieldPoints : kFieldAttractors);
+    hdr->field.dispersion = std::clamp(m.field.dispersion, -2.0f, 2.0f);
+    hdr->blockIndex = m.blockIndex++;
     auto* up = reinterpret_cast<CloudVoice*>(m.hUpload + sizeof(BlockHeader));
     const float dt = static_cast<float>(n / m.cfg.sampleRate);
     for (int i = 0; i < m.cfg.voices; ++i) {
