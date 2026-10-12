@@ -17,7 +17,7 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And four whole nights across groups: twenty-four presets, the stillest few of every group in a
+And six whole nights across groups (two of them from the sleep concerts): twenty-four presets, the stillest few of every group in a
 family of groups, chained,
 twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
@@ -54,6 +54,9 @@ WHOLE_NIGHTS = [
     ("Whole Night - Living Systems", ["Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Night Gardens", "Reservoir Minds",
                                       "Self-Listening", "Strange Attractors"]),
     ("Whole Night - Tides", ["Waves", "Shepard & Tides", "Ripples", "Pendulums", "Glissandi", "Air & Noise"]),
+    ("Whole Night - Lullabies", ["Lullabies", "Cradle", "Slow Breath", "Afterglow", "Twilight Choirs", "Moonlight"]),
+    ("Whole Night - Deep Sleep", ["Deep Sleep", "Warm Drones", "Starfield", "Ocean Sleep", "Slow Tides", "Night Rain", "Dream Drift",
+                                  "Hypnagogia"]),
 ]
 
 

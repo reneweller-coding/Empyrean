@@ -1,5 +1,23 @@
 # Release notes
 
+## 0.12.0 (12.10.2026, not released)
+
+Sleep concerts: 1024 more presets, sixteen groups made for the night.
+
+- **Sixteen groups of sleep concerts:** Lullabies, Slow Breath, Deep Sleep, Dream Drift, Moonlight, Night Rain, Ocean
+  Sleep, Cradle, Starfield, Hypnagogia, Twilight Choirs, Warm Drones, Snowfall, Forest Night, Slow Tides, Afterglow.
+  Each starts from one of the sixteen sounds and is made slow (attacks of six seconds and more, releases of fifteen),
+  darker, with a slow conductor (a change every one and a half to five minutes, few voices, low) and nothing sudden.
+- **Modulations made for the night**, four or five a preset on top of the bank's own, every one slow and smooth: a
+  breath of five to seven a minute (Slow Breath lets the room, the harmonics' pulse and the colour breathe at the same
+  rate), tides of two to eight minutes, a smooth random wander, Lorenz and Roessler over ten to thirty minutes, the
+  Kuramoto oscillators well in step, slow Lenia, the night deepening while the harmony stands (Root Age makes it darker
+  and farther), calming answers to what is heard (louder becomes darker, change stills the shimmer, roughness tunes it
+  purer), a reservoir with a long memory -- many of them through a via source.
+- **102 journeys:** a Journey and a Night for every group, and six Whole Nights, two of them (Lullabies, Deep Sleep)
+  from the sleep concerts.
+- The 2048 presets before are unchanged; the new ones are measured and levelled like them.
+
 ## 0.11.0 (12.10.2026, not released)
 
 Glide, morph and journeys: one sound becoming another, and sleep concerts for a whole night.

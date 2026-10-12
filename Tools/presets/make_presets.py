@@ -1,4 +1,4 @@
-"""make_presets.py: the factory bank -- 32 groups of 64 presets -- into Core/src/Presets.inc.
+"""make_presets.py: the factory bank -- 48 groups of 64 presets -- into Core/src/Presets.inc.
 
 Every group is a recipe: the ranges its sound lives in, drawn by a seeded die, so the bank is the
 same on every run. A preset names only what it changes (Presets.h). The four macros mean the same
@@ -10,6 +10,12 @@ start from one of them and put one of the systems in front: the living landscape
 flock, the ripple, the melt, the spectral echo, the modal hall, the memory, the attractors, the
 reservoir, what the instrument hears, the field, the dispersion, beating lattices. Phase 10 was
 added to the first sixteen too, drawn after everything else, so what they had stays as it was.
+
+The third sixteen are sleep concerts (12.10.2026): each again from one of the first sixteen's
+sounds, made slow, dark and without anything sudden (sleepy()), and moved by modulations made
+for the night -- a breath of five to seven a minute, tides of minutes, a smooth wander, chaos
+over half an hour, Kuramoto in step, slow Lenia, the night deepening while the harmony stands
+(Root Age), calming answers to what is heard, a reservoir with a long memory.
 
 Levelling: Tools/presets (additiv_presets) renders every preset and writes work/presets/levels.json;
 run this script again and every preset's master_gain brings it to the bank's common level.
@@ -38,7 +44,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Glissandi", "Pendulums", "Waves", "Shepard & Tides", "Shimmer", "Dark Drones", "Microtonal", "Keys",
           "Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Ripples", "Melting Spectra", "Spectral Cascades",
           "Resonant Halls", "Ghosts & Memory", "Strange Attractors", "Reservoir Minds", "Self-Listening", "Gravity Wells",
-          "Smear & Dispersion", "Lattices & Beats", "Night Gardens"]
+          "Smear & Dispersion", "Lattices & Beats", "Night Gardens",
+          "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain", "Ocean Sleep", "Cradle",
+          "Starfield", "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -105,6 +113,38 @@ NAMES = {
                          ["Lattice", "Weave", "Tapestry", "Trellis", "Loom", "Mesh", "Grid", "Fabric"]),
     "Night Gardens": (["Moonlit", "Nightblooming", "Starlit", "Dewy", "Midnight", "Dusky", "Owl", "Firefly"],
                       ["Orchard", "Grove", "Arbour", "Glade", "Pergola", "Lawn", "Hedge", "Bower"]),
+    "Lullabies": (["Hushing", "Lilting", "Rocking", "Humming", "Tender", "Cooing", "Swaying", "Mild"],
+                  ["Lullaby", "Berceuse", "Nursery", "Song", "Blanket", "Pillow", "Hush", "Rhyme"]),
+    "Slow Breath": (["Inhaling", "Exhaling", "Breathing", "Resting", "Sighing", "Easing", "Settling", "Calming"],
+                    ["Breath", "Lungs", "Rhythm", "Pause", "Exhale", "Swell", "Pulse", "Ease"]),
+    "Deep Sleep": (["Dreamless", "Heavy", "Sunken", "Dormant", "Unconscious", "Delta", "Still", "Weighted"],
+                   ["Slumber", "Sleep", "Depths", "Hibernation", "Repose", "Stillness", "Rest", "Torpor"]),
+    "Dream Drift": (["Dozing", "Wandering", "Floating", "Drifting", "Unmoored", "Weightless", "Hazy", "Meandering"],
+                    ["Reverie", "Dreamscape", "Current", "Raft", "Feather", "Haze", "Float", "Balloon"]),
+    "Moonlight": (["Silvered", "Pale", "Moonbeam", "Lunar", "Crescent", "Waning", "Waxing", "Gibbous"],
+                  ["Glow", "Beam", "Path", "Night", "Silver", "Reflection", "Light", "Halo"]),
+    "Night Rain": (["Pattering", "Drizzling", "Misting", "Dripping", "Steady", "Quiet", "Distant", "Warm"],
+                   ["Rain", "Drizzle", "Roof", "Window", "Gutter", "Puddles", "Showers", "Downpour"]),
+    "Ocean Sleep": (["Undulating", "Lulling", "Swaying", "Briny", "Seaward", "Rolling", "Pelagic", "Abyssal"],
+                    ["Sea", "Swells", "Bay", "Lagoon", "Kelp", "Shoreline", "Fathoms", "Seabed"]),
+    "Cradle": (["Rocked", "Cradled", "Nested", "Wrapped", "Soothing", "Lulled", "Cosy", "Snug"],
+               ["Hammock", "Bassinet", "Crib", "Nest", "Swing", "Arms", "Rocker", "Shelter"]),
+    "Starfield": (["Starry", "Twinkling", "Sidereal", "Galactic", "Celestial", "Faraway", "Faint", "Polar"],
+                  ["Stars", "Constellation", "Sky", "Milky Way", "Vault", "Firmament", "Meridian", "Zenith"]),
+    "Hypnagogia": (["Hypnagogic", "Half-Asleep", "Vanishing", "Liminal", "Drowsing", "Twilit", "Unfocused", "Nodding"],
+                   ["Threshold", "Visions", "Images", "Edge", "Doorway", "Murmurs", "Shapes", "Glimpses"]),
+    "Twilight Choirs": (["Vesper", "Evening", "Compline", "Dimmed", "Faraway", "Murmured", "Hushed", "Softened"],
+                        ["Choir", "Voices", "Hymn", "Chant", "Psalm", "Anthem", "Carol", "Canticle"]),
+    "Warm Drones": (["Warm", "Glowing", "Mellow", "Woollen", "Amber", "Hearth", "Embered", "Velvety"],
+                    ["Drone", "Hum", "Organ", "Bass", "Ground", "Pedal", "Murmur", "Bed"]),
+    "Snowfall": (["Snowy", "Falling", "Powdered", "Silent", "Settling", "Hushed", "White", "Crystalline"],
+                 ["Snow", "Flakes", "Snowfall", "Flurry", "Hoarfrost", "Crystals", "Blanket", "Field"]),
+    "Forest Night": (["Wooded", "Shadowed", "Ferny", "Rustling", "Silent", "Midnight", "Pine", "Hollow"],
+                     ["Forest", "Woods", "Canopy", "Thicket", "Clearing", "Pines", "Undergrowth", "Copse"]),
+    "Slow Tides": (["Ebbing", "Flowing", "Receding", "Neap", "Spring", "Lunar", "Turning", "Retreating"],
+                   ["Ebb", "Flow", "Estuary", "Mudflats", "Shallows", "Sandbar", "Inlet", "Waterline"]),
+    "Afterglow": (["Lingering", "Golden", "Fading", "Embered", "Rosy", "Dimming", "Last", "Sunset"],
+                  ["Glow", "Afterglow", "Embers", "Light", "Dusk", "Horizon", "Warmth", "Evening"]),
 }
 
 
@@ -915,6 +955,310 @@ RECIPES = RECIPES + [n_living, n_turing, n_sync, n_flock, n_ripple, n_melt, n_ca
                      n_ghosts, n_attractors, n_reservoir, n_listening, n_gravity, n_smear, n_lattice, n_night]
 
 
+# ---- The sleep concerts: sixteen groups made for the night.
+
+def num(r, key, default):
+    """A parameter as the preset has it so far (its default when it names none)."""
+    return float(r.p[key]) if key in r.p else default
+
+
+def sleepy(r, attack=(6, 25), release=(15, 45)):
+    """What every sleep concert keeps: slow in and out, darker, a slow conductor low down, nothing sudden."""
+    if num(r, "attack", 2.0) < attack[0]:
+        r.set("attack", f(r.lg(*attack), 3))
+    if num(r, "release", 4.0) < release[0]:
+        r.set("release", f(r.lg(*release), 3))
+    r.set("sustain", f(r.u(0.85, 1.0), 3))
+    if num(r, "brightness", 1.0) > 0.6:
+        r.set("brightness", f(r.u(0.3, 0.6), 2))
+    if num(r, "tilt", 1.2) < 1.4:
+        r.set("tilt", f(r.u(1.4, 2.0), 2))
+    if num(r, "shimmer", 0.4) > 0.5:
+        r.set("shimmer", f(r.u(0.2, 0.5), 2))
+    if num(r, "shimmer_rate", 0.15) > 0.3:
+        r.set("shimmer_rate", f(r.lg(0.03, 0.2), 3))
+    if num(r, "presence", 0.0) > 2.0:
+        r.set("presence", f(r.u(0.0, 2.0), 1))
+    if num(r, "motion_rate", 1.0) > 0.6:
+        r.set("motion_rate", f(r.lg(0.1, 0.5), 3))
+    # The conductor: on, in chords, slow, few voices, low.
+    r.set("brain_on", 1)
+    r.set("auto_mode", 1)
+    r.set("auto_rate", f(r.lg(90, 300), 1))
+    r.set("brain_rate", f(r.lg(30, 90), 1))
+    r.set("brain_density", r.rng.randint(3, 5))
+    r.set("brain_low", r.rng.randint(31, 40))
+    r.set("brain_high", r.rng.randint(62, 74))
+    # Nothing sudden: soft echoes, slow low ripples, slow sync.
+    if "delay_feedback" in r.p:
+        r.set("delay_feedback", f(min(num(r, "delay_feedback", 0.4), 0.5), 2))
+    if "delay_mix" in r.p:
+        r.set("delay_mix", f(min(num(r, "delay_mix", 0.0), 0.15), 3))
+    if "spec_mix" in r.p:
+        r.set("spec_mix", f(min(num(r, "spec_mix", 0.0), 0.2), 3))
+    if "ripple_depth" in r.p:
+        r.set("ripple_depth", f(min(num(r, "ripple_depth", 0.0), 0.4), 2))
+        r.set("ripple_speed", f(r.lg(0.1, 0.4), 3))
+        r.set("ripple_decay", f(r.lg(12, 30), 2))
+    if num(r, "sync_rate", 0.5) > 1.0:
+        r.set("sync_rate", f(r.lg(0.05, 0.3), 3))
+
+
+def setup(r, kind):
+    """A kind of sleep modulation's source, set once per preset."""
+    done = r.p.setdefault("_sleep", set())
+    if kind in done:
+        return
+    done.add(kind)
+    if kind == "breath":    # LFO 4: a breath, five to seven a minute
+        r.set("lfo4_shape", LFO["Sine"])
+        r.set("lfo4_rate", f(r.u(0.08, 0.12), 4))
+    elif kind == "tide":    # LFO 3: a tide, one every two to eight minutes
+        r.set("lfo3_shape", r.pick(LFO["Sine"], LFO["Triangle"]))
+        r.set("lfo3_rate", f(r.lg(0.002, 0.008), 4))
+    elif kind == "wander":  # LFO 2: a smooth random wander
+        r.set("lfo2_shape", LFO["Random"])
+        r.set("lfo2_rate", f(r.lg(0.01, 0.04), 4))
+    elif kind == "chaos":   # the attractors over ten to thirty minutes
+        r.set("chaos_period", f(r.lg(600, 1800), 0))
+    elif kind == "kura":    # the oscillators well in step
+        r.set("coherence", f(r.u(0.5, 0.9), 2))
+        r.set("coherence_rate", f(r.u(0.3, 0.7), 2))
+    elif kind == "lenia":   # the field slow
+        r.set("lenia_rate", f(r.lg(0.5, 2.0), 2))
+    elif kind == "reservoir":
+        set_reservoir(r, (0.9, 1.05), (10, 30), (0.3, 0.8))
+
+
+# Sleep modulations, by kind: (source, target, depth range). Slow and smooth only.
+SLEEP_POOLS = {
+    "breath": [("lfo4", "brightness", (0.03, 0.07)), ("lfo4", "cloud_width", (0.04, 0.1)), ("lfo4", "air", (0.05, 0.12)),
+               ("lfo4", "presence", (0.05, 0.1)), ("lfo4", "depth", (0.03, 0.06))],
+    "tide": [("lfo3", "depth", (0.08, 0.18)), ("lfo3", "far_level", (0.06, 0.14)), ("lfo3", "tilt", (0.03, 0.07)),
+             ("lfo3", "cloud_width", (0.06, 0.14))],
+    "wander": [("lfo2", "drift", (0.1, 0.25)), ("lfo2", "shimmer", (0.08, 0.2)), ("lfo2", "motion_depth", (0.08, 0.2)),
+               ("lfo2", "air_center", (0.1, 0.2))],
+    "chaos": [("lorenz_x", "cloud_width", (0.06, 0.15)), ("lorenz_z", "tilt", (0.03, 0.07)), ("rossler_x", "drift", (0.1, 0.2)),
+              ("rossler_y", "shimmer", (0.08, 0.2)), ("lorenz_y", "depth", (0.05, 0.12))],
+    "kura": [("kura1", "cloud_width", (0.05, 0.12)), ("kura2", "shimmer", (0.08, 0.2)), ("kura3", "air", (0.08, 0.2)),
+             ("kura4", "brightness", (0.04, 0.1))],
+    "lenia": [("lenia1", "shimmer", (0.1, 0.25)), ("lenia2", "air", (0.1, 0.25)), ("lenia3", "presence", (0.08, 0.15)),
+              ("lenia4", "cloud_width", (0.08, 0.2))],
+    "night": [("root_age", "brightness", (-0.2, -0.08)), ("root_age", "depth", (0.1, 0.25)), ("root_age", "far_level", (0.08, 0.2)),
+              ("root_age", "memory_level", (0.1, 0.25)), ("root_age", "melt_mix", (0.1, 0.25))],
+    "calm": [("loudness", "brightness", (-0.2, -0.08)), ("flux", "shimmer", (-0.2, -0.08)), ("roughness", "tune_gravity", (0.3, 0.6)),
+             ("loudness", "depth", (0.08, 0.2))],
+    "reservoir": [("reservoir1", "brightness", (0.05, 0.12)), ("reservoir2", "cloud_width", (0.08, 0.18)),
+                  ("reservoir3", "air_center", (0.08, 0.2)), ("reservoir4", "tilt", (0.03, 0.07))],
+}
+SLEEP_VIAS = ["root_age", "lenia2", "kura3"]
+
+
+def sleep_rows(r, kinds, count, via_p=0.25):
+    """Up to `count` sleep modulations from the kinds: each a source and a target not taken yet, some through a via."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        kind = r.pick(*kinds)
+        src, target, (lo, hi) = r.pick(*SLEEP_POOLS[kind])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        setup(r, kind)
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+CALM = ("Sleep Concert", "Choirs", "Strings", "Deep Space", "Dark Drones", "Shepard & Tides", "Organs", "Air & Noise")
+
+
+def s_lullaby(r):
+    based(r, "Sleep Concert", "Strings", "Choirs", "Organs", "Bells")
+    sleepy(r)
+    r.set("scale", r.pick(SCALE["JI Major"], SCALE["JI Pentatonic"], SCALE["Otonality"]))
+    r.set("purity", 1)
+    r.set("motion", MOTION["Breathe"])
+    r.set("motion_depth", f(r.u(0.3, 0.6), 2))
+    sleep_rows(r, ["breath", "kura", "night"], 4)
+
+
+def s_breath(r):
+    based(r, "Sleep Concert", "Choirs", "Strings", "Air & Noise", "Organs")
+    sleepy(r)
+    rate = r.u(0.08, 0.12)   # one breath, five to seven a minute: the room, the harmonics' pulse and LFO 4 share it
+    r.p.setdefault("_sleep", set()).add("breath")
+    r.set("lfo4_shape", LFO["Sine"])
+    r.set("lfo4_rate", f(rate, 4))
+    r.set("breath", f(r.u(0.3, 0.6), 2))
+    r.set("breath_rate", f(rate, 4))
+    set_sync(r, (0.3, 0.5), (0.7, 1.0), (rate, rate), (0.05, 0.15))
+    r.row("lfo4", "brightness", round(r.u(0.04, 0.08), 3))
+    r.row("lfo4", "cloud_width", round(r.u(0.05, 0.12), 3))
+    sleep_rows(r, ["night", "calm"], 2)
+
+
+def s_deep(r):
+    based(r, "Dark Drones", "Deep Space", "Sleep Concert")
+    sleepy(r, attack=(12, 30), release=(25, 60))
+    r.set("filter_model", FILTER["LP 24"])
+    r.set("cutoff", f(r.lg(150, 500), 0))
+    r.set("tilt", f(r.u(2.0, 2.6), 2))
+    r.set("brightness", f(r.u(0.2, 0.4), 2))
+    r.set("auto_rate", f(r.lg(180, 420), 1))
+    r.set("brain_density", r.rng.randint(2, 4))
+    r.set("brain_high", r.rng.randint(55, 64))
+    sleep_rows(r, ["tide", "night", "chaos"], 4)
+
+
+def s_dream(r):
+    based(r, *CALM)
+    sleepy(r)
+    if r.rng.random() < 0.5:
+        r.set("field_mode", 2)   # Swarm, wandering slowly
+        r.set("field_strength", f(r.u(0.3, 0.6), 2))
+        r.set("field_radius", f(r.u(100, 300), 0))
+        r.set("field_spring", f(r.u(0.2, 0.5), 2))
+        r.set("field_rate", f(r.lg(0.005, 0.02), 3))
+    if r.rng.random() < 0.4:
+        set_melt(r, (0.15, 0.35), (10, 30), (0.2, 0.6))
+    sleep_rows(r, ["chaos"], 3)
+    sleep_rows(r, ["wander"], 1)
+
+
+def s_moon(r):
+    based(r, "Shimmer", "Glass", "Choirs", "Sleep Concert")
+    sleepy(r)
+    r.set("shimmer", f(r.u(0.3, 0.5), 2))
+    r.set("shimmer_rate", f(r.lg(0.03, 0.12), 3))
+    if r.rng.random() < 0.5:
+        set_sync(r, (0.15, 0.3), (0.5, 0.8), (0.05, 0.2), (0.2, 0.5))
+    sleep_rows(r, ["kura", "breath"], 4)
+
+
+def s_rain(r):
+    based(r, "Air & Noise", "Sleep Concert", "Choirs")
+    sleepy(r)
+    r.set("air", f(r.u(0.5, 0.9), 2))
+    r.set("air_jitter", f(r.lg(6, 20), 2))
+    r.set("air_center", f(r.u(2, 5), 2))
+    r.set("air_width", f(r.u(1200, 2400), 0))
+    if r.rng.random() < 0.5:
+        set_life(r, 2, (0.3, 0.5), (0.1, 0.3), (0.0, 1.0), (0.4, 1.0))
+    if r.rng.random() < 0.5:
+        set_melt(r, (0.2, 0.4), (8, 25), (0.6, 1.4))
+    sleep_rows(r, ["lenia", "wander", "night"], 4)
+
+
+def s_ocean(r):
+    based(r, "Waves", "Shepard & Tides", "Sleep Concert")
+    sleepy(r)
+    r.set("motion", MOTION["Wave"])
+    r.set("motion_rate", f(r.lg(0.1, 0.3), 3))
+    r.set("motion_depth", f(r.u(0.4, 0.8), 2))
+    r.set("tide", f(r.u(5, 15), 1))
+    r.set("tide_period", f(r.u(2, 8), 1))
+    if r.rng.random() < 0.5:
+        set_ripple(r, (0.2, 0.4), (0.1, 0.3), (15, 30))
+    sleep_rows(r, ["breath", "tide"], 4)
+
+
+def s_cradle(r):
+    based(r, "Pendulums", "Sleep Concert", "Strings")
+    sleepy(r)
+    r.set("motion", MOTION["Pendulum"])
+    r.set("motion_rate", f(r.lg(0.1, 0.25), 3))
+    r.set("motion_depth", f(r.u(0.4, 0.7), 2))
+    set_sync(r, (0.2, 0.4), (0.6, 0.9), (0.1, 0.2), (0.1, 0.3))
+    sleep_rows(r, ["kura", "breath", "night"], 4)
+
+
+def s_star(r):
+    based(r, "Deep Space", "Glass", "Bells", "Sleep Concert")
+    sleepy(r)
+    r.set("brain_density", r.rng.randint(2, 3))
+    set_melt(r, (0.35, 0.7), (20, 60), (0.2, 0.8))
+    sleep_rows(r, ["chaos", "tide", "night"], 4)
+
+
+def s_hypna(r):
+    based(r, *CALM)
+    sleepy(r)
+    if r.rng.random() < 0.6:
+        set_life(r, 1, (0.3, 0.6), (0.05, 0.2), (0.1, 0.5), (0.5, 1.0))
+    if r.rng.random() < 0.5:
+        set_melt(r, (0.2, 0.4), (10, 30), (0.3, 0.9))
+    sleep_rows(r, ["reservoir"], 3, via_p=0.4)
+    sleep_rows(r, ["lenia"], 1)
+    if not any(row.startswith("reservoir") for row in r.rows):
+        setup(r, "reservoir")
+        r.row("reservoir1", "brightness", round(r.u(0.05, 0.12), 3))
+
+
+def s_choirs(r):
+    based(r, "Choirs")
+    sleepy(r)
+    r.set("lfo2_rate", f(r.lg(0.004, 0.02), 4))   # the vowel turns slowly
+    if r.rng.random() < 0.5:
+        r.set("memory_level", f(r.u(0.3, 0.55), 2))
+        r.set("memory_time", f(r.lg(90, 240), 0))
+    sleep_rows(r, ["kura", "breath", "night"], 3)
+
+
+def s_warm(r):
+    based(r, "Organs", "Strings", "Dark Drones", "Sleep Concert")
+    sleepy(r)
+    r.set("brain_density", r.rng.randint(2, 3))
+    r.set("brain2_on", 1)
+    r.set("brain2_interval", -12)
+    r.set("brain2_depth", f(r.u(0.6, 0.9), 2))
+    set_sync(r, (0.2, 0.4), (0.6, 1.0), (0.05, 0.15), (0.1, 0.3))
+    sleep_rows(r, ["calm", "tide"], 4)
+
+
+def s_snow(r):
+    based(r, "Glass", "Bells", "Shimmer")
+    sleepy(r, attack=(2, 8))
+    set_melt(r, (0.3, 0.6), (10, 30), (0.3, 1.0))
+    if r.rng.random() < 0.5:
+        set_ripple(r, (0.15, 0.3), (0.1, 0.3), (10, 25))
+    sleep_rows(r, ["lenia", "kura", "calm"], 4)
+
+
+def s_forest(r):
+    based(r, "Air & Noise", "Choirs", "Strings", "Sleep Concert")
+    sleepy(r)
+    set_life(r, r.pick(1, 2), (0.4, 0.7), (0.05, 0.3), (0.1, 0.8), (0.4, 1.0))
+    r.set("air", f(r.u(0.2, 0.5), 2))
+    sleep_rows(r, ["lenia", "wander", "chaos"], 4)
+
+
+def s_tides(r):
+    based(r, "Shepard & Tides", "Waves", "Glissandi")
+    sleepy(r)
+    r.set("motion", MOTION["Aurora"])
+    r.set("landscape", LAND["Tides"])
+    r.set("motion_rate", f(r.lg(0.1, 0.4), 3))
+    r.set("tide", f(r.u(8, 20), 1))
+    r.set("tide_period", f(r.u(3, 12), 1))
+    sleep_rows(r, ["tide", "night"], 4)
+
+
+def s_afterglow(r):
+    based(r, "Sleep Concert", "Strings", "Choirs", "Keys", "Organs")
+    sleepy(r)
+    r.set("memory_level", f(r.u(0.4, 0.7), 2))
+    r.set("memory_time", f(r.lg(120, 300), 0))
+    r.set("memory_bloom", f(r.lg(5, 15), 1))
+    r.set("memory_blur", f(r.u(0.5, 1.0), 2))
+    r.set("memory_sink", f(r.u(0.5, 0.9), 2))
+    if r.rng.random() < 0.5:
+        set_melt(r, (0.2, 0.4), (15, 40), (0.2, 0.6))
+    sleep_rows(r, ["night", "calm", "kura"], 4)
+
+
+RECIPES = RECIPES + [s_lullaby, s_breath, s_deep, s_dream, s_moon, s_rain, s_ocean, s_cradle,
+                     s_star, s_hypna, s_choirs, s_warm, s_snow, s_forest, s_tides, s_afterglow]
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -931,6 +1275,7 @@ def build():
                 motion_effects(r, group)
                 p9_effects(r, group)
                 p10_effects(r, group)
+            r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
@@ -944,7 +1289,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 32 groups of 64 (Presets.h).",
+             "/// The factory presets: 48 groups of 64 (Presets.h).",
              "const Preset kPresets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

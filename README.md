@@ -72,10 +72,11 @@ offline renderer and the manual, and a portable zip.
   curve; Noctuary's Lenia, Lorenz, Roessler and Kuramoto; the Beat, the conductor's Cascade, Root Age; what the
   instrument hears (loudness, brightness, change, roughness); a reservoir of 2048 neurons on the GPU -- through a
   matrix of sixteen rows, each with a via source, and every source drawn live.
-- **2048 presets** in 32 groups (sixteen of sounds, sixteen of living systems), levelled by their loudest second.
+- **3072 presets** in 48 groups (sixteen of sounds, sixteen of living systems, sixteen of sleep concerts with slow
+  modulations made for the night), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, the filter
   fades from one into the other; a morph knob between two slots; and journeys, presets in a row glided into each
-  other for a whole night (68 come with it, sleep concerts among them).
+  other for a whole night (102 come with it, six of them whole nights).
 
 ## Build
 

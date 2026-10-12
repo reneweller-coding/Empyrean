@@ -490,6 +490,22 @@ größter Pegelschritt zwischen Zehntelsekunden 3,2 dB gleitend gegen 0,8 vorher
 am Ende exakt das Ziel. A/B bei 0,25: Tilt und Filteranteil exakt. Journeys: 68 lesbar, 864 Schritte, alle Presets
 bekannt, gleich geseedete Player gleich.
 
+## Phase 12: Schlafkonzerte (gebaut, 12.10.2026)
+
+Der Nutzer: "noch 1024 Presets ... mit vielfältigen Modulationen, die sich besonders für Schlafkonzerte eignen".
+Sechzehn Gruppen (Lullabies, Slow Breath, Deep Sleep, Dream Drift, Moonlight, Night Rain, Ocean Sleep, Cradle,
+Starfield, Hypnagogia, Twilight Choirs, Warm Drones, Snowfall, Forest Night, Slow Tides, Afterglow), je vom Klang
+einer der ersten sechzehn aus. `sleepy()`: Attack ≥ 6 s, Release ≥ 15 s, Brightness ≤ 0,6, Tilt ≥ 1,4, Shimmer ≤ 0,5,
+Presence ≤ 2 dB, Motion Rate ≤ 0,6; Dirigent an, Chords, alle 90–300 s, 3–5 Stimmen, Lage 31–74; Echo-Feedback ≤ 0,5,
+Echo ≤ 0,15, spektrales Echo ≤ 0,2, Ripple ≤ 0,4 und langsam, Sync ≤ 1 Hz. Schlafmodulationen nach Art (`SLEEP_POOLS`,
+je Art ihre Quelle einmal eingestellt): Atem (LFO 4 Sinus 0,08–0,12 Hz), Gezeiten (LFO 3 Sinus/Dreieck 0,002–0,008 Hz),
+Wanderung (LFO 2 Random 0,01–0,04 Hz), Chaos (Periode 10–30 min), Kuramoto (Kohärenz 0,5–0,9), Lenia (0,5–2 Hz),
+Nacht (Root Age → dunkler, ferner, mehr Gedächtnis und Melt), Beruhigen (Loudness → dunkler, Change → weniger
+Shimmer, Roughness → Self-Tune), Reservoir (Gedächtnis 10–30 s); Via aus Root Age, Lenia 2, Kura 3. Slow Breath teilt
+eine Atemrate zwischen Raumatem, Partial-Sync und LFO 4. 1024 Presets mit 11–15 Zeilen (Mittel 13,8), 878 Zeilen mit
+Via; die alten 2048 unverändert. Zwei neue Whole Nights (Lullabies, Deep Sleep): 102 Journeys. Gemessen wurden nur
+die neuen (`additiv_presets --from 2048 --to 3071`, führt in levels.json zusammen).
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut

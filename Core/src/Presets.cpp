@@ -16,6 +16,8 @@ const char* const kPresetGroupNames[kNumPresetGroups] = {
     "Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Ripples", "Melting Spectra", "Spectral Cascades", "Resonant Halls",
     "Ghosts & Memory", "Strange Attractors", "Reservoir Minds", "Self-Listening", "Gravity Wells", "Smear & Dispersion",
     "Lattices & Beats", "Night Gardens",
+    "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain", "Ocean Sleep", "Cradle", "Starfield",
+    "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow",
 };
 
 namespace {
