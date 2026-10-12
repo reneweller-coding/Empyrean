@@ -265,6 +265,113 @@ Landscape landscapeAurora(float loopSeconds, float rangeDb, int columns, int row
     return l;
 }
 
+const char* const kLandscapeNames[kNumFactoryLandscapes] = { "Aurora", "Shepard", "Tides", "Rain", "Choir" };
+
+namespace {
+
+/**
+ * @brief A generated landscape from a brightness function of loop time and log frequency.
+ * @param loopSeconds  its length
+ * @param rangeDb      the decibel range of the brightness
+ * @param bright       b(t, y): t 0 .. 1 through the loop, y 0 .. 1 from 20 Hz to 20 kHz; 0 .. 1
+ * @return             the landscape, 256 columns and 1024 rows
+ */
+template <class Bright>
+Landscape generate(float loopSeconds, float rangeDb, Bright&& bright)
+{
+    Landscape l;
+    l.columns = 256;
+    l.rows = 1024;
+    l.rowSeconds = loopSeconds / static_cast<float>(l.rows);
+    l.amps.resize(static_cast<size_t>(l.columns) * l.rows);
+    for (int r = 0; r < l.rows; ++r) {
+        const float t = static_cast<float>(r) / static_cast<float>(l.rows);
+        for (int c = 0; c < l.columns; ++c) {
+            const float y = static_cast<float>(c) / static_cast<float>(l.columns - 1);
+            l.amps[static_cast<size_t>(r) * l.columns + c] = brightnessToAmp(std::clamp(bright(t, y), 0.0f, 1.0f), rangeDb);
+        }
+    }
+    return l;
+}
+
+/** @brief A Gaussian bump. @param x where @param centre its centre @param width its standard deviation @return 0 .. 1 */
+float bump(float x, float centre, float width)
+{
+    const float d = (x - centre) / width;
+    return std::exp(-0.5f * d * d);
+}
+
+/** @brief Log frequency as a landscape's y. @param hz the frequency @return 0 at 20 Hz .. 1 at 20 kHz */
+float yOf(float hz) { return std::log2(hz / kLandLowHz) / std::log2(kLandHighHz / kLandLowHz); }
+
+/** @brief A deterministic number in [0, 1) for the k-th draw of a generated landscape. @param k the draw @return 0 .. 1 */
+float dice(std::uint32_t k)
+{
+    k ^= k >> 16; k *= 0x7feb352dU; k ^= k >> 15; k *= 0x846ca68bU; k ^= k >> 16;
+    return static_cast<float>(k >> 8) * (1.0f / 16777216.0f);
+}
+
+} // namespace
+
+Landscape factoryLandscape(int index, float rangeDb)
+{
+    const float tau = 2.0f * static_cast<float>(kPi);
+    switch (index) {
+    case 1:   // Shepard: four bands climbing for ever
+        return generate(40.0f, rangeDb, [&](float t, float y) {
+            float b = 0.3f;
+            for (int k = 0; k < 4; ++k) {
+                float u = t + 0.25f * static_cast<float>(k);
+                u -= std::floor(u);
+                b = std::max(b, std::sin(static_cast<float>(kPi) * u) * bump(y, 0.15f + 0.75f * u, 0.03f));
+            }
+            return b;
+        });
+    case 2:   // Tides: broad swells rolling upwards
+        return generate(60.0f, rangeDb, [&](float t, float y) {
+            const float swell = 0.5f + 0.5f * std::sin(tau * (2.0f * t - 1.5f * y));
+            return 0.35f + 0.6f * swell * bump(y, 0.5f, 0.3f);
+        });
+    case 3:   // Rain: sixty short glints at chance places
+        return generate(30.0f, rangeDb, [&](float t, float y) {
+            float b = 0.35f;
+            for (std::uint32_t k = 0; k < 60; ++k) {
+                float dt = t - dice(2 * k);
+                dt -= std::floor(dt);                     // time since the glint, around the loop
+                const float decay = std::exp(-dt * 30.0f);   // about a second
+                if (decay > 0.01f) b = std::max(b, 0.9f * decay * bump(y, 0.25f + 0.6f * dice(2 * k + 1), 0.015f));
+            }
+            return b;
+        });
+    case 4: {   // Choir: the formants of u-o-a-e-i, the vowel turning slowly
+        static const float kF[5][3] = { { 350, 600, 2400 }, { 450, 800, 2830 }, { 800, 1150, 2900 }, { 400, 2000, 2550 }, { 270, 2140, 2950 } };
+        return generate(48.0f, rangeDb, [&](float t, float y) {
+            // Through u o a e i and back: 0 .. 4 .. 0 over the loop.
+            const float v = 4.0f * (1.0f - std::fabs(2.0f * t - 1.0f));
+            const int i0 = std::min(static_cast<int>(v), 3);
+            const float fr = v - static_cast<float>(i0);
+            float b = 0.3f;
+            const float w[3] = { 0.95f, 0.8f, 0.6f };
+            for (int k = 0; k < 3; ++k) {
+                const float fk = kF[i0][k] * std::pow(kF[i0 + 1][k] / kF[i0][k], fr);
+                b = std::max(b, w[k] * bump(y, yOf(fk), 0.02f));
+            }
+            return b;
+        });
+    }
+    default:
+        return landscapeAurora(30.0f, rangeDb);
+    }
+}
+
+float landscapeRms(const Landscape& l)
+{
+    if (l.amps.empty()) return 1.0f;
+    double sq = 0.0;
+    for (float a : l.amps) sq += static_cast<double>(a) * a;
+    return static_cast<float>(std::sqrt(sq / static_cast<double>(l.amps.size())));
+}
+
 bool landscapeFromImage(const std::filesystem::path& path, float loopSeconds, float rangeDb, Landscape& out, std::string* error)
 {
     const HRESULT init = CoInitializeEx(nullptr, COINIT_MULTITHREADED);

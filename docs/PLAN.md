@@ -189,6 +189,33 @@ ein Fünftel der Tiefe, und die Pendelwelle verschwand fast.
 Clock-Sync für den Autoplay, MPE und Controller, Pegelausgleich der Landschaft (Aurora), die Frage der GPU-Klasse im
 Plugin, der Name.
 
+## Phase 2: das Klangmodell (gebaut, 12.10.2026)
+
+Nach der Regel "pro Partial im Spektrum auf die GPU, rekursiv auf der Summe auf die CPU":
+- **Noctuarys Spektralformel pro Partial** (`Spectrum.h`, für GPU und Host dieselben Funktionen): Tilt, Odd/Even,
+  Brightness als Fenster über bis zu 200 Harmonische, Inharmonic als steife Saite (die Zahl der Harmonischen unter der
+  Grenze mit Streckung gerechnet), Presence (Glocke 1,8 bis 5,6 kHz, nur nah), Pad Low Cut (12 dB/Okt). Die Stimme
+  wird wie in Noctuary **nach** der ganzen Form normiert: Farbe ändert den Klang, nicht den Pegel.
+- **Das Stimmfilter als exakter Frequenzgang am Partial:** LP 6/12/24, HP 12, BP 12, Notch, Peak, Formant (u-o-a-e-i,
+  die Ecke wählt den Vokal); Ecke mit Key Track, Hüllkurve (Oktaven) und eigener Drift.
+- **Air:** 20 % der Partials als Rauschband um ein Vielfaches des Grundtons, mit 40-Cent-Flackern in Tonhöhe und Pegel.
+- **Raum auf der CPU pro Stimme:** Breath (die Ebene wandert), Doppler (näher = höher), Tide (das ganze Instrument
+  neigt sich im Minutentakt); Seitenstrom für alle Drifter, damit sie die Würfel der Noten nie verschieben.
+- **Brain 2** (Noctuarys zweiter Dirigent, Free, eigener Strom, Grundton = erster + Intervall, tief im Raum), **Step**
+  als Schalter für den Autoplay, **Timbre-Skala** (Sethares) aus dem Spektrum der Wolke.
+- **Landschaftsbibliothek** (fünf erzeugte, beim Start gebaut): Aurora, Shepard, Tides, Rain, Choir; **Pegelausgleich**
+  nach ihrem RMS (bis 18 dB). Wave hat einen Boden (80 % Tiefe).
+
+**Gemessen [M]:** Probe-Selbsttest 18/18 (u. a. LP12 eine Oktave über der Ecke 0,02425 = Soll, Spitze bei Q 4
+genau 0,4; Presence und Low Cut auf vier Stellen; Brightness und Odd/Even unter 1e-6; Streckung exakt; Air +3,2 dB
+statt +3,0; Ferne exakt); Engine-Selbsttest 14/14 (Brain 2 spielt, Timbre-Skala mit 9 Stufen, Aurora 2,1 dB neben
+der nackten Wolke, alles gleichzeitig endlich und vernünftig). Volle Last (16 Stimmen, Air, Formant, Brain 2,
+Breathe): 0,077 ms GPU pro Block, 3 % des Budgets. Hörbeispiele: `work/renders/phase2/` (choir, shepard, rain,
+air-formant-brain2).
+
+**Offen:** binaural pro Partial (Brown/Duda) mit der Quest; eigene Bilder und Aufnahmen als Landschaft brauchen den
+Dateidialog der GUI (Phase 3); Z-Plane und Strike als Modalsynthese.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut
@@ -199,7 +226,7 @@ Plugin, der Name.
    **nah und fern** (4 Kanäle), die Entfernung ist eine Eigenschaft des Partials; Far-Reverb, Mid/Side und Soft Clip aus
    Noctuary; Parametertabelle; ein schlichter Standalone und VST3 (JUCE, generische Oberfläche); ein Renderer für die
    Nacht ohne Oberfläche; Selbsttests.
-2. Klangmodell: Noctuarys Spektralformel (Tilt, Brightness, Odd/Even, Inharmonic, Match auf die Skala) mal Wolke
+2. **Gebaut (siehe oben).** Klangmodell: Noctuarys Spektralformel (Tilt, Brightness, Odd/Even, Inharmonic, Match auf die Skala) mal Wolke
    (Breite, Steigung, Dichte), Drift, Shimmer; Raummodell und Filter pro Partial auf der GPU; Landschaften als
    Kernstück (Bibliothek, Pegelausgleich); Werksformen nach "Bewegung auf tragendem Klang"; Rauschanteile.
 3. Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.

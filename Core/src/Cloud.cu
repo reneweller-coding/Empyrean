@@ -17,6 +17,7 @@
  * drift a float phase would gather.
  */
 #include "additiv/Cloud.h"
+#include "additiv/Spectrum.h"
 
 #include <cuda_runtime.h>
 
@@ -33,6 +34,7 @@ constexpr int kChunk = 512;     ///< partials per CUDA block of the render kerne
 constexpr int kThreads = 256;   ///< threads per CUDA block of the update and render kernels
 constexpr int kReduceLanes = 32;    ///< samples per CUDA block of the reduce kernel
 constexpr int kReduceGroups = 16;   ///< threads per sample in the reduce kernel, each summing every 16th chunk
+constexpr float kAirShare = 0.2f;    ///< the share of a voice's partials that become its air band when Air is up
 
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
 struct BlockHeader {
@@ -242,6 +244,66 @@ __device__ float laneValue(const EnvLane& L, const LaneContext& c, std::uint32_t
     return shapeValue(c.shapes[idx], tau, tauOff, phase);
 }
 
+/** @brief The formants of u, o, a, e, i (Hz), three each. */
+__constant__ float kFormants[5][3] = {
+    { 350.0f, 600.0f, 2400.0f },
+    { 450.0f, 800.0f, 2830.0f },
+    { 800.0f, 1150.0f, 2900.0f },
+    { 400.0f, 2000.0f, 2550.0f },
+    { 270.0f, 2140.0f, 2950.0f },
+};
+
+/**
+ * @brief A two-pole band pass's magnitude, unity at its centre.
+ * @param r  frequency over centre
+ * @param q  Q
+ * @return   the gain
+ */
+__device__ inline float bandPass(float r, float q)
+{
+    const float a = 1.0f - r * r, b = r / q;
+    return b * rsqrtf(a * a + b * b + 1.0e-12f);
+}
+
+/**
+ * @brief The voice filter's response at one partial: the analogue prototype's magnitude.
+ * @param model   FilterModel
+ * @param f       the partial, Hz
+ * @param cutoff  Hz
+ * @param q       resonance as a Q (Peak: the bell's gain; Formant: the formants' Q)
+ * @param vowel   Formant: 0 .. 4, u o a e i
+ * @return        the gain
+ */
+__device__ float filterGain(int model, float f, float cutoff, float q, float vowel)
+{
+    if (model <= 0) return 1.0f;
+    const float r = f / fmaxf(cutoff, 1.0f);
+    const float a = 1.0f - r * r, b = r / fmaxf(q, 0.1f);
+    const float den2 = a * a + b * b + 1.0e-12f;
+    switch (static_cast<FilterModel>(model)) {
+    case FilterModel::LP6:   return rsqrtf(1.0f + r * r);
+    case FilterModel::LP12:  return rsqrtf(den2);
+    case FilterModel::LP24:  return 1.0f / den2;
+    case FilterModel::HP12:  return r * r * rsqrtf(den2);
+    case FilterModel::BP12:  return b * rsqrtf(den2);
+    case FilterModel::Notch: return fabsf(a) * rsqrtf(den2);
+    case FilterModel::Peak:  return 1.0f + (fmaxf(q, 1.0f) - 1.0f) * bandPass(r, 2.0f);
+    case FilterModel::Formant: {
+        const float v = fminf(fmaxf(vowel, 0.0f), 4.0f);
+        const int i0 = min(static_cast<int>(v), 3);
+        const float fr = v - static_cast<float>(i0);
+        float g = 0.02f;
+        const float w[3] = { 1.0f, 0.5f, 0.25f };
+        for (int k = 0; k < 3; ++k) {
+            const float fk = kFormants[i0][k] * exp2f(fr * log2f(kFormants[i0 + 1][k] / kFormants[i0][k]));
+            g += w[k] * bandPass(f / fk, q);
+        }
+        return g;
+    }
+    default: return 1.0f;
+    }
+}
+
 /**
  * @brief The update kernel: every partial's frequency glide, amplitude ramps and start phase for this block.
  * @param hdr     the block header (device copy)
@@ -281,29 +343,51 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     float f = 0.0f;
     float place = cv.stereo * (2.0f * hash01(seed, up, 10) - 1.0f);   // -1 .. 1 across the field
     const int H = cv.harmonics, K = cv.members;
-    if (p < H * K) {
-        const int h = p / K + 1;
-        const int k = p - (h - 1) * K;
-        // The member's place in its harmonic's cloud: stratified over the bell curve, so K members
-        // always cover it evenly and only jitter within their own slice.
-        float z = 0.0f;
-        if (K > 1) z = normcdfinvf((static_cast<float>(k) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(K));
-        const float sigma = 0.5f * cv.width * __powf(static_cast<float>(h), cv.widthSlope);
-        const float centre = cv.hz * static_cast<float>(h) * exp2f(z * sigma * (1.0f / 1200.0f));
-        const float d = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
-                                  + 0.35f * slowSine(cv.driftRate * (1.2f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
-        const float sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
-                                                         + 0.3f * slowSine(cv.shimmerRate * (1.3f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
+    const int HP = cv.harmonicPartials;
+    const bool isAir = p >= HP;
+    if (isAir || p < H * K) {
+        // Who the partial is: a member of harmonic h's cloud, or one of the air band's partials.
+        int h = 1;
+        float z = 0.0f, centre, amp0, sh, drift;
+        if (!isAir) {
+            h = p / K + 1;
+            const int k = p - (h - 1) * K;
+            // The member's place in its harmonic's cloud: stratified over the bell curve, so K members
+            // always cover it evenly and only jitter within their own slice.
+            if (K > 1) z = normcdfinvf((static_cast<float>(k) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(K));
+            const float sigma = 0.5f * cv.width * __powf(static_cast<float>(h), cv.widthSlope);
+            const float stretch = stretchOf(h, cv.inharmonic);
+            centre = cv.hz * static_cast<float>(h) * stretch * exp2f(z * sigma * (1.0f / 1200.0f));
+            drift = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
+                              + 0.35f * slowSine(cv.driftRate * (1.2f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
+            sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
+                                                 + 0.3f * slowSine(cv.shimmerRate * (1.3f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
+            amp0 = cv.scale * harmonicShape(h, cv.tilt, cv.oddEven, cv.brightness);
+        } else {
+            // Air (Noctuary's band-passed noise around a multiple of the fundamental): a wide cloud
+            // whose partials flicker in pitch and level at audio-near rates -- dense random sines in
+            // a band are heard as its noise.
+            const int A = cv.partials - HP;
+            const int a = p - HP;
+            if (A > 1) z = normcdfinvf((static_cast<float>(a) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(A));
+            centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f));
+            const float j = cv.airJitter;
+            drift = 40.0f * (0.6f * slowSine(j * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
+                           + 0.4f * slowSine(j * (1.3f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
+            sh = fmaxf(0.0f, 1.0f + 0.8f * (0.7f * slowSine(j * (0.7f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
+                                          + 0.3f * slowSine(j * (1.6f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
+            amp0 = cv.airScale;
+        }
 
         // The envelope lanes, read against this partial's sources.
         LaneContext c;
         const float pitchPos = log2f(fmaxf(centre, kLandLowHz) * (1.0f / kLandLowHz)) * (1.0f / 9.96578428f);   // log2(1000)
         c.src[0] = 0.0f;
         c.src[1] = fminf(fmaxf(pitchPos, 0.0f), 1.0f);
-        c.src[2] = H > 1 ? static_cast<float>(h - 1) / static_cast<float>(H - 1) : 0.0f;
+        c.src[2] = isAir ? 0.5f : (H > 1 ? static_cast<float>(h - 1) / static_cast<float>(H - 1) : 0.0f);
         c.src[3] = fminf(fmaxf((z + 3.0f) * (1.0f / 6.0f), 0.0f), 1.0f);
         c.src[4] = 0.0f;   // Random: laneValue throws its own die per parameter
-        c.src[5] = (h & 1) ? 0.0f : 1.0f;
+        c.src[5] = (isAir || (h & 1)) ? 0.0f : 1.0f;
         c.seed = seed;
         c.p = up;
         c.t = t;
@@ -322,11 +406,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             depth = fminf(fmaxf(depth, 0.0f), 1.0f);
             env = 1.0f - depth + depth * e;
         }
-        float cents = z * sigma + d;
+        float cents = drift;
         if (cv.pitch.amount != 0.0f) cents += laneValue(cv.pitch, c, 40, true, depth) * depth;
         if (cv.pan.amount != 0.0f) place = fminf(fmaxf(place + laneValue(cv.pan, c, 50, true, depth) * depth, -1.0f), 1.0f);
 
-        f = cv.hz * static_cast<float>(h) * exp2f(cents * (1.0f / 1200.0f));
+        f = centre * exp2f(cents * (1.0f / 1200.0f));
         // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist.
         const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f);
         // Distance (Noctuary's planes): 6 dB per unit, and the air's low pass -- a first-order
@@ -336,8 +420,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         const float dist = fminf(fmaxf(cv.distance, 0.0f), 1.0f);
         const float x0 = f * (1.0f / 16000.0f);
         const float x = x0 / exp2f(-5.0f * dist * cv.airAbsorb);
-        const float air = sqrtf((1.0f + x0 * x0) / (1.0f + x * x));
-        target = cv.scale * __powf(static_cast<float>(h), -cv.tilt) * sh * fade * env * cv.gain * exp2f(-dist) * air;
+        const float absorb = sqrtf((1.0f + x0 * x0) / (1.0f + x * x));
+        // The voice's colour and filter, each read at this partial's frequency.
+        float colour = filterGain(cv.filterModel, f, cv.cutoff, cv.filterQ, cv.vowel);
+        if (!isAir) colour *= presenceGain(f, cv.presenceDb, dist) * lowCutGain(f, cv.lowCut);
+        target = amp0 * sh * fade * env * cv.gain * exp2f(-dist) * absorb * colour;
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>(fminf(f / fs, 0.49f) * 4294967296.0f);
 
@@ -509,9 +596,26 @@ struct CloudEngine::Impl {
     int pcap = 0;                     ///< partials per voice in the tables, a multiple of kChunk
     int chunks = 0;                   ///< render CUDA blocks: voices * pcap / kChunk
     std::vector<CloudVoice> voices;   ///< the host's voices, edited by the caller
-    std::vector<float> powerSum;      ///< per voice: sum of h^-2tilt over its harmonics, cached
-    std::vector<int>   powerH;        ///< the harmonic count that sum was made for
-    std::vector<float> powerTilt;     ///< and the tilt
+    /** @brief What a voice's power sum was computed for: when none of it changed, the sum is reused. */
+    struct ShapeKey {
+        float hz = -1.0f;          ///< fundamental
+        int   harmonics = 0;       ///< harmonics summed
+        float tilt = 0.0f;         ///< spectral tilt
+        float oddEven = 0.0f;      ///< odd/even weight
+        float brightness = 0.0f;   ///< brightness window
+        float inharmonic = 0.0f;   ///< stretch
+        float presenceDb = 0.0f;   ///< presence bell
+        float distance = 0.0f;     ///< the presence's distance
+        float lowCut = 0.0f;       ///< pad low cut
+        /** @brief Equal in every field. @param o the other key @return true when the sum can be reused */
+        bool operator==(const ShapeKey& o) const
+        {
+            return hz == o.hz && harmonics == o.harmonics && tilt == o.tilt && oddEven == o.oddEven && brightness == o.brightness
+                && inharmonic == o.inharmonic && presenceDb == o.presenceDb && distance == o.distance && lowCut == o.lowCut;
+        }
+    };
+    std::vector<ShapeKey> shapeKey;   ///< per voice: what powerSum was made for
+    std::vector<double> powerSum;     ///< per voice: the sum over its harmonics of the squared shape (tilt, odd/even, brightness, presence, low cut)
     int nPrev = 0;                    ///< the previous block's length, sent with the next
     int shapeCount = 0;               ///< shapes in the bank on the GPU
     int landColumns = 0;              ///< the landscape on the GPU: columns (0 = none)
@@ -567,8 +671,11 @@ struct CloudEngine::Impl {
     }
 
     /**
-     * @brief Fills a voice's derived fields: harmonics below the cutoff, members per harmonic, and
-     *        the scale that makes the voice's RMS its level.
+     * @brief Fills a voice's derived fields: how its partials divide between the harmonic clouds and
+     *        the air band, the harmonics below the cutoff (with the stiff string's stretch), members
+     *        per harmonic, and the scales that make the voice's RMS its level -- normalised after the
+     *        whole spectral shape, as Noctuary does, so brightness, odd/even, presence and the low cut
+     *        colour the voice without changing its level (the filter, the distance and the motions do).
      * @param i  the voice
      * @param v  its upload copy, completed here
      */
@@ -578,22 +685,36 @@ struct CloudEngine::Impl {
         const float cutoff = std::min(20000.0f, 0.43f * fs);
         const int partials = std::clamp(v.partials, 1, cfg.partialsPerVoice);
         v.partials = partials;
+        const int airPartials = (v.air > 0.0f && partials >= 2) ? std::clamp(static_cast<int>(std::lround(partials * kAirShare)), 1, partials - 1) : 0;
+        const int HP = partials - airPartials;
         const float hz = std::max(v.hz, 1.0f);
-        const int H = std::clamp(static_cast<int>(cutoff / hz), 1, partials);
+        // Harmonics below the cutoff: h f0 sqrt(1 + B h^2) < cutoff, solved for h.
+        const double c = cutoff / hz;
+        const double B = std::max(0.0f, v.inharmonic);
+        const double hmax = B > 0.0 ? std::sqrt((-1.0 + std::sqrt(1.0 + 4.0 * B * c * c)) / (2.0 * B)) : c;
+        const int H = std::clamp(static_cast<int>(hmax), 1, HP);
         v.harmonics = H;
-        v.members = partials / H;
-        if (powerH[i] != H || powerTilt[i] != v.tilt) {
+        v.members = HP / H;
+        v.harmonicPartials = HP;
+        const ShapeKey key{ hz, H, v.tilt, v.oddEven, v.brightness, v.inharmonic, v.presenceDb, std::clamp(v.distance, 0.0f, 1.0f), v.lowCut };
+        if (!(shapeKey[i] == key)) {
             double sum = 0.0;
-            for (int h = 1; h <= H; ++h) sum += std::pow(static_cast<double>(h), -2.0 * v.tilt);
-            powerSum[i] = static_cast<float>(sum);
-            powerH[i] = H;
-            powerTilt[i] = v.tilt;
+            for (int h = 1; h <= H; ++h) {
+                const float fh = hz * static_cast<float>(h) * stretchOf(h, v.inharmonic);
+                const double a = static_cast<double>(harmonicShape(h, v.tilt, v.oddEven, v.brightness))
+                               * presenceGain(fh, v.presenceDb, key.distance) * lowCutGain(fh, v.lowCut);
+                sum += a * a;
+            }
+            powerSum[i] = std::max(sum, 1.0e-30);
+            shapeKey[i] = key;
         }
         // Power of the voice: every member a sine (mean square 1/2), the shimmer's two sines add
         // their own mean square (0.7^2 + 0.3^2) / 2 times its depth squared. The envelopes are
         // the sound's own motion and are not compensated.
         const float shimmerMs = 1.0f + 0.29f * v.shimmer * v.shimmer;
-        v.scale = v.level / std::sqrt(0.5f * static_cast<float>(v.members) * powerSum[i] * shimmerMs);
+        v.scale = static_cast<float>(v.level / std::sqrt(0.5 * v.members * powerSum[i] * shimmerMs));
+        // The air band at `air` times the voice's level; its flicker's mean square is 1 + 0.29 * 0.8^2.
+        v.airScale = airPartials > 0 ? static_cast<float>(v.air * v.level / std::sqrt(0.5 * airPartials * (1.0 + 0.29 * 0.64))) : 0.0f;
     }
 };
 
@@ -612,9 +733,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
     im->pcap = (config.partialsPerVoice + kChunk - 1) / kChunk * kChunk;
     im->chunks = config.voices * im->pcap / kChunk;
     im->voices.assign(config.voices, CloudVoice{});
-    im->powerSum.assign(config.voices, 0.0f);
-    im->powerH.assign(config.voices, -1);
-    im->powerTilt.assign(config.voices, 0.0f);
+    im->shapeKey.assign(config.voices, Impl::ShapeKey{});
+    im->powerSum.assign(config.voices, 1.0);
 
     int count = 0;
     if (!ok(cudaGetDeviceCount(&count), "cudaGetDeviceCount", error)) return false;

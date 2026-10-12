@@ -128,12 +128,46 @@ struct CloudVoice {
     float distance = 0.0f;
     float airAbsorb = 1.0f;       ///< 0 .. 1: how far distance darkens -- at 1 a partial's corner falls 5 octaves per unit from 16 kHz
     int   onset = 0;              ///< with restart: samples into the block at which the note begins (sample-accurate starts)
+    // The spectrum (Noctuary's formula; the voice is normalised after it, so these colour, not level).
+    float brightness = 1.0f;      ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (raised cosine); 1 keeps them all
+    float oddEven = 0.0f;         ///< -1 .. 1: positive thins the even harmonics, negative the odd ones above the first
+    float inharmonic = 0.0f;      ///< the stiff string's B: harmonic h at h sqrt(1 + B h^2)
+    float presenceDb = 0.0f;      ///< 0 .. 6 dB: a bell over 1.8 .. 5.6 kHz, only near the listener (times 1 - distance)
+    float lowCut = 0.0f;          ///< Hz: partials below fall 12 dB/oct (0 = off)
+    // The voice filter, read as a frequency response at every partial (FilterModel).
+    int   filterModel = 0;        ///< FilterModel; 0 = off
+    float cutoff = 2500.0f;       ///< Hz, after key tracking, envelope and drift (the engine's)
+    float filterQ = 0.707f;       ///< the resonance as a Q
+    float vowel = 0.0f;           ///< Formant: 0 .. 4, u o a e i
+    // Air: a share of the partials as a band of noise around a multiple of the fundamental.
+    float air = 0.0f;             ///< 0 .. 1: the band's level against the voice's
+    float airCenter = 3.0f;       ///< the band's centre, times the fundamental
+    float airWidth = 600.0f;      ///< its width in cents (two standard deviations)
+    float airJitter = 8.0f;       ///< Hz: how fast its partials flicker in pitch and level -- what makes them noise
     // Filled by the engine at launch(), read by the GPU.
     int   harmonics = 0;          ///< harmonics below the cutoff, at most `partials`
-    int   members = 0;            ///< partials per harmonic: partials / harmonics
+    int   members = 0;            ///< partials per harmonic
+    int   harmonicPartials = 0;   ///< partials of the harmonic clouds; the rest up to `partials` are air
     float scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
-    float pad = 0.0f;             ///< keeps the struct a multiple of 16 bytes
+    float airScale = 0.0f;        ///< amplitude of every air partial
+    float pad0 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float pad1 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
 };
+
+/** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
+enum class FilterModel : int {
+    Off = 0,   ///< no filter
+    LP6,       ///< one-pole low pass
+    LP12,      ///< two-pole low pass with resonance
+    LP24,      ///< two of them in series
+    HP12,      ///< two-pole high pass
+    BP12,      ///< band pass, unity at the cutoff
+    Notch,     ///< band stop
+    Peak,      ///< a resonant bell on a flat line
+    Formant,   ///< three band passes on the formants of u-o-a-e-i; the cutoff picks the vowel
+    Count      ///< number of models
+};
+constexpr int kNumFilterModels = static_cast<int>(FilterModel::Count);   ///< entries of kFilterModelNames
 
 constexpr int kCloudChannels = 4;   ///< the GPU's output per frame: near left, near right, far left, far right
 

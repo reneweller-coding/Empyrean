@@ -1,6 +1,6 @@
 /**
  * @file Engine.cpp
- * @brief The instrument (Engine.h): voices, conductor, tuning, the GPU cloud, far reverb, master,
+ * @brief The instrument (Engine.h): voices, conductors, tuning, the GPU cloud, far reverb, master,
  *        and the worker that renders ahead of the audio callback.
  */
 #include "additiv/Engine.h"
@@ -8,6 +8,7 @@
 #include "additiv/Landscape.h"
 #include "additiv/Motion.h"
 #include "additiv/Shapes.h"
+#include "additiv/Spectrum.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -25,6 +26,8 @@ constexpr std::uint32_t kQueueSize = 4096;   ///< note events in flight from the
 constexpr float kVoiceLevel = 0.1f;          ///< RMS of one voice at full gain, all of its partials together (set so the autoplay sits near -24 dBFS, Noctuary's range)
 constexpr double kGlideSeconds = 0.3;        ///< how fast a sounding voice follows a change of tuning
 constexpr float kPurityNarrowing = 0.6f;     ///< at Purity 1 the clouds are this much narrower, so pure intervals can lock (PLAN.md)
+constexpr float kMetresPerUnit = 20.0f;      ///< one unit of distance, for the doppler (Noctuary: about twenty metres)
+constexpr float kSpeedOfSound = 343.0f;      ///< m/s
 
 /**
  * @brief Raises this process's GPU scheduling class to REALTIME (PLAN.md, Phase 0: the only class
@@ -64,6 +67,27 @@ std::int64_t nextPow2(std::int64_t x)
     return p;
 }
 
+/** @brief The generated landscapes and their RMS, made once (generating one takes up to a tenth of a second). */
+struct FactoryLandscapes {
+    std::vector<Landscape> land;   ///< kNumFactoryLandscapes of them
+    std::vector<float> rms;        ///< and their RMS
+
+    FactoryLandscapes()
+    {
+        for (int i = 0; i < kNumFactoryLandscapes; ++i) {
+            land.push_back(factoryLandscape(i));
+            rms.push_back(landscapeRms(land.back()));
+        }
+    }
+};
+
+/** @brief The one set, built on first use. @return the landscapes */
+const FactoryLandscapes& factoryLandscapes()
+{
+    static const FactoryLandscapes f;
+    return f;
+}
+
 } // namespace
 
 Engine::Engine() { resetParams(); }
@@ -100,16 +124,24 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     if (!cloud_.open(cc, error)) return false;
     const std::vector<EnvShape> bank = factoryShapes();
     cloud_.setShapes(bank.data(), static_cast<int>(bank.size()));
-    const Landscape aurora = landscapeAurora(30.0f);
-    cloud_.setLandscape(aurora.amps.data(), aurora.columns, aurora.rows, aurora.rowSeconds);
+    factoryLandscapes();   // made now, not in the middle of a block
+    landChoice_ = -1;
     if (cfg_.realtimeGpuClass) raiseGpuClass();
 
     voices_.assign(static_cast<size_t>(cfg_.voices), Voice{});
     for (Voice& v : voices_) v.env.setSampleRate(cfg_.sampleRate / G);   // stepped once per GPU block
     rng_.seed(cfg_.seed);
+    side_.seed(cfg_.seed ^ 0xA5A5A5A55A5A5A5Aull);
+    tide_.init(side_);
+    std::fill(std::begin(specKey_), std::end(specKey_), -1.0f);
     scaleChoice_ = -1;
+    readParams();
+    refreshSpectrum();
     refreshScale();
+    refreshLandscape();
     brain_.reset(rng_.fork(), 48 + rootPc_);
+    brain2_.reset(side_.fork(), 36 + rootPc_);   // its own stream: switching it on never moves the first
+    stepWas_ = param(ParamId::AutoStep) >= 0.5f;
     far_.prepare(cfg_.sampleRate);
     midSide_.prepare(cfg_.sampleRate);
     nearL_.assign(static_cast<size_t>(G), 0.0f);
@@ -258,6 +290,9 @@ void Engine::readParams()
     blk_.master = dbToGain(g(ParamId::MasterGain));
     blk_.partials = static_cast<int>(std::lround(g(ParamId::Partials)));
     blk_.tilt = g(ParamId::Tilt);
+    blk_.brightness = g(ParamId::Brightness);
+    blk_.oddEven = g(ParamId::OddEven);
+    blk_.inharmonicB = inharmonicB(g(ParamId::Inharmonic));
     blk_.purity = g(ParamId::Purity);
     blk_.width = g(ParamId::CloudWidth) * (1.0f - kPurityNarrowing * blk_.purity);
     blk_.widthSlope = g(ParamId::WidthSlope);
@@ -266,6 +301,16 @@ void Engine::readParams()
     blk_.shimmer = g(ParamId::Shimmer);
     blk_.shimmerRate = g(ParamId::ShimmerRate);
     blk_.stereo = g(ParamId::Stereo);
+    blk_.air = g(ParamId::Air);
+    blk_.airCenter = g(ParamId::AirCenter);
+    blk_.airWidth = g(ParamId::AirWidth);
+    blk_.airJitter = g(ParamId::AirJitter);
+    blk_.filterModel = static_cast<int>(std::lround(g(ParamId::FilterModel)));
+    blk_.cutoff = g(ParamId::Cutoff);
+    blk_.resonance = g(ParamId::Resonance);
+    blk_.filterEnv = g(ParamId::FilterEnv);
+    blk_.keyTrack = g(ParamId::KeyTrack);
+    blk_.filterDrift = g(ParamId::FilterDrift);
     blk_.motion = static_cast<int>(std::lround(g(ParamId::Motion)));
     blk_.motionRate = g(ParamId::MotionRate);
     blk_.motionDepth = g(ParamId::MotionDepth);
@@ -274,9 +319,19 @@ void Engine::readParams()
     blk_.sustain = g(ParamId::Sustain);
     blk_.release = g(ParamId::Release);
     blk_.refPitch = g(ParamId::RefPitch);
+    blk_.tide = g(ParamId::Tide);
+    blk_.tidePeriod = g(ParamId::TidePeriod);
     blk_.depth = g(ParamId::Depth);
     blk_.keysDepth = g(ParamId::KeysDepth);
     blk_.farLevel = g(ParamId::FarLevel);
+    blk_.presence = g(ParamId::Presence);
+    blk_.padLowCut = g(ParamId::PadLowCut);
+    blk_.breath = g(ParamId::Breath);
+    blk_.breathRate = g(ParamId::BreathRate);
+    blk_.doppler = g(ParamId::Doppler);
+    blk_.brain2 = g(ParamId::Brain2On) >= 0.5f;
+    blk_.brain2Interval = static_cast<int>(std::lround(g(ParamId::Brain2Interval)));
+    blk_.brain2Depth = g(ParamId::Brain2Depth);
 
     bp_.on = g(ParamId::BrainOn) >= 0.5f;
     bp_.mode = static_cast<BrainMode>(std::clamp(static_cast<int>(std::lround(g(ParamId::AutoMode))), 0, kNumBrainModes - 1));
@@ -292,13 +347,33 @@ void Engine::readParams()
     bp_.chordTension = g(ParamId::AutoTension);
     bp_.rootMove = g(ParamId::AutoRootMove);
     bp_.timbre = g(ParamId::BrainTimbre);
-    // The conductor judges timbre against the cloud's own harmonic spectrum.
+    bp_.spectrum = &brainSpec_;
+
+    // The second conductor: the first one's knobs, its own pace, density and register (its root
+    // follows the first one's plus the interval), always in Free -- a slow background.
+    bp2_ = bp_;
+    bp2_.on = blk_.brain2;
+    bp2_.mode = BrainMode::Free;
+    bp2_.density = static_cast<int>(std::lround(g(ParamId::Brain2Density)));
+    bp2_.rateSeconds = g(ParamId::Brain2Rate);
+    bp2_.holdMin = 2.0f * bp_.holdMin;
+    bp2_.holdMax = 2.0f * bp_.holdMax;
+    bp2_.low = std::clamp(bp_.low + blk_.brain2Interval, 12, 115);
+    bp2_.high = std::clamp(bp_.high + blk_.brain2Interval, bp2_.low, 120);
+}
+
+void Engine::refreshSpectrum()
+{
+    const float key[4] = { blk_.tilt, blk_.oddEven, blk_.brightness, blk_.inharmonicB };
+    if (std::equal(std::begin(key), std::end(key), std::begin(specKey_))) return;
+    std::copy(std::begin(key), std::end(key), std::begin(specKey_));
+    // The conductors judge timbre against the voice's own harmonic spectrum, stretch included.
     brainSpec_.count = BrainSpectrum::kMax;
     for (int h = 1; h <= BrainSpectrum::kMax; ++h) {
-        brainSpec_.ratio[h - 1] = h;
-        brainSpec_.amp[h - 1] = std::pow(static_cast<double>(h), -static_cast<double>(blk_.tilt));
+        brainSpec_.ratio[h - 1] = static_cast<double>(h) * stretchOf(h, blk_.inharmonicB);
+        brainSpec_.amp[h - 1] = harmonicShape(h, blk_.tilt, blk_.oddEven, blk_.brightness);
     }
-    bp_.spectrum = &brainSpec_;
+    if (scaleChoice_ == kTimbreScaleIndex) scaleChoice_ = -1;   // the Timbre scale follows the spectrum
 }
 
 void Engine::refreshScale()
@@ -306,12 +381,25 @@ void Engine::refreshScale()
     const int choice = static_cast<int>(std::lround(param(ParamId::Scale)));
     if (choice != scaleChoice_) {
         FixedScale s;
-        if (makeBuiltinScale(choice, s)) scale_ = s;
-        else if (scaleChoice_ < 0) makeBuiltinScale(0, scale_);   // the Scala and timbre slots come later: 12-TET until then
+        // The Timbre scale (Sethares) is the one a timbre asks for: here the cloud's own spectrum.
+        const bool built = choice == kTimbreScaleIndex ? makeTimbreScale(brainSpec_, s) : makeBuiltinScale(choice, s);
+        if (built) scale_ = s;
+        else if (scaleChoice_ < 0) makeBuiltinScale(0, scale_);   // the Scala slot comes with the editor: 12-TET until then
         scaleChoice_ = choice;
     }
     rootPc_ = std::clamp(static_cast<int>(std::lround(param(ParamId::RootNote))), 0, 11);
     snapKeys_ = std::lround(param(ParamId::KeyMap)) == 0;
+}
+
+void Engine::refreshLandscape()
+{
+    const int choice = std::clamp(static_cast<int>(std::lround(param(ParamId::Landscape))), 0, kNumFactoryLandscapes - 1);
+    if (choice == landChoice_) return;
+    const FactoryLandscapes& f = factoryLandscapes();
+    const Landscape& l = f.land[static_cast<size_t>(choice)];
+    cloud_.setLandscape(l.amps.data(), l.columns, l.rows, l.rowSeconds);
+    landRms_ = f.rms[static_cast<size_t>(choice)];
+    landChoice_ = choice;
 }
 
 double Engine::frequencyOf(int note) const
@@ -331,13 +419,17 @@ float Engine::brainDistance()
     return rng_.uniform() < 0.4f ? blk_.depth * 0.15f * u : blk_.depth * (0.55f + 0.45f * u);
 }
 
-void Engine::beginOn(int i, int note, float velocity, float distance, bool fromBrain, int onset)
+void Engine::beginOn(int i, int note, float velocity, float distance, int source, int onset)
 {
     Voice& v = voices_[static_cast<size_t>(i)];
     v.note = note;
-    v.fromBrain = fromBrain;
+    v.source = source;
     v.velocity = velocity;
-    v.distance = std::clamp(distance, 0.0f, 1.0f);
+    v.place = std::clamp(distance, 0.0f, 1.0f);
+    v.distance = v.place;
+    v.prevDistance = v.place;
+    v.breath.init(side_);
+    v.cutoffDrift.init(side_);
     v.env.kill();
     v.env.noteOn();
     v.seed = static_cast<std::uint32_t>(rng_.next()) | 1u;
@@ -351,11 +443,11 @@ void Engine::beginOn(int i, int note, float velocity, float distance, bool fromB
     cloud_.voice(i).releaseAt = -1.0f;
 }
 
-void Engine::startNote(int note, float velocity, float distance, bool fromBrain, int onset)
+void Engine::startNote(int note, float velocity, float distance, int source, int onset)
 {
     const int count = static_cast<int>(voices_.size());
     for (int i = 0; i < count; ++i)
-        if (voices_[static_cast<size_t>(i)].note < 0 && !voices_[static_cast<size_t>(i)].stealing) { beginOn(i, note, velocity, distance, fromBrain, onset); return; }
+        if (voices_[static_cast<size_t>(i)].note < 0 && !voices_[static_cast<size_t>(i)].stealing) { beginOn(i, note, velocity, distance, source, onset); return; }
     // Every voice sounds: take the quietest released one, else the oldest. It fades to silence
     // over one block (a restart from full level would click) and the new note begins after it.
     int best = -1;
@@ -376,16 +468,16 @@ void Engine::startNote(int note, float velocity, float distance, bool fromBrain,
     v.stealing = true;
     v.stealBlocks = 1;
     v.next = { 0, note, velocity, 0 };
-    v.nextFromBrain = fromBrain;
+    v.nextSource = source;
     v.nextDistance = distance;
 }
 
-void Engine::stopNote(int note, bool fromBrain)
+void Engine::stopNote(int note, int source)
 {
     for (size_t i = 0; i < voices_.size(); ++i) {
         Voice& v = voices_[i];
-        if (v.stealing && v.next.type == 0 && v.next.note == note && v.nextFromBrain == fromBrain) { v.next.type = -1; return; }
-        if (v.note == note && v.fromBrain == fromBrain && !v.released && !v.stealing) {
+        if (v.stealing && v.next.type == 0 && v.next.note == note && v.nextSource == source) { v.next.type = -1; return; }
+        if (v.note == note && v.source == source && !v.released && !v.stealing) {
             v.released = true;
             v.env.noteOff();
             CloudVoice& cv = cloud_.voice(static_cast<int>(i));
@@ -399,9 +491,12 @@ void Engine::renderBlock()
 {
     const int G = cfg_.gpuBlock;
     const double dt = G / cfg_.sampleRate;
+    const float dtf = static_cast<float>(dt);
     const std::int64_t pos = renderPos_.load(std::memory_order_relaxed);
     readParams();
+    refreshSpectrum();
     refreshScale();
+    refreshLandscape();
 
     // 1. The played notes that are due, in the order they came, each on its own sample.
     drainEvents();
@@ -411,33 +506,46 @@ void Engine::renderBlock()
         pending_.erase(pending_.begin() + static_cast<std::ptrdiff_t>(i));
         if (e.stamp < pos) late_.fetch_add(1, std::memory_order_relaxed);
         const int onset = static_cast<int>(std::clamp<std::int64_t>(e.stamp - pos, 0, G - 1));
-        if (e.type == 0) startNote(e.note, e.velocity, blk_.keysDepth, false, onset);
-        else if (e.type == 1) stopNote(e.note, false);
+        if (e.type == 0) startNote(e.note, e.velocity, blk_.keysDepth, 0, onset);
+        else if (e.type == 1) stopNote(e.note, 0);
         else
             for (const Voice& v : voices_)
-                if (v.note >= 0 && !v.fromBrain && !v.released) stopNote(v.note, false);
+                if (v.note >= 0 && v.source == 0 && !v.released) stopNote(v.note, 0);
     }
 
-    // 2. The conductor.
-    if (stepAsked_.exchange(false, std::memory_order_relaxed)) brain_.requestStep();
-    brain_.update(dt, bp_, -1,
-                  [this](int note) { return frequencyOf(note); },
-                  [this](const BrainEvent& e) {
-                      if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, brainDistance(), true, 0);
-                      else stopNote(e.note, true);
-                  });
+    // 2. The conductors. Step fires on the rising edge of its switch, or from autoplayStep().
+    const bool step = param(ParamId::AutoStep) >= 0.5f;
+    if ((step && !stepWas_) | stepAsked_.exchange(false, std::memory_order_relaxed)) brain_.requestStep();
+    stepWas_ = step;
+    auto freqOf = [this](int note) { return frequencyOf(note); };
+    brain_.update(dt, bp_, -1, freqOf, [this](const BrainEvent& e) {
+        if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, brainDistance(), 1, 0);
+        else stopNote(e.note, 1);
+    });
+    brain2_.setRoot(std::clamp(brain_.root() + blk_.brain2Interval, 0, 127));
+    brain2_.update(dt, bp2_, -1, freqOf, [this](const BrainEvent& e) {
+        if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, blk_.brain2Depth * (0.85f + 0.15f * rng_.uniform()), 2, 0);
+        else stopNote(e.note, 2);
+    });
     brainRoot_.store(brain_.root(), std::memory_order_relaxed);
 
-    // 3. The voices: envelope, frequency, the cloud and its motion.
+    // 3. The voices: envelope, place, frequency, colour, filter, air, motion.
     const double follow = 1.0 - std::exp(-dt / kGlideSeconds);
+    const double tideMul = std::pow(2.0, blk_.tide * tide_.update(dtf, 1.0f / (blk_.tidePeriod * 60.0f), side_) / 1200.0);
+    const MotionKind motion = static_cast<MotionKind>(std::clamp(blk_.motion, 0, kNumMotions - 1));
+    // A voice that reads the landscape is as much quieter as the landscape is dark: made up here
+    // (at most 18 dB), so a dim landscape changes the motion, not the level.
+    float landMakeup = 1.0f;
+    if (motionUsesLandscape(motion)) landMakeup = 1.0f / std::max(0.125f, 1.0f - blk_.motionDepth + blk_.motionDepth * landRms_);
     int sounding = 0;
+    int by[3] = { 0, 0, 0 };
     for (int i = 0; i < static_cast<int>(voices_.size()); ++i) {
         Voice& v = voices_[static_cast<size_t>(i)];
         CloudVoice& cv = cloud_.voice(i);
         if (v.stealing) {
             if (v.stealBlocks > 0) { --v.stealBlocks; cv.gain = 0.0f; v.env.kill(); ++sounding; continue; }
             v.stealing = false;
-            if (v.next.type == 0) beginOn(i, v.next.note, v.next.velocity, v.nextDistance, v.nextFromBrain, 0);
+            if (v.next.type == 0) beginOn(i, v.next.note, v.next.velocity, v.nextDistance, v.nextSource, 0);
             else v.note = -1;
         }
         if (v.note < 0) { cv.active = 0; continue; }
@@ -449,13 +557,41 @@ void Engine::renderBlock()
             cv.active = 0;
             continue;
         }
-        const double target = frequencyOf(v.note);
+        // Breath: the voice's plane wanders (Noctuary's "the room breathes"); Doppler: coming closer
+        // raises it, receding lowers it.
+        v.distance = std::clamp(v.place + 0.35f * blk_.breath * v.breath.update(dtf, blk_.breathRate, side_), 0.0f, 1.0f);
+        const float velocity = (v.distance - v.prevDistance) / dtf * kMetresPerUnit;
+        const double doppler = v.restart ? 1.0 : 1.0 - static_cast<double>(blk_.doppler * velocity / kSpeedOfSound);
+        v.prevDistance = v.distance;
+        const double target = frequencyOf(v.note) * tideMul;
         v.hz = v.restart ? target : v.hz * std::pow(target / v.hz, follow);
-        const float level = kVoiceLevel * (v.fromBrain ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
-        cv.hz = static_cast<float>(v.hz);
-        cv.level = level;
+        // The filter's cutoff: key tracking, the envelope, and its own drift of up to an octave.
+        const float oct = blk_.keyTrack * static_cast<float>(v.note - 60) / 12.0f + blk_.filterEnv * gain
+                        + blk_.filterDrift * v.cutoffDrift.update(dtf, 0.05f, side_);
+        const float fc = std::clamp(blk_.cutoff * std::exp2(oct), 20.0f, 20000.0f);
+        const FilterModel model = static_cast<FilterModel>(std::clamp(blk_.filterModel, 0, kNumFilterModels - 1));
+        float q = 0.707f + blk_.resonance * blk_.resonance * 11.3f;   // up to Q 12
+        if (model == FilterModel::Peak) q = 1.0f + 3.0f * blk_.resonance;   // the bell's gain, up to +12 dB
+        if (model == FilterModel::Formant) q = 4.0f + 16.0f * blk_.resonance;
+
+        float level = kVoiceLevel * (v.source != 0 ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
+        cv.hz = static_cast<float>(v.hz * doppler);
+        cv.level = level * landMakeup;
         cv.gain = gain;
         cv.tilt = blk_.tilt;
+        cv.brightness = blk_.brightness;
+        cv.oddEven = blk_.oddEven;
+        cv.inharmonic = blk_.inharmonicB;
+        cv.presenceDb = blk_.presence;
+        cv.lowCut = blk_.padLowCut;
+        cv.filterModel = static_cast<int>(model);
+        cv.cutoff = fc;
+        cv.filterQ = q;
+        cv.vowel = 4.0f * std::clamp(std::log(fc / 40.0f) / std::log(18000.0f / 40.0f), 0.0f, 1.0f);
+        cv.air = blk_.air;
+        cv.airCenter = blk_.airCenter;
+        cv.airWidth = blk_.airWidth;
+        cv.airJitter = blk_.airJitter;
         cv.width = blk_.width;
         cv.widthSlope = blk_.widthSlope;
         cv.drift = blk_.drift;
@@ -470,13 +606,15 @@ void Engine::renderBlock()
         cv.active = 1;
         cv.restart = v.restart ? 1 : 0;
         cv.onset = v.restart ? v.onset : 0;
-        applyMotion(static_cast<MotionKind>(std::clamp(blk_.motion, 0, kNumMotions - 1)), cv, blk_.motionRate, blk_.motionDepth);
+        applyMotion(motion, cv, blk_.motionRate, blk_.motionDepth);
         v.restart = false;
         v.onset = 0;
         v.age += dt;
         ++sounding;
+        ++by[std::clamp(v.source, 0, 2)];
     }
     sounding_.store(sounding, std::memory_order_relaxed);
+    for (int s = 0; s < 3; ++s) soundingBy_[s].store(by[s], std::memory_order_relaxed);
 
     // 4. The GPU: near and far, left and right.
     cloud_.launch();

@@ -6,6 +6,7 @@
  *        measurements are probe's selftest.
  */
 #include "additiv/Engine.h"
+#include "additiv/Spectrum.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -242,6 +243,87 @@ int main()
               fmt("underruns %llu, late %llu, latency %d samples (%.1f ms), GPU %.3f ms/block",
                   static_cast<unsigned long long>(e.underruns()), static_cast<unsigned long long>(e.lateEvents()),
                   e.latencySamples(), e.latencySamples() / 48.0, e.lastGpuMs()));
+    }
+
+    // 10. Brain 2: the second conductor plays its own notes in the background.
+    {
+        Engine e;
+        if (!openOffline(e, true, 11)) return 1;
+        e.setParam(ParamId::AutoRate, 5.0f);
+        e.setParam(ParamId::Brain2On, 1.0f);
+        e.setParam(ParamId::Brain2Rate, 4.0f);
+        const std::vector<float> lr = render(e, 60.0);
+        const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x); });
+        check(finite && e.soundingFrom(1) >= 3 && e.soundingFrom(2) >= 1, "brain 2: a second conductor in the background",
+              fmt("conductor %d, second conductor %d voices", e.soundingFrom(1), e.soundingFrom(2)));
+    }
+
+    // 11. The Timbre scale (Sethares) is made from the cloud's own spectrum.
+    {
+        BrainSpectrum sp;
+        sp.count = BrainSpectrum::kMax;
+        for (int h = 1; h <= sp.count; ++h) { sp.ratio[h - 1] = h * stretchOf(h, 0.02f); sp.amp[h - 1] = harmonicShape(h, 1.2f, 0.0f, 1.0f); }
+        FixedScale s;
+        const bool built = makeTimbreScale(sp, s);
+        Engine e;
+        if (!openOffline(e, false)) return 1;
+        e.setParam(ParamId::Scale, static_cast<float>(kTimbreScaleIndex));
+        e.setParam(ParamId::Attack, 0.05f);
+        e.noteOn(60, 0.8f, 0);
+        e.noteOn(67, 0.8f, 0);
+        const std::vector<float> lr = render(e, 2.0);
+        const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x); });
+        check(built && s.count >= 2 && finite && rmsDb(lr, 48000, 96000) > -60.0, "timbre scale: from the stretched spectrum",
+              fmt("%d degrees per period, plays at %.1f dBFS", s.count, rmsDb(lr, 48000, 96000)));
+    }
+
+    // 12. The landscape's make-up: the same chord in Aurora sits within 4 dB of the bare cloud;
+    //     a low pass at 60 Hz, under every fundamental, takes it far down.
+    {
+        auto chordDb = [](float motion, float filterModel) {
+            Engine e;
+            if (!openOffline(e, false)) return -200.0;
+            e.setParam(ParamId::Motion, motion);
+            e.setParam(ParamId::FilterModel, filterModel);
+            e.setParam(ParamId::Cutoff, 60.0f);   // below every fundamental: at tilt 1.2 they carry two thirds of the power
+            e.setParam(ParamId::KeyTrack, 0.0f);
+            e.setParam(ParamId::FilterDrift, 0.0f);
+            e.setParam(ParamId::Attack, 0.5f);
+            for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+            const std::vector<float> lr = render(e, 20.0);
+            return rmsDb(lr, 5 * 48000, 20 * 48000);
+        };
+        const double bare = chordDb(0.0f, 0.0f);
+        const double aurora = chordDb(6.0f, 0.0f);
+        const double lp = chordDb(0.0f, 2.0f);
+        check(std::fabs(aurora - bare) < 4.0 && lp < bare - 10.0, "landscape make-up, and the filter's reach",
+              fmt("bare %.1f, Aurora %.1f, LP 12 at 60 Hz %.1f dBFS", bare, aurora, lp));
+    }
+
+    // 13. Everything that moves at once -- breath, doppler, tide, air, presence, a resonant filter
+    //     with drift and envelope, glissando -- stays finite and sane.
+    {
+        Engine e;
+        if (!openOffline(e, true, 5)) return 1;
+        e.setParam(ParamId::AutoRate, 4.0f);
+        e.setParam(ParamId::Breath, 1.0f);
+        e.setParam(ParamId::BreathRate, 0.2f);
+        e.setParam(ParamId::Doppler, 1.0f);
+        e.setParam(ParamId::Tide, 30.0f);
+        e.setParam(ParamId::TidePeriod, 1.0f);
+        e.setParam(ParamId::Air, 0.7f);
+        e.setParam(ParamId::Presence, 6.0f);
+        e.setParam(ParamId::PadLowCut, 120.0f);
+        e.setParam(ParamId::FilterModel, 8.0f);   // Formant
+        e.setParam(ParamId::Resonance, 0.8f);
+        e.setParam(ParamId::FilterEnv, 2.0f);
+        e.setParam(ParamId::FilterDrift, 1.0f);
+        e.setParam(ParamId::Motion, 5.0f);       // Glissando
+        e.setParam(ParamId::Inharmonic, 0.5f);
+        const std::vector<float> lr = render(e, 40.0);
+        const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
+        const double db = rmsDb(lr, 20 * 48000, 40 * 48000);
+        check(finite && db > -50.0 && db < -6.0, "everything moving at once: finite and sane", fmt("%.1f dBFS RMS over 20-40 s", db));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

@@ -784,6 +784,63 @@ std::vector<float> onePartial(const std::vector<EnvShape>& bank, const Landscape
     return renderBlocks(e, blocks);
 }
 
+/**
+ * @brief A few partials, one per harmonic (no cloud: width 0), centred, without drift or shimmer,
+ *        at level 0.1 -- for the spectral shape's checks.
+ * @param partials  harmonics, and the engine's capacity
+ * @param hz        the fundamental
+ * @param blocks    how many 128-sample blocks
+ * @param setup     sets the shape
+ * @return          the samples, interleaved stereo
+ */
+template <class Setup>
+std::vector<float> fewPartials(int partials, float hz, int blocks, Setup&& setup)
+{
+    CloudConfig c;
+    c.sampleRate = kSampleRate;
+    c.blockSize = 128;
+    c.voices = 1;
+    c.partialsPerVoice = partials;
+    CloudEngine e;
+    if (!openEngine(e, c)) return {};
+    CloudVoice& v = e.voice(0);
+    v = CloudVoice{};
+    v.hz = hz;
+    v.partials = partials;
+    v.seed = 9u;
+    v.width = 0.0f;
+    v.drift = 0.0f;
+    v.shimmer = 0.0f;
+    v.stereo = 0.0f;
+    v.level = 0.1f;
+    v.gain = 1.0f;
+    v.active = 1;
+    v.restart = 1;
+    setup(v);
+    return renderBlocks(e, blocks);
+}
+
+/**
+ * @brief The amplitude of one sine in the left channel, by projection on the very phase step the
+ *        GPU computes for that frequency (float, as the kernel does).
+ * @param lr    interleaved stereo
+ * @param from  first frame
+ * @param f     the sine's frequency, Hz
+ * @return      its amplitude
+ */
+double toneAmp(const std::vector<float>& lr, size_t from, float f)
+{
+    const std::uint32_t step = static_cast<std::uint32_t>(std::min(f / static_cast<float>(kSampleRate), 0.49f) * 4294967296.0f);
+    double re = 0.0, im = 0.0;
+    const size_t frames = lr.size() / 2;
+    for (size_t s = from; s < frames; ++s) {
+        const double ph = static_cast<double>(static_cast<std::uint32_t>(s * step)) * (6.283185307179586 / 4294967296.0);
+        re += lr[s * 2] * std::cos(ph);
+        im += lr[s * 2] * std::sin(ph);
+    }
+    return 2.0 * std::sqrt(re * re + im * im) / static_cast<double>(std::max<size_t>(frames - from, 1));
+}
+
 /** @brief A block's amplitude in one channel: sqrt(2 * mean square). @param lr interleaved stereo @param b the block (128 frames) @param ch 0 left, 1 right @return the amplitude */
 double blockAmp(const std::vector<float>& lr, size_t b, int ch)
 {
@@ -972,6 +1029,84 @@ int cmdSelftest(const Options& o)
         const double gone = blockAmp(lr, static_cast<size_t>(3.5 * kSampleRate / 128), 0);
         std::snprintf(buf, sizeof buf, "held %.4f, at 2 s %.4f, at 3.5 s %.5f", held, halfway, gone);
         check(std::fabs(held - 0.1) < 0.001 && std::fabs(halfway - 0.05) < 0.002 && gone < 0.0005, "release: the tail from the loop to silence", buf);
+    }
+
+    // 10. The voice filter as a frequency response: LP12 an octave above its corner, and its peak.
+    {
+        const int blocks = static_cast<int>(1.0 * kSampleRate / 128);
+        const std::vector<EnvShape> none;
+        const std::vector<float> below = onePartial(none, nullptr, blocks, [](CloudVoice& v) {
+            v.filterModel = static_cast<int>(FilterModel::LP12); v.cutoff = 750.0f; v.filterQ = 0.70710678f; });
+        const std::vector<float> peak = onePartial(none, nullptr, blocks, [](CloudVoice& v) {
+            v.filterModel = static_cast<int>(FilterModel::LP12); v.cutoff = 1500.0f; v.filterQ = 4.0f; });
+        const double a = blockAmp(below, 100, 0), b = blockAmp(peak, 100, 0);
+        const double expect = 0.1 / std::sqrt(9.0 + 8.0);   // r = 2: (1 - r^2)^2 + (r/Q)^2
+        std::snprintf(buf, sizeof buf, "an octave above: %.5f (%.5f), at the corner Q 4: %.4f (0.4)", a, expect, b);
+        check(std::fabs(a / expect - 1.0) < 0.01 && std::fabs(b / 0.4 - 1.0) < 0.01, "filter: LP12 read at the partial", buf);
+    }
+
+    // 11. Noctuary's spectral formula, partial by partial, after the voice's normalisation:
+    //     presence lifts 3.2 kHz by 6 dB at the ear, the low cut drops an octave below it by 12 dB.
+    {
+        const int blocks = static_cast<int>(1.0 * kSampleRate / 128);
+        const size_t from = 4800;
+        const std::vector<float> pres = fewPartials(2, 1600.0f, blocks, [](CloudVoice& v) { v.presenceDb = 6.0f; });
+        const double ratioP = toneAmp(pres, from, 3200.0f) / toneAmp(pres, from, 1600.0f);
+        const double expectP = std::pow(2.0, -1.2) * std::pow(10.0, 6.0 / 20.0);
+        const std::vector<float> cut = fewPartials(2, 100.0f, blocks, [](CloudVoice& v) { v.lowCut = 200.0f; });
+        const double ratioC = toneAmp(cut, from, 200.0f) / toneAmp(cut, from, 100.0f);
+        const double expectC = std::pow(2.0, -1.2) / 0.25;
+        std::snprintf(buf, sizeof buf, "presence %.4f (%.4f), low cut %.4f (%.4f)", ratioP, expectP, ratioC, expectC);
+        check(std::fabs(ratioP / expectP - 1.0) < 0.01 && std::fabs(ratioC / expectC - 1.0) < 0.01, "spectrum: presence and low cut", buf);
+    }
+
+    // 12. Brightness closes the window above harmonic 9; odd/even +1 silences the even harmonics.
+    {
+        const int blocks = static_cast<int>(1.0 * kSampleRate / 128);
+        const size_t from = 4800;
+        const std::vector<float> dark = fewPartials(200, 100.0f, blocks, [](CloudVoice& v) { v.brightness = 0.2f; });
+        const double h5 = toneAmp(dark, from, 500.0f), h20 = toneAmp(dark, from, 2000.0f);
+        const std::vector<float> odd = fewPartials(4, 200.0f, blocks, [](CloudVoice& v) { v.oddEven = 1.0f; });
+        const double o2 = toneAmp(odd, from, 400.0f), o3 = toneAmp(odd, from, 600.0f);
+        std::snprintf(buf, sizeof buf, "h20/h5 %.1e, h2/h3 %.1e", h20 / h5, o2 / o3);
+        check(h5 > 1e-4 && h20 / h5 < 1e-4 && o3 > 1e-4 && o2 / o3 < 1e-4, "spectrum: brightness window and odd/even", buf);
+    }
+
+    // 13. Inharmonic: the stiff string moves even the fundamental to f0 sqrt(1 + B).
+    {
+        const std::vector<float> lr = fewPartials(1, 100.0f, static_cast<int>(1.0 * kSampleRate / 128), [](CloudVoice& v) { v.inharmonic = 0.02f; });
+        const float f = 100.0f * std::sqrt(1.0f + 0.02f);
+        const double at = toneAmp(lr, 4800, f), off = toneAmp(lr, 4800, 100.0f);
+        // A second's projection one hertz off still leaks sinc(pi * 0.995 * 0.9) = 11 %: the full
+        // amplitude at the stretched frequency is the proof, the unstretched one only leakage.
+        std::snprintf(buf, sizeof buf, "at %.3f Hz %.4f, at 100 Hz %.4f (leakage)", f, at, off);
+        check(std::fabs(at - 0.1) < 0.0002 && off < 0.02, "spectrum: the stiff string's stretch", buf);
+    }
+
+    // 14. Air: a band of partials at the voice's own level beside it, so the whole is 3 dB up.
+    {
+        auto rms = [](const std::vector<float>& lr) {
+            double sq = 0.0;
+            for (size_t i = lr.size() / 4; i < lr.size(); ++i) sq += static_cast<double>(lr[i]) * lr[i];
+            return std::sqrt(sq / static_cast<double>(lr.size() - lr.size() / 4));
+        };
+        const int blocks = static_cast<int>(2.0 * kSampleRate / 128);
+        const std::vector<float> dry = fewPartials(2000, 110.0f, blocks, [](CloudVoice& v) { v.width = 25.0f; v.stereo = 1.0f; });
+        const std::vector<float> wet = fewPartials(2000, 110.0f, blocks, [](CloudVoice& v) { v.width = 25.0f; v.stereo = 1.0f; v.air = 1.0f; });
+        const double db = 20.0 * std::log10(rms(wet) / rms(dry));
+        std::snprintf(buf, sizeof buf, "%+.2f dB with the band (+3.01 expected)", db);
+        check(std::fabs(db - 3.01) < 0.6, "air: a band of partials at the voice's level", buf);
+    }
+
+    // 15. Distance 1: nothing near, half the level, and the air's low pass read at 1.5 kHz.
+    {
+        const std::vector<EnvShape> none;
+        const std::vector<float> lr = onePartial(none, nullptr, 100, [](CloudVoice& v) { v.distance = 1.0f; });
+        const double x0 = 1500.0 / 16000.0, x = x0 * 32.0;
+        const double expect = 0.1 * 0.5 * std::sqrt((1.0 + x0 * x0) / (1.0 + x * x));
+        const double a = blockAmp(lr, 50, 0);
+        std::snprintf(buf, sizeof buf, "amplitude %.5f (%.5f)", a, expect);
+        check(std::fabs(a / expect - 1.0) < 0.01, "distance: the far plane, darker and quieter", buf);
     }
 
     std::printf(failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", failures);

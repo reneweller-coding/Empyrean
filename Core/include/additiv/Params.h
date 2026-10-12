@@ -21,6 +21,9 @@ enum class ParamId : int {
     // Cloud: the voice's spectrum and its own life
     Partials,       ///< partials per voice
     Tilt,           ///< spectral tilt: harmonic h at h^-tilt
+    Brightness,     ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (1 keeps them all)
+    OddEven,        ///< -1 .. 1: odd against even harmonics
+    Inharmonic,     ///< 0 .. 1: the stiff string's stretch
     CloudWidth,     ///< the cloud around harmonic 1, cents
     WidthSlope,     ///< how the cloud widens with the harmonic number
     Drift,          ///< each partial's own pitch wander, cents
@@ -28,10 +31,23 @@ enum class ParamId : int {
     Shimmer,        ///< each partial's own amplitude wander, 0 .. 1
     ShimmerRate,    ///< its speed, Hz
     Stereo,         ///< how far the partials scatter across the field
+    // Air: a band of noise made of partials
+    Air,            ///< the band's level against the voice's, 0 .. 1
+    AirCenter,      ///< its centre, times the fundamental
+    AirWidth,       ///< its width, cents
+    AirJitter,      ///< how fast its partials flicker, Hz
+    // Filter: read as a frequency response at every partial
+    FilterModel,    ///< kFilterModelNames
+    Cutoff,         ///< Hz
+    Resonance,      ///< 0 .. 1
+    FilterEnv,      ///< octaves the voice's envelope moves the cutoff
+    KeyTrack,       ///< 0 .. 1: how far the cutoff follows the note
+    FilterDrift,    ///< 0 .. 1: the cutoff's own slow wander, up to an octave
     // Motion: the envelope lanes, as a scene
     Motion,         ///< which motion the partials' envelopes make (kMotionNames)
     MotionRate,     ///< how fast the motion runs, times its own speed
     MotionDepth,    ///< how deep it reaches, times its own depth
+    Landscape,      ///< which landscape the Aurora motion reads (kLandscapeNames)
     // Envelope of every voice
     Attack,         ///< seconds
     Decay,          ///< seconds
@@ -43,6 +59,8 @@ enum class ParamId : int {
     KeyMap,         ///< Snap to 12 keys or consecutive degrees
     RefPitch,       ///< A4 in Hz
     Purity,         ///< 0 = 12-TET, 1 = the scale; the clouds narrow with it so pure intervals can lock
+    Tide,           ///< cents the whole instrument leans on a minute-scale curve
+    TidePeriod,     ///< minutes per swing
     // Conductor
     BrainOn,        ///< the conductor plays
     AutoMode,       ///< Free or Chords (Autoplay), kBrainModeNames
@@ -59,6 +77,12 @@ enum class ParamId : int {
     AutoTension,    ///< Chords: 0 = the new note must fit the chord, 1 = anything goes
     AutoRootMove,   ///< Chords: how often an exchange moves the root too
     BrainTimbre,    ///< how much consonance is judged from the cloud's own spectrum (Sethares)
+    AutoStep,       ///< Autoplay: a rising edge exchanges a voice now
+    Brain2On,       ///< the second conductor, in the background
+    Brain2Interval, ///< its root against the first one's, semitones
+    Brain2Density,  ///< its notes at once
+    Brain2Rate,     ///< seconds between its events
+    Brain2Depth,    ///< where its notes stand, 0 near .. 1 far
     // Space
     Depth,          ///< how deep the conductor's notes sit (near/far planes)
     KeysDepth,      ///< where played notes sit, 0 at the ear .. 1 far
@@ -66,6 +90,11 @@ enum class ParamId : int {
     FarSize,        ///< the far reverb's size
     FarDecay,       ///< its decay, seconds
     FarDamp,        ///< its damping
+    Presence,       ///< dB: the 2-5 kHz bell on the near plane
+    PadLowCut,      ///< Hz: below it the clouds fall 12 dB/oct, leaving the bottom free
+    Breath,         ///< 0 .. 1: every voice's distance wanders
+    BreathRate,     ///< Hz
+    Doppler,        ///< 0 .. 1: a voice coming closer rises, one receding falls
     BassMono,       ///< below this the mix is mono, Hz
     StereoWidth,    ///< the master's width
     Count           ///< number of parameters
@@ -115,5 +144,6 @@ extern const char* const kKeyMapNames[2];                 ///< "Snap to 12 keys"
 
 constexpr int kNumMotions = 7;                       ///< entries of kMotionNames
 extern const char* const kMotionNames[kNumMotions];  ///< None, Random, Wave, Pendulum, Breathe, Glissando, Aurora
+extern const char* const kFilterModelNames[];        ///< Off, LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak, Formant (Cloud.h FilterModel)
 
 } // namespace additiv

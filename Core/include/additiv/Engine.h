@@ -138,6 +138,9 @@ public:
     /** @brief Voices sounding after the last rendered block. @return 0 .. voices */
     int soundingVoices() const { return sounding_.load(std::memory_order_relaxed); }
 
+    /** @brief Voices sounding after the last rendered block, by whose notes they play. @param source 0 played, 1 the conductor, 2 the second conductor @return count */
+    int soundingFrom(int source) const { return source >= 0 && source < 3 ? soundingBy_[source].load(std::memory_order_relaxed) : 0; }
+
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return brainRoot_.load(std::memory_order_relaxed); }
 
@@ -162,9 +165,13 @@ private:
     /** @brief One voice on the host side: the note, its envelope, its place, and what the GPU voice is told. */
     struct Voice {
         int note = -1;             ///< MIDI note, -1 when free
-        bool fromBrain = false;    ///< the conductor's note (true) or a played one
+        int source = 0;            ///< 0 played, 1 the conductor, 2 the second conductor
         float velocity = 0.0f;     ///< 0 .. 1
-        float distance = 0.0f;     ///< 0 at the ear .. 1 far
+        float distance = 0.0f;     ///< where it stands now, 0 at the ear .. 1 far (its place plus the breath)
+        float place = 0.0f;        ///< where it was put
+        float prevDistance = 0.0f; ///< the distance of the block before, for the doppler
+        Drifter breath;            ///< the slow wander of its distance (Breath)
+        Drifter cutoffDrift;       ///< the slow wander of its filter's cutoff (Filter Drift)
         double hz = 0.0;           ///< the frequency it is gliding at (purity and root changes glide)
         Envelope env;              ///< the amplitude envelope, stepped once per GPU block
         std::uint32_t seed = 1;    ///< the note's dice on the GPU
@@ -176,8 +183,8 @@ private:
         bool stealing = false;     ///< fading out before `next` begins
         int stealBlocks = 0;       ///< blocks of fading still to go
         Event next;                ///< the note waiting for a stolen voice (type 0; -1 = cancelled)
-        bool nextFromBrain = false;   ///< whether that note is the conductor's
-        float nextDistance = 0.0f;    ///< and where it will stand
+        int nextSource = 0;        ///< whose note that is
+        float nextDistance = 0.0f; ///< and where it will stand
     };
 
     void workerLoop();                        ///< the worker: renders while the ring is short of the latency
@@ -191,28 +198,32 @@ private:
      * @param note       MIDI note
      * @param velocity   0 .. 1
      * @param distance   0 at the ear .. 1 far
-     * @param fromBrain  the conductor's note
+     * @param source     0 played, 1 the conductor, 2 the second conductor
      * @param onset      sample of the block it begins at
      */
-    void startNote(int note, float velocity, float distance, bool fromBrain, int onset);
+    void startNote(int note, float velocity, float distance, int source, int onset);
     /**
      * @brief Begins a note on a voice now (the voice is free or has just faded).
      * @param i          the voice
      * @param note       MIDI note
      * @param velocity   0 .. 1
      * @param distance   0 .. 1
-     * @param fromBrain  the conductor's note
+     * @param source     0 played, 1 the conductor, 2 the second conductor
      * @param onset      sample of the block it begins at
      */
-    void beginOn(int i, int note, float velocity, float distance, bool fromBrain, int onset);
+    void beginOn(int i, int note, float velocity, float distance, int source, int onset);
     /**
-     * @brief Lets a note go (the conductor's or a played one).
-     * @param note       MIDI note
-     * @param fromBrain  which kind of note
+     * @brief Lets a note go.
+     * @param note    MIDI note
+     * @param source  whose note: 0 played, 1 the conductor, 2 the second conductor
      */
-    void stopNote(int note, bool fromBrain);
+    void stopNote(int note, int source);
     /** @brief Where a conductor's note stands: Noctuary's two planes, 40 % close and 60 % deep. @return 0 .. 1 */
     float brainDistance();
+    /** @brief Loads the landscape the Landscape parameter names when it changed, and its RMS. */
+    void refreshLandscape();
+    /** @brief Fills the conductors' spectrum from the voice's shape, and rebuilds the Timbre scale when it changed. */
+    void refreshSpectrum();
     /** @brief A note's frequency: the scale blended with 12-TET by Purity (Noctuary's frequencyOf). @param note MIDI note @return Hz */
     double frequencyOf(int note) const;
     /** @brief Rebuilds the scale when its choice, root or key mapping changed. */
@@ -228,8 +239,16 @@ private:
     std::vector<Voice> voices_;                        ///< the host's voices
     ClusterBrain brain_;                               ///< the conductor
     BrainParams bp_;                                   ///< its knobs, filled per block
+    ClusterBrain brain2_;                              ///< the second conductor, in the background (Noctuary's Brain 2)
+    BrainParams bp2_;                                  ///< its knobs
     BrainSpectrum brainSpec_;                          ///< the cloud's spectrum for its Timbre judgement
+    float specKey_[4] = { -1.0f, 0.0f, 0.0f, 0.0f };   ///< tilt, odd/even, brightness, inharmonic the spectrum was built for
     Rng rng_;                                          ///< the engine's dice (seeds, distances)
+    Rng side_;                                         ///< a side stream for the drifters, so switching them on never moves the notes' dice
+    Drifter tide_;                                     ///< the whole instrument's slow lean (Tide)
+    int landChoice_ = -1;                              ///< the landscape on the GPU
+    float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
+    bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
     FixedScale scale_;                                 ///< the current scale
     int scaleChoice_ = -1;                             ///< the choice scale_ was built from
     int rootPc_ = 0;                                   ///< the scale's root, a pitch class
@@ -265,6 +284,29 @@ private:
         float depth = 0.6f;      ///< conductor's depth
         float keysDepth = 0.2f;  ///< played notes' distance
         float farLevel = 0.8f;   ///< far reverb level
+        float brightness = 1.0f; ///< brightness window
+        float oddEven = 0.0f;    ///< odd/even
+        float inharmonicB = 0.0f;///< the stiff string's B
+        float air = 0.0f;        ///< air band level
+        float airCenter = 3.0f;  ///< its centre, times f0
+        float airWidth = 600.0f; ///< its width, cents
+        float airJitter = 8.0f;  ///< its flicker, Hz
+        int filterModel = 0;     ///< FilterModel
+        float cutoff = 2500.0f;  ///< Hz
+        float resonance = 0.15f; ///< 0 .. 1
+        float filterEnv = 0.0f;  ///< octaves
+        float keyTrack = 0.5f;   ///< 0 .. 1
+        float filterDrift = 0.3f;///< 0 .. 1
+        float presence = 0.0f;   ///< dB
+        float padLowCut = 0.0f;  ///< Hz
+        float breath = 0.0f;     ///< 0 .. 1
+        float breathRate = 0.03f;///< Hz
+        float doppler = 0.0f;    ///< 0 .. 1
+        float tide = 0.0f;       ///< cents
+        float tidePeriod = 12.0f;///< minutes
+        bool brain2 = false;     ///< the second conductor plays
+        int brain2Interval = -12;///< semitones
+        float brain2Depth = 0.9f;///< its plane
     } blk_;                      ///< read by readParams()
 
     std::vector<Event> queue_;                         ///< audio thread -> renderer, a single-producer single-consumer ring
@@ -281,6 +323,7 @@ private:
     std::atomic<bool> running_{ false };               ///< the worker runs
     std::atomic<bool> stepAsked_{ false };             ///< autoplayStep() was asked for
     std::atomic<int> sounding_{ 0 };                   ///< voices sounding, for status
+    std::atomic<int> soundingBy_[3] = {};               ///< voices sounding per source, for status
     std::atomic<int> brainRoot_{ 0 };                  ///< the conductor's root, for status
     std::atomic<std::uint64_t> underruns_{ 0 };        ///< callbacks short of samples
     std::atomic<std::uint64_t> late_{ 0 };             ///< notes applied after their stamp

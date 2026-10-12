@@ -44,6 +44,30 @@ float ampToBrightness(float a, float rangeDb);
  */
 Landscape landscapeAurora(float loopSeconds, float rangeDb = 40.0f, int columns = 256, int rows = 1024);
 
+constexpr int kNumFactoryLandscapes = 5;                         ///< entries of kLandscapeNames
+extern const char* const kLandscapeNames[kNumFactoryLandscapes];  ///< Aurora, Shepard, Tides, Rain, Choir
+
+/**
+ * @brief One of the generated landscapes, each looping seamlessly over a floor (motion on a carrying
+ *        sound, the user's rule of 12.10.2026):
+ *        Aurora -- swaying bands, one climbing and wrapping, a fluttering high band (30 s);
+ *        Shepard -- four bands climbing for ever, fading in at the bottom and out at the top (40 s);
+ *        Tides -- broad swells rolling up through the spectrum (60 s);
+ *        Rain -- sixty short glints at chance places (30 s);
+ *        Choir -- the formants of u-o-a-e-i, the vowel turning slowly (48 s).
+ * @param index    0 .. kNumFactoryLandscapes-1
+ * @param rangeDb  the decibel range of the brightness
+ * @return         the landscape (Aurora for an unknown index)
+ */
+Landscape factoryLandscape(int index, float rangeDb = 40.0f);
+
+/**
+ * @brief The RMS of a landscape's amplitudes: how much quieter a voice gets that reads it fully.
+ * @param l  the landscape
+ * @return   sqrt of the mean squared amplitude (1 for an empty one)
+ */
+float landscapeRms(const Landscape& l);
+
 /**
  * @brief A landscape from a picture (PNG, JPEG, BMP, TIFF, GIF -- whatever Windows can decode):
  *        time runs left to right over `loopSeconds`, frequency from the bottom (20 Hz) to the top

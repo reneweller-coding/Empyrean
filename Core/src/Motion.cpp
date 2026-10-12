@@ -24,7 +24,7 @@ void applyMotion(MotionKind kind, CloudVoice& v, float rate, float depth)
         v.amp.chaos = 1.0f;
         break;
     case MotionKind::Wave:
-        v.amp.amount = 1.0f;
+        v.amp.amount = 0.8f;   // a floor under the wave: motion on a carrying sound (12.10.2026)
         v.amp.shape = kSwell;
         v.amp.phase = -2.0f;
         v.amp.phaseBy = MapSource::Pitch;
