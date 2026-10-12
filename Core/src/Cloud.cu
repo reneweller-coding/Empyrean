@@ -470,16 +470,21 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  *                the near plane's cosine parts (binaural: the ears' phases)
  * @param ring    per voice kGainRing levels (gainRingKernel), for the dispersion
  * @param ampQ    per partial the near plane's cosine parts the last block ended on
+ * @param snap    every kSnapStride-th partial's frequency and amplitude, for the picture
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
-                             const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ)
+                             const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
+                             float2* snap)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
     const int p = gid - v * pcap;
     if (v >= hdr->voices) return;
     const CloudVoice& cv = voices[v];
+    const bool snapped = p % kSnapStride == 0;
+    float2* dot = snapped ? snap + static_cast<size_t>(v) * (pcap / kSnapStride) + p / kSnapStride : nullptr;
     if (!cv.active || p >= cv.partials) {
+        if (dot) *dot = make_float2(0.0f, 0.0f);
         // Beyond the voice's partials (or a silent voice): the render kernel skips whole chunks, the
         // tail of the last chunk it covers must be silent.
         if (cv.active) {
@@ -640,6 +645,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
     gains[3 * gid + 2] = make_float4(q0.x, (tq.x - q0.x) * inv, q0.y, (tq.y - q0.y) * inv);
     amp[gid] = t4;
     ampQ[gid] = tq;
+    if (dot) *dot = make_float2(f, target);
     run[gid] = make_uint4(ph, inc0, dinc, __float_as_uint(fieldOff));
 }
 
@@ -1139,6 +1145,11 @@ struct CloudEngine::Impl {
     float* dEchoAcc = nullptr;        ///< device: its overlap, two rings of kEchoN
     float2* dEchoRing = nullptr;      ///< device: its delay lines, per ear and band kEchoSlots spectra
     int* dEchoState = nullptr;        ///< device: its history index and frame count
+    float2* dSnap = nullptr;          ///< device: the picture's snapshot, every kSnapStride-th partial (Hz, amplitude)
+    float2* hSnap = nullptr;          ///< pinned host: the snapshot brought down
+    bool snapAsked = false;           ///< the next launch brings it down
+    bool snapInFlight = false;        ///< the launched block brings it down
+    bool snapReady = false;           ///< a snapshot came down and was not taken yet
     Binaural binaural;                ///< the host's copy of the binaural placement
     SpectralEcho echo;                ///< the host's copy of the spectral echo's settings
     EnvShape* dShapes = nullptr;      ///< device: the envelope bank, kEnvShapes
@@ -1166,17 +1177,19 @@ struct CloudEngine::Impl {
         if (stream) cudaStreamDestroy(stream);
         if (hUpload) cudaFreeHost(hUpload);
         if (hOut) cudaFreeHost(hOut);
+        if (hSnap) cudaFreeHost(hSnap);
         for (void* p : { static_cast<void*>(dUpload), static_cast<void*>(dOut), static_cast<void*>(dScratch), static_cast<void*>(dRun),
                          static_cast<void*>(dAmp), static_cast<void*>(dGains), static_cast<void*>(dShapes), static_cast<void*>(dLand),
                          static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing),
                          static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
-                         static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState) })
+                         static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
         dRun = nullptr; dAmp = nullptr; dGains = nullptr; dShapes = nullptr;
         dModal = nullptr; dModalScratch = nullptr; dGainRing = nullptr;
         dAmpQ = nullptr; dEchoHist = nullptr; dEchoAcc = nullptr; dEchoRing = nullptr; dEchoState = nullptr;
+        dSnap = nullptr; hSnap = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1289,6 +1302,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dEchoAcc, sizeof(float) * 2 * kEchoN), "cudaMalloc echo overlap", error)
                 && ok(cudaMalloc(&m.dEchoRing, sizeof(float2) * 2 * kEchoBins * static_cast<size_t>(kEchoSlots)), "cudaMalloc echo lines", error)
                 && ok(cudaMalloc(&m.dEchoState, sizeof(int) * 2), "cudaMalloc echo state", error)
+                && ok(cudaMalloc(&m.dSnap, sizeof(float2) * (partialsTotal / kSnapStride)), "cudaMalloc snapshot", error)
+                && ok(cudaHostAlloc(&m.hSnap, sizeof(float2) * (partialsTotal / kSnapStride), cudaHostAllocDefault), "cudaHostAlloc snapshot", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
                 && ok(cudaMalloc(&m.dModal, sizeof(float2) * kModalModes), "cudaMalloc modal", error)
@@ -1305,6 +1320,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dEchoAcc, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dEchoRing, 0, sizeof(float2) * 2 * kEchoBins * static_cast<size_t>(kEchoSlots), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dEchoState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dSnap, 0, sizeof(float2) * (partialsTotal / kSnapStride), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
@@ -1323,7 +1339,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             cudaMemcpyAsync(m.dUpload, m.hUpload, m.uploadBytes(), cudaMemcpyHostToDevice, m.stream);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
@@ -1385,6 +1401,18 @@ Binaural& CloudEngine::binaural() { return impl_->binaural; }
 
 SpectralEcho& CloudEngine::spectralEcho() { return impl_->echo; }
 
+void CloudEngine::requestSnapshot() { impl_->snapAsked = true; }
+
+bool CloudEngine::takeSnapshot(const float*& dots, int& perVoice)
+{
+    Impl& m = *impl_;
+    if (!m.snapReady) return false;
+    m.snapReady = false;
+    dots = reinterpret_cast<const float*>(m.hSnap);
+    perVoice = m.pcap / kSnapStride;
+    return true;
+}
+
 void CloudEngine::launch()
 {
     Impl& m = *impl_;
@@ -1424,6 +1452,11 @@ void CloudEngine::launch()
     }
     cudaEventRecord(m.evStart, m.stream);
     cudaGraphLaunch(m.exec, m.stream);
+    m.snapInFlight = m.snapAsked;
+    if (m.snapAsked) {   // the picture's snapshot behind the block, before the event wait() waits for
+        cudaMemcpyAsync(m.hSnap, m.dSnap, sizeof(float2) * (static_cast<size_t>(m.cfg.voices) * m.pcap / kSnapStride), cudaMemcpyDeviceToHost, m.stream);
+        m.snapAsked = false;
+    }
     cudaEventRecord(m.evStop, m.stream);
     m.nPrev = n;
     m.launched = true;
@@ -1445,6 +1478,7 @@ const float* CloudEngine::wait()
         }
         cudaEventElapsedTime(&m.gpuMs, m.evStart, m.evStop);
         m.launched = false;
+        if (m.snapInFlight) { m.snapReady = true; m.snapInFlight = false; }
     }
     return m.hOut;
 }

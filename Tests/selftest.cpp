@@ -855,6 +855,39 @@ int main()
         check(std::fabs(level[1] - level[0]) < 3.0, "modal hall: painted, it keeps its level", fmt("%.1f dBFS plain, %.1f painted", level[0], level[1]));
     }
 
+    // 33. The picture's snapshot: the partials of a sounding note come down from the GPU, at its
+    //     harmonics, with their amplitudes; the silent voices' points are empty.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.05f);
+        if (!openOffline(e, false, 89)) return 1;
+        e.noteOn(62, 0.8f, 0);
+        render(e, 1.0);
+        std::vector<float> dots;
+        int per = 0;
+        const bool got = e.partialSnapshot(dots, per);
+        const double f0 = soundingHz(e);
+        int voice = -1;
+        for (int i = 0; i < 16; ++i)
+            if (e.voiceView(i).hz > 0.0f) voice = i;
+        int onHarmonic = 0, loud = 0, elsewhere = 0;
+        if (got && per > 0 && voice >= 0) {
+            for (int v = 0; v < static_cast<int>(dots.size() / 2) / per; ++v)
+                for (int i = 0; i < per; ++i) {
+                    const size_t at = 2 * (static_cast<size_t>(v) * static_cast<size_t>(per) + static_cast<size_t>(i));
+                    const float hz = dots[at], a = dots[at + 1];
+                    if (v != voice) { if (a > 0.0f) ++elsewhere; continue; }
+                    if (a <= 0.0f) continue;
+                    ++loud;
+                    const double h = hz / f0;   // a harmonic's cloud lies within 100 cents of it (the air band is off)
+                    if (std::fabs(1200.0 * std::log2(h / std::max(1.0, std::round(h)))) < 100.0) ++onHarmonic;
+                }
+        }
+        check(got && loud > per / 2 && onHarmonic > loud * 9 / 10 && elsewhere == 0, "picture: the partials come down from the GPU",
+              fmt("%d of %d points of the sounding voice heard, %d at its harmonics; %d elsewhere", loud, per, onHarmonic, elsewhere));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

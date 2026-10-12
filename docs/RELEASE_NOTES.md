@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.9.1 (12.10.2026, not released)
+
+- **The picture shows the partials themselves.** It used to draw each voice's shape from the knobs, one quiet bar per
+  harmonic, so nothing of what the partials do was seen. Now the update kernel keeps every eighth partial's frequency
+  and amplitude each block, the engine brings the 51,200 points down about thirty times a second (400 KB, behind the
+  block, before the event the worker waits for), and the picture draws them as points with fading trails: loudness
+  up, frequency across. Measured how much they move: with a preset that reads a landscape (Velvet Dreaming, Aurora)
+  single harmonics' bands swing by 15 to 22 dB within twenty seconds, with the default Breathe motion 5 to 8 dB.
+
 ## 0.9.0 (12.10.2026, not released)
 
 Five ideas for the GPU.

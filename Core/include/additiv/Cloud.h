@@ -255,6 +255,8 @@ struct SpectralEcho {
 };
 static_assert(sizeof(SpectralEcho) % 16 == 0, "SpectralEcho rides in the block header");
 
+constexpr int kSnapStride = 8;       ///< every eighth partial of every voice is in the picture's snapshot
+
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
 constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
@@ -373,6 +375,17 @@ public:
 
     /** @brief The host's copy of the spectral echo's settings, edited between wait() and the next launch(). @return the settings */
     SpectralEcho& spectralEcho();
+
+    /** @brief The next launch() also brings the partials' snapshot down (every kSnapStride-th partial's frequency and amplitude). */
+    void requestSnapshot();
+
+    /**
+     * @brief The snapshot a launch brought down, once: after the wait() of a launch that copied it.
+     * @param dots      receives the points, per voice snapshotPerVoice() of (Hz, amplitude), voices in order
+     * @param perVoice  receives how many points each voice has
+     * @return          true when a new snapshot is there (then valid until the next launch())
+     */
+    bool takeSnapshot(const float*& dots, int& perVoice);
 
     /**
      * @brief Sends the voices up and starts one block on the GPU; returns at once. Clears every

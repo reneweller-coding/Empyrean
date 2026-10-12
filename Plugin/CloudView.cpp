@@ -42,7 +42,54 @@ void CloudView::refresh()
 {
     for (int i = 0; i < additiv::kMaxViewVoices; ++i) views_[static_cast<size_t>(i)] = proc_.engine().voiceView(i);
     refreshLandscape();
+    if (proc_.engine().partialSnapshot(snap_, snapPer_)) {}
+    if (!dotsArea_.isEmpty()) plotDots(dotsArea_.getWidth(), dotsArea_.getHeight());
     repaint();
+}
+
+void CloudView::plotDots(int w, int h)
+{
+    if (w <= 0 || h <= 0) return;
+    if (dots_.getWidth() != w || dots_.getHeight() != h) {
+        dots_ = juce::Image(juce::Image::ARGB, w, h, true);
+        glow_.assign(static_cast<size_t>(w) * h * 3, 0.0f);
+    }
+    // The trails fade by a fifth each frame (about half a second to vanish), then the points come in:
+    // each partial at its frequency and loudness (-100 .. -35 dB of a partial's amplitude), its
+    // colour by whose note it is, as bright as it is loud.
+    for (float& x : glow_) x *= 0.8f;
+    const frame::Skin& skin = additivui::skin();
+    const juce::Colour bySource[4] = { skin.accent, additivui::colour::violet, skin.family(frame::Family::Space),
+                                       skin.dim.brighter(0.4f) };   // played, conductor, Brain 2, the memory's ghosts (pale grey)
+    const int voices = snapPer_ > 0 ? static_cast<int>(snap_.size() / 2) / snapPer_ : 0;
+    const float logSpan = std::log2(1000.0f);
+    for (int v = 0; v < voices; ++v) {
+        const int src = v < additiv::kMaxViewVoices ? juce::jlimit(0, 3, views_[static_cast<size_t>(v)].source) : 3;
+        const juce::Colour c = bySource[src];
+        const float cr = c.getFloatRed(), cg = c.getFloatGreen(), cb = c.getFloatBlue();
+        const float* d = snap_.data() + static_cast<size_t>(v) * snapPer_ * 2;
+        for (int i = 0; i < snapPer_; ++i) {
+            const float hz = d[2 * i], a = d[2 * i + 1];
+            if (hz <= 20.0f || a <= 1.0e-6f) continue;
+            const float db = 20.0f * std::log10(a);
+            const float u = std::log2(hz / 20.0f) / logSpan, l = (db + 100.0f) / 65.0f;
+            if (u < 0.0f || u >= 1.0f || l <= 0.0f) continue;
+            const int x = static_cast<int>(u * static_cast<float>(w));
+            const int y = juce::jlimit(0, h - 1, static_cast<int>((1.0f - std::min(l, 1.0f)) * static_cast<float>(h - 1)));
+            const float k = 0.25f + 0.75f * std::min(l, 1.0f);
+            float* p = glow_.data() + (static_cast<size_t>(y) * w + x) * 3;   // two pixels wide
+            p[0] += cr * k; p[1] += cg * k; p[2] += cb * k;
+            if (x + 1 < w) { p[3] += 0.6f * cr * k; p[4] += 0.6f * cg * k; p[5] += 0.6f * cb * k; }
+        }
+    }
+    const juce::Image::BitmapData px(dots_, juce::Image::BitmapData::writeOnly);
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            const float* p = glow_.data() + (static_cast<size_t>(y) * w + x) * 3;
+            const float m = std::max({ p[0], p[1], p[2] });
+            const float s = m > 1.0f ? 1.0f / m : 1.0f;
+            px.setPixelColour(x, y, juce::Colour::fromFloatRGBA(p[0] * s, p[1] * s, p[2] * s, std::min(1.0f, m)));
+        }
 }
 
 void CloudView::paint(juce::Graphics& g)
@@ -69,34 +116,12 @@ void CloudView::paint(juce::Graphics& g)
                    juce::Justification::centred);
     }
 
-    // The clouds: the voice's own shape, as the GPU draws it, one soft bar per harmonic.
-    const float tilt = proc_.value(static_cast<int>(ParamId::Tilt));
-    const float oddEven = proc_.value(static_cast<int>(ParamId::OddEven));
-    const float bright = proc_.value(static_cast<int>(ParamId::Brightness));
-    const float B = additiv::inharmonicB(proc_.value(static_cast<int>(ParamId::Inharmonic)));
-    const float width = proc_.value(static_cast<int>(ParamId::CloudWidth)) * (1.0f - 0.6f * proc_.value(static_cast<int>(ParamId::Purity)));
-    const float slope = proc_.value(static_cast<int>(ParamId::WidthSlope));
-    const float pxPerCent = spec.getWidth() / (1200.0f * std::log2(1000.0f));
-    const juce::Colour bySource[4] = { skin.accent, additivui::colour::violet, skin.family(frame::Family::Space),
-                                       skin.family(frame::Family::Envelope).withMultipliedAlpha(0.7f) };   // played, conductor, Brain 2, memory
+    // The partials themselves: every eighth one a point with its trail (plotDots, from the GPU's snapshot).
+    dotsArea_ = spec.toNearestInt();
+    if (dots_.isValid()) g.drawImage(dots_, spec, juce::RectanglePlacement::stretchToFit);
     float firstTime = -1.0f;
-    for (const additiv::VoiceView& v : views_) {
-        if (v.hz <= 0.0f || v.gain <= 0.0f) continue;
-        if (firstTime < 0.0f) firstTime = v.time;
-        const juce::Colour c = bySource[juce::jlimit(0, 3, v.source)];
-        const float strength = v.gain * (1.0f - 0.6f * v.distance);
-        const int H = std::min(160, static_cast<int>(20000.0f / v.hz));
-        for (int h = 1; h <= H; ++h) {
-            const float a = additiv::harmonicShape(h, tilt, oddEven, bright);
-            if (a < 1.0e-3f) continue;
-            const float f = v.hz * static_cast<float>(h) * additiv::stretchOf(h, B);
-            const float x = xOf(f, spec);
-            const float barH = spec.getHeight() * std::pow(a, 0.5f) * strength * 0.95f;
-            const float w = std::max(1.5f, width * std::pow(static_cast<float>(h), slope) * pxPerCent);
-            g.setColour(c.withAlpha(juce::jlimit(0.05f, 0.85f, 0.25f + 0.6f * strength)));
-            g.fillRect(juce::Rectangle<float>(x - 0.5f * w, spec.getBottom() - barH, w, barH));
-        }
-    }
+    for (const additiv::VoiceView& v : views_)
+        if (v.hz > 0.0f && v.gain > 0.0f) { firstTime = v.time; break; }
 
     // The landscape, and where the voices are in its loop (when the Aurora motion reads it).
     const bool reading = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(proc_.value(static_cast<int>(ParamId::Motion)))));

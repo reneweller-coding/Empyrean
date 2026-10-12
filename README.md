@@ -13,7 +13,7 @@ and a command-line renderer. Licence: AGPL-3.0. The empyrean is the highest heav
 
 <br clear="left" />
 
-![The Cloud page: every sounding voice as its spectrum of clouds, the landscape beside it](docs/screenshot.png)
+![The Cloud page: the partials themselves as points with trails, the landscape beside them](docs/screenshot.png)
 
 ## Download
 

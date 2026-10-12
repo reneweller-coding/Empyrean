@@ -36,6 +36,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -222,6 +223,15 @@ public:
         v.source = viewSource_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         return v;
     }
+
+    /**
+     * @brief The partials as the picture draws them: every kSnapStride-th partial of every voice (and
+     *        ghost), as (Hz, amplitude), brought from the GPU about thirty times a second. Message thread.
+     * @param dots      receives the points, voice after voice, perVoice each
+     * @param perVoice  receives how many points each voice has
+     * @return          true when there was a new snapshot since the last call
+     */
+    bool partialSnapshot(std::vector<float>& dots, int& perVoice);
 
     /** @brief The slowest block the renderer took since the last call, and starts over (diagnostics). @return milliseconds */
     float takeWorstBlockMs() { return worstBlockUs_.exchange(0, std::memory_order_relaxed) * 0.001f; }
@@ -410,6 +420,12 @@ private:
     float binAngle_ = 0.0f;                            ///< the binaural cloud's orbit, radians
     float paintTime_ = 0.0f;                           ///< seconds into the landscape's loop, for the painted hall
     float landLoop_ = 0.0f;                            ///< the landscape's loop, seconds
+    std::mutex snapLock_;                              ///< guards snap_ (the worker only tries it: it never waits)
+    std::vector<float> snap_;                          ///< the last snapshot of the partials, for the picture
+    int snapPer_ = 0;                                  ///< its points per voice
+    std::uint64_t snapSeq_ = 0;                        ///< snapshots published (under snapLock_)
+    std::uint64_t snapSeen_ = 0;                       ///< the last one the picture took (message thread)
+    int snapCountdown_ = 0;                            ///< blocks until the next snapshot is asked for
     /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */
     void captureGhost(int i);
 

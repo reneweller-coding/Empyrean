@@ -629,6 +629,16 @@ void Engine::stopNote(int note, int source)
     }
 }
 
+bool Engine::partialSnapshot(std::vector<float>& dots, int& perVoice)
+{
+    const std::lock_guard<std::mutex> lock(snapLock_);
+    if (snapSeq_ == snapSeen_ || snap_.empty()) return false;
+    snapSeen_ = snapSeq_;
+    dots = snap_;
+    perVoice = snapPer_;
+    return true;
+}
+
 void Engine::captureGhost(int i)
 {
     size_t slot = 0;
@@ -1006,11 +1016,30 @@ void Engine::renderBlock()
     }
 
     // 5. The GPU: near and far, left and right, the modal hall and the spectral echo.
+    // The picture's snapshot about thirty times a second, brought down with the block.
+    if (--snapCountdown_ <= 0) {
+        snapCountdown_ = std::max(1, static_cast<int>(std::lround(0.033 * cfg_.sampleRate / G)));
+        cloud_.requestSnapshot();
+    }
     LARGE_INTEGER qpcLaunch, qpcBack;
     QueryPerformanceCounter(&qpcLaunch);
     cloud_.launch();
     const float* q = cloud_.wait();
     QueryPerformanceCounter(&qpcBack);
+    {
+        const float* dots = nullptr;
+        int per = 0;
+        if (cloud_.takeSnapshot(dots, per)) {
+            std::unique_lock<std::mutex> lock(snapLock_, std::try_to_lock);   // the picture is reading: this one is skipped
+            if (lock.owns_lock()) {
+                const size_t count = static_cast<size_t>(cloud_.config().voices) * static_cast<size_t>(per) * 2;
+                if (snap_.size() != count) snap_.resize(count);   // once: the size stays
+                std::memcpy(snap_.data(), dots, count * sizeof(float));
+                snapPer_ = per;
+                ++snapSeq_;
+            }
+        }
+    }
     gpuMs_.store(cloud_.lastGpuMs(), std::memory_order_relaxed);
     for (int s = 0; s < G; ++s) {
         const float* f = q + static_cast<size_t>(kCloudOutChannels) * s;

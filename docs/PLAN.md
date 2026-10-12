@@ -287,9 +287,9 @@ deutsche Namen mag der Nutzer nicht). Gefunden nur ein Zebra-Soundset, EmpyreanF
 (`portOf` in allen sechs Kopien von `Frame.cpp`). Der Code behält den Arbeitsnamen des Ordners (Namensraum `additiv`,
 `ADDITIV_`-Optionen und -Variablen, `additiv_presets`, `additiv_selftest`), wie Noctuarys Code `ambient` heißt.
 
-**Offen:** AGPL und die statisch gelinkte CUDA-Laufzeit klären; ein einzelner Unterlauf beim Start des Standalone
-(in 2 von 6 Bildschirmfoto-Läufen, mit Log nicht nachgestellt; der Ring fällt beim Start durch zwei WASAPI-Callbacks
-direkt hintereinander auf 576 von 1536); Hören auf älteren Karten (nur RTX 5090 gemessen); Linux optional.
+**Entschieden (12.10.2026):** AGPL mit der statisch gelinkten CUDA-Laufzeit ist für den Nutzer in Ordnung.
+**Offen:** der Startunterlauf (siehe Phase 9: fremde GPU-Last); Hören auf älteren Karten (nur RTX 5090 gemessen);
+Linux optional.
 
 ## Phase 7: Echos, Räume und der modale Hall (gebaut, 12.10.2026)
 
@@ -379,6 +379,17 @@ deren Grafikarbeit sich gröber unterbrechen lässt als die CUDA-Last aus Phase 
 Betrieb hält der Ring (nie unter 960 von 1536), nur beim Start nach den zwei WASAPI-Callbacks wird es eng. Nebenbei:
 Denormals jetzt je Block aus (`NoDenormals`, FTZ und DAZ), denn der Worker ist nicht JUCEs Audio-Thread. **Offen:**
 mehr Vorlauf nur beim Start oder eine Einstellung für den Vorlauf (10/20/40 ms).
+
+## 0.9.1: das Bild zeigt die Partials (12.10.2026)
+
+Der Nutzer: "die Partials selbst bleiben immer konstant". Gemessen bewegen sie sich (Bandenergie einzelner
+Harmonischer über 20 s: ruhende Wolke 1–4 dB in den oberen Harmonischen, Breathe 5–8 dB, Velvet Dreaming mit Aurora
+15–22 dB) -- aber das Bild zeichnete nur die Form jeder Stimme aus den Reglern. Jetzt schreibt der Update-Kernel für
+jeden achten Partial (f, Amplitude) in `dSnap`; `launch()` kopiert sie, wenn verlangt, hinter dem Graphen vor dem
+Ereignis, auf das `wait()` wartet; das Engine verlangt es etwa alle 33 ms und reicht die 51.200 Punkte über einen
+Mutex weiter, den der Worker nur versucht (nie wartet). Die Ansicht: Punkte (log f quer, −100 … −35 dB hoch) in
+einem Glühpuffer, der je Bild auf 80 % fällt. Selbsttest 33: 2499 von 2560 Punkten der klingenden Stimme, alle an
+ihren Harmonischen, keiner bei stummen Stimmen.
 
 ## Phasen (Vorschlag)
 
