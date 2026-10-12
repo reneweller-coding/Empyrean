@@ -62,6 +62,11 @@ enum class ModSource : int {
     Note,       ///< the loudest voice's note, 0 (C1) .. 1 (C8)
     Distance,   ///< the loudest voice's distance, 0 at the ear .. 1 far
     RandomNote, ///< one draw per note, -1 .. 1, held until the next note
+    // Phase 10d: what the instrument hears of itself
+    Loudness,   ///< its level, 0 at -70 dBFS .. 1 at -10, followed over a third of a second
+    Centroid,   ///< where its energy stands, 0 at 20 Hz .. 1 at 20 kHz (log), over half a second
+    Flux,       ///< how much its spectrum changes, 0 .. 1, over a fifth of a second
+    Roughness,  ///< how rough its chord is (Sethares' dissonance of the voices' harmonics), 0 .. 1, over a second
     Count       ///< number of sources
 };
 constexpr int kNumModSources = static_cast<int>(ModSource::Count);   ///< entries of kModSourceNames
@@ -143,6 +148,10 @@ struct ModInputs {
     float note = 0.5f;                       ///< the loudest voice's note, 0 .. 1
     float distance = 0.5f;                   ///< the loudest voice's distance, 0 .. 1
     float randomNote = 0.0f;                 ///< the draw of the last note, -1 .. 1
+    float heardDb = -120.0f;                 ///< the level heard, dB of full scale
+    float heardCentroid = 0.0f;              ///< the energy's centre heard, 0 .. 1
+    float heardFlux = 0.0f;                  ///< the change heard, 0 .. 1
+    float roughness = 0.0f;                  ///< the chord's roughness, 0 .. 1 (the engine finds it)
 };
 
 /** @brief The sources, advanced once per block on the renderer's thread. */
@@ -199,6 +208,7 @@ private:
     float beatHz_ = 0.0f;                            ///< the beat rate, followed over two seconds
     float beatPhase_ = 0.0f;                         ///< the Beat oscillator's phase, radians
     float cascade_ = 0.0f;                           ///< the excitation, smoothed over two seconds
+    float heard_[4] = {};                            ///< loudness, centroid, flux, roughness, each followed
 };
 
 } // namespace additiv

@@ -427,6 +427,30 @@ void Engine::readParams()
                 if (v.note >= 0 && (loud == nullptr || v.lastGain > loud->lastGain)) loud = &v;
             in.note = loud ? (static_cast<float>(loud->note) - 24.0f) / 84.0f : 0.5f;
             in.distance = loud ? loud->distance : 0.5f;
+            // What was heard in the last block (the GPU's), and the chord's roughness: Sethares'
+            // dissonance curve (after Plomp and Levelt) over the first eight harmonics of every pair of
+            // sounding voices, weighted by their loudness and 1/h, over its own weight.
+            if (prepared_) cloud_.heard(in.heardDb, in.heardCentroid, in.heardFlux);
+            double rough = 0.0, weight = 0.0;
+            for (size_t a = 0; a < voices_.size(); ++a) {
+                const Voice& va = voices_[a];
+                if (va.note < 0 || va.lastGain <= 0.0f) continue;
+                for (size_t b = a + 1; b < voices_.size(); ++b) {
+                    const Voice& vb = voices_[b];
+                    if (vb.note < 0 || vb.lastGain <= 0.0f) continue;
+                    for (int ha = 1; ha <= 8; ++ha)
+                        for (int hb = 1; hb <= 8; ++hb) {
+                            const double fa = va.hz * ha, fb = vb.hz * hb;
+                            const double s = 0.24 / (0.021 * std::min(fa, fb) + 19.0), d = std::fabs(fb - fa) * s;
+                            const double w = static_cast<double>(va.lastGain) * vb.lastGain / (ha * hb);
+                            rough += w * (std::exp(-3.5 * d) - std::exp(-5.75 * d));
+                            weight += w;
+                        }
+                }
+            }
+            // Scaled so that a minor second, the roughest common interval, reads about 0.55 and a pure
+            // fifth under 0.1 (most of the 64 pairs lie far apart and add nothing to the mean).
+            in.roughness = weight > 1.0e-12 ? static_cast<float>(16.0 * rough / weight) : 0.0f;
         }
         phraseStart_ = false;
         mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);

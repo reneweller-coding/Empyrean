@@ -1306,6 +1306,87 @@ spectralEchoKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, f
 }
 
 /**
+ * @brief The instrument listening to itself, one CUDA block: the voices' block into a history, a
+ *        Hann-windowed frame through the FFT, and three numbers -- the level, the energy's centre
+ *        on the log axis, the change (the magnitudes' rise against the last frame over their sum).
+ *        Summed in a fixed order.
+ * @param hdr    the header
+ * @param io     the block's frames (the voices' four channels are read)
+ * @param hist   the history, two rings of kEchoN
+ * @param prev   the last frame's magnitudes, kEchoBins
+ * @param st     the history's write index
+ * @param stats  receives level (energy), centroid, flux at [2], [3], [4]
+ */
+__global__ void __launch_bounds__(kEchoThreads)
+listenKernel(const BlockHeader* hdr, const float* io, float* hist, float* prev, int* st, float* stats)
+{
+    __shared__ float2 z[kEchoN];
+    __shared__ float red[3][kEchoThreads];
+    const int n = hdr->n;
+    const int t = static_cast<int>(threadIdx.x);
+    const int w0 = st[0];
+    for (int s = t; s < n; s += kEchoThreads) {
+        const float* f = io + static_cast<size_t>(s) * kCloudOutChannels;
+        const int i = (w0 + s) & (kEchoN - 1);
+        hist[i] = f[0] + f[2];
+        hist[kEchoN + i] = f[1] + f[3];
+    }
+    __syncthreads();
+    const int start = (w0 + n) & (kEchoN - 1);
+    for (int k = t; k < kEchoN; k += kEchoThreads) {
+        const int i = (start + k) & (kEchoN - 1);
+        const float win = 0.5f - 0.5f * cospif(2.0f * static_cast<float>(k) / static_cast<float>(kEchoN));
+        z[k] = make_float2(win * hist[i], win * hist[kEchoN + i]);
+    }
+    __syncthreads();
+    fft1024(z, false);
+    const float fs = hdr->sampleRate;
+    float e = 0.0f, c = 0.0f, rise = 0.0f, sum = 0.0f;
+    const int bins = t == 0 ? 2 : 1;
+    for (int b = 0; b < bins; ++b) {
+        const int k = b == 0 ? t : kEchoN / 2;
+        const float2 Zk = z[k], Zm = z[(kEchoN - k) & (kEchoN - 1)];
+        const float xr = 0.5f * (Zk.x + Zm.x), xi = 0.5f * (Zk.y - Zm.y);
+        const float yr = 0.5f * (Zk.y + Zm.y), yi = -0.5f * (Zk.x - Zm.x);
+        const float en = xr * xr + xi * xi + yr * yr + yi * yi;
+        const float mag = sqrtf(en);
+        const float fk = static_cast<float>(k) * fs / static_cast<float>(kEchoN);
+        const float place = fminf(fmaxf(log2f(fmaxf(fk, 20.0f) * (1.0f / 20.0f)) * (1.0f / 9.96578428f), 0.0f), 1.0f);
+        e += en;
+        c += en * place;
+        rise += fmaxf(0.0f, mag - prev[k]);
+        sum += mag;
+        prev[k] = mag;
+    }
+    red[0][t] = e;
+    red[1][t] = c;
+    red[2][t] = rise;
+    __syncthreads();
+    for (int s = kEchoThreads / 2; s > 0; s >>= 1) {
+        if (t < s) { red[0][t] += red[0][t + s]; red[1][t] += red[1][t + s]; red[2][t] += red[2][t + s]; }
+        __syncthreads();
+    }
+    // The magnitudes' sum for the flux, in a second pass over the energy's shared row (its total kept first).
+    __shared__ float total[2];
+    if (t == 0) { total[0] = red[0][0]; total[1] = red[1][0]; }
+    __syncthreads();
+    red[1][t] = sum;
+    __syncthreads();
+    for (int s = kEchoThreads / 2; s > 0; s >>= 1) {
+        if (t < s) red[1][t] += red[1][t + s];
+        __syncthreads();
+    }
+    if (t == 0) {
+        // Energy to a level: a full-scale sine in one ear gives (N/2)^2 (3/8) per bin pair under Hann.
+        const float ref = 0.375f * 0.25f * static_cast<float>(kEchoN) * static_cast<float>(kEchoN);
+        stats[2] = 10.0f * log10f(total[0] / ref + 1.0e-12f);
+        stats[3] = total[0] > 1.0e-12f ? total[1] / total[0] : 0.0f;
+        stats[4] = red[1][0] > 1.0e-9f ? red[2][0] / red[1][0] : 0.0f;
+        st[0] = (w0 + n) & (kEchoN - 1);
+    }
+}
+
+/**
  * @brief Writes a failed CUDA call into `error`.
  * @param e      the call's result
  * @param what   the call, for the message
@@ -1377,7 +1458,10 @@ struct CloudEngine::Impl {
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
     float2* dLifeA = nullptr;         ///< device: the living field, buffer A
     float2* dLifeB = nullptr;         ///< device: buffer B
-    float* dLifeStats = nullptr;      ///< device: its mean and mean square
+    float* dLifeStats = nullptr;      ///< device: its mean and mean square, then what was heard (level, centroid, flux)
+    float* dListenHist = nullptr;     ///< device: the listening's history, two rings of kEchoN
+    float* dListenPrev = nullptr;     ///< device: its last frame's magnitudes
+    int* dListenState = nullptr;      ///< device: its history index
     float* hLifeStats = nullptr;      ///< pinned host: the same, brought down every block
     float2* hLife = nullptr;          ///< pinned host: the field brought down with a snapshot
     std::vector<float> lifeCells;     ///< the field as the partials read it, for the picture
@@ -1425,7 +1509,8 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
                          static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap),
                          static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats),
-                         static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder) })
+                         static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder),
+                         static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -1435,6 +1520,7 @@ struct CloudEngine::Impl {
         dSnap = nullptr; hSnap = nullptr;
         dLifeA = dLifeB = nullptr; dLifeStats = nullptr; hLifeStats = nullptr; hLife = nullptr;
         dSyncTheta = nullptr; dSyncOrder = nullptr;
+        dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1551,10 +1637,13 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaHostAlloc(&m.hSnap, sizeof(float2) * (partialsTotal / kSnapStride), cudaHostAllocDefault), "cudaHostAlloc snapshot", error)
                 && ok(cudaMalloc(&m.dLifeA, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
                 && ok(cudaMalloc(&m.dLifeB, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
-                && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 2), "cudaMalloc life stats", error)
+                && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 8), "cudaMalloc life stats", error)
+                && ok(cudaMalloc(&m.dListenHist, sizeof(float) * 2 * kEchoN), "cudaMalloc listen", error)
+                && ok(cudaMalloc(&m.dListenPrev, sizeof(float) * kEchoBins), "cudaMalloc listen", error)
+                && ok(cudaMalloc(&m.dListenState, sizeof(int) * 2), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dSyncTheta, sizeof(float) * partialsTotal), "cudaMalloc sync", error)
                 && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * partialsTotal), "cudaMalloc sync order", error)
-                && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 2, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
+                && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 8, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
                 && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
@@ -1575,7 +1664,10 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dSnap, 0, sizeof(float2) * (partialsTotal / kSnapStride), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeA, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeB, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 2, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 8, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dListenHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dListenState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dSyncTheta, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dSyncOrder, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
@@ -1616,7 +1708,6 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dLifeA, m.dLifeB);
             lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB);
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
-            cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 2, cudaMemcpyDeviceToHost, m.stream);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dSyncTheta, m.dSyncOrder);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
@@ -1629,6 +1720,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             modalReduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dModalScratch, n, m.dOut);
             spectralEchoKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dEchoHist, m.dEchoAcc, m.dEchoRing, m.dEchoState);
+            listenKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dListenHist, m.dListenPrev, m.dListenState, m.dLifeStats);
+            cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 8, cudaMemcpyDeviceToHost, m.stream);
             cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudOutChannels * n, cudaMemcpyDeviceToHost, m.stream);
             good = ok(cudaStreamEndCapture(m.stream, &m.graph), "cudaStreamEndCapture", error)
                 && ok(cudaGraphInstantiate(&m.exec, m.graph, 0), "cudaGraphInstantiate", error);
@@ -1692,6 +1785,13 @@ void CloudEngine::lifeStats(float& mean, float& meanSq) const
 {
     mean = impl_->hLifeStats[0];
     meanSq = impl_->hLifeStats[1];
+}
+
+void CloudEngine::heard(float& levelDb, float& centroid, float& flux) const
+{
+    levelDb = impl_->hLifeStats[2];
+    centroid = impl_->hLifeStats[3];
+    flux = impl_->hLifeStats[4];
 }
 
 const float* CloudEngine::lifePicture() const { return impl_->lifeShown ? impl_->lifeCells.data() : nullptr; }

@@ -18,12 +18,14 @@ const char* const kModSourceNames[kNumModSources] = { "Off", "LFO 1", "LFO 2", "
                                                       "Macro 3", "Macro 4", "Mod Wheel", "Pressure", "Velocity", "Random",
                                                       "Lenia 1", "Lenia 2", "Lenia 3", "Lenia 4", "Lorenz X", "Lorenz Y", "Lorenz Z",
                                                       "Roessler X", "Roessler Y", "Roessler Z", "Kura 1", "Kura 2", "Kura 3", "Kura 4",
-                                                      "Beat", "Cascade", "Root Age", "Note", "Distance", "Random per Note" };
+                                                      "Beat", "Cascade", "Root Age", "Note", "Distance", "Random per Note",
+                                                      "Loudness", "Heard Brightness", "Change", "Roughness" };
 const char* const kModSourceTokens[kNumModSources] = { "off", "lfo1", "lfo2", "lfo3", "lfo4", "env1", "env2", "macro1", "macro2",
                                                        "macro3", "macro4", "wheel", "pressure", "velocity", "random",
                                                        "lenia1", "lenia2", "lenia3", "lenia4", "lorenz_x", "lorenz_y", "lorenz_z",
                                                        "rossler_x", "rossler_y", "rossler_z", "kura1", "kura2", "kura3", "kura4",
-                                                       "beat", "cascade", "root_age", "note", "distance", "random_note" };
+                                                       "beat", "cascade", "root_age", "note", "distance", "random_note",
+                                                       "loudness", "centroid", "flux", "roughness" };
 
 namespace {
 
@@ -73,6 +75,7 @@ bool isUnipolarSource(ModSource s)
     case ModSource::ModWheel: case ModSource::Pressure: case ModSource::Velocity:
     case ModSource::Lenia1: case ModSource::Lenia2: case ModSource::Lenia3: case ModSource::Lenia4:
     case ModSource::Cascade: case ModSource::RootAge: case ModSource::Note: case ModSource::Distance:
+    case ModSource::Loudness: case ModSource::Centroid: case ModSource::Flux: case ModSource::Roughness:
         return true;
     default:
         return false;
@@ -193,6 +196,7 @@ void Modulators::reset(std::uint64_t seed)
     beatHz_ = 0.0f;
     beatPhase_ = 0.0f;
     cascade_ = 0.0f;
+    for (float& h : heard_) h = 0.0f;
 }
 
 void Modulators::seedLenia()
@@ -383,6 +387,15 @@ void Modulators::advance(float dt, const ModInputs& in)
     values_[static_cast<int>(ModSource::Note)] = std::clamp(in.note, 0.0f, 1.0f);
     values_[static_cast<int>(ModSource::Distance)] = std::clamp(in.distance, 0.0f, 1.0f);
     values_[static_cast<int>(ModSource::RandomNote)] = std::clamp(in.randomNote, -1.0f, 1.0f);
+
+    // What it hears of itself, each followed at its own pace (a level jumps, a judgement settles).
+    const float target[4] = { std::clamp((in.heardDb + 70.0f) / 60.0f, 0.0f, 1.0f), std::clamp(in.heardCentroid, 0.0f, 1.0f),
+                              std::clamp(in.heardFlux * 4.0f, 0.0f, 1.0f), std::clamp(in.roughness, 0.0f, 1.0f) };
+    const float tau[4] = { 0.33f, 0.5f, 0.2f, 1.0f };
+    for (int k = 0; k < 4; ++k) {
+        heard_[k] += (1.0f - std::exp(-dt / tau[k])) * (target[k] - heard_[k]);
+        values_[static_cast<int>(ModSource::Loudness) + k] = heard_[k];
+    }
 }
 
 } // namespace additiv

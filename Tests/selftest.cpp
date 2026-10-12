@@ -1046,6 +1046,35 @@ int main()
               fmt("8th harmonic's swing %.1f dB free, %.1f dB coupled; level %.1f / %.1f dBFS", sd[0], sd[1], level[0], level[1]));
     }
 
+    // 39. What it hears of itself: louder with a note than in silence, brighter for a bright spectrum,
+    //     more change at an attack than in a held note, rougher for a minor second than a pure fifth.
+    {
+        // A source's value through a row onto the brightness (depth 1 from 0): the live value is the source.
+        auto heard = [](ModSource s, const std::vector<int>& notes, float tilt, double seconds, float attack, float scale = 3.0f) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, attack);
+            e.setParam(ParamId::Tilt, tilt);
+            e.setParam(ParamId::Scale, scale);     // JI 7-limit on C (C and G pure); 12-TET where a semitone must be a semitone
+            e.setParam(ParamId::RootNote, 0.0f);
+            e.setParam(ParamId::Brightness, 0.0f);
+            e.setModRow(0, { s, static_cast<int>(ParamId::Brightness), 1.0f });
+            if (!openOffline(e, false, 113)) return -1.0f;
+            for (int note : notes) e.noteOn(note, 0.8f, 0);
+            render(e, seconds);
+            return e.playedNorm(ParamId::Brightness);
+        };
+        const float quiet = heard(ModSource::Loudness, {}, 1.2f, 2.0, 0.05f), loud = heard(ModSource::Loudness, { 60, 64, 67 }, 1.2f, 2.0, 0.05f);
+        const float dark = heard(ModSource::Centroid, { 48 }, 3.0f, 2.0, 0.05f), bright = heard(ModSource::Centroid, { 48 }, 0.3f, 2.0, 0.05f);
+        // Change right after the attack (the attack's rise lasts a frame or two, the source follows over a fifth of a second).
+        const float onset = heard(ModSource::Flux, { 60 }, 1.2f, 0.06, 0.005f), held = heard(ModSource::Flux, { 60 }, 1.2f, 4.0, 0.005f);
+        // In 12-TET: the just scale has no C sharp of its own, so C and C sharp on the keys would be a unison.
+        const float pure = heard(ModSource::Roughness, { 60, 67 }, 1.2f, 3.0, 0.05f, 0.0f), rough = heard(ModSource::Roughness, { 60, 61 }, 1.2f, 3.0, 0.05f, 0.0f);
+        check(loud > quiet + 0.3f && bright > dark + 0.1f && onset > held + 0.03f && rough > pure + 0.2f, "listening: loudness, brightness, change, roughness",
+              fmt("loudness %.2f -> %.2f, brightness %.2f -> %.2f, change %.2f at the attack / %.2f held, roughness %.2f fifth / %.2f second",
+                  quiet, loud, dark, bright, onset, held, pure, rough));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

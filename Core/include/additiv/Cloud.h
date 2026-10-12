@@ -448,6 +448,15 @@ public:
     void lifeStats(float& mean, float& meanSq) const;
 
     /**
+     * @brief What the instrument heard of its own voices in the last block (an FFT of the last 1024
+     *        samples, near and far together): its level, where its energy stands, how much it changed.
+     * @param levelDb   receives the level, dB of full scale
+     * @param centroid  receives the energy's centre on the log axis, 0 at 20 Hz .. 1 at 20 kHz
+     * @param flux      receives the change: the rise of the spectrum's magnitudes over their sum, 0 .. 1
+     */
+    void heard(float& levelDb, float& centroid, float& flux) const;
+
+    /**
      * @brief The living field as the last snapshot brought it down: kLifeW x kLifeH cells, each the value
      *        the partials read (0 .. 1), row after row. Valid after takeSnapshot() returned true.
      * @return  the cells, or null when the field is off

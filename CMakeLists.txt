@@ -80,17 +80,22 @@ if(ADDITIV_BUILD_TOOLS)
     add_executable(empy_render Tools/render/main.cpp)
     target_compile_options(empy_render PRIVATE /W4 /permissive-)
     target_link_libraries(empy_render PRIVATE AdditivCore)
+    # An Engine lives on main's stack in the tools and the self-test; with its modulators (Lenia's field
+    # among them) forty of them in one frame passed Windows' 1 MB: 8 MB, as the family's Linux builds have.
+    target_link_options(empy_render PRIVATE /STACK:8388608)
     family_bin(empy_render)
 
     # additiv_presets: every factory preset's level, for make_presets.py to bring the bank to one level.
     add_executable(additiv_presets Tools/presets/main.cpp)
     target_compile_options(additiv_presets PRIVATE /W4 /permissive-)
     target_link_libraries(additiv_presets PRIVATE AdditivCore)
+    target_link_options(additiv_presets PRIVATE /STACK:8388608)
     family_bin(additiv_presets)
 
     add_executable(additiv_selftest Tests/selftest.cpp)
     target_compile_options(additiv_selftest PRIVATE /W4 /permissive-)
     target_link_libraries(additiv_selftest PRIVATE AdditivCore)
+    target_link_options(additiv_selftest PRIVATE /STACK:8388608)
     add_test(NAME selftest COMMAND additiv_selftest)
     add_test(NAME probe COMMAND probe selftest)
 endif()
