@@ -22,20 +22,40 @@ float CloudView::xOf(float hz, juce::Rectangle<float> area)
 
 void CloudView::refreshLandscape()
 {
-    const int choice = juce::jlimit(0, additiv::kNumFactoryLandscapes - 1, juce::roundToInt(proc_.value(static_cast<int>(ParamId::Landscape))));
-    if (choice == landChoice_) return;
+    int choice = juce::jlimit(0, additiv::kNumLandscapeChoices - 1, juce::roundToInt(proc_.value(static_cast<int>(ParamId::Landscape))));
+    const bool own = choice == additiv::kUserLandscape && !proc_.userLandscape().amps.empty();
+    if (choice == additiv::kUserLandscape && !own) choice = 0;   // none loaded: the engine plays Aurora
+    if (choice == landChoice_ && (!own || landVersion_ == proc_.userLandscapeVersion())) return;
     landChoice_ = choice;
-    const additiv::Landscape l = additiv::factoryLandscape(choice);
+    landVersion_ = proc_.userLandscapeVersion();
+    const additiv::Landscape l = own ? proc_.userLandscape() : additiv::factoryLandscape(choice);
     landLoop_ = l.rows * l.rowSeconds;
-    // Every fourth row and every second column is enough for a picture this size.
-    const int w = l.rows / 4, h = l.columns / 2;
+    // About 256 x 128 points are enough for a picture this size.
+    const int sx = std::max(1, l.rows / 256), sy = std::max(1, l.columns / 128);
+    const int w = std::max(1, l.rows / sx), h = std::max(1, l.columns / sy);
     land_ = juce::Image(juce::Image::RGB, w, h, false);
     const juce::Colour lo = additivui::colour::bg, hi = additivui::colour::accent;
     for (int x = 0; x < w; ++x)
         for (int y = 0; y < h; ++y) {
-            const float a = l.amps[static_cast<size_t>(x * 4) * l.columns + static_cast<size_t>((h - 1 - y) * 2)];
+            const float a = l.amps[static_cast<size_t>(x * sx) * l.columns + static_cast<size_t>((h - 1 - y) * sy)];
             land_.setPixelAt(x, y, lo.interpolatedWith(hi, additiv::ampToBrightness(a, 40.0f)));
         }
+}
+
+void CloudView::mouseUp(const juce::MouseEvent& e)
+{
+    if (!landArea_.contains(e.position)) return;
+    chooser_ = std::make_unique<juce::FileChooser>("Your own landscape: a picture (time left to right, low at the bottom) or a recording",
+                                                   proc_.userLandscapeFile().existsAsFile() ? proc_.userLandscapeFile()
+                                                                                            : juce::File::getSpecialLocation(juce::File::userPicturesDirectory),
+                                                   "*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff;*.gif;*.wav;*.flac");
+    chooser_->launchAsync(juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles, [this](const juce::FileChooser& fc) {
+        const juce::File f = fc.getResult();
+        if (f == juce::File()) return;
+        juce::String why;
+        if (!proc_.loadLandscape(f, true, &why))
+            juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Landscape", "This file could not be read: " + why);
+    });
 }
 
 void CloudView::refresh()
@@ -114,6 +134,7 @@ void CloudView::paint(juce::Graphics& g)
 
     auto inner = all.reduced(10.0f);
     const auto landArea = inner.removeFromRight(inner.getWidth() * 0.28f).withTrimmedLeft(10.0f);
+    landArea_ = landArea;
     const auto spec = inner.withTrimmedBottom(14.0f);
 
     // The axis: 100 Hz, 1 kHz, 10 kHz.
@@ -151,8 +172,17 @@ void CloudView::paint(juce::Graphics& g)
     if (living)
         g.drawText(juce::String("Living landscape: ") + additiv::kLifeModeNames[juce::jlimit(0, additiv::kNumLifeModes - 1, lifeMode)],
                    landArea.withHeight(14.0f).translated(0.0f, -1.0f), juce::Justification::centredLeft);
-    else g.drawText(juce::String(additiv::kLandscapeNames[std::max(landChoice_, 0)]) + (reading ? "" : "  (Motion: Aurora reads it)"),
-               landArea.withHeight(14.0f).translated(0.0f, -1.0f), juce::Justification::centredLeft);
+    else {
+        const bool own = landChoice_ == additiv::kUserLandscape;
+        const juce::String name = own ? juce::String("Your own: ") + proc_.userLandscapeFile().getFileNameWithoutExtension()
+                                      : juce::String(additiv::kLandscapeChoiceNames[std::max(landChoice_, 0)]);
+        g.drawText(name + (reading ? "" : "  (Motion: Aurora reads it)"), landArea.withHeight(14.0f).translated(0.0f, -1.0f),
+                   juce::Justification::centredLeft);
+    }
+    if (isMouseOver(true)) {   // what a click does
+        g.setColour(skin.dim);
+        g.drawText("click: your own picture or recording", landArea.withTrimmedTop(landArea.getHeight() - 14.0f), juce::Justification::centredRight);
+    }
     if (reading && !living && firstTime >= 0.0f) {
         const float rate = proc_.value(static_cast<int>(ParamId::MotionRate));
         float u = firstTime * rate / std::max(landLoop_, 0.1f);

@@ -266,6 +266,7 @@ Landscape landscapeAurora(float loopSeconds, float rangeDb, int columns, int row
 }
 
 const char* const kLandscapeNames[kNumFactoryLandscapes] = { "Aurora", "Shepard", "Tides", "Rain", "Choir" };
+const char* const kLandscapeChoiceNames[kNumLandscapeChoices] = { "Aurora", "Shepard", "Tides", "Rain", "Choir", "Your Own" };
 
 namespace {
 

@@ -46,6 +46,9 @@ Landscape landscapeAurora(float loopSeconds, float rangeDb = 40.0f, int columns 
 
 constexpr int kNumFactoryLandscapes = 5;                         ///< entries of kLandscapeNames
 extern const char* const kLandscapeNames[kNumFactoryLandscapes];  ///< Aurora, Shepard, Tides, Rain, Choir
+constexpr int kUserLandscape = kNumFactoryLandscapes;             ///< the Landscape choice that is the player's own (Engine::setUserLandscape)
+constexpr int kNumLandscapeChoices = kNumFactoryLandscapes + 1;   ///< entries of kLandscapeChoiceNames
+extern const char* const kLandscapeChoiceNames[kNumLandscapeChoices];   ///< the factory's, then "Your Own"
 
 /**
  * @brief One of the generated landscapes, each looping seamlessly over a floor (motion on a carrying

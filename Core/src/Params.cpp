@@ -143,7 +143,7 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     C(ParamId::Motion,      "motion",       "Motion",        "Motion",    kMotionNames, kNumMotions, 4),
     F(ParamId::MotionRate,  "motion_rate",  "Rate",          "Motion",    0.1f,  4.f,   1.f,   0.5f, ""),
     F(ParamId::MotionDepth, "motion_depth", "Depth",         "Motion",    0.f,   1.f,   1.f,   1.f,  ""),
-    C(ParamId::Landscape,   "landscape",    "Landscape",     "Motion",    kLandscapeNames, kNumFactoryLandscapes, 0),
+    C(ParamId::Landscape,   "landscape",    "Landscape",     "Motion",    kLandscapeChoiceNames, kNumLandscapeChoices, 0),
 
     F(ParamId::Attack,      "attack",       "Attack",        "Envelope",  0.01f, 60.f,  6.f,   0.3f, "s"),
     F(ParamId::Decay,       "decay",        "Decay",         "Envelope",  0.01f, 60.f,  4.f,   0.3f, "s"),

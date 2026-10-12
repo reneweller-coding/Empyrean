@@ -6,6 +6,7 @@
 
 #include "PluginEditor.h"
 
+#include "additiv/Motion.h"
 #include "additiv/Presets.h"
 
 #include <algorithm>
@@ -204,6 +205,31 @@ void AdditivProcessor::setSlotFromPreset(int slot, int index)
     additiv::presetValues(index, slotValues_[slot].data(), &slotMods_[slot]);
     engine_.setMorphSlot(slot, slotValues_[slot].data(), slotMods_[slot]);
     slotNames_[slot] = juce::String(additiv::kPresetGroupNames[additiv::preset(index).group]) + ": " + additiv::preset(index).name;
+}
+
+bool AdditivProcessor::loadLandscape(const juce::File& file, bool letItSound, juce::String* error)
+{
+    additiv::Landscape l;
+    std::string why;
+    const juce::String ext = file.getFileExtension().toLowerCase();
+    const bool audio = ext == ".wav" || ext == ".flac";
+    // A picture lasts a minute from left to right (Motion Rate speeds it); a recording keeps its own
+    // time, its columns whitened so it carries its motion rather than its colour (the probe's settings).
+    const bool read = audio ? additiv::landscapeFromAudio(file.getFullPathName().toStdString(), 40.0f, 0.7f, 0.1f, 0.15f, l, &why)
+                            : additiv::landscapeFromImage(file.getFullPathName().toStdString(), 60.0f, 40.0f, l, &why);
+    if (!read) {
+        if (error != nullptr) *error = juce::String(why.empty() ? std::string("it could not be read") : why);
+        return false;
+    }
+    engine_.setUserLandscape(l);
+    userLand_ = std::move(l);
+    userLandFile_ = file;
+    ++userLandVersion_;
+    setValue(static_cast<int>(ParamId::Landscape), static_cast<float>(additiv::kUserLandscape));
+    // Heard: the Aurora motion reads the landscape, the living landscape's picture modes too.
+    const bool read2 = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(value(static_cast<int>(ParamId::Motion)))));
+    if (letItSound && !read2) setValue(static_cast<int>(ParamId::Motion), static_cast<float>(additiv::MotionKind::Aurora));
+    return true;
 }
 
 juce::File AdditivProcessor::journeyFolder()
@@ -407,6 +433,7 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
     }
     xml.createNewChildElement("Mod")->setAttribute("rows", juce::String(engine_.modText()));
     xml.setAttribute("preset", current_.load(std::memory_order_relaxed));
+    if (userLandFile_ != juce::File()) xml.setAttribute("landscapeFile", userLandFile_.getFullPathName());
     for (int k = 0; k < 2; ++k) {   // the morph's slots, as their values and their matrix
         if (slotValues_[k].size() != static_cast<size_t>(additiv::kNumParams)) continue;
         auto* s = xml.createNewChildElement("Slot");
@@ -437,6 +464,15 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         p->setValueNotifyingHost(p->convertTo0to1(std::clamp(v, d.min, d.max)));
     }
     current_.store(xml->getIntAttribute("preset", -1), std::memory_order_relaxed);
+    {   // the player's own landscape, read again from its file (a moved file: Aurora plays instead)
+        const juce::File f(xml->getStringAttribute("landscapeFile"));
+        const float choice = value(static_cast<int>(ParamId::Landscape));
+        if (f.existsAsFile() && f != userLandFile_) {
+            juce::String why;
+            loadLandscape(f, false, &why);
+            setValue(static_cast<int>(ParamId::Landscape), choice);   // as the state chose, not forced to Your Own
+        }
+    }
     const juce::XmlElement* mod = xml->getChildByName("Mod");
     engine_.setModText(mod != nullptr ? mod->getStringAttribute("rows").toStdString() : std::string());   // no rows named: an empty matrix
     for (auto* s : xml->getChildWithTagNameIterator("Slot")) {

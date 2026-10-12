@@ -707,9 +707,45 @@ void Engine::refreshScale()
     snapKeys_ = std::lround(base(ParamId::KeyMap)) == 0;
 }
 
+void Engine::setUserLandscape(const Landscape& l)
+{
+    if (l.columns < 2 || l.columns > kLandMaxColumns || l.rows < 1 || l.amps.size() < static_cast<size_t>(l.columns) * l.rows) return;
+    Landscape fit = l;
+    if (fit.rows > kLandMaxRows) {   // a long recording: rows averaged in groups, the loop kept
+        const int k = (fit.rows + kLandMaxRows - 1) / kLandMaxRows, rows = fit.rows / k;
+        std::vector<float> a(static_cast<size_t>(rows) * fit.columns, 0.0f);
+        for (int r = 0; r < rows; ++r)
+            for (int j = 0; j < k; ++j)
+                for (int c = 0; c < fit.columns; ++c) a[static_cast<size_t>(r) * fit.columns + c] += fit.amps[static_cast<size_t>(r * k + j) * fit.columns + c] / k;
+        fit.amps.swap(a);
+        fit.rowSeconds *= static_cast<float>(k);
+        fit.rows = rows;
+    }
+    const float rms = landscapeRms(fit);
+    {
+        const std::lock_guard<std::mutex> lock(userLandLock_);
+        userLand_ = std::move(fit);
+        userLandRms_ = rms;
+    }
+    userLandVersion_.fetch_add(1, std::memory_order_release);
+}
+
 void Engine::refreshLandscape()
 {
-    const int choice = std::clamp(static_cast<int>(std::lround(base(ParamId::Landscape))), 0, kNumFactoryLandscapes - 1);
+    int choice = std::clamp(static_cast<int>(std::lround(base(ParamId::Landscape))), 0, kNumLandscapeChoices - 1);
+    const int version = userLandVersion_.load(std::memory_order_acquire);
+    if (choice == kUserLandscape && version == 0) choice = 0;   // none of the player's yet: Aurora
+    if (choice == kUserLandscape) {
+        if (landChoice_ == choice && version == userLandSeen_) return;
+        if (!userLandLock_.try_lock()) return;   // the editor is handing one over: the next block
+        cloud_.setLandscape(userLand_.amps.data(), userLand_.columns, userLand_.rows, userLand_.rowSeconds);
+        landRms_ = userLandRms_;
+        landLoop_ = static_cast<float>(userLand_.rows) * userLand_.rowSeconds;
+        userLandLock_.unlock();
+        landChoice_ = choice;
+        userLandSeen_ = version;
+        return;
+    }
     if (choice == landChoice_) return;
     const FactoryLandscapes& f = factoryLandscapes();
     const Landscape& l = f.land[static_cast<size_t>(choice)];

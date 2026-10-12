@@ -7,6 +7,7 @@
  */
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/Landscape.h"
 #include "additiv/Presets.h"
 #include "additiv/Spectrum.h"
 
@@ -1511,6 +1512,37 @@ int main()
         check(spread > 15.0 && swing > 15.0 && std::fabs(swept - plain) < 1.0, "comb: notches across the harmonics, travelling",
               fmt("standing: harmonics 2-9 cut %.1f dB apart (one note %.1f dBFS against %.1f); sweeping: the 4th swings %.1f dB; "
                   "over two sweeps %.1f dBFS against %.1f", spread, level[1], level[0], swing, swept, plain));
+    }
+
+    // 49. The player's own landscape: one that is bright only around 1 kHz, chosen as Your Own and
+    //     read by Aurora, lifts the 8th harmonic (near 1 kHz) far above the 2nd.
+    {
+        double tilt[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::CloudWidth, 4.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::Motion, k == 0 ? 0.0f : 6.0f);   // None, Aurora
+            e.setParam(ParamId::MotionDepth, 1.0f);
+            e.setParam(ParamId::Landscape, static_cast<float>(kUserLandscape));
+            Landscape l;
+            l.columns = 256;
+            l.rows = 64;
+            l.rowSeconds = 0.5f;
+            l.amps.assign(static_cast<size_t>(l.columns) * l.rows, 0.01f);
+            for (int r = 0; r < l.rows; ++r)
+                for (int c = 0; c < l.columns; ++c)
+                    if (std::fabs(std::log2(landscapeColumnHz(c, l.columns) / 1000.0f)) < 0.25f) l.amps[static_cast<size_t>(r) * l.columns + c] = 1.0f;
+            e.setUserLandscape(l);
+            if (!openOffline(e, false, 161)) return 1;
+            e.noteOn(48, 0.8f, 0);
+            const std::vector<float> lr = render(e, 3.0);
+            const double f0 = soundingHz(e);
+            tilt[k] = toneDb(lr, 96000, 144000, 8.0 * f0) - toneDb(lr, 96000, 144000, 2.0 * f0);
+        }
+        check(tilt[1] > tilt[0] + 15.0, "landscape: the player's own is read",
+              fmt("8th harmonic against the 2nd: %.1f dB without, %.1f dB reading a landscape bright at 1 kHz", tilt[0], tilt[1]));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

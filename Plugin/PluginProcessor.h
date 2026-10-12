@@ -13,6 +13,7 @@
 
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/Landscape.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -114,6 +115,24 @@ public:
     juce::String slotName(int slot) const { return slotNames_[slot & 1].isEmpty() ? juce::String("empty") : slotNames_[slot & 1]; }
     /** @} */
 
+    /** @name The player's own landscape @{ */
+    /**
+     * @brief Reads a picture (PNG, JPEG, BMP, TIFF, GIF: time left to right over a minute, low at the
+     *        bottom) or a recording (WAV, FLAC: its own motion) as the landscape, and chooses it.
+     * @param file        the file
+     * @param letItSound  also switch the motion to Aurora when nothing reads the landscape yet
+     * @param error       receives why it could not be read
+     * @return            true when it plays
+     */
+    bool loadLandscape(const juce::File& file, bool letItSound, juce::String* error);
+    /** @brief The player's own landscape (empty when none). Message thread. @return it */
+    const additiv::Landscape& userLandscape() const { return userLand_; }
+    /** @brief Bumped whenever the player's landscape changes (for the picture). @return the count */
+    int userLandscapeVersion() const { return userLandVersion_; }
+    /** @brief The file the player's landscape came from. @return it, or an empty File */
+    juce::File userLandscapeFile() const { return userLandFile_; }
+    /** @} */
+
     /** @name Journeys (Journey.h) @{ */
     /** @brief A journey to choose: one that comes with the instrument, or a file of the player's. */
     struct JourneyEntry {
@@ -178,6 +197,9 @@ private:
     additiv::JourneyPlayer journeyPlayer_;                 ///< its clock and step
     double journeyLastTick_ = 0.0;                         ///< seconds of the last tick, 0 before the first
     additiv::Journey draft_;                               ///< the journey being written
+    additiv::Landscape userLand_;                          ///< the player's own landscape, as read
+    juce::File userLandFile_;                              ///< where it came from
+    int userLandVersion_ = 0;                              ///< bumped when it changes
     mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)
     std::string engineError_;                              ///< why the engine did not open, empty when it runs
     const bool muted_ = juce::SystemStats::getEnvironmentVariable("ADDITIV_MUTE", {}).isNotEmpty();   ///< ADDITIV_MUTE: silent output

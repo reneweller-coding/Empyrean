@@ -325,6 +325,12 @@ void AdditivEditor::shootStep()
             if (want == additiv::preset(i).name) index = i;
         if (index < 0 && want.containsOnly("0123456789") && want.isNotEmpty()) index = want.getIntValue();
         if (index >= 0) proc_.applyPreset(index);
+        // ADDITIV_LANDSCAPE: a picture or a recording as the player's own landscape.
+        const juce::String land = juce::SystemStats::getEnvironmentVariable("ADDITIV_LANDSCAPE", {});
+        if (land.isNotEmpty()) {
+            juce::String why;
+            proc_.loadLandscape(juce::File(land), true, &why);
+        }
         // ADDITIV_SET ("key=value;key=value"): parameters after the preset, a choice by its name or its index.
         for (const juce::String& item : juce::StringArray::fromTokens(juce::SystemStats::getEnvironmentVariable("ADDITIV_SET", {}), ";", ""))
             if (const additiv::ParamDesc* d = additiv::findParam(item.upToFirstOccurrenceOf("=", false, false).trim().toRawUTF8())) {

@@ -21,6 +21,8 @@ public:
     void refresh();
     /** @brief Draws the clouds and the landscape. */
     void paint(juce::Graphics& g) override;
+    /** @brief A click on the landscape opens a picture or a recording as the player's own. @param e the click */
+    void mouseUp(const juce::MouseEvent& e) override;
 
 private:
     /** @brief Remakes the landscape's picture when the choice changed. */
@@ -33,6 +35,9 @@ private:
     AdditivProcessor& proc_;                                            ///< whose voices
     std::array<additiv::VoiceView, additiv::kMaxViewVoices> views_{};  ///< the voices as the last block left them
     int landChoice_ = -1;                                               ///< the landscape pictured
+    int landVersion_ = -1;                                              ///< the player's landscape pictured (its version)
+    juce::Rectangle<float> landArea_;                                   ///< where the landscape is drawn (a click there opens a file)
+    std::unique_ptr<juce::FileChooser> chooser_;                        ///< the open dialog while it is open
     juce::Image land_;                                                  ///< its picture: time left to right, low at the bottom
     float landLoop_ = 30.0f;                                            ///< its loop, seconds
     std::vector<float> snap_;                                           ///< the partials' snapshot: (Hz, amplitude) per point

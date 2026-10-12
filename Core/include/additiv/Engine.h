@@ -28,6 +28,7 @@
 #include "additiv/ClusterBrain.h"
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
+#include "additiv/Landscape.h"
 #include "additiv/Modulation.h"
 #include "additiv/Morph.h"
 #include "additiv/Params.h"
@@ -161,6 +162,15 @@ public:
      * is the blend of the slots at A - B instead of the knobs; switching it on or off glides
      * (Glide seconds, at least one).
      * @{ */
+    /**
+     * @brief The player's own landscape, played when the Landscape choice is Your Own (until one is
+     *        set, that choice plays Aurora). Message thread; the worker uploads it between blocks.
+     *        Rows beyond the GPU's room are averaged down, the loop kept.
+     * @param l  the landscape (a picture's or a recording's, Landscape.h)
+     */
+    void setUserLandscape(const Landscape& l);
+    /** @brief Whether the player's own landscape has been set. Any thread. @return true then */
+    bool hasUserLandscape() const { return userLandVersion_.load(std::memory_order_relaxed) > 0; }
     /** @brief Glide from what plays now to what is set next. Any thread. @param seconds how long (at least 0.05) */
     void beginMorph(double seconds);
     /** @brief How far the glide has come. Any thread. @return 0 .. 1; 1 when none runs */
@@ -433,6 +443,11 @@ private:
     Rng side_;                                         ///< a side stream for the drifters, so switching them on never moves the notes' dice
     Drifter tide_;                                     ///< the whole instrument's slow lean (Tide)
     int landChoice_ = -1;                              ///< the landscape on the GPU
+    Landscape userLand_;                               ///< the player's own, as setUserLandscape left it (under userLandLock_)
+    float userLandRms_ = 1.0f;                         ///< its RMS
+    std::mutex userLandLock_;                          ///< guards userLand_ (the worker only tries it)
+    std::atomic<int> userLandVersion_{ 0 };            ///< bumped by setUserLandscape
+    int userLandSeen_ = 0;                             ///< the version on the GPU
     float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
     bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
     Modulators mods_;                                  ///< the modulation sources
