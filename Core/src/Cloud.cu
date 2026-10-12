@@ -74,6 +74,7 @@ struct BlockHeader {
     Ripple ripple;         ///< the ripple for this block
     Reservoir reservoir;   ///< the reservoir for this block
     Melt melt;             ///< the melt for this block
+    SpectralComb comb;     ///< the spectral comb for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -929,6 +930,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         // The voice's colour and filter, each read at this partial's frequency.
         float colour = filterGain(cv.filterModel, f, cv.cutoff, cv.filterQ, cv.vowel);
         if (cv.filterMix < 1.0f) colour = exp2f(cv.filterMix * log2f(fmaxf(colour, 1.0e-6f)));   // a share of the filter, in decibels
+        if (hdr->comb.depth > 0.0f) {   // the spectral comb: a raised cosine per notch, on the log axis
+            const SpectralComb& K = hdr->comb;
+            const float x = log2f(f) * K.density + K.phase + 0.25f * K.stereo * place;
+            colour *= (1.0f - K.depth * (0.5f - 0.5f * __cosf(6.2831853f * x))) * K.makeup;
+        }
         if (!isAir) colour *= presenceGain(f, cv.presenceDb, dist) * lowCutGain(f, cv.lowCut);
         // The voice's level, as late as this partial's clock (the dispersion), from the ring.
         const float level = lateBy > 0.0f ? gainAgo(ring + static_cast<size_t>(v) * kGainRing, hdr->blockIndex, lateBy * fs / static_cast<float>(n))
@@ -1904,6 +1910,7 @@ struct CloudEngine::Impl {
     Ripple ripple;                    ///< the host's copy of the ripple
     Reservoir reservoir;              ///< the host's copy of the reservoir's settings
     Melt melt;                        ///< the host's copy of the melt's settings
+    SpectralComb comb;                ///< the host's copy of the spectral comb
     float* dMeltHist = nullptr;       ///< device: the melt's input history, two rings of kMeltN
     float* dMeltAcc = nullptr;        ///< device: its overlap, two rings of kMeltN
     float* dMeltEnergy = nullptr;     ///< device: its held energy, per ear and band
@@ -2281,6 +2288,8 @@ Reservoir& CloudEngine::reservoir() { return impl_->reservoir; }
 
 Melt& CloudEngine::melt() { return impl_->melt; }
 
+SpectralComb& CloudEngine::comb() { return impl_->comb; }
+
 void CloudEngine::reservoirOut(float* out) const
 {
     for (int k = 0; k < kReservoirOutputs; ++k) out[k] = impl_->hLifeStats[5 + k];
@@ -2337,6 +2346,7 @@ void CloudEngine::launch()
     hdr->ripple = m.ripple;
     hdr->reservoir = m.reservoir;
     hdr->melt = m.melt;
+    hdr->comb = m.comb;
     m.melt.clear = 0;   // asked for once
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);

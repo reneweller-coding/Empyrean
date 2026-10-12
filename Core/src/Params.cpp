@@ -321,6 +321,10 @@ const std::array<ParamDesc, kNumParams> kTable = { {
 
     F(ParamId::Stretch,         "stretch",          "Stretch",    "Cloud", 1080.f, 1320.f, 1200.f, 1.f, "ct/oct"),
     F(ParamId::Shift,           "shift",            "Shift",      "Cloud", -200.f, 200.f, 0.f,   1.f,  "Hz"),
+    F(ParamId::CombDepth,       "comb_depth",       "Comb",       "Comb", 0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::CombDensity,     "comb_density",     "Density",    "Comb", 0.25f, 12.f,  2.f,   0.5f, "/oct"),
+    F(ParamId::CombSweep,       "comb_sweep",       "Sweep",      "Comb", -2.f,  2.f,   0.1f,  1.f,  "/s"),
+    F(ParamId::CombStereo,      "comb_stereo",      "Stereo",     "Comb", 0.f,   1.f,   0.5f,  1.f,  ""),
 } };
 
 } // namespace

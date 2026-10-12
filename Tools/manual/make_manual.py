@@ -31,7 +31,7 @@ TITLE = "Empyrean"   # the cover's
 TABS = {
     "Cloud": ["Cloud", "Air"],
     "Motion": ["Motion", "Field", "Life", "Sync", "Ripple"],
-    "Filter": ["Filter", "Envelope"],
+    "Filter": ["Filter", "Comb", "Envelope"],
     "Tuning": ["Tuning"],
     "Conductor": ["Conductor"],
     "Space": ["Space", "Master", "Binaural"],

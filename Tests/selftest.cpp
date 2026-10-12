@@ -1443,6 +1443,76 @@ int main()
                   stretched[0], stretched[1], shifted[0], shifted[1]));
     }
 
+    // 48. The spectral comb: standing, it cuts some harmonics deep and leaves others; sweeping, a
+    //     harmonic dives and surfaces as the notches pass; over whole sweeps the level stays (one
+    //     note standing is louder or softer as its fundamental meets a crest or a notch).
+    {
+        double spread = 0.0, swing = 0.0, level[2] = { 0.0, 0.0 }, swept = 0.0;
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::CloudWidth, 4.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::CombDepth, static_cast<float>(k));
+            e.setParam(ParamId::CombDensity, 1.0f);
+            e.setParam(ParamId::CombSweep, 0.0f);
+            e.setParam(ParamId::CombStereo, 0.0f);
+            if (!openOffline(e, false, 157)) return 1;
+            e.noteOn(48, 0.8f, 0);
+            const std::vector<float> lr = render(e, 2.0);
+            const double f0 = soundingHz(e);
+            level[k] = rmsDb(lr, 48000, 96000);   // standing: for the message
+            if (k == 1) {
+                // Against the same note without the comb: how far apart the harmonics are cut.
+                Engine o;
+                quietEffects(o);
+                o.setParam(ParamId::Motion, 0.0f);
+                o.setParam(ParamId::CloudWidth, 4.0f);
+                o.setParam(ParamId::Shimmer, 0.0f);
+                if (!openOffline(o, false, 157)) return 1;
+                o.noteOn(48, 0.8f, 0);
+                const std::vector<float> ref = render(o, 2.0);
+                double lo = 1e9, hi = -1e9;
+                for (int h = 2; h <= 9; ++h) {
+                    const double d = toneDb(lr, 48000, 96000, h * f0) - toneDb(ref, 48000, 96000, h * f0);
+                    lo = std::min(lo, d);
+                    hi = std::max(hi, d);
+                }
+                spread = hi - lo;
+            }
+        }
+        double plain = 0.0;
+        for (int k = 0; k < 2; ++k) {   // the same note, the same seed, with and without a sweeping comb
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::CloudWidth, 4.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::CombDepth, static_cast<float>(k));
+            e.setParam(ParamId::CombDensity, 1.0f);
+            e.setParam(ParamId::CombSweep, 0.25f);
+            e.setParam(ParamId::CombStereo, 0.0f);
+            if (!openOffline(e, false, 159)) return 1;
+            e.noteOn(48, 0.8f, 0);
+            const std::vector<float> lr = render(e, 9.0);
+            (k == 0 ? plain : swept) = rmsDb(lr, 48000, 9 * 48000);   // two whole sweeps (a notch an octave, a quarter notch a second)
+            if (k == 0) continue;
+            const double f4 = 4.0 * soundingHz(e);
+            double lo = 1e9, hi = -1e9;
+            for (int w = 0; w < 40; ++w) {
+                const size_t a = static_cast<size_t>(48000 + w * 9600);
+                const double db = toneDb(lr, a, a + 4800, f4);
+                lo = std::min(lo, db);
+                hi = std::max(hi, db);
+            }
+            swing = hi - lo;
+        }
+        check(spread > 15.0 && swing > 15.0 && std::fabs(swept - plain) < 1.0, "comb: notches across the harmonics, travelling",
+              fmt("standing: harmonics 2-9 cut %.1f dB apart (one note %.1f dBFS against %.1f); sweeping: the 4th swings %.1f dB; "
+                  "over two sweeps %.1f dBFS against %.1f", spread, level[1], level[0], swing, swept, plain));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

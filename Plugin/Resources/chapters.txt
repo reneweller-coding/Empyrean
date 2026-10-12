@@ -32,6 +32,8 @@ Dispersion makes each partial's clock late by its pitch. Positive, the low ones 
 == Filter and envelope | Filter | ==
 The filter is read as a frequency response at every partial: LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak and Formant (whose cutoff picks the vowel). Env Amount moves the cutoff with the voice's envelope, in octaves; Key Track follows the note; Drift lets the cutoff wander on its own. MIDI controller 74 moves the cutoff.
 
+The spectral comb cuts notches into the spectrum, evenly spaced per octave (Density), as deep as Comb says -- read at every partial, so it needs no delay line and can be anything from one notch an octave to twelve. Sweep moves the notches through the spectrum, in notches a second: since the comb repeats every notch, it travels on without end, a phaser that rises (or, negative, falls) forever. Stereo combs the left and the right of the field apart, so the notches travel crosswise through the space. The level is kept whatever the depth.
+
 The envelope is every voice's: Attack, Decay, Sustain, Release, in seconds to minutes.
 
 == Tuning | Tuning | ==

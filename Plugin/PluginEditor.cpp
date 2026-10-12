@@ -165,6 +165,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                      { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
+                     { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
     page("Tuning", { { "Tuning", F::Motion, Ids{ ParamId::Scale, ParamId::RootNote, ParamId::KeyMap, ParamId::RefPitch, ParamId::Purity } },
                      { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod } },

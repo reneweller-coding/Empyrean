@@ -289,6 +289,25 @@ constexpr int kLifeW = 256;          ///< the living field's width, cells (acros
 constexpr int kLifeH = 128;          ///< its height, cells (across a cloud's members)
 constexpr int kLifeRadius = 10;      ///< Lenia's ring kernel radius, cells
 
+/**
+ * @brief The spectral comb: notches evenly spaced per octave, read at every partial's frequency
+ *        (a filter only an additive instrument has: no delay line, any spacing, any depth). Its
+ *        phase runs on, so the notches travel through the spectrum without end -- a phaser that
+ *        rises or falls forever -- and each partial reads it a little further on by its place in
+ *        the stereo field, so left and right are combed apart.
+ */
+struct SpectralComb {
+    float depth = 0.0f;     ///< 0 .. 1: the notches' depth (0: no comb)
+    float density = 2.0f;   ///< notches an octave
+    float phase = 0.0f;     ///< where the notches stand, in notches (the engine runs it on)
+    float stereo = 0.0f;    ///< 0 .. 1: half a notch apart from one side of the field to the other
+    float makeup = 1.0f;    ///< one over the root of the comb's mean square
+    float pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
+    float pad1 = 0.0f;      ///< likewise
+    float pad2 = 0.0f;      ///< likewise
+};
+static_assert(sizeof(SpectralComb) % 16 == 0, "SpectralComb rides in the block header");
+
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeMode : std::int32_t {
     Off = 0,   ///< no field
@@ -513,6 +532,9 @@ public:
 
     /** @brief The host's copy of the melt's settings, edited between wait() and the next launch(). @return the settings */
     Melt& melt();
+
+    /** @brief The host's copy of the spectral comb, edited between wait() and the next launch(). @return the settings */
+    SpectralComb& comb();
 
     /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
     void reservoirOut(float* out) const;

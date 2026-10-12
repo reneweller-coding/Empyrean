@@ -221,6 +221,10 @@ enum class ParamId : int {
     // Phase 13: the partials' ratios
     Stretch,        ///< cents an octave of the harmonics spans (1200: harmonic; Sethares' stretched timbres)
     Shift,          ///< Hz every partial is moved by (a frequency shifter: harmonic ratios become inharmonic)
+    CombDepth,      ///< 0 .. 1: the spectral comb's notches (0: none)
+    CombDensity,    ///< notches an octave
+    CombSweep,      ///< notches a second the comb travels (positive: up, an endless rise)
+    CombStereo,     ///< 0 .. 1: left and right combed apart
     Count           ///< number of parameters
 };
 

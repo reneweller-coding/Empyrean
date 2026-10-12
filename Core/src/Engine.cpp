@@ -1299,6 +1299,20 @@ void Engine::renderBlock()
 
     stepRipple(dtf);
 
+    // The spectral comb: its phase runs on at the sweep (kept within a notch), and the make-up is
+    // exact -- the raised cosine's mean square is (1 - d/2)^2 + d^2/8 over the notches.
+    {
+        SpectralComb& K = cloud_.comb();
+        K.depth = cur(ParamId::CombDepth);
+        K.density = cur(ParamId::CombDensity);
+        K.stereo = cur(ParamId::CombStereo);
+        combPhase_ += static_cast<double>(cur(ParamId::CombSweep)) * dt;
+        combPhase_ -= std::floor(combPhase_);
+        K.phase = static_cast<float>(combPhase_);
+        const float d = K.depth;
+        K.makeup = 1.0f / std::sqrt(std::max((1.0f - 0.5f * d) * (1.0f - 0.5f * d) + 0.125f * d * d, 1.0e-6f));
+    }
+
     // The reservoir: stepped only while a row reads it; fed with what the instrument hears and
     // plays (the sources as the last block left them), each standardised against its last half
     // minute -- the reservoir hears how the music departs from its recent self.
