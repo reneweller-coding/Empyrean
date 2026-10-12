@@ -193,6 +193,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     morphT_ = 1.0f;
     morphSeen_ = morphAsked_.load(std::memory_order_acquire);
     abWas_ = false;
+    mapWas_ = false;
     phraseStart_ = false;
     prevSounding_ = 0;
     readParams();
@@ -404,6 +405,17 @@ void Engine::setMorphSlot(int slot, const float* values, const std::string& modT
         pendingSlots_[slot & 1].set(values, rows, n);
     }
     slotSet_[static_cast<size_t>(slot & 1)].store(true, std::memory_order_relaxed);
+    abVersion_.fetch_add(1, std::memory_order_release);
+    slotVersion_.fetch_add(1, std::memory_order_release);
+}
+
+void Engine::setMapTarget(const MorphState& s)
+{
+    {
+        const std::lock_guard<std::mutex> lock(slotLock_);
+        pendingSlots_[2] = s;
+    }
+    slotSet_[2].store(true, std::memory_order_relaxed);
     slotVersion_.fetch_add(1, std::memory_order_release);
 }
 
@@ -426,15 +438,23 @@ void Engine::updateSound()
     bool slotsChanged = false;
     const int version = slotVersion_.load(std::memory_order_acquire);
     if (version != slotSeen_ && slotLock_.try_lock()) {
-        slots_[0] = pendingSlots_[0];
-        slots_[1] = pendingSlots_[1];
+        const int abVersion = abVersion_.load(std::memory_order_acquire);
+        if (abVersion != abSeen_) {
+            slots_[0] = pendingSlots_[0];
+            slots_[1] = pendingSlots_[1];
+            abSeen_ = abVersion;
+            slotsChanged = true;
+        }
+        slots_[2] = pendingSlots_[2];
         slotLock_.unlock();
         slotSeen_ = version;
-        slotsChanged = true;
     }
-    // Where the sound goes: the A/B blend, or the knobs and the matrix.
-    const bool ab = param(ParamId::MorphActive) >= 0.5f && morphSlotSet(0) && morphSlotSet(1);
-    if (ab) {
+    // Where the sound goes: the map's blend round its cursor, the A/B blend, or the knobs and the matrix.
+    const bool map = param(ParamId::MapActive) >= 0.5f && mapTargetSet();
+    const bool ab = !map && param(ParamId::MorphActive) >= 0.5f && morphSlotSet(0) && morphSlotSet(1);
+    if (map) {
+        target_ = slots_[2];
+    } else if (ab) {
         blendMorph(slots_[0], slots_[1], std::clamp(param(ParamId::MorphPos), 0.0f, 1.0f), target_);
     } else {
         float live[kNumParams];
@@ -454,6 +474,10 @@ void Engine::updateSound()
         if (len < 0.0f) len = std::max(param(ParamId::PresetGlide), 1.0f);
         abWas_ = ab;
     }
+    if (map != mapWas_) {   // the map taking over or letting go glides too
+        if (len < 0.0f) len = std::max(param(ParamId::MapGlide), 1.0f);
+        mapWas_ = map;
+    }
     if (len > 0.0f && soundValid_) {
         from_ = sound_;
         morphT_ = 0.0f;
@@ -463,6 +487,12 @@ void Engine::updateSound()
         morphT_ = std::min(1.0f, morphT_ + static_cast<float>(dt) / morphLen_);
         if (morphT_ < 1.0f) blendMorph(from_, target_, morphCurve(morphT_), sound_);
         else sound_ = target_;
+    } else if (map) {
+        // The map's cursor moves (a hand, a route, automation): the sound follows it, about 95 %
+        // of the way in Map Glide.
+        const float coef = 1.0f - std::exp(-static_cast<float>(dt) / std::max(param(ParamId::MapGlide) / 3.0f, 0.01f));
+        approachMorph(sound_, target_, coef, from_);   // from_ is free outside a glide
+        sound_ = from_;
     } else {
         sound_ = target_;
     }

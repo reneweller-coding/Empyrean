@@ -118,6 +118,25 @@ void addRow(MorphState& out, const ModRow& r, float k)
 
 } // namespace
 
+void approachMorph(const MorphState& cur, const MorphState& target, float coef, MorphState& out)
+{
+    coef = std::clamp(coef, 0.0f, 1.0f);
+    for (const ParamDesc& d : paramTable()) {
+        const size_t i = static_cast<size_t>(d.id);
+        // Whole numbers too take the target's at once: a share of a step, rounded, would never move.
+        out.values[i] = d.kind == ParamKind::Float ? lerpParam(d, cur.values[i], target.values[i], coef) : target.values[i];
+    }
+    out.filterMix = cur.filterMix + (target.filterMix - cur.filterMix) * coef;
+    out.rowCount = 0;
+    for (int i = 0; i < cur.rowCount; ++i) addRow(out, cur.rows[i], 1.0f - coef);
+    for (int i = 0; i < target.rowCount; ++i) addRow(out, target.rows[i], coef);
+    // Rows the target no longer has fade geometrically: drop them once they are nothing.
+    int keep = 0;
+    for (int i = 0; i < out.rowCount; ++i)
+        if (std::fabs(out.rows[i].depth) > 1.0e-4f) out.rows[keep++] = out.rows[i];
+    out.rowCount = keep;
+}
+
 void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& out)
 {
     w = std::clamp(w, 0.0f, 1.0f);

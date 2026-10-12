@@ -185,6 +185,14 @@ public:
     /** @brief Whether a slot has been chosen. Any thread. @param slot 0 or 1 @return true then */
     bool morphSlotSet(int slot) const { return slotSet_[static_cast<size_t>(slot & 1)].load(std::memory_order_relaxed); }
     /**
+     * @brief The sound at the map's cursor (PresetMap.h's MapBlender), played while Map is on: the
+     *        sound follows it over Map Glide. Message thread (the host blends when the cursor moves).
+     * @param s  the blend
+     */
+    void setMapTarget(const MorphState& s);
+    /** @brief Whether the map has a target yet. Any thread. @return true then */
+    bool mapTargetSet() const { return slotSet_[2].load(std::memory_order_relaxed); }
+    /**
      * @brief A parameter where the sound stands, before the matrix: the knob's, or the morph's or
      *        the glide's way between. Any thread.
      * @param id  the parameter
@@ -460,12 +468,15 @@ private:
     MorphState sound_;                                 ///< what plays this block, before the matrix
     MorphState from_;                                  ///< what played when the glide began
     MorphState target_;                                ///< where the glide goes: the knobs, or the A/B blend
-    MorphState slots_[2];                              ///< the A/B morph's slots, as the worker has them
-    MorphState pendingSlots_[2];                       ///< the slots as the editor last set them
+    MorphState slots_[3];                              ///< the A/B morph's slots and the map's target, as the worker has them
+    MorphState pendingSlots_[3];                       ///< the same as the host last set them
     std::mutex slotLock_;                              ///< guards pendingSlots_ (the worker only tries it)
     std::atomic<int> slotVersion_{ 0 };                ///< bumped by setMorphSlot
     int slotSeen_ = 0;                                 ///< the version the worker has
-    std::array<std::atomic<bool>, 2> slotSet_{};       ///< a slot has been chosen
+    std::array<std::atomic<bool>, 3> slotSet_{};       ///< a slot has been chosen (2: the map's target)
+    std::atomic<int> abVersion_{ 0 };                  ///< bumped by setMorphSlot only (a new A or B glides; the map's cursor follows)
+    int abSeen_ = 0;                                   ///< the A/B version the worker has
+    bool mapWas_ = false;                              ///< the map played the last block
     std::atomic<int> morphAsked_{ 0 };                 ///< bumped by beginMorph
     int morphSeen_ = 0;                                ///< the request the worker has served
     std::atomic<float> morphSeconds_{ 1.0f };          ///< the glide asked for

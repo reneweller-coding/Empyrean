@@ -89,7 +89,8 @@ bool isModTarget(ParamId id)
     const int i = static_cast<int>(id);
     if (i < 0 || i >= kNumParams) return false;
     // The morph's position and the glide are where the base values come from, before the matrix.
-    if (id == ParamId::MorphPos || id == ParamId::PresetGlide) return false;
+    if (id == ParamId::MorphPos || id == ParamId::PresetGlide || id == ParamId::MapX || id == ParamId::MapY || id == ParamId::MapRadius
+        || id == ParamId::MapGlide || id == ParamId::RouteSpeed) return false;
     const ParamKind k = paramDesc(id).kind;
     return k == ParamKind::Float || k == ParamKind::Int;
 }

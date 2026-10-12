@@ -18,6 +18,8 @@ const char* const kPresetGroupNames[kNumPresetGroups] = {
     "Lattices & Beats", "Night Gardens",
     "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain", "Ocean Sleep", "Cradle", "Starfield",
     "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow",
+    "Kaleidoscopes", "Tunnels", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
+    "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines",
 };
 
 namespace {
@@ -27,7 +29,9 @@ constexpr int kCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));
 
 bool keptByPresets(ParamId id)
 {
-    return id == ParamId::Binaural || id == ParamId::MorphActive || id == ParamId::MorphPos || id == ParamId::PresetGlide;
+    return id == ParamId::Binaural || id == ParamId::MorphActive || id == ParamId::MorphPos || id == ParamId::PresetGlide
+        || id == ParamId::MapActive || id == ParamId::MapX || id == ParamId::MapY || id == ParamId::MapRadius || id == ParamId::MapGlide
+        || id == ParamId::RouteSpeed;
 }
 
 int numPresets() { return kCount; }

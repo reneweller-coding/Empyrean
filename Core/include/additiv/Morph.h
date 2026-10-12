@@ -51,6 +51,18 @@ struct MorphState {
 void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& out);
 
 /**
+ * @brief One step of following a sound that moves (the map's cursor): every real number a share `coef`
+ *        of the way in its own domain, the filter's share and the matrix likewise, every choice and
+ *        switch and whole number the target's at once (the map's blend has already faded an amount through nothing
+ *        where its neighbours' choices meet).
+ * @param cur     where the sound is
+ * @param target  where it goes
+ * @param coef    0 .. 1: the share of the way this step
+ * @param out     receives the step; must not be cur or target
+ */
+void approachMorph(const MorphState& cur, const MorphState& target, float coef, MorphState& out);
+
+/**
  * @brief The glide's shape over time: smoothstep, so a glide leaves and arrives gently.
  * @param t  0 .. 1 of the glide's time
  * @return   0 .. 1 of the way

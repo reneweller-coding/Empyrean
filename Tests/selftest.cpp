@@ -9,6 +9,8 @@
 #include "additiv/Journey.h"
 #include "additiv/Landscape.h"
 #include "additiv/Presets.h"
+#include "additiv/Route.h"
+#include "additiv/PresetMap.h"
 #include "additiv/Spectrum.h"
 
 #define NOMINMAX
@@ -496,7 +498,7 @@ int main()
               fmt("level swings %.1f dB with the row, %.1f dB without; cutoff plays at %.2f", moved, steady, played));
     }
 
-    // 17. The factory bank: 48 groups of 64, unique names, every key known and every value in its
+    // 17. The factory bank: 64 groups of 64, unique names, every key known and every value in its
     //     range, every matrix row read, and bank select plus program finding each preset again.
     {
         int bad = 0, outOfRange = 0, rowsLost = 0, perGroup[kNumPresetGroups] = {};
@@ -530,7 +532,7 @@ int main()
         const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
         bool full = true;
         for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
-        check(numPresets() == 3072 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
+        check(numPresets() == 4096 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
               fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
                   bad, outOfRange, rowsLost));
     }
@@ -1586,6 +1588,71 @@ int main()
             report += fmt("%s %.3f %.1f%s%s; ", kLifeModeNames[mode], moved, level, a == b ? "" : " NOT identical", ok ? "" : " (FAILED)");
         }
         check(good, "life: the animated pictures move, keep the level, repeat", fmt("free %.1f dBFS; moved a cell, dBFS: ", level0) + report);
+    }
+
+    // 51. The preset map: on a preset's own point the blend is that preset; half way to a neighbour a
+    //     number lies between the two; the engine follows the map's target over Map Glide; the
+    //     routes that come with it read, write back and walk to their points.
+    {
+        MapBlender blender;
+        float x = 0.0f, y = 0.0f;
+        presetMapPosition(100, x, y);
+        MorphState at;
+        MapNeighbours nb;
+        blender.blend(x, y, 0.004f, at, &nb);
+        float values[kNumParams];
+        presetValues(100, values, nullptr);
+        double worst = 0.0;   // what carries the sound (an amount whose choice is off may differ: it is not heard)
+        for (ParamId id : { ParamId::Tilt, ParamId::Brightness, ParamId::CloudWidth, ParamId::Shimmer, ParamId::Attack, ParamId::Release,
+                            ParamId::MasterGain, ParamId::Depth, ParamId::FarLevel, ParamId::Drift }) {
+            const ParamDesc& d = paramDesc(id);
+            worst = std::max(worst, static_cast<double>(std::fabs(toNorm(d, at.values[static_cast<size_t>(id)]) - toNorm(d, values[static_cast<size_t>(id)]))));
+        }
+        const bool onPoint = nb.index[0] == 100 && nb.weight[0] > 0.99f && worst < 1.0e-3;
+        // Half way to the nearest other preset, a wide blend: the tilt between the two (or equal).
+        const int other = nb.index[1];
+        float ox = 0.0f, oy = 0.0f;
+        presetMapPosition(other, ox, oy);
+        MorphState mid;
+        blender.blend(0.5f * (x + ox), 0.5f * (y + oy), 0.02f, mid);
+        float vo[kNumParams];
+        presetValues(other, vo, nullptr);
+        const float ta = values[static_cast<size_t>(ParamId::Tilt)], tb = vo[static_cast<size_t>(ParamId::Tilt)], tm = mid.values[static_cast<size_t>(ParamId::Tilt)];
+        const bool between = tm >= std::min(ta, tb) - 1.0e-3f && tm <= std::max(ta, tb) + 1.0e-3f;
+        // The engine follows the target.
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::MapGlide, 0.3f);
+        if (!openOffline(e, false, 165)) return 1;
+        e.noteOn(55, 0.8f, 0);
+        render(e, 0.5);
+        e.setMapTarget(mid);
+        e.setParam(ParamId::MapActive, 1.0f);
+        render(e, 3.0);
+        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
+        const bool follows = std::fabs(toNorm(tilt, e.soundValue(ParamId::Tilt)) - toNorm(tilt, tm)) < 1.0e-3f;
+        // The routes.
+        int bad = 0;
+        for (int i = 0; i < numRoutePresets(); ++i) {
+            Route r, back;
+            char buf[4096];
+            if (!r.parse(routePreset(i).points) || r.count() < 3 || r.write(buf, sizeof(buf)) <= 0 || !back.parse(buf) || back.count() != r.count()) ++bad;
+        }
+        Route r;
+        r.parse("0.2,0.2|1|1|0.05;0.8,0.6|2|1|0.1");
+        r.start(0.5f, 0.5f, 0.05f, true);
+        float cx = 0.0f, cy = 0.0f, cr = 0.0f;
+        bool reachedA = false, reachedB = false, looped = false;
+        for (int k = 0; k < 160; ++k) {   // 8 s at 0.05 s: A after 1 s, B after 4 s, A again after 6 s
+            r.update(0.05f, cx, cy, cr);
+            if (std::fabs(cx - 0.2f) < 1.0e-4f && std::fabs(cy - 0.2f) < 1.0e-4f) { reachedA = true; if (reachedB) looped = true; }
+            if (std::fabs(cx - 0.8f) < 1.0e-4f && std::fabs(cy - 0.6f) < 1.0e-4f && std::fabs(cr - 0.1f) < 1.0e-5f) reachedB = true;
+        }
+        check(onPoint && between && follows && bad == 0 && reachedA && reachedB && looped && r.running(), "map: blends, follows, and routes walk",
+              fmt("on its point: preset %d weight %.3f, off by %.1e; half way the tilt %.2f between %.2f and %.2f; followed: %s; "
+                  "%d routes, %d unreadable; walked A %s, B %s, round again %s",
+                  nb.index[0], nb.weight[0], worst, tm, ta, tb, follows ? "yes" : "NO", numRoutePresets(), bad,
+                  reachedA ? "yes" : "NO", reachedB ? "yes" : "NO", looped ? "yes" : "NO"));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

@@ -328,6 +328,12 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::CombDensity,     "comb_density",     "Density",    "Comb", 0.25f, 12.f,  2.f,   0.5f, "/oct"),
     F(ParamId::CombSweep,       "comb_sweep",       "Sweep",      "Comb", -2.f,  2.f,   0.1f,  1.f,  "/s"),
     F(ParamId::CombStereo,      "comb_stereo",      "Stereo",     "Comb", 0.f,   1.f,   0.5f,  1.f,  ""),
+    B(ParamId::MapActive,       "map_active",       "Map",        "Map", false),
+    F(ParamId::MapX,            "map_x",            "Map X",      "Map", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::MapY,            "map_y",            "Map Y",      "Map", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::MapRadius,       "map_radius",       "Radius",     "Map", 0.01f, 0.3f,  0.05f, 0.5f, ""),
+    F(ParamId::MapGlide,        "map_glide",        "Map Glide",  "Map", 0.1f,  60.f,  3.f,   0.4f, "s"),
+    F(ParamId::RouteSpeed,      "route_speed",      "Route Speed", "Map", 0.25f, 4.f,  1.f,   0.5f, "x"),
 } };
 
 } // namespace

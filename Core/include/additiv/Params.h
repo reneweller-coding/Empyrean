@@ -227,6 +227,13 @@ enum class ParamId : int {
     CombDensity,    ///< notches an octave
     CombSweep,      ///< notches a second the comb travels (positive: up, an endless rise)
     CombStereo,     ///< 0 .. 1: left and right combed apart
+    // Phase 14: the preset map (the player's: presets never set them)
+    MapActive,      ///< the sound is the blend of the presets round the map's cursor (PresetMap.h)
+    MapX,           ///< the cursor across, 0 .. 1 (dark to bright)
+    MapY,           ///< the cursor up, 0 .. 1 (still to moving)
+    MapRadius,      ///< the blend's width on the map
+    MapGlide,       ///< s: how fast the sound follows the cursor
+    RouteSpeed,     ///< times: how fast a route is walked (its travel and hold times divided by it)
     Count           ///< number of parameters
 };
 
