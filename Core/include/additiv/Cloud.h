@@ -295,6 +295,25 @@ struct LifeField {
 };
 static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 
+/**
+ * @brief Partial sync: a Kuramoto oscillator for every partial, coupled to its own cloud.
+ *
+ * Every partial carries a phase that turns at a rate of its own (`rate`, scattered by `spread`)
+ * and is pulled towards the mean phase of the members of its harmonic -- Kuramoto's mean field,
+ * dθ = ω + K R sin(ψ - θ), measured by the GPU each block in a fixed order. Its loudness follows
+ * the phase by `depth`. Uncoupled, the members flicker each for itself and the flicker averages
+ * out in the harmonic; coupled past the critical strength they fall into step and the whole cloud
+ * pulses as one -- fireflies, pacemaker cells, applause. The mean power is kept whatever happens:
+ * the factor is (1 + depth sin θ) / sqrt(1 + depth^2 / 2).
+ */
+struct PartialSync {
+    float depth = 0.0f;      ///< 0 .. 1: how far the loudness follows the phase (0: nothing computed)
+    float coupling = 0.0f;   ///< K, rad/s
+    float rate = 0.5f;       ///< Hz: the oscillators' middle rate
+    float spread = 0.3f;     ///< 0 .. 1: each rate scattered by up to this share either way
+};
+static_assert(sizeof(PartialSync) % 16 == 0, "PartialSync rides in the block header");
+
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
 constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
@@ -416,6 +435,9 @@ public:
 
     /** @brief The host's copy of the living landscape's settings, edited between wait() and the next launch(). @return the settings */
     LifeField& life();
+
+    /** @brief The host's copy of the partial sync's settings, edited between wait() and the next launch(). @return the settings */
+    PartialSync& sync();
 
     /**
      * @brief The living field's mean and mean square (of what the partials read, 0 .. 1), measured by

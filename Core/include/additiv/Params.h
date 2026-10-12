@@ -196,6 +196,11 @@ enum class ParamId : int {
     LifeRate,       ///< 0 .. 1: how fast it lives
     LifeCharacter,  ///< 0 .. 1: Lenia's growth; the Turing field's way from spots to mazes
     LifeZoom,       ///< 0.25 .. 1: how much of the field's width the range spans
+    // Phase 10c: partial sync
+    SyncDepth,      ///< 0 .. 1: how far each partial's loudness follows its oscillator
+    SyncCoupling,   ///< 0 .. 1: how strongly the members of a harmonic pull each other into step
+    SyncRate,       ///< Hz: the oscillators' middle rate
+    SyncSpread,     ///< 0 .. 1: how far their own rates scatter
     Count           ///< number of parameters
 };
 

@@ -296,6 +296,11 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::LifeRate,       "life_rate",       "Life Rate",    "Life", 0.f,   1.f,   0.3f,  1.f,  ""),
     F(ParamId::LifeCharacter,  "life_character",  "Character",    "Life", 0.f,   1.f,   0.3f,  1.f,  ""),
     F(ParamId::LifeZoom,       "life_zoom",       "Zoom",         "Life", 0.25f, 1.f,   1.f,   1.f,  ""),
+
+    F(ParamId::SyncDepth,      "sync_depth",      "Sync",         "Sync", 0.f,   1.f,   0.f,   1.f,  ""),
+    F(ParamId::SyncCoupling,   "sync_coupling",   "Coupling",     "Sync", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::SyncRate,       "sync_rate",       "Sync Rate",    "Sync", 0.05f, 6.f,   0.5f,  0.4f, "Hz"),
+    F(ParamId::SyncSpread,     "sync_spread",     "Spread",       "Sync", 0.f,   1.f,   0.3f,  1.f,  ""),
 } };
 
 } // namespace

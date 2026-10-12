@@ -153,7 +153,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                 ParamId::FieldRate, ParamId::FieldCount } },
                      { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } },
                      { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
-                                                           ParamId::LifeZoom } } });
+                                                           ParamId::LifeZoom } },
+                     { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });

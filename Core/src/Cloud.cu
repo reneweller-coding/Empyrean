@@ -67,6 +67,7 @@ struct BlockHeader {
     Binaural binaural;     ///< the binaural placement for this block
     SpectralEcho echo;     ///< the spectral echo for this block
     LifeField life;        ///< the living landscape for this block
+    PartialSync sync;      ///< the partial sync for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -580,6 +581,40 @@ __device__ float lifeAt(const BlockHeader* hdr, const float2* cur, float fx, flo
 }
 
 /**
+ * @brief The partial sync's mean fields: for every harmonic of every voice (and its air band, as one
+ *        more group) the mean of its members' phasors from the last block, summed in member order.
+ * @param hdr    the header
+ * @param voices the voices
+ * @param pcap   partials per voice in the tables
+ * @param theta  per partial its phase
+ * @param order  per voice and group the mean phasor (R cos ψ, R sin ψ)
+ */
+__global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const float* theta, float2* order)
+{
+    if (hdr->sync.depth <= 0.0f) return;
+    const int gid = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const int v = gid / pcap, g = gid - v * pcap;
+    if (v >= hdr->voices) return;
+    const CloudVoice& cv = voices[v];
+    if (!cv.active) return;
+    const int H = cv.harmonics, K = cv.members, HP = cv.harmonicPartials;
+    int first, count;
+    if (g < H) { first = g * K; count = K; }
+    else if (g == H && cv.partials > HP) { first = HP; count = cv.partials - HP; }
+    else return;
+    float sx = 0.0f, sy = 0.0f;
+    const float* th = theta + static_cast<size_t>(v) * pcap + first;
+    for (int j = 0; j < count; ++j) {
+        float s, c;
+        __sincosf(th[j], &s, &c);
+        sx += c;
+        sy += s;
+    }
+    const float inv = 1.0f / static_cast<float>(max(count, 1));
+    order[static_cast<size_t>(v) * pcap + g] = make_float2(sx * inv, sy * inv);
+}
+
+/**
  * @brief The ring of the voices' levels: this block's level of every voice written where the
  *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
  *        partial of the new note never hears the old one's level).
@@ -633,10 +668,12 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param snap    every kSnapStride-th partial's frequency and amplitude, for the picture
  * @param lifeA   the living field, buffer A
  * @param lifeB   buffer B
+ * @param theta   per partial the sync's phase
+ * @param order   per voice and group the sync's mean phasor (syncOrderKernel)
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
-                             float2* snap, const float2* lifeA, const float2* lifeB)
+                             float2* snap, const float2* lifeA, const float2* lifeB, float* theta, const float2* order)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -737,6 +774,23 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             const float e = laneValue(cv.amp, c, 30, false, depth);
             depth = fminf(fmaxf(depth, 0.0f), 1.0f);
             env = 1.0f - depth + depth * e;
+        }
+        // Partial sync: the phase turns at its own rate and is pulled to its harmonic's mean phase.
+        if (hdr->sync.depth > 0.0f) {
+            const PartialSync& S = hdr->sync;
+            float th = cv.restart ? 6.2831853f * hash01(seed, up, 13) : theta[gid];
+            const float w = 6.2831853f * S.rate * (1.0f + S.spread * (2.0f * hash01(seed, up, 12) - 1.0f));
+            float pull = 0.0f;
+            if (!cv.restart) {
+                const float2 z = order[static_cast<size_t>(v) * pcap + (isAir ? H : h - 1)];
+                float s, co;
+                __sincosf(th, &s, &co);
+                pull = S.coupling * (z.y * co - z.x * s);   // K R sin(ψ - θ)
+            }
+            th += (w + pull) * static_cast<float>(n) / fs;
+            th -= 6.2831853f * floorf(th * 0.15915494f);
+            theta[gid] = th;
+            env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(th)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
         }
         // The living landscape: the field at this partial's frequency and its place in its cloud.
         if (hdr->life.mode != LifeMode::Off && hdr->life.depth > 0.0f) {
@@ -1318,6 +1372,9 @@ struct CloudEngine::Impl {
     float* dEchoAcc = nullptr;        ///< device: its overlap, two rings of kEchoN
     float2* dEchoRing = nullptr;      ///< device: its delay lines, per ear and band kEchoSlots spectra
     int* dEchoState = nullptr;        ///< device: its history index and frame count
+    float* dSyncTheta = nullptr;      ///< device: per partial the sync's phase
+    float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasor
+    PartialSync sync;                 ///< the host's copy of the partial sync's settings
     float2* dLifeA = nullptr;         ///< device: the living field, buffer A
     float2* dLifeB = nullptr;         ///< device: buffer B
     float* dLifeStats = nullptr;      ///< device: its mean and mean square
@@ -1367,7 +1424,8 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dModal), static_cast<void*>(dModalScratch), static_cast<void*>(dGainRing),
                          static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
                          static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap),
-                         static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats) })
+                         static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats),
+                         static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -1376,6 +1434,7 @@ struct CloudEngine::Impl {
         dAmpQ = nullptr; dEchoHist = nullptr; dEchoAcc = nullptr; dEchoRing = nullptr; dEchoState = nullptr;
         dSnap = nullptr; hSnap = nullptr;
         dLifeA = dLifeB = nullptr; dLifeStats = nullptr; hLifeStats = nullptr; hLife = nullptr;
+        dSyncTheta = nullptr; dSyncOrder = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1493,6 +1552,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dLifeA, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
                 && ok(cudaMalloc(&m.dLifeB, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
                 && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 2), "cudaMalloc life stats", error)
+                && ok(cudaMalloc(&m.dSyncTheta, sizeof(float) * partialsTotal), "cudaMalloc sync", error)
+                && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * partialsTotal), "cudaMalloc sync order", error)
                 && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 2, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
                 && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
@@ -1515,6 +1576,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dLifeA, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeB, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 2, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dSyncTheta, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dSyncOrder, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
@@ -1555,8 +1618,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
             cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 2, cudaMemcpyDeviceToHost, m.stream);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
+            syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dSyncTheta, m.dSyncOrder);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta, m.dSyncOrder);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
@@ -1622,6 +1686,8 @@ void CloudEngine::requestSnapshot() { impl_->snapAsked = true; }
 
 LifeField& CloudEngine::life() { return impl_->life; }
 
+PartialSync& CloudEngine::sync() { return impl_->sync; }
+
 void CloudEngine::lifeStats(float& mean, float& meanSq) const
 {
     mean = impl_->hLifeStats[0];
@@ -1662,6 +1728,7 @@ void CloudEngine::launch()
     hdr->binaural = m.binaural;
     hdr->echo = m.echo;
     m.echo.clear = 0;   // asked for once
+    hdr->sync = m.sync;
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);
     hdr->lifeParity = m.lifeParity;

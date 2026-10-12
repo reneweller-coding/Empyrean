@@ -1013,6 +1013,39 @@ int main()
         check(good, "life: Lenia and Turing live, keep the level, repeat", report);
     }
 
+    // 38. Partial sync: coupled, the members of a harmonic fall into step and the harmonic pulses as
+    //     one -- its level in tenths of a second swings far more than uncoupled -- at the same level.
+    {
+        double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::SyncDepth, 1.0f);
+            e.setParam(ParamId::SyncRate, 1.0f);
+            e.setParam(ParamId::SyncCoupling, static_cast<float>(k));
+            if (!openOffline(e, false, 109)) return 1;
+            e.noteOn(62, 0.8f, 0);
+            const std::vector<float> lr = render(e, 12.0);
+            const double f8 = 8.0 * soundingHz(e);
+            double s = 0.0, s2 = 0.0;
+            const int windows = 60;
+            for (int w = 0; w < windows; ++w) {
+                const size_t a = static_cast<size_t>(6 * 48000 + w * 4800);
+                const double db = toneDb(lr, a, a + 4800, f8);
+                s += db;
+                s2 += db * db;
+            }
+            sd[k] = std::sqrt(std::max(0.0, s2 / windows - (s / windows) * (s / windows)));
+            level[k] = rmsDb(lr, 6 * 48000, 12 * 48000);
+        }
+        check(sd[1] > sd[0] + 2.0 && std::fabs(level[1] - level[0]) < 1.5, "sync: coupled, a harmonic's members pulse as one",
+              fmt("8th harmonic's swing %.1f dB free, %.1f dB coupled; level %.1f / %.1f dBFS", sd[0], sd[1], level[0], level[1]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

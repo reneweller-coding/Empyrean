@@ -1087,6 +1087,16 @@ void Engine::renderBlock()
         }
     }
 
+    // Partial sync: the coupling in units of the oscillators' own spread of rates -- 2.5 times it at
+    // full Coupling, well past the critical strength (for a uniform spread about 1.3 times it).
+    {
+        PartialSync& S = cloud_.sync();
+        S.depth = cur(ParamId::SyncDepth);
+        S.rate = cur(ParamId::SyncRate);
+        S.spread = cur(ParamId::SyncSpread);
+        S.coupling = cur(ParamId::SyncCoupling) * 2.5f * kTwoPi * S.rate * (S.spread + 0.05f);
+    }
+
     // The binaural cloud (its orbit turns the whole of it) and the spectral echo (its lines
     // cleared when it is switched on; its delay less the 1024 - G samples its window adds).
     {
