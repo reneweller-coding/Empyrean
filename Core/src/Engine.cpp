@@ -155,9 +155,12 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     pending_.clear();
     pending_.reserve(kQueueSize);
 
-    // The timeline runs a host block plus the lookahead ahead of what the callback has taken,
-    // rounded up to whole GPU blocks; the ring holds that and room to spare.
-    const int ahead = cfg_.maxHostBlock + static_cast<int>(std::ceil(cfg_.lookaheadMs * 0.001 * cfg_.sampleRate));
+    // The timeline runs two host blocks plus the lookahead ahead of what the callback has taken,
+    // rounded up to whole GPU blocks; the ring holds that and room to spare. Two, because a driver
+    // may deliver two callbacks back to back (WASAPI did, in the standalone: the ring stood at 448
+    // samples for a callback of 480 while the slowest block took 2 ms), and the worker cannot
+    // render between them.
+    const int ahead = 2 * cfg_.maxHostBlock + static_cast<int>(std::ceil(cfg_.lookaheadMs * 0.001 * cfg_.sampleRate));
     latency_ = (ahead + G - 1) / G * G;
     const std::int64_t frames = nextPow2(static_cast<std::int64_t>(latency_) + cfg_.maxHostBlock + 2 * G);
     ring_.assign(static_cast<size_t>(frames) * 2, 0.0f);
@@ -168,7 +171,12 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     late_.store(0);
     sounding_.store(0);
     prepared_ = true;
-    if (realtime_) startWorker();
+    if (realtime_) {
+        startWorker();
+        // The first callback must find the ring full: the first blocks are the slowest (the GPU's
+        // module loads on its first launch), and the host may call at once.
+        for (int waited = 0; waited < 500 && renderPos_.load(std::memory_order_acquire) + G <= latency_; ++waited) Sleep(1);
+    }
     return true;
 }
 
@@ -261,6 +269,11 @@ void Engine::process(float* L, float* R, int n)
             while (renderPos_.load(std::memory_order_relaxed) < out + len) renderBlock();
         const std::int64_t have = renderPos_.load(std::memory_order_acquire) - out;
         const int take = static_cast<int>(std::clamp<std::int64_t>(have, 0, len));
+        const int fill = static_cast<int>(std::clamp<std::int64_t>(have, 0, 1 << 30));
+        int seen = minFill_.load(std::memory_order_relaxed);
+        while ((seen < 0 || fill < seen) && !minFill_.compare_exchange_weak(seen, fill, std::memory_order_relaxed)) {}
+        int big = maxCallback_.load(std::memory_order_relaxed);
+        while (n > big && !maxCallback_.compare_exchange_weak(big, n, std::memory_order_relaxed)) {}
         for (int i = 0; i < take; ++i) {
             const size_t at = static_cast<size_t>((out + i) & ringMask_) * 2;
             L[done + i] = ring_[at];
@@ -489,6 +502,8 @@ void Engine::stopNote(int note, int source)
 
 void Engine::renderBlock()
 {
+    LARGE_INTEGER qpcStart;
+    QueryPerformanceCounter(&qpcStart);
     const int G = cfg_.gpuBlock;
     const double dt = G / cfg_.sampleRate;
     const float dtf = static_cast<float>(dt);
@@ -615,6 +630,16 @@ void Engine::renderBlock()
     }
     sounding_.store(sounding, std::memory_order_relaxed);
     for (int s = 0; s < 3; ++s) soundingBy_[s].store(by[s], std::memory_order_relaxed);
+    for (int i = 0; i < static_cast<int>(voices_.size()) && i < kMaxViewVoices; ++i) {
+        const Voice& v = voices_[static_cast<size_t>(i)];
+        const CloudVoice& cv = cloud_.voice(i);
+        const bool on = v.note >= 0 && cv.active;
+        viewHz_[static_cast<size_t>(i)].store(on ? cv.hz : 0.0f, std::memory_order_relaxed);
+        viewGain_[static_cast<size_t>(i)].store(on ? cv.gain : 0.0f, std::memory_order_relaxed);
+        viewDistance_[static_cast<size_t>(i)].store(v.distance, std::memory_order_relaxed);
+        viewTime_[static_cast<size_t>(i)].store(cv.time, std::memory_order_relaxed);
+        viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
+    }
 
     // 4. The GPU: near and far, left and right.
     cloud_.launch();
@@ -643,6 +668,12 @@ void Engine::renderBlock()
         ring_[at + 1] = softClip(nearR_[static_cast<size_t>(s)] * blk_.master);
     }
     renderPos_.store(pos + G, std::memory_order_release);
+    LARGE_INTEGER qpcEnd, qpcFreq;
+    QueryPerformanceCounter(&qpcEnd);
+    QueryPerformanceFrequency(&qpcFreq);
+    const int us = static_cast<int>((qpcEnd.QuadPart - qpcStart.QuadPart) * 1000000 / qpcFreq.QuadPart);
+    int worst = worstBlockUs_.load(std::memory_order_relaxed);
+    while (us > worst && !worstBlockUs_.compare_exchange_weak(worst, us, std::memory_order_relaxed)) {}
 }
 
 } // namespace additiv

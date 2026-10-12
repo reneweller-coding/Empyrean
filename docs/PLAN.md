@@ -216,6 +216,28 @@ air-formant-brain2).
 **Offen:** binaural pro Partial (Brown/Duda) mit der Quest; eigene Bilder und Aufnahmen als Landschaft brauchen den
 Dateidialog der GUI (Phase 3); Z-Plane und Strike als Modalsynthese.
 
+## Phase 3: die Oberfläche (gebaut, 13.10.2026)
+
+Auf dem Rahmen der Familie (`Plugin/Frame.h/.cpp`, unverändert aus Totality, in allen fünf Repos gleich):
+- **Skin** "Aurora bei Nacht" (Nachtblau, Türkis, Violett; Logo: ein Ring aus Partials), Fenster 1280 x 860.
+- **Kopfzeile:** Autoplay Start/Stopp (Leertaste im Standalone), Modus, Step, Skala, Grundton, Bewegung, Landschaft;
+  Statuszeile (Stimmen nach Herkunft, Grundton, GPU-Zeit, Latenz, Gerät, Unterläufe); Rückgängig, Wiederholen,
+  Hilfe (F1, Text aus `Plugin/Resources/chapters.txt` plus "Diese Seite" mit allen Parametern), Einstellungen.
+- **Wolkenbild:** jede klingende Stimme als Spektrum ihrer Wolken (gespielt grün, Dirigent violett, Brain 2 blass),
+  daneben die Landschaft mit der Stelle, an der die Stimmen in ihrem Loop sind.
+- **Seiten:** Cloud, Motion, Filter (mit Hüllkurve), Tuning, Conductor (mit Brain 2), Space (mit Master); jeder
+  Regler mit dem Rechtsklick-Menü der Familie (MIDI Learn, Vergessen, Standard); Rückgängig über die Gesten.
+- **MIDI:** Haltepedal (CC 64), CC 74 auf das Filter, MIDI Learn (im Zustand gespeichert).
+- **Bildschirmfotos** ohne Desktop-Steuerung: `ADDITIV_SHOT=<Präfix>` (und `ADDITIV_SHOT_AFTER=<s>`) fotografiert jede
+  Seite und beendet den Standalone; `ADDITIV_LOG=<Datei>` schreibt sekündlich den Echtzeitpfad mit.
+
+**Gefunden und behoben [M]:** Im Standalone wuchsen die Unterläufe auf etwa einen pro Sekunde (61 nach 60 s), obwohl
+der langsamste Block nur 2 ms brauchte: WASAPI lieferte zwei Callbacks (je 480 Samples) direkt hintereinander, und
+der Ring stand dann bei 448. Der Vorlauf deckt jetzt zwei Hostblöcke plus 10 ms (Latenz 32 ms bei 480, 21 ms bei
+256): 0 Unterläufe in 31 s, der Ring nie unter 576. Dazu füllt `prepare()` den Ring vor dem ersten Callback.
+
+**Gemessen:** Doccheck, Selbsttest 14/14, Probe 18/18, **pluginval Stufe 10 mit dem Editor** bestanden.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut
@@ -229,7 +251,7 @@ Dateidialog der GUI (Phase 3); Z-Plane und Strike als Modalsynthese.
 2. **Gebaut (siehe oben).** Klangmodell: Noctuarys Spektralformel (Tilt, Brightness, Odd/Even, Inharmonic, Match auf die Skala) mal Wolke
    (Breite, Steigung, Dichte), Drift, Shimmer; Raummodell und Filter pro Partial auf der GPU; Landschaften als
    Kernstück (Bibliothek, Pegelausgleich); Werksformen nach "Bewegung auf tragendem Klang"; Rauschanteile.
-3. Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.
+3. **Gebaut (siehe oben).** Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.
 4. Modulation und Presets (rund 1024 wie die Geschwister).
 5. Familie: Jam, Keyboard-Spiel, Quest.
 6. Release für Windows (Linux optional).

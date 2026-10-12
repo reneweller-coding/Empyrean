@@ -1,0 +1,43 @@
+# The help's chapters (frame::HelpView): "== Title | modules | shot ==" starts a chapter, blank lines part paragraphs.
+
+== The instrument | all | ==
+An additive ambient synthesizer: every voice is twenty thousand sine waves, computed on the graphics card. Each harmonic of a note is not one sine but a cloud of slightly detuned ones, every partial with its own slow drift, its own shimmer and its own place in the stereo field.
+
+It plays by itself or under your hands. The conductor (Autoplay) is Noctuary's: a chord in just intonation that changes one voice at a time, minutes apart, in the spirit of Robert Rich's sleep concerts. Press Play in the header (or Space in the standalone) to start or stop it; play the keyboard over it, or switch it off and play alone.
+
+The picture under the header shows every sounding voice as its spectrum of clouds: green for what you play, violet for the conductor, pale blue for the second conductor. The brighter a cloud, the louder and nearer it is. On the right, the landscape the Aurora motion reads, with a line where the voices are in its loop.
+
+== The cloud | Cloud | ==
+Spectrum shapes the harmonics: Tilt makes the upper ones fall away, Brightness closes a window over them, Odd / Even thins one kind, Inharmonic stretches them as a stiff string does. The voice keeps its level whatever the shape: these colour the sound, they do not make it louder.
+
+Cloud sets how wide each harmonic's cloud is (in cents, and how it widens towards the top), how far every partial drifts in pitch and how far its level shimmers, and how far the partials scatter across the stereo field. Purity (Tuning) narrows the clouds too, so that just intervals can lock.
+
+Air adds a band of noise made of partials around a multiple of the fundamental: Centre, Width and Flicker (how fast its partials quiver -- which is what makes them heard as noise).
+
+== Motion and landscapes | Motion | ==
+Every partial has envelopes of its own, on three lanes: loudness, pitch and place. A motion sets them all at once: Random (every partial for itself, a fine glitter), Wave (a wave climbing through the spectrum), Pendulum (each harmonic pulses a little faster than the one below, over a bass that stays), Breathe (loudness, place and pitch travel through each cloud), Glissando (every partial glides into its note from up to fifteen semitones away), Aurora (the partials read a landscape).
+
+A landscape is time against frequency: every partial reads the column at its own frequency. Aurora, Shepard (bands climbing for ever), Tides, Rain (short glints) and Choir (the formants of u-o-a-e-i, the vowel turning slowly). Rate and Depth scale whatever the motion does; Depth 0 leaves the bare cloud.
+
+== Filter and envelope | Filter | ==
+The filter is read as a frequency response at every partial: LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak and Formant (whose cutoff picks the vowel). Env Amount moves the cutoff with the voice's envelope, in octaves; Key Track follows the note; Drift lets the cutoff wander on its own. MIDI controller 74 moves the cutoff.
+
+The envelope is every voice's: Attack, Decay, Sustain, Release, in seconds to minutes.
+
+== Tuning | Tuning | ==
+Scale chooses the tuning: equal temperament, the just scales, the harmonic series, slendro, Bohlen-Pierce, or Timbre -- the scale the cloud's own spectrum asks for (Sethares). Root is its tonic; Keys maps the keyboard (snapped to twelve keys, or one key per degree). Purity blends equal temperament (0) with the scale (1). Tide leans the whole instrument by a few cents on a curve of minutes.
+
+== The conductor | Conductor | ==
+Free lets notes come and go on their own timers. Chords (Autoplay) keeps the chord full and exchanges one voice at a time, every so many seconds (Every) or now (Step): the new note is the one that sits best against the voices that stay, within Voice Lead semitones. Tension allows notes that lean; Root Move lets the harmony travel. Timbre judges consonance from the cloud's own spectrum.
+
+Brain 2 is a second conductor in the background: its root follows the first one's plus Interval, it plays slowly (Rate 2), few notes (Density 2), deep in the space (Depth 2).
+
+== Space | Space | ==
+Every note stands on a plane between the ear (0) and the far background (1): the conductor puts some notes near and most deep (Depth), played notes stand at Keys Depth. A far note is quieter, darker and heard only through the far reverb. Breath lets every voice's plane wander; Doppler raises a voice that comes closer. Presence lifts the 2-5 kHz band on the near plane; Pad Low Cut leaves the bottom free.
+
+The far reverb (Level, Size, Decay, Damping) is Noctuary's. Master: the level, the bass made mono below Bass Mono, and the width.
+
+== Playing | all | ==
+The keyboard plays over the conductor. The hold pedal (controller 64) keeps notes sounding until it comes up. Right-click any control for MIDI learn (move a controller to bind it), to forget a binding or to return to the default.
+
+Everything you hear is delayed by the same few milliseconds (the engine renders ahead of the audio so the graphics card can never make it stutter); a host compensates for it.

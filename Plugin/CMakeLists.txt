@@ -1,5 +1,6 @@
-# The instrument as a VST3 and a standalone (Phase 1: JUCE's generic editor; the family's Frame.h GUI is Phase 3).
-# After Totality's Plugin/CMakeLists.txt. Working name AdditivAmbientSynth until the instrument has its name.
+# The instrument as a VST3 and a standalone, on the family's panel (Frame.h, copied unchanged from Totality's
+# Plugin/, which is canonical). After Totality's Plugin/CMakeLists.txt. Working name AdditivAmbientSynth until the
+# instrument has its name.
 juce_add_plugin(AdditivAmbientSynth
     COMPANY_NAME                "Rene Weller"
     BUNDLE_ID                   "com.reneweller.additivambientsynth"
@@ -15,7 +16,12 @@ juce_add_plugin(AdditivAmbientSynth
     VST3_CATEGORIES             Instrument Synth
     VERSION                     ${PROJECT_VERSION}
     PRODUCT_NAME                "AdditivAmbientSynth")
-target_sources(AdditivAmbientSynth PRIVATE PluginProcessor.cpp)
+target_sources(AdditivAmbientSynth PRIVATE PluginProcessor.cpp PluginEditor.cpp ParamPage.cpp CloudView.cpp Theme.cpp Frame.cpp)
+# The help's prose (frame::HelpView).
+juce_add_binary_data(AdditivData
+    HEADER_NAME AdditivData.h
+    NAMESPACE AdditivData
+    SOURCES Resources/chapters.txt)
 target_compile_definitions(AdditivAmbientSynth PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
@@ -25,7 +31,9 @@ target_compile_definitions(AdditivAmbientSynth PUBLIC
 target_link_libraries(AdditivAmbientSynth
     PRIVATE
         AdditivCore
+        AdditivData
         juce::juce_audio_utils
+        juce::juce_osc
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)

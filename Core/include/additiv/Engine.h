@@ -48,10 +48,21 @@ struct EngineConfig {
     int    gpuBlock = 128;            ///< samples per GPU block, a power of two
     int    voices = 16;               ///< voices
     int    partialsPerVoice = 20000;  ///< the most partials a voice can have
-    float  lookaheadMs = 10.0f;       ///< how far beyond the host block the worker renders ahead
+    float  lookaheadMs = 10.0f;       ///< how far beyond two host blocks the worker renders ahead
     bool   realtimeGpuClass = true;   ///< raise the process's GPU scheduling class to REALTIME (PLAN.md)
     std::uint64_t seed = 0x5EEDu;     ///< the conductor's and the notes' dice
 };
+
+/** @brief What a picture of the instrument needs to know about one voice (Engine::voiceView). */
+struct VoiceView {
+    float hz = 0.0f;         ///< the frequency it sounds at, 0 when silent
+    float gain = 0.0f;       ///< its envelope, 0 .. 1
+    float distance = 0.0f;   ///< where it stands, 0 at the ear .. 1 far
+    float time = 0.0f;       ///< seconds since it began (the motions' clock)
+    int source = 0;          ///< 0 played, 1 the conductor, 2 the second conductor
+};
+
+constexpr int kMaxViewVoices = 32;   ///< voices a picture can be given
 
 /** @brief The instrument (see the file comment). */
 class Engine {
@@ -149,6 +160,31 @@ public:
 
     /** @brief Notes that arrived after their stamp had been rendered. @return count since prepare() */
     std::uint64_t lateEvents() const { return late_.load(std::memory_order_relaxed); }
+
+    /**
+     * @brief A voice as the last rendered block left it, for pictures (any thread; the fields may come from two
+     *        neighbouring blocks, which a picture does not mind).
+     * @param i  the voice, 0 .. config().voices-1
+     * @return   its view; hz 0 when it is silent
+     */
+    VoiceView voiceView(int i) const
+    {
+        VoiceView v;
+        if (i < 0 || i >= kMaxViewVoices) return v;
+        v.hz = viewHz_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.gain = viewGain_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.distance = viewDistance_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.time = viewTime_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.source = viewSource_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        return v;
+    }
+
+    /** @brief The slowest block the renderer took since the last call, and starts over (diagnostics). @return milliseconds */
+    float takeWorstBlockMs() { return worstBlockUs_.exchange(0, std::memory_order_relaxed) * 0.001f; }
+    /** @brief The emptiest the ring was when a callback came, since the last call, and starts over. @return samples, -1 if no callback came */
+    int takeMinFill() { return minFill_.exchange(-1, std::memory_order_relaxed); }
+    /** @brief The largest block a callback asked for since the last call, and starts over. @return samples */
+    int takeMaxCallback() { return maxCallback_.exchange(0, std::memory_order_relaxed); }
 
     /** @brief GPU time of the last block. @return milliseconds */
     float lastGpuMs() const { return gpuMs_.load(std::memory_order_relaxed); }
@@ -328,6 +364,14 @@ private:
     std::atomic<std::uint64_t> underruns_{ 0 };        ///< callbacks short of samples
     std::atomic<std::uint64_t> late_{ 0 };             ///< notes applied after their stamp
     std::atomic<float> gpuMs_{ 0.0f };                 ///< GPU time of the last block
+    std::atomic<int> worstBlockUs_{ 0 };               ///< the slowest renderBlock since takeWorstBlockMs(), microseconds
+    std::atomic<int> minFill_{ -1 };                   ///< the emptiest ring a callback found since takeMinFill(), samples
+    std::atomic<int> maxCallback_{ 0 };                ///< the largest callback since takeMaxCallback(), samples
+    std::array<std::atomic<float>, kMaxViewVoices> viewHz_{};        ///< per voice its frequency for pictures (0 silent)
+    std::array<std::atomic<float>, kMaxViewVoices> viewGain_{};      ///< its envelope
+    std::array<std::atomic<float>, kMaxViewVoices> viewDistance_{};  ///< its distance
+    std::array<std::atomic<float>, kMaxViewVoices> viewTime_{};      ///< its time since the note began
+    std::array<std::atomic<int>, kMaxViewVoices> viewSource_{};      ///< whose note it plays
 };
 
 } // namespace additiv
