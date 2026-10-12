@@ -493,7 +493,7 @@ int main()
               fmt("level swings %.1f dB with the row, %.1f dB without; cutoff plays at %.2f", moved, steady, played));
     }
 
-    // 17. The factory bank: 16 groups of 64, unique names, every key known and every value in its
+    // 17. The factory bank: 32 groups of 64, unique names, every key known and every value in its
     //     range, every matrix row read, and bank select plus program finding each preset again.
     {
         int bad = 0, outOfRange = 0, rowsLost = 0, perGroup[kNumPresetGroups] = {};
@@ -527,7 +527,7 @@ int main()
         const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
         bool full = true;
         for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
-        check(numPresets() == 1024 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
+        check(numPresets() == 2048 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
               fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
                   bad, outOfRange, rowsLost));
     }

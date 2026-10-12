@@ -13,6 +13,9 @@ namespace additiv {
 const char* const kPresetGroupNames[kNumPresetGroups] = {
     "Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air & Noise", "Deep Space",
     "Glissandi", "Pendulums", "Waves", "Shepard & Tides", "Shimmer", "Dark Drones", "Microtonal", "Keys",
+    "Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Ripples", "Melting Spectra", "Spectral Cascades", "Resonant Halls",
+    "Ghosts & Memory", "Strange Attractors", "Reservoir Minds", "Self-Listening", "Gravity Wells", "Smear & Dispersion",
+    "Lattices & Beats", "Night Gardens",
 };
 
 namespace {

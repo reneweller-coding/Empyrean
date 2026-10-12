@@ -377,8 +377,8 @@ GPU und Effekte. Vorbereitung bis 1 ms, Effekte bis 0,65 ms, das **Warten auf di
 0,1–0,17 ms rechnen: Die Karte war zu rund 50 % mit anderen Programmen belegt (Firefox, Teams u. a.; `nvidia-smi`),
 deren Grafikarbeit sich gröber unterbrechen lässt als die CUDA-Last aus Phase 0, auch gegen die REALTIME-Klasse. Im
 Betrieb hält der Ring (nie unter 960 von 1536), nur beim Start nach den zwei WASAPI-Callbacks wird es eng. Nebenbei:
-Denormals jetzt je Block aus (`NoDenormals`, FTZ und DAZ), denn der Worker ist nicht JUCEs Audio-Thread. **Offen:**
-mehr Vorlauf nur beim Start oder eine Einstellung für den Vorlauf (10/20/40 ms).
+Denormals jetzt je Block aus (`NoDenormals`, FTZ und DAZ), denn der Worker ist nicht JUCEs Audio-Thread. Mehr
+Vorlauf nur beim Start: in Phase 10 gebaut (Startreserve).
 
 ## 0.9.1: das Bild zeigt die Partials (12.10.2026)
 
@@ -390,6 +390,64 @@ Ereignis, auf das `wait()` wartet; das Engine verlangt es etwa alle 33 ms und re
 Mutex weiter, den der Worker nur versucht (nie wartet). Die Ansicht: Punkte (log f quer, −100 … −35 dB hoch) in
 einem Glühpuffer, der je Bild auf 80 % fällt. Selbsttest 33: 2499 von 2560 Punkten der klingenden Stimme, alle an
 ihren Harmonischen, keiner bei stummen Stimmen.
+
+## Phase 10: lebende Systeme (gebaut, 12.10.2026)
+
+Der Nutzer fragte nach weiteren GPU-Effekten und nach Noctuarys Modulatoren ("Da hatten wir doch bei Noctuary so
+eine Art 2D Game-Of-Life-Modulator") und nahm alle Vorschläge an außer Paulstretch ("eher was für Samples": die
+Töne werden ohnehin neu erzeugt). Je Baustein ein Commit, ein Selbsttest, die Hilfe.
+- **10a Noctuarys Quellen:** Lenia 1–4 (32×32 auf der CPU, Ringkern, Wachstumsglocke), Lorenz X/Y/Z und Rössler
+  X/Y/Z (RK4, Chaos Period), Kuramoto 1–4 (Coherence, Coherence Rate), Beat (die Schwebung der zwei tiefsten Töne),
+  Cascade (die Erregung des Dirigenten, Brain Cascade), Root Age, Note, Distance, Random per Note; jede Matrixzeile
+  mit einer **Via**-Quelle, die die Tiefe skaliert (Text `src>ziel:tiefe:via`). Die Attraktoren laufen beim Reset
+  25 Lorenz-Zeiteinheiten vor, Lenia zwanzig Generationen: sie leben ab der ersten Sekunde.
+- **10b Lebende Landschaft** (`LifeField`): Lenia oder Gray-Scott (Turing; Character läuft über Pearsons Karte
+  Flecken → Mitose → Koralle → Würmer → Labyrinth) auf einem 256×128-Torus auf der GPU, jeder Partial liest ihn bei
+  (log f · Zoom, Platz in seiner Wolke). Ausgleich exakt aus E[(1−d+d·v·m)²] = 1, über 0,5 s geglättet; Neusaat,
+  wenn das Feld stirbt oder voll ist. −25,4 (Lenia) / −25,5 (Turing) gegen −26,3 dBFS frei.
+- **10c Partial-Sync:** je Partial ein Kuramoto-Oszillator mit dem Mittelfeld seiner Harmonischen; Faktor
+  (1 + d sin θ)/√(1 + d²/2). Gekoppelt pulsiert die 8. Harmonische mit 10,7 statt 5,8 dB.
+- **10d Selbsthören** (`listenKernel`, 1024er-FFT der Stimmen je Block): Loudness, Heard Brightness (Schwerpunkt
+  auf der log-Achse), Change (Fluss), Roughness (Sethares über 8×8 Harmonische, ×16). Eine Quinte 0,08, eine
+  Sekunde 0,54.
+- **10e Schwarm** (Field-Modus Flock): Boids je Wolke -- Zusammenhalt und Ausrichtung auf den Versätzen, Abstand
+  ab dem halben Heimatabstand (die Reihenfolge bleibt), Lorenz-Wind, Feder, Reibung. Die Mitte der 4. Harmonischen
+  wandert 42,8 Cent, die Breite bleibt 7,1 Cent.
+- **10f Welle** (`Ripple`): gedämpfte Wellengleichung auf 256 Zellen über das Spektrum (CPU, Leapfrog,
+  reflektierende Enden), jede neue Note schlägt sie an ihren ersten acht Harmonischen an (Ricker-Wavelet in Ruhe);
+  jeder Partial liest (1 + d·tanh u) · Ausgleich. Die 4. Harmonische schwankt 8,5 statt 3,3 dB.
+- **10g Reservoir:** Echo-State-Netz mit 2048 Neuronen auf der GPU (Kopplung gleichverteilt ±√(3/N), Spektralradius
+  = Chaos; ein Warp je Zeile; Leck aus Memory), gefüttert mit acht Größen (was es hört, Beat, Note, Kaskade, Lenia),
+  jede gegen ihre letzte halbe Minute standardisiert; vier feste Auslesungen sind Reservoir 1–4. Läuft nur, wenn
+  eine Zeile es liest (oder das Fenster offen ist); 6,5 µs pro Block. Ausschlag 0,50 mit dem Dirigenten, allein
+  ruhig bei Chaos 0,6 (0,0001), frei laufend bei 1,4 (0,74), bitgleich wiederholbar.
+- **10h Melt** (`meltKernel`, ein CUDA-Block mit 1024 Threads, eigene 4096er-FFT): alle 512 Samples ein Frame; jedes
+  Band hält seine Energie (Melt Time bis −60 dB), das gehaltene Spektrum diffundiert auf der log-Achse (Spread:
+  Oktaven nach einer Sekunde) -- jede Quelle streut ihre Energie gleichmäßig über 1 + 2κx Bänder, gesammelt über
+  Präfixsummen in Double-Float (zwei floats; double läuft auf GeForce mit 1/64 und kostete 25 µs), also
+  energieerhaltend. Ein Phasen-Vocoder singt es neu: jedes Band auf der gehörten Frequenz, beim Schmelzen zur
+  eigenen Mitte gezogen, je Ohr leicht verstimmt. Kanäle 8/9 (`kCloudOutChannels` 10), Mix und To Far. Nachklang
+  −26,7 dBFS bei −26,4 gehalten (−28,4 mit Spread 1,5); zwischen den Harmonischen −75,4 → −8,7 dB; 7 µs pro Block.
+- **Die Quellen live** (`SourcesView`): auf der Modulation-Seite alle 42 Quellen als Spur ihrer letzten vier
+  Sekunden, gefärbt nach Art; das Engine veröffentlicht sie je Block (`sourceValue`).
+- **Presets:** 2048 in 32 Gruppen. Die ersten sechzehn bekamen Phase 10, wo sie passt -- gezogen nach allem
+  anderen, sodass jeder bisherige Wert bleibt (761 von 1024: Melt 173, Ripple 160, Sync 140, Life 112, Reservoir 72,
+  Flock 28; 516 neue Matrixzeilen). Sechzehn neue Gruppen, die lebenden Systeme, beginnen je mit dem Klang einer
+  der ersten sechzehn und stellen ein System nach vorn: Living Fields, Turing Gardens, Synchrony, Flocks, Ripples,
+  Melting Spectra, Spectral Cascades, Resonant Halls, Ghosts & Memory, Strange Attractors, Reservoir Minds,
+  Self-Listening, Gravity Wells, Smear & Dispersion, Lattices & Beats, Night Gardens. Alle neu gemessen und auf
+  −20 dBFS gebracht.
+
+- **Der Startunterlauf, behoben:** vor dem ersten Callback rendert der Worker eine zweite Latenzlänge voraus
+  (`startReserve_`) und ersetzt sie nicht, bis die Callbacks sie verbraucht haben; ein startendes Gerät darf
+  seinen Puffer in einem Schub füllen. Die gemeldete Latenz bleibt; ein Ereignis in den ersten ~32 ms kommt um den
+  unverbrauchten Rest der Reserve später (`stampFor`), nie zu spät. Die Rauheit (bis 15.000 `exp` je Block bei 16
+  Stimmen) wird nur jeden achten Block gerechnet.
+
+**Gemessen [M]:** Selbsttest 44/44. GPU mit zwölf Stimmen (probe bench): 0,091–0,103 ms ohne, +0,0065 ms Reservoir,
++0,007 ms Melt. Standalone mit Nightblooming Grove (Life, Melt, Gedächtnis, modaler Hall) neben einer zweiten
+GPU-Last: langsamster Block 0,6–0,9 ms (Vorbereitung bis 0,39, GPU-Warten bis 0,57, Effekte bis 0,26); drei Starts
+ohne Unterlauf, Mindestfüllung in der ersten Sekunde 960–1056 von 1536 (vorher 224 und ein Unterlauf).
 
 ## Phasen (Vorschlag)
 
@@ -405,6 +463,6 @@ ihren Harmonischen, keiner bei stummen Stimmen.
    (Breite, Steigung, Dichte), Drift, Shimmer; Raummodell und Filter pro Partial auf der GPU; Landschaften als
    Kernstück (Bibliothek, Pegelausgleich); Werksformen nach "Bewegung auf tragendem Klang"; Rauschanteile.
 3. **Gebaut (siehe oben).** Plugin (VST3, Standalone) mit der Frame.h-GUI der Familie und einem Bild der Partials.
-4. **Gebaut (siehe oben).** Modulation und Presets (1024 wie die Geschwister).
+4. **Gebaut (siehe oben).** Modulation und Presets (1024 wie die Geschwister; seit Phase 10 2048).
 5. **Gebaut (siehe oben).** Familie: Jam, Headset im Bridge-Modus (eine Quest-App mit CUDA gibt es nicht).
 6. **Vorbereitet (siehe oben).** Release für Windows (Linux optional); veröffentlicht wird nach dem Namen.

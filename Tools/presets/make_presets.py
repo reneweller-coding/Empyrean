@@ -1,9 +1,15 @@
-"""make_presets.py: the factory bank -- 16 groups of 64 presets -- into Core/src/Presets.inc.
+"""make_presets.py: the factory bank -- 32 groups of 64 presets -- into Core/src/Presets.inc.
 
 Every group is a recipe: the ranges its sound lives in, drawn by a seeded die, so the bank is the
 same on every run. A preset names only what it changes (Presets.h). The four macros mean the same
 in every preset: 1 the motion, 2 the brightness (the cutoff where a filter is on), 3 the air, 4 the
 space; the mod wheel opens the brightness too, pressure lifts the presence.
+
+The first sixteen groups are the sounds; the second sixteen (the living systems, 12.10.2026) each
+start from one of them and put one of the systems in front: the living landscape, the sync, the
+flock, the ripple, the melt, the spectral echo, the modal hall, the memory, the attractors, the
+reservoir, what the instrument hears, the field, the dispersion, beating lattices. Phase 10 was
+added to the first sixteen too, drawn after everything else, so what they had stays as it was.
 
 Levelling: Tools/presets (additiv_presets) renders every preset and writes work/presets/levels.json;
 run this script again and every preset's master_gain brings it to the bank's common level.
@@ -29,7 +35,10 @@ LFO = {"Sine": 0, "Triangle": 1, "Ramp Up": 2, "Ramp Down": 3, "Square": 4, "Ran
 ENV = {"Swell": 0, "Pulse": 1, "Bloom": 2, "Flicker": 3, "Wobble": 4, "Rise In": 5, "Fall In": 6, "Saw Up": 7}
 
 GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air & Noise", "Deep Space",
-          "Glissandi", "Pendulums", "Waves", "Shepard & Tides", "Shimmer", "Dark Drones", "Microtonal", "Keys"]
+          "Glissandi", "Pendulums", "Waves", "Shepard & Tides", "Shimmer", "Dark Drones", "Microtonal", "Keys",
+          "Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Ripples", "Melting Spectra", "Spectral Cascades",
+          "Resonant Halls", "Ghosts & Memory", "Strange Attractors", "Reservoir Minds", "Self-Listening", "Gravity Wells",
+          "Smear & Dispersion", "Lattices & Beats", "Night Gardens"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -64,6 +73,38 @@ NAMES = {
                    ["Scale", "Gamelan", "Tuning", "Lattice", "Comma", "Mode", "Series", "Ratio"]),
     "Keys": (["Soft", "Felt", "Played", "Close", "Gentle", "Touched", "Night", "Quiet"],
              ["Keys", "Pad", "Piano", "Hands", "Chords", "Notes", "Touch", "Fingers"]),
+    "Living Fields": (["Growing", "Teeming", "Mossy", "Budding", "Creeping", "Verdant", "Spreading", "Seeded"],
+                      ["Meadow", "Colony", "Lichen", "Bloom", "Culture", "Garden", "Reef", "Fern"]),
+    "Turing Gardens": (["Spotted", "Striped", "Dappling", "Patterned", "Mottled", "Branching", "Labyrinth", "Coral"],
+                       ["Morphogen", "Pattern", "Leopard", "Zebra", "Maze", "Mitosis", "Shell", "Pigment"]),
+    "Synchrony": (["Entrained", "Locked", "Pulsing", "Coupled", "Aligned", "Gathered", "Kindred", "Phased"],
+                  ["Fireflies", "Crickets", "Hearts", "Lanterns", "Rowers", "Metronomes", "Pulses", "Tremolo"]),
+    "Flocks": (["Murmuring", "Wheeling", "Banking", "Scattering", "Soaring", "Flocking", "Darting", "Homing"],
+               ["Starlings", "Swifts", "Shoal", "Murmuration", "Geese", "Swallows", "Sparrows", "Herons"]),
+    "Ripples": (["Rippling", "Pebbled", "Concentric", "Plucked", "Skimmed", "Dropped", "Quivering", "Lapping"],
+                ["Pond", "Rings", "Stones", "Puddle", "Basin", "Lake", "Fountain", "Water"]),
+    "Melting Spectra": (["Melting", "Thawing", "Molten", "Dissolving", "Softened", "Liquid", "Fading", "Weeping"],
+                        ["Icefield", "Wax", "Snow", "Glacier", "Candle", "Frost", "Sugar", "Icicles"]),
+    "Spectral Cascades": (["Cascading", "Splintered", "Echoing", "Refracted", "Tumbling", "Mirrored", "Fractured", "Repeating"],
+                          ["Prisms", "Stairs", "Falls", "Fountains", "Spectra", "Rainbows", "Steps", "Mirrors"]),
+    "Resonant Halls": (["Resonant", "Vaulted", "Ringing", "Painted", "Columned", "Marble", "Hollowed", "Echoed"],
+                       ["Rotunda", "Cistern", "Basilica", "Atrium", "Cloister", "Vault", "Chamber", "Apse"]),
+    "Ghosts & Memory": (["Remembered", "Haunted", "Faded", "Lingering", "Spectral", "Recalled", "Former", "Vanished"],
+                        ["Rooms", "Letters", "Portraits", "Summers", "Gardens", "Waltz", "Footsteps", "Afternoons"]),
+    "Strange Attractors": (["Strange", "Chaotic", "Folded", "Butterfly", "Wandering", "Unstable", "Turbulent", "Looping"],
+                           ["Attractor", "Orbit", "Lorenz", "Roessler", "Saddle", "Torus", "Manifold", "Trajectory"]),
+    "Reservoir Minds": (["Thinking", "Dreaming", "Listening", "Echo-State", "Neural", "Recurrent", "Pondering", "Musing"],
+                        ["Network", "Mind", "Synapse", "Neurons", "Memory", "Thought", "Reverie", "Cortex"]),
+    "Self-Listening": (["Attentive", "Responsive", "Self-Aware", "Heeding", "Answering", "Hearing", "Reacting", "Alert"],
+                       ["Ear", "Mirror", "Feedback", "Reply", "Echo", "Response", "Witness", "Listener"]),
+    "Gravity Wells": (["Gravitating", "Pulled", "Drawn", "Orbiting", "Falling", "Magnetic", "Tethered", "Sinking"],
+                      ["Well", "Mass", "Lodestone", "Anchor", "Centre", "Pole", "Core", "Magnet"]),
+    "Smear & Dispersion": (["Smeared", "Dispersed", "Blurred", "Smudged", "Streaked", "Diffuse", "Bleeding", "Washed"],
+                           ["Ink", "Watercolour", "Chalk", "Pastel", "Charcoal", "Graphite", "Gouache", "Sepia"]),
+    "Lattices & Beats": (["Interlocking", "Beating", "Woven", "Latticed", "Gridded", "Knotted", "Braided", "Meshed"],
+                         ["Lattice", "Weave", "Tapestry", "Trellis", "Loom", "Mesh", "Grid", "Fabric"]),
+    "Night Gardens": (["Moonlit", "Nightblooming", "Starlit", "Dewy", "Midnight", "Dusky", "Owl", "Firefly"],
+                      ["Orchard", "Grove", "Arbour", "Glade", "Pergola", "Lawn", "Hedge", "Bower"]),
 }
 
 
@@ -100,9 +141,9 @@ class Recipe:
         """A parameter."""
         self.p[key] = value
 
-    def row(self, src, target, depth):
-        """A matrix row."""
-        self.rows.append(f"{src}>{target}:{f(depth, 3)}")
+    def row(self, src, target, depth, via=None):
+        """A matrix row, its depth scaled by a via source's amount when one is given."""
+        self.rows.append(f"{src}>{target}:{f(depth, 3)}" + (f":{via}" if via else ""))
 
 
 def common(r, filtered):
@@ -562,6 +603,318 @@ def effects(r, group):
         r.set("far_mode", r.rng.randint(*mode))
 
 
+# ---- Phase 10 (12.10.2026): the living landscape, the sync, the flock, the ripple, the melt, the
+# reservoir, and matrix rows from the new sources.
+
+# Rows from the new sources, by kind: (source, target, depth range). Depths are in the target's
+# normalised range; a unipolar source (Lenia, what is heard, the piece's) only adds.
+POOLS = {
+    "chaos": [("lorenz_x", "cloud_width", (0.08, 0.2)), ("lorenz_z", "tilt", (0.04, 0.1)), ("rossler_x", "drift", (0.1, 0.25)),
+              ("rossler_y", "shimmer", (0.1, 0.25)), ("lorenz_y", "presence", (0.05, 0.12))],
+    "kura": [("kura1", "cloud_width", (0.06, 0.15)), ("kura2", "shimmer", (0.1, 0.25)), ("kura3", "air", (0.1, 0.25)),
+             ("kura4", "brightness", (0.06, 0.15))],
+    "lenia": [("lenia1", "shimmer", (0.15, 0.35)), ("lenia2", "air", (0.15, 0.35)), ("lenia3", "presence", (0.1, 0.2)),
+              ("lenia4", "cloud_width", (0.1, 0.25))],
+    "heard": [("centroid", "brightness", (-0.25, -0.1)), ("loudness", "depth", (0.1, 0.25)), ("flux", "shimmer", (0.2, 0.4)),
+              ("roughness", "tune_gravity", (0.3, 0.6))],
+    "reservoir": [("reservoir1", "brightness", (0.08, 0.2)), ("reservoir2", "cloud_width", (0.1, 0.25)),
+                  ("reservoir3", "air_center", (0.1, 0.25)), ("reservoir4", "tilt", (0.04, 0.1))],
+    "piece": [("beat", "cloud_width", (0.06, 0.15)), ("cascade", "shimmer", (0.15, 0.3)), ("root_age", "depth", (0.1, 0.25)),
+              ("random_note", "drift", (0.1, 0.25)), ("note", "tilt", (-0.1, -0.04))],
+}
+VIAS = ["root_age", "lenia2", "loudness", "kura3"]   # a via that is never 0 for long (no macro: they rest at 0)
+
+
+def rows_from(r, pools, count, via_p=0.3):
+    """Up to `count` rows from the pools, one per source, some through a via source."""
+    used = {row.split(">")[0] for row in r.rows}
+    for _ in range(count):
+        src, target, (lo, hi) = r.pick(*POOLS[r.pick(*pools)])
+        if src in used:
+            continue
+        used.add(src)
+        via = r.pick(*VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def set_life(r, mode, depth, rate, character, zoom):
+    """The living landscape: 1 Lenia, 2 Turing."""
+    r.set("life_mode", mode)
+    r.set("life_depth", f(r.u(*depth), 2))
+    r.set("life_rate", f(r.u(*rate), 2))
+    r.set("life_character", f(r.u(*character), 2))
+    r.set("life_zoom", f(r.u(*zoom), 2))
+
+
+def set_sync(r, depth, coupling, rate, spread):
+    """The partials falling into step."""
+    r.set("sync_depth", f(r.u(*depth), 2))
+    r.set("sync_coupling", f(r.u(*coupling), 2))
+    r.set("sync_rate", f(r.lg(*rate), 3))
+    r.set("sync_spread", f(r.u(*spread), 2))
+
+
+def set_ripple(r, depth, speed, decay):
+    """The wave along the spectrum, struck by every note."""
+    r.set("ripple_depth", f(r.u(*depth), 2))
+    r.set("ripple_speed", f(r.lg(*speed), 3))
+    r.set("ripple_decay", f(r.lg(*decay), 2))
+
+
+def set_melt(r, mix, time, spread):
+    """The spectrum held and melting."""
+    r.set("melt_mix", f(r.u(*mix), 3))
+    r.set("melt_time", f(r.lg(*time), 2))
+    r.set("melt_spread", f(r.u(*spread), 2))
+    r.set("melt_to_far", f(r.u(0.2, 0.6), 2))
+
+
+def set_flock(r, strength, wander, spring):
+    """The clouds as flocks (the field's fourth mode)."""
+    r.set("field_mode", 4)
+    r.set("field_strength", f(r.u(*strength), 2))
+    r.set("field_rate", f(r.lg(*wander), 3))
+    r.set("field_spring", f(r.u(*spring), 2))
+
+
+def set_reservoir(r, chaos, memory, inp):
+    """The reservoir's character (it runs only where a row reads it)."""
+    r.set("reservoir_chaos", f(r.u(*chaos), 2))
+    r.set("reservoir_memory", f(r.lg(*memory), 2))
+    r.set("reservoir_input", f(r.u(*inp), 2))
+
+
+# Phase 10 in the first sixteen groups: life = (p, modes, depth, rate, character, zoom); sync = (p,
+# depth, coupling, rate Hz, spread); ripple = (p, depth, speed oct/s, decay s); melt = (p, mix, time
+# s, spread oct); flock = (p, strength, wander, spring), only where no field was drawn; rows = (p,
+# pools, count).
+P10_FX = {
+    "Sleep Concert":   dict(life=(0.3, (1,), (0.3, 0.6), (0.05, 0.3), (0.1, 0.5), (0.5, 1.0)),
+                            melt=(0.4, (0.2, 0.4), (15, 40), (0.2, 0.6)), rows=(0.6, ["chaos", "kura", "lenia"], 1)),
+    "Choirs":          dict(sync=(0.3, (0.2, 0.5), (0.4, 0.8), (0.2, 1.0), (0.2, 0.5)),
+                            melt=(0.3, (0.15, 0.35), (8, 25), (0.2, 0.6)), rows=(0.5, ["heard", "kura"], 1)),
+    "Glass":           dict(ripple=(0.5, (0.4, 0.8), (0.5, 2.5), (3, 12)), rows=(0.4, ["heard", "chaos"], 1)),
+    "Bells":           dict(ripple=(0.5, (0.4, 0.8), (0.3, 1.5), (4, 15)), melt=(0.3, (0.2, 0.4), (10, 30), (0.3, 0.9)),
+                            rows=(0.4, ["kura", "piece"], 1)),
+    "Strings":         dict(sync=(0.3, (0.2, 0.4), (0.3, 0.7), (0.2, 0.8), (0.2, 0.5)), flock=(0.3, (0.4, 0.8), (0.05, 0.3), (0.1, 0.4)),
+                            rows=(0.5, ["kura", "chaos"], 1)),
+    "Organs":          dict(sync=(0.4, (0.15, 0.35), (0.6, 1.0), (4.0, 6.0), (0.05, 0.2)), rows=(0.4, ["heard", "piece"], 1)),
+    "Air & Noise":     dict(life=(0.4, (2,), (0.4, 0.7), (0.2, 0.6), (0.0, 1.0), (0.3, 1.0)),
+                            melt=(0.4, (0.2, 0.5), (6, 20), (0.8, 1.5)), rows=(0.6, ["reservoir", "lenia"], 1)),
+    "Deep Space":      dict(life=(0.3, (1,), (0.3, 0.6), (0.05, 0.2), (0.1, 0.5), (0.5, 1.0)),
+                            melt=(0.5, (0.3, 0.6), (20, 60), (0.3, 1.0)), rows=(0.7, ["chaos", "reservoir"], 2)),
+    "Glissandi":       dict(flock=(0.3, (0.5, 0.9), (0.1, 0.4), (0.1, 0.3)), ripple=(0.3, (0.3, 0.6), (0.5, 2.0), (4, 12)),
+                            rows=(0.4, ["chaos"], 1)),
+    "Pendulums":       dict(sync=(0.6, (0.4, 0.8), (0.5, 1.0), (0.3, 1.5), (0.1, 0.4)), rows=(0.4, ["kura"], 1)),
+    "Waves":           dict(ripple=(0.6, (0.4, 0.8), (0.3, 1.2), (6, 20)), life=(0.2, (2,), (0.3, 0.6), (0.1, 0.4), (0.2, 0.8), (0.4, 1.0)),
+                            rows=(0.4, ["chaos", "kura"], 1)),
+    "Shepard & Tides": dict(melt=(0.3, (0.2, 0.4), (10, 30), (0.3, 0.8)), rows=(0.5, ["kura", "piece"], 1)),
+    "Shimmer":         dict(sync=(0.3, (0.2, 0.4), (0.4, 0.8), (2.0, 5.0), (0.2, 0.6)),
+                            life=(0.3, (2,), (0.3, 0.6), (0.3, 0.8), (0.0, 1.0), (0.3, 1.0)), rows=(0.5, ["heard", "lenia"], 1)),
+    "Dark Drones":     dict(melt=(0.5, (0.3, 0.6), (20, 60), (0.2, 0.8)), life=(0.3, (1,), (0.3, 0.6), (0.05, 0.2), (0.1, 0.5), (0.5, 1.0)),
+                            rows=(0.6, ["reservoir", "chaos"], 1)),
+    "Microtonal":      dict(sync=(0.3, (0.2, 0.5), (0.4, 0.8), (0.3, 2.0), (0.1, 0.4)), rows=(0.6, ["piece"], 1)),
+    "Keys":            dict(ripple=(0.6, (0.4, 0.8), (0.5, 2.5), (3, 12)), melt=(0.3, (0.15, 0.35), (6, 20), (0.2, 0.6)),
+                            rows=(0.5, ["heard", "piece"], 1)),
+}
+
+
+def p10_effects(r, group):
+    """Phase 10 in one of the first sixteen groups, drawn after everything else."""
+    fx = P10_FX.get(group, {})
+    if "life" in fx:
+        p, modes, *ranges = fx["life"]
+        if r.rng.random() < p:
+            set_life(r, r.pick(*modes), *ranges)
+    if "sync" in fx:
+        p, *ranges = fx["sync"]
+        if r.rng.random() < p:
+            set_sync(r, *ranges)
+    if "ripple" in fx:
+        p, *ranges = fx["ripple"]
+        if r.rng.random() < p:
+            set_ripple(r, *ranges)
+    if "melt" in fx:
+        p, *ranges = fx["melt"]
+        if r.rng.random() < p:
+            set_melt(r, *ranges)
+    if "flock" in fx:
+        p, *ranges = fx["flock"]
+        if r.rng.random() < p and "field_mode" not in r.p:
+            set_flock(r, *ranges)
+    if "rows" in fx:
+        p, pools, count = fx["rows"]
+        if r.rng.random() < p:
+            rows_from(r, pools, count)
+            if any(row.startswith("reservoir") for row in r.rows):
+                set_reservoir(r, (0.85, 1.2), (2, 10), (0.5, 1.2))
+
+
+# ---- The living systems: sixteen groups, each from one of the first sixteen's sounds.
+
+BASE = dict(zip(GROUPS[:16], RECIPES))
+
+
+def based(r, *bases):
+    """A new group's sound: one of the first sixteen groups' recipes with all its effects."""
+    group = r.pick(*bases)
+    BASE[group](r)
+    effects(r, group)
+    motion_effects(r, group)
+    p9_effects(r, group)
+    return group
+
+
+ALL = tuple(GROUPS[:16])
+
+
+def n_living(r):
+    based(r, "Sleep Concert", "Choirs", "Strings", "Deep Space", "Shimmer", "Shepard & Tides")
+    set_life(r, 1, (0.45, 0.85), (0.08, 0.5), (0.1, 0.6), (0.4, 1.0))
+    r.set("lenia_rate", f(r.lg(1, 8), 2))
+    rows_from(r, ["lenia"], 2)
+    rows_from(r, ["kura"], 1)
+
+
+def n_turing(r):
+    based(r, "Glass", "Air & Noise", "Shimmer", "Waves", "Bells", "Choirs")
+    set_life(r, 2, (0.45, 0.85), (0.15, 0.7), (0.0, 1.0), (0.3, 1.0))
+    rows_from(r, ["lenia", "heard"], 2)
+
+
+def n_sync(r):
+    based(r, "Choirs", "Strings", "Organs", "Sleep Concert", "Pendulums", "Glass")
+    set_sync(r, (0.45, 0.9), (0.5, 1.0), (0.2, 3.0), (0.1, 0.5))
+    r.row("kura1", "sync_depth", round(r.u(0.1, 0.25), 3))
+    rows_from(r, ["kura"], 1)
+
+
+def n_flock(r):
+    based(r, "Glissandi", "Waves", "Strings", "Air & Noise", "Shimmer", "Choirs")
+    set_flock(r, (0.5, 1.0), (0.08, 0.6), (0.1, 0.4))
+    rows_from(r, ["chaos"], 2)
+
+
+def n_ripple(r):
+    based(r, "Keys", "Bells", "Glass", "Pendulums", "Waves", "Strings")
+    set_ripple(r, (0.5, 1.0), (0.3, 2.5), (3, 20))
+    if r.p.get("brain_on") != 0:   # the conductor changes notes often: every change strikes the string
+        r.set("auto_rate", f(r.lg(8, 30), 1))
+    rows_from(r, ["heard", "piece"], 1)
+
+
+def n_melt(r):
+    based(r, "Sleep Concert", "Deep Space", "Dark Drones", "Choirs", "Bells", "Strings")
+    set_melt(r, (0.4, 0.8), (10, 50), (0.3, 1.5))
+    if r.rng.random() < 0.4:
+        r.row("lorenz_x", "melt_spread", round(r.u(0.1, 0.25), 3))
+    rows_from(r, ["chaos", "kura"], 1)
+
+
+def n_cascade(r):
+    based(r, "Glass", "Bells", "Shimmer", "Keys", "Pendulums", "Microtonal")
+    r.set("spec_mix", f(r.u(0.2, 0.4), 3))
+    r.set("spec_time", f(r.lg(0.3, 2.5), 3))
+    r.set("spec_tilt", f(r.u(-1, 1), 2))
+    r.set("spec_scatter", f(r.u(0.3, 0.9), 2))
+    r.set("spec_feedback", f(r.u(0.5, 0.85), 2))
+    r.set("spec_damp", f(r.u(0.2, 0.6), 2))
+    r.set("spec_to_far", f(r.u(0.2, 0.6), 2))
+    if r.rng.random() < 0.4:
+        set_melt(r, (0.15, 0.3), (5, 15), (0.2, 0.6))
+    rows_from(r, ["piece", "heard"], 1)
+
+
+def n_halls(r):
+    based(r, "Bells", "Organs", "Choirs", "Dark Drones", "Microtonal", "Glass")
+    r.set("modal_level", f(r.u(0.3, 0.5), 3))
+    r.set("modal_decay", f(r.lg(20, 60), 1))
+    r.set("modal_damp", f(r.u(0.2, 0.5), 2))
+    r.set("modal_tune", f(r.u(0.5, 1.0), 2))
+    r.set("modal_spread", f(r.u(2, 10), 1))
+    r.set("modal_breath", f(r.u(0.3, 0.9), 2))
+    r.set("modal_paint", f(r.u(0.4, 1.0), 2))
+    if r.rng.random() < 0.5:
+        r.row("kura2", "modal_level", round(r.u(0.05, 0.15), 3))
+    rows_from(r, ["kura", "lenia"], 1)
+
+
+def n_ghosts(r):
+    based(r, "Sleep Concert", "Strings", "Keys", "Choirs", "Deep Space", "Organs")
+    r.set("memory_level", f(r.u(0.4, 0.7), 2))
+    r.set("memory_time", f(r.lg(90, 300), 0))
+    r.set("memory_bloom", f(r.lg(4, 15), 1))
+    r.set("memory_blur", f(r.u(0.5, 1.0), 2))
+    r.set("memory_sink", f(r.u(0.4, 0.9), 2))
+    r.set("tune_gravity", f(r.u(0.2, 0.6), 2))
+    r.row("root_age", "memory_level", round(r.u(0.1, 0.25), 3))
+    rows_from(r, ["piece"], 1)
+
+
+def n_attractors(r):
+    based(r, *ALL)
+    r.set("chaos_period", f(r.lg(20, 200), 1))
+    rows_from(r, ["chaos"], 3)
+
+
+def n_reservoir(r):
+    based(r, *ALL)
+    set_reservoir(r, (0.85, 1.25), (1, 15), (0.5, 1.5))
+    rows_from(r, ["reservoir"], 3, via_p=0.2)
+    if not any(row.startswith("reservoir") for row in r.rows):   # the pool's draws may all have been taken
+        r.row("reservoir1", "brightness", round(r.u(0.08, 0.2), 3))
+
+
+def n_listening(r):
+    based(r, *ALL)
+    rows_from(r, ["heard"], 3, via_p=0.15)
+
+
+def n_gravity(r):
+    based(r, "Microtonal", "Glass", "Organs", "Shimmer", "Choirs", "Bells")
+    r.set("field_mode", r.pick(1, 2, 3))
+    r.set("field_strength", f(r.u(0.5, 0.9), 2))
+    r.set("field_radius", f(r.u(30, 300), 0))
+    r.set("field_spring", f(r.u(0.1, 0.5), 2))
+    r.set("field_rate", f(r.lg(0.02, 0.2), 3))
+    r.set("field_count", r.rng.randint(2, 6))
+    r.set("tune_gravity", f(r.u(0.3, 0.8), 2))
+    if r.rng.random() < 0.5:
+        r.set("dispersion", f(r.u(0.2, 0.8), 2))
+    rows_from(r, ["chaos", "kura"], 1)
+
+
+def n_smear(r):
+    based(r, "Glass", "Bells", "Keys", "Air & Noise", "Glissandi", "Shimmer")
+    r.set("dispersion", f(r.u(0.5, 1.5) * (1 if r.rng.random() < 0.7 else -1), 2))
+    set_melt(r, (0.25, 0.5), (4, 15), (0.8, 2.0))
+    rows_from(r, ["heard"], 1)
+
+
+def n_lattice(r):
+    based(r, "Microtonal", "Organs", "Glass", "Strings", "Choirs")
+    r.set("scale", r.pick(SCALE["JI Major"], SCALE["JI Minor"], SCALE["JI 7-limit"], SCALE["JI Pentatonic"], SCALE["Otonality"]))
+    r.set("purity", f(r.u(0.5, 0.9), 2))   # not quite pure: the beats are what this group plays with
+    set_sync(r, (0.2, 0.45), (0.6, 1.0), (2.0, 6.0), (0.05, 0.25))
+    rows_from(r, ["piece"], 2)
+    if not any(row.startswith("beat") for row in r.rows):
+        r.row("beat", "cloud_width", round(r.u(0.06, 0.15), 3))
+
+
+def n_night(r):
+    based(r, "Sleep Concert", "Deep Space", "Shepard & Tides", "Choirs", "Dark Drones")
+    if r.rng.random() < 0.6:
+        set_life(r, 1, (0.3, 0.6), (0.05, 0.25), (0.1, 0.5), (0.5, 1.0))
+    set_melt(r, (0.2, 0.45), (15, 45), (0.2, 0.7))
+    r.set("memory_level", f(r.u(0.2, 0.45), 2))
+    r.set("memory_time", f(r.lg(60, 200), 0))
+    rows_from(r, ["kura", "lenia", "chaos"], 2)
+
+
+RECIPES = RECIPES + [n_living, n_turing, n_sync, n_flock, n_ripple, n_melt, n_cascade, n_halls,
+                     n_ghosts, n_attractors, n_reservoir, n_listening, n_gravity, n_smear, n_lattice, n_night]
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -573,20 +926,25 @@ def build():
         for i in range(64):
             r = Recipe(random.Random(g * 1000 + i))
             recipe(r)
-            effects(r, group)
-            motion_effects(r, group)
-            p9_effects(r, group)
+            if g < 16:   # a new group's recipe brings its sound's effects itself
+                effects(r, group)
+                motion_effects(r, group)
+                p9_effects(r, group)
+                p10_effects(r, group)
+            assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
                 r.set("master_gain", f(max(-18.0, min(12.0, TARGET_DB - levels[name])), 2))
             bank.append((name, g, " ".join(f"{k}={v}" for k, v in r.p.items()), ";".join(r.rows)))
+    all_names = [name for name, *_ in bank]
+    assert len(set(all_names)) == len(all_names), "preset names repeat"
     return bank
 
 
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 16 groups of 64 (Presets.h).",
+             "/// The factory presets: 32 groups of 64 (Presets.h).",
              "const Preset kPresets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

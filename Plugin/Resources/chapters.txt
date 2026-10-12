@@ -82,7 +82,7 @@ Above the matrix every source draws its last four seconds, live, coloured by its
 Every row of the matrix can have a via source: the depth is scaled by its amount, 0 to 1 -- an LFO that only moves the filter as far as the mod wheel allows, a Lorenz wander that opens with Root Age.
 
 == Presets | all | ==
-The bank holds 1024 presets in sixteen groups of 64: Sleep Concert, Choirs, Glass, Bells, Strings, Organs, Air & Noise, Deep Space, Glissandi, Pendulums, Waves, Shepard & Tides, Shimmer, Dark Drones, Microtonal and Keys. The arrows in the header step through them; a click on the name opens the list by group. Every preset was measured by its loudest second and brought to the same level, so stepping through them does not jump.
+The bank holds 2048 presets in 32 groups of 64. Sixteen groups of sounds: Sleep Concert, Choirs, Glass, Bells, Strings, Organs, Air & Noise, Deep Space, Glissandi, Pendulums, Waves, Shepard & Tides, Shimmer, Dark Drones, Microtonal and Keys. Sixteen of living systems, each starting from one of those sounds and putting one system in front: Living Fields and Turing Gardens (the living landscape), Synchrony, Flocks, Ripples, Melting Spectra, Spectral Cascades, Resonant Halls (the modal hall), Ghosts & Memory, Strange Attractors, Reservoir Minds, Self-Listening (what it hears), Gravity Wells (the field), Smear & Dispersion, Lattices & Beats and Night Gardens. The arrows in the header step through them; a click on the name opens the list by group. Every preset was measured by its loudest second and brought to the same level, so stepping through them does not jump.
 
 MIDI program change chooses a preset within the group that bank select (controller 0) names. A preset sets every knob and the matrix; your MIDI-learn bindings stay.
 

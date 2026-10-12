@@ -1,5 +1,39 @@
 # Release notes
 
+## 0.10.0 (12.10.2026, not released)
+
+Living systems: Noctuary's modulators, five new things on the GPU, and twice the presets.
+
+- **Noctuary's sources** in the matrix: Lenia (a living field), Lorenz and Roessler (two strange attractors), four
+  Kuramoto oscillators falling into step, the Beat (the rate the lowest interval beats: it turns in equal temperament,
+  stands in just intonation), the conductor's Cascade, Root Age, Note, Distance, Random per Note. Every row of the
+  matrix can now have a **via** source that scales its depth.
+- **What it hears:** the instrument listens to itself on the GPU -- Loudness, Heard Brightness, Change and Roughness
+  (Sethares' dissonance: a fifth reads 0.08, a second 0.54) are sources too.
+- **The reservoir:** an echo state network of 2048 neurons on the GPU, listening to what is heard and played; its
+  four readouts are smooth curves that never repeat and remember the music. Chaos (below 1 it forgets, above it runs
+  on by itself), Memory, Input.
+- **Living landscape** (Motion page): Lenia or a Turing pattern (spots, mitosis, coral, worms, mazes) grows on a
+  256 x 128 field on the GPU, and every partial's loudness follows the field where it stands. The level is kept.
+- **Partial sync:** each partial a Kuramoto oscillator coupled to the others of its harmonic: coupled, a harmonic's
+  members pulse as one (the 8th harmonic swings 10.7 dB instead of 5.8).
+- **Flock** (the field's fourth mode): each harmonic's cloud moves like a flock of birds on a Lorenz wind, keeping its
+  width (its centre wandered 42.8 cents, its spread stayed 7.1).
+- **Ripple:** every new note strikes a string stretched along the spectrum; the waves run up and down, reflect,
+  cross, and every partial's loudness rides them.
+- **Melt** (Effects page): the spectrum held and melting into the space between the notes -- 4096-point frames on
+  the GPU, each band's energy held over Melt Time and diffused across the spectrum (Spread, in octaves after a
+  second, energy kept), sung again by a phase vocoder at the frequencies it heard.
+- **The sources, live:** the Modulation page draws every source's last four seconds.
+- **2048 presets** in 32 groups. The first sixteen use the new systems where they fit (761 of them; every value they
+  had stays). Sixteen new groups put one system in front each: Living Fields, Turing Gardens, Synchrony, Flocks,
+  Ripples, Melting Spectra, Spectral Cascades, Resonant Halls, Ghosts & Memory, Strange Attractors, Reservoir Minds,
+  Self-Listening, Gravity Wells, Smear & Dispersion, Lattices & Beats, Night Gardens. All measured and levelled again.
+- GPU time with twelve voices: about 0.1 ms per block of 2.7 ms; the reservoir adds 0.0065 ms, the melt 0.007 ms.
+- **No dropout at the start:** the engine renders a second latency's worth ahead before the first callback and lets
+  the callbacks use it up, so a device that fills its buffer in a burst no longer finds the ring short (the
+  standalone had one underrun in its first second). The latency the host is told stays.
+
 ## 0.9.1 (12.10.2026, not released)
 
 - **The picture shows the partials themselves.** It used to draw each voice's shape from the knobs, one quiet bar per

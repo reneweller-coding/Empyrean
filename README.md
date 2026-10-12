@@ -65,9 +65,14 @@ offline renderer and the manual, and a portable zip.
   pinna and the time round the head, worked out per partial; the whole cloud can orbit the listener.
 - **Self-Tune:** voices whose harmonics nearly meet pull together; an equal-tempered chord settles to just intervals.
 - **The conductor:** Free or Chords (Autoplay), Step, and Brain 2, a second conductor deep in the background.
+- **Living systems:** a Lenia or Turing field grows on the GPU and the partials follow it; partials fall into step
+  (Kuramoto sync); clouds fly as flocks; every note sends a ripple along the spectrum; the Melt holds the spectrum and
+  lets it flow into the space between the notes.
 - **Modulation:** four LFOs without hard edges, two envelopes, four macros, mod wheel, pressure, velocity and a random
-  curve, through a matrix of sixteen rows.
-- **1024 presets** in sixteen groups, levelled by their loudest second.
+  curve; Noctuary's Lenia, Lorenz, Roessler and Kuramoto; the Beat, the conductor's Cascade, Root Age; what the
+  instrument hears (loudness, brightness, change, roughness); a reservoir of 2048 neurons on the GPU -- through a
+  matrix of sixteen rows, each with a via source, and every source drawn live.
+- **2048 presets** in 32 groups (sixteen of sounds, sixteen of living systems), levelled by their loudest second.
 
 ## Build
 
