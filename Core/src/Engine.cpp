@@ -1300,10 +1300,27 @@ void Engine::renderBlock()
         lifeModeWas_ = mode;
         if (mode != 0) {
             const float rate = cur(ParamId::LifeRate);
-            lifeAcc_ += (L.mode == LifeMode::Lenia ? 2.0f + 38.0f * rate : 20.0f + 730.0f * rate) * dtf;
-            const int steps = std::min(2, static_cast<int>(lifeAcc_));
-            lifeAcc_ = std::min(lifeAcc_ - static_cast<float>(steps), 2.0f);
-            L.steps = steps;
+            if (lifeIsPicture(L.mode)) {
+                // The animated pictures: a step every block; the flow at Life Rate (squared: slow at
+                // the bottom), the turn at Turn, Rain's drops by Life Rate too.
+                L.steps = 1;
+                pictureTime_ += (0.01 + 0.5 * static_cast<double>(rate) * rate) * dt;
+                pictureAngle_ += 2.0 * 3.14159265358979 * static_cast<double>(cur(ParamId::LifeTurn)) / 60.0 * dt;
+                pictureSeconds_ += dt;
+                pictureAngle_ = std::remainder(pictureAngle_, 2.0 * 3.14159265358979 * 60.0);   // whole turns away, kept small
+                L.time = static_cast<float>(std::fmod(pictureTime_, 4096.0));
+                L.angle = static_cast<float>(pictureAngle_);
+                L.seconds = static_cast<float>(std::fmod(pictureSeconds_, 600000.0));
+                L.sides = std::round(cur(ParamId::LifeSides));
+                L.character = std::clamp(cur(ParamId::LifeCharacter), 0.0f, 1.0f);
+                L.drops = static_cast<float>((0.5 + 30.0 * static_cast<double>(rate) * rate) * dt / (kLifeW * kLifeH));   // drops a second, over every cell
+                L.turnStep = static_cast<float>(2.0 * 3.14159265358979 * static_cast<double>(cur(ParamId::LifeTurn)) / 60.0 * dt);
+            } else {
+                lifeAcc_ += (L.mode == LifeMode::Lenia ? 2.0f + 38.0f * rate : 20.0f + 730.0f * rate) * dtf;
+                const int steps = std::min(2, static_cast<int>(lifeAcc_));
+                lifeAcc_ = std::min(lifeAcc_ - static_cast<float>(steps), 2.0f);
+                L.steps = steps;
+            }
             const float ch = std::clamp(cur(ParamId::LifeCharacter), 0.0f, 1.0f);
             L.lenMu = 0.12f + 0.08f * ch;
             L.lenSigma = 0.012f + 0.012f * ch;
@@ -1326,7 +1343,7 @@ void Engine::renderBlock()
                 lifeMakeup_ += (1.0f - std::exp(-dtf / 0.5f)) * (static_cast<float>(std::clamp(m, 0.0, 8.0)) - lifeMakeup_);
                 L.makeup = lifeMakeup_;
             }
-            const bool dead = mean < 0.002f, full = L.mode == LifeMode::Lenia && mean > 0.85f;
+            const bool dead = !lifeIsPicture(L.mode) && mean < 0.002f, full = L.mode == LifeMode::Lenia && mean > 0.85f;
             if ((dead || full) && lifeQuiet_ > 2.0f && L.reseed == 0) { L.reseed = 1; ++L.salt; lifeQuiet_ = 0.0f; }
         } else {
             L.steps = 0;

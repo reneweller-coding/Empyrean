@@ -313,8 +313,24 @@ enum class LifeMode : std::int32_t {
     Off = 0,   ///< no field
     Lenia,     ///< Lenia (Chan 2019): Conway's Life made continuous -- blobs that drift, pulse, split, die
     Turing,    ///< Gray-Scott reaction-diffusion (Pearson 1993): spots, mitosis, coral, worms, mazes
+    // Animated pictures (Phase 13d): KaleidoscopeEnhanced's continuous transforms, over the landscape
+    // (the factory's or the player's own) or drawn from nothing.
+    Kaleidoscope,   ///< the landscape folded into turning mirror wedges round a wandering centre
+    Tunnel,         ///< a flight down a tunnel lined with the landscape: rings born in the middle, running out
+    Spiral,         ///< the landscape wound into a log-polar spiral that zooms for ever (Droste)
+    Flow,           ///< the landscape carried on a flowing noise current, like ink in water
+    Feedback,       ///< video feedback: the field fed back into itself, turned and zoomed, the landscape seeping in
+    Rain,           ///< drops on a pond: a damped 2D wave, rings spreading and crossing
+    Starfield,      ///< stars streaming out of the middle (log-polar: they speed up as they go)
+    Moire,          ///< two turning line gratings, their slow interference bands
     Count      ///< number of modes
 };
+
+/** @brief Whether a living landscape is one of the animated pictures (computed, not grown). @param m the mode @return true then */
+#if defined(__CUDACC__)
+__host__ __device__
+#endif
+inline bool lifeIsPicture(LifeMode m) { return m >= LifeMode::Kaleidoscope && m < LifeMode::Count; }
 
 /**
  * @brief The living landscape: a field on a torus the GPU steps every block, and every partial reads.
@@ -339,7 +355,15 @@ struct LifeField {
     float lenSigma = 0.015f;         ///< Lenia: its width
     float feed = 0.035f;             ///< Turing: the feed rate F
     float kill = 0.065f;             ///< Turing: the kill rate k
-    float pad0 = 0.0f;               ///< keeps the table 16-byte aligned
+    float time = 0.0f;               ///< pictures: how far the flow has run (Life Rate's units)
+    float angle = 0.0f;              ///< pictures: how far it has turned, radians (Turn)
+    float sides = 6.0f;              ///< pictures: mirror wedges, spiral arms, grating lines (Sides)
+    float character = 0.3f;          ///< pictures: how strongly the transform distorts (Character)
+    float seconds = 0.0f;            ///< pictures: real seconds, for the centre's slow wander
+    float drops = 0.0f;              ///< Rain: the chance a cell is struck this block
+    float turnStep = 0.0f;           ///< pictures: the turn this block, radians (Feedback turns by it)
+    float pad1 = 0.0f;               ///< keeps the table 16-byte aligned
+    float pad2 = 0.0f;               ///< likewise
 };
 static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 

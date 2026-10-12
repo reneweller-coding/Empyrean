@@ -221,6 +221,8 @@ enum class ParamId : int {
     // Phase 13: the partials' ratios
     Stretch,        ///< cents an octave of the harmonics spans (1200: harmonic; Sethares' stretched timbres)
     Shift,          ///< Hz every partial is moved by (a frequency shifter: harmonic ratios become inharmonic)
+    LifeSides,      ///< animated pictures: mirror wedges, spiral arms, grating lines
+    LifeTurn,       ///< animated pictures: turns a minute (negative: the other way)
     CombDepth,      ///< 0 .. 1: the spectral comb's notches (0: none)
     CombDensity,    ///< notches an octave
     CombSweep,      ///< notches a second the comb travels (positive: up, an endless rise)
@@ -280,8 +282,8 @@ constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven table
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
-constexpr int kNumLifeModes = 3;    ///< entries of kLifeModeNames
-extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing" (Cloud.h LifeMode)
+constexpr int kNumLifeModes = 11;   ///< entries of kLifeModeNames
+extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing", the animated pictures (Cloud.h LifeMode)
 constexpr int kNumFieldModes = 5;   ///< entries of kFieldModeNames
 extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames

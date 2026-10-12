@@ -41,7 +41,8 @@ const char* const kKeyMapNames[2] = { "Snap to 12 keys", "Consecutive degrees" }
 const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
-const char* const kLifeModeNames[kNumLifeModes] = { "Off", "Lenia", "Turing" };
+const char* const kLifeModeNames[kNumLifeModes] = { "Off", "Lenia", "Turing", "Kaleidoscope", "Tunnel", "Spiral", "Flow", "Feedback",
+                                                     "Rain", "Starfield", "Moire" };
 const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock" };
 const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
@@ -321,6 +322,8 @@ const std::array<ParamDesc, kNumParams> kTable = { {
 
     F(ParamId::Stretch,         "stretch",          "Stretch",    "Cloud", 1080.f, 1320.f, 1200.f, 1.f, "ct/oct"),
     F(ParamId::Shift,           "shift",            "Shift",      "Cloud", -200.f, 200.f, 0.f,   1.f,  "Hz"),
+    I(ParamId::LifeSides,       "life_sides",       "Sides",      "Life", 2.f,   12.f,  6.f),
+    F(ParamId::LifeTurn,        "life_turn",        "Turn",       "Life", -4.f,  4.f,   0.5f,  1.f,  "/min"),
     F(ParamId::CombDepth,       "comb_depth",       "Comb",       "Comb", 0.f,   1.f,   0.f,   1.f,  ""),
     F(ParamId::CombDensity,     "comb_density",     "Density",    "Comb", 0.25f, 12.f,  2.f,   0.5f, "/oct"),
     F(ParamId::CombSweep,       "comb_sweep",       "Sweep",      "Comb", -2.f,  2.f,   0.1f,  1.f,  "/s"),

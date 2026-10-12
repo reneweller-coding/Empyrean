@@ -1545,6 +1545,49 @@ int main()
               fmt("8th harmonic against the 2nd: %.1f dB without, %.1f dB reading a landscape bright at 1 kHz", tilt[0], tilt[1]));
     }
 
+    // 50. The animated pictures: every one moves (the field at 6 s is not the field at 3 s), stays
+    //     finite, keeps the level within 2 dB of no field, and the same seed plays the same.
+    {
+        std::string report;
+        bool good = true;
+        double level0 = 0.0;
+        for (int mode : { 0, 3, 4, 5, 6, 7, 8, 9, 10 }) {
+            auto play = [&](std::vector<float>& f3, std::vector<float>& f6) {
+                Engine e;
+                quietEffects(e);
+                e.setParam(ParamId::Attack, 0.5f);
+                e.setParam(ParamId::LifeMode, static_cast<float>(mode));
+                e.setParam(ParamId::LifeDepth, 0.7f);
+                e.setParam(ParamId::LifeRate, 0.5f);
+                e.setParam(ParamId::LifeTurn, 1.0f);
+                if (!openOffline(e, false, 163)) return std::vector<float>();
+                for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+                std::vector<float> lr = render(e, 3.0);
+                e.lifeSnapshot(f3);
+                const std::vector<float> rest = render(e, 3.0);
+                e.lifeSnapshot(f6);
+                lr.insert(lr.end(), rest.begin(), rest.end());
+                return lr;
+            };
+            std::vector<float> a3, a6, b3, b6;
+            const std::vector<float> a = play(a3, a6), b = play(b3, b6);
+            if (a.empty()) return 1;
+            const double level = rmsDb(a, 3 * 48000, 6 * 48000);
+            if (mode == 0) { level0 = level; continue; }
+            double moved = 0.0;
+            bool finite = true;
+            for (size_t i = 0; i < a3.size() && i < a6.size(); ++i) {
+                moved += std::fabs(a6[i] - a3[i]);
+                finite = finite && std::isfinite(a6[i]);
+            }
+            moved /= std::max<size_t>(1, a3.size());
+            const bool ok = a3.size() == static_cast<size_t>(kLifeW * kLifeH) && finite && moved > 0.005 && std::fabs(level - level0) < 2.0 && a == b;
+            good = good && ok;
+            report += fmt("%s %.3f %.1f%s%s; ", kLifeModeNames[mode], moved, level, a == b ? "" : " NOT identical", ok ? "" : " (FAILED)");
+        }
+        check(good, "life: the animated pictures move, keep the level, repeat", fmt("free %.1f dBFS; moved a cell, dBFS: ", level0) + report);
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

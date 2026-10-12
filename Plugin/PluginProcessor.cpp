@@ -228,7 +228,8 @@ bool AdditivProcessor::loadLandscape(const juce::File& file, bool letItSound, ju
     setValue(static_cast<int>(ParamId::Landscape), static_cast<float>(additiv::kUserLandscape));
     // Heard: the Aurora motion reads the landscape, the living landscape's picture modes too.
     const bool read2 = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(value(static_cast<int>(ParamId::Motion)))));
-    if (letItSound && !read2) setValue(static_cast<int>(ParamId::Motion), static_cast<float>(additiv::MotionKind::Aurora));
+    const bool pictured = additiv::lifeIsPicture(static_cast<additiv::LifeMode>(juce::roundToInt(value(static_cast<int>(ParamId::LifeMode)))));
+    if (letItSound && !read2 && !pictured) setValue(static_cast<int>(ParamId::Motion), static_cast<float>(additiv::MotionKind::Aurora));
     return true;
 }
 

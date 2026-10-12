@@ -445,7 +445,181 @@ __device__ void earGains(const Binaural& B, float place, float u, float f, float
  */
 __device__ __forceinline__ float lifeValue(LifeMode mode, float2 c)
 {
-    return mode == LifeMode::Turing ? fminf(c.y * 3.0f, 1.0f) : c.x;
+    if (mode == LifeMode::Turing) return fminf(c.y * 3.0f, 1.0f);
+    if (mode == LifeMode::Rain) return 0.5f + 0.5f * tanhf(3.0f * c.x);   // the water's height about its rest
+    return c.x;
+}
+
+// ---- Animated pictures (KaleidoscopeEnhanced's Scene2D/Chain*.frag, its continuous transforms) ----
+
+/** @brief Smooth value noise, 0 .. 1 (corners hashed). @param x across @param y along @return the noise */
+__device__ float pictureNoise(float x, float y)
+{
+    const float ix = floorf(x), iy = floorf(y), fx = x - ix, fy = y - iy;
+    const float sx = fx * fx * (3.0f - 2.0f * fx), sy = fy * fy * (3.0f - 2.0f * fy);
+    auto h = [](float a, float b) {
+        return static_cast<float>(hash32(static_cast<std::uint32_t>(static_cast<int>(a)) * 0x8DA6B343U ^ static_cast<std::uint32_t>(static_cast<int>(b)) * 0xD8163841U) >> 8)
+             * (1.0f / 16777216.0f);
+    };
+    const float a = h(ix, iy), b = h(ix + 1.0f, iy), c = h(ix, iy + 1.0f), d = h(ix + 1.0f, iy + 1.0f);
+    return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+
+/** @brief Three octaves of noise, 0 .. 1 (the shaders' fbm3). @param x across @param y along @return the noise */
+__device__ float pictureFbm(float x, float y)
+{
+    float v = 0.0f, a = 0.5f;
+    for (int i = 0; i < 3; ++i) {
+        v += a * pictureNoise(x, y);
+        const float nx = 1.6f * x + 1.2f * y + 2.3f, ny = -1.2f * x + 1.6f * y + 2.3f;
+        x = nx;
+        y = ny;
+        a *= 0.5f;
+    }
+    return v / 0.875f;
+}
+
+/** @brief The shaders' mirror repeat: identity on [0, 1], mirrored beyond, so every fold is seamless. @param u a coordinate @return 0 .. 1 */
+__device__ __forceinline__ float pictureMirror(float u)
+{
+    const float f = u * 0.5f - floorf(u * 0.5f);
+    return 1.0f - fabsf(f * 2.0f - 1.0f);
+}
+
+/**
+ * @brief The landscape as a picture at (u, v), mirror-repeated: u its time (left to right), v its
+ *        frequency (low at the bottom); its brightness on the landscapes' 40 dB scale.
+ * @param hdr   the header (the landscape's size)
+ * @param land  the landscape
+ * @param u     across
+ * @param v     up
+ * @return      0 .. 1
+ */
+__device__ float pictureAt(const BlockHeader* hdr, const float* land, float u, float v)
+{
+    const int cols = hdr->landColumns, rows = hdr->landRows;
+    if (cols < 2 || rows < 2) return 0.5f;
+    const float fr = pictureMirror(u) * static_cast<float>(rows - 1), fc = pictureMirror(v) * static_cast<float>(cols - 1);
+    const int r0 = min(static_cast<int>(fr), rows - 2), c0 = min(static_cast<int>(fc), cols - 2);
+    const float ar = fr - static_cast<float>(r0), ac = fc - static_cast<float>(c0);
+    const float* p = land + static_cast<size_t>(r0) * cols + c0;
+    const float top = p[0] + (p[1] - p[0]) * ac, bottom = p[cols] + (p[cols + 1] - p[cols]) * ac;
+    const float a = top + (bottom - top) * ar;
+    return fminf(fmaxf(1.0f + 20.0f * log10f(fmaxf(a, 1.0e-6f)) / 40.0f, 0.0f), 1.0f);
+}
+
+/**
+ * @brief One cell of an animated picture. The field is the screen (twice as wide as high); the
+ *        transforms are the shaders' (tKaleido, tTunnel, tSpiral, tWarp), the feedback and the
+ *        rain read the field before this step.
+ * @param hdr   the header (its life: time, angle, sides, character)
+ * @param land  the landscape
+ * @param src   the field before this step
+ * @param x     the cell across
+ * @param y     the cell along
+ * @return      the cell (x: the value, or Rain's height; y: Rain's height before)
+ */
+__device__ float2 pictureCell(const BlockHeader* hdr, const float* land, const float2* src, int x, int y)
+{
+    const LifeField& L = hdr->life;
+    const float px = (static_cast<float>(x) + 0.5f) / static_cast<float>(kLifeW), py = (static_cast<float>(y) + 0.5f) / static_cast<float>(kLifeH);
+    const float dx = (px - 0.5f) * 2.0f, dy = py - 0.5f;   // centred, the aspect kept
+    const float r = fmaxf(sqrtf(dx * dx + dy * dy), 1.0e-4f), a = atan2f(dy, dx);
+    const float T = L.time, ch = L.character, S = fmaxf(L.sides, 2.0f);
+    const float kPi = 3.14159265f;
+    switch (L.mode) {
+    case LifeMode::Kaleidoscope: {
+        // tKaleido round a centre that wanders slowly through the picture, the picture flowing under it.
+        const float cx = 0.5f + 0.2f * __sinf(0.0107f * L.seconds), cy = 0.5f + 0.2f * __cosf(0.0131f * L.seconds);
+        const float sec = 2.0f * kPi / S;
+        const float w = fabsf(a - sec * floorf(a / sec) - 0.5f * sec) + L.angle;
+        float u = cx + 0.6f * r * __cosf(w) + 0.05f * T, v = cy + 0.6f * r * __sinf(w);
+        u += ch * 0.15f * (pictureFbm(3.0f * u + T, 3.0f * v) - 0.5f);
+        v += ch * 0.15f * (pictureFbm(3.0f * u + 5.2f, 3.0f * v - T) - 0.5f);
+        return make_float2(pictureAt(hdr, land, u, v), 0.0f);
+    }
+    case LifeMode::Tunnel: {
+        // tTunnel: the angle round (folded into Sides mirror wedges), the depth 1/r along, flying in.
+        const float sec = 2.0f * kPi / S;
+        const float w = fabsf(a + L.angle - sec * floorf((a + L.angle) / sec) - 0.5f * sec) / sec;
+        const float depth = 0.25f / r + 0.3f * T;
+        return make_float2(pictureAt(hdr, land, w + ch * 0.3f * depth, depth), 0.0f);
+    }
+    case LifeMode::Spiral: {
+        // tSpiral: log-polar, the angle sheared into the radius -- an endless zoom along Sides arms.
+        const float arms = 2.0f * floorf(S * 0.5f);
+        const float u = logf(r) * (0.5f + 0.5f * ch) - 0.3f * T + (a + L.angle) / kPi;
+        const float v = (a + L.angle) / kPi * arms * 0.5f;
+        return make_float2(pictureAt(hdr, land, u, v), 0.0f);
+    }
+    case LifeMode::Flow: {
+        // tWarp, twice: the picture carried on a current of noise that itself drifts.
+        float u = px + 0.05f * T * __cosf(L.angle), v = py + 0.05f * T * __sinf(L.angle);
+        const float s = 0.15f + 0.45f * ch;
+        for (int k = 0; k < 2; ++k) {
+            const float wu = pictureFbm(2.5f * u + 0.3f * T, 2.5f * v) - 0.5f, wv = pictureFbm(2.5f * u + 5.2f, 2.5f * v - 0.3f * T) - 0.5f;
+            u += s * wu;
+            v += s * wv;
+        }
+        return make_float2(pictureAt(hdr, land, u, v), 0.0f);
+    }
+    case LifeMode::Feedback: {
+        // Video feedback: this cell takes the field from a point turned and drawn towards the middle
+        // (so everything spirals outward), fading a little, and the picture seeps in.
+        // A step every block (375 a second): it zooms out by 0.15 .. 0.6 a second and forgets in about three.
+        const float step = 0.0004f * (1.0f + 3.0f * ch), rot = L.turnStep;
+        const float cs = __cosf(rot), sn = __sinf(rot);
+        const float qx = (dx * cs - dy * sn) / (1.0f + step), qy = (dx * sn + dy * cs) / (1.0f + step);
+        const float fx = (qx * 0.5f + 0.5f) * static_cast<float>(kLifeW) - 0.5f, fy = (qy + 0.5f) * static_cast<float>(kLifeH) - 0.5f;
+        const int x0 = static_cast<int>(floorf(fx)), y0 = static_cast<int>(floorf(fy));
+        const float ax = fx - static_cast<float>(x0), ay = fy - static_cast<float>(y0);
+        auto at = [&](int xx, int yy) { return src[(yy & (kLifeH - 1)) * kLifeW + (xx & (kLifeW - 1))].x; };
+        const float back = (at(x0, y0) * (1.0f - ax) + at(x0 + 1, y0) * ax) * (1.0f - ay) + (at(x0, y0 + 1) * (1.0f - ax) + at(x0 + 1, y0 + 1) * ax) * ay;
+        const float seep = pictureAt(hdr, land, px + 0.02f * T, py + 0.5f * __sinf(0.01f * L.seconds));
+        return make_float2(fminf(fmaxf(0.997f * back + 0.003f * seep, 0.0f), 1.0f), 0.0f);
+    }
+    case LifeMode::Rain: {
+        // A damped 2D wave (leapfrog, the five-point Laplacian), struck at chance cells.
+        const float2 c = src[y * kLifeW + x];
+        const float l = src[y * kLifeW + ((x - 1) & (kLifeW - 1))].x, rr = src[y * kLifeW + ((x + 1) & (kLifeW - 1))].x;
+        const float u = src[((y - 1) & (kLifeH - 1)) * kLifeW + x].x, d = src[((y + 1) & (kLifeH - 1)) * kLifeW + x].x;
+        // A step every block: the rings cross the field in about three seconds; Character keeps them ringing.
+        const float damp = 0.0005f + 0.004f * (1.0f - ch);
+        float next = (2.0f * c.x - (1.0f - damp) * c.y + 0.05f * (l + rr + u + d - 4.0f * c.x)) / (1.0f + damp);
+        const float roll = static_cast<float>(hash32(static_cast<std::uint32_t>(y * kLifeW + x) * 0x9E3779B9U ^ hdr->blockIndex * 0x85EBCA6BU) >> 8)
+                         * (1.0f / 16777216.0f);
+        if (roll < L.drops) next += 1.5f;
+        return make_float2(fminf(fmaxf(next, -4.0f), 4.0f), c.x);
+    }
+    case LifeMode::Starfield: {
+        // Stars on a log-polar grid streaming outwards; three layers of different density.
+        float v = 0.0f;
+        for (int k = 0; k < 3; ++k) {
+            const float density = 6.0f * S * (1.0f + static_cast<float>(k));
+            const float gu = (a + L.angle * (1.0f + 0.3f * k)) / (2.0f * kPi) * density, gv = (logf(r) - T * (0.6f + 0.4f * k)) * density * 0.25f;
+            const float cu = floorf(gu), cv = floorf(gv);
+            const std::uint32_t hs = hash32(static_cast<std::uint32_t>(static_cast<int>(cu)) * 0x27D4EB2DU ^ static_cast<std::uint32_t>(static_cast<int>(cv)) * 0x165667B1U ^ (k * 0x9E3779B9U));
+            if ((hs & 255U) < static_cast<std::uint32_t>(40 + 60 * ch)) {
+                const float su = gu - cu - (0.2f + 0.6f * static_cast<float>((hs >> 8) & 255U) / 255.0f), sv = gv - cv - (0.2f + 0.6f * static_cast<float>((hs >> 16) & 255U) / 255.0f);
+                v = fmaxf(v, __expf(-(su * su + sv * sv) * 25.0f) * fminf(r * 3.0f, 1.0f));
+            }
+        }
+        // A faint glow under the stars: a sky of nothing but points is so sparse that no make-up can
+        // keep its level (measured 2 dB under), and the partials between them would all but vanish.
+        return make_float2(0.12f + 0.88f * v, 0.0f);
+    }
+    case LifeMode::Moire: {
+        // Two line gratings, nearly alike and turning nearly together: where they agree and where they
+        // cancel makes broad bands that wander slowly (the moire), far wider than the lines.
+        const float f1 = 2.0f * S, f2 = f1 * (1.0f + 0.02f + 0.08f * ch);
+        const float a1 = L.angle, a2 = 0.9f * L.angle + 0.08f;
+        const float g1 = 0.5f + 0.5f * __cosf(2.0f * kPi * f1 * (dx * __cosf(a1) + dy * __sinf(a1)) + T);
+        const float g2 = 0.5f + 0.5f * __cosf(2.0f * kPi * f2 * (dx * __cosf(a2) + dy * __sinf(a2)) - 0.7f * T);
+        return make_float2(g1 * g2, 0.0f);
+    }
+    default:
+        return make_float2(0.0f, 0.0f);
+    }
 }
 
 /** @brief The field buffer that holds the field after this block's steps. @param hdr the header @param a buffer A @param b buffer B @return the current one */
@@ -471,6 +645,7 @@ __global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
     const int x = i & (kLifeW - 1), y = i >> 8;
     const std::uint32_t salt = static_cast<std::uint32_t>(L.salt) * 0x9E3779B9U;
     float2 c = L.mode == LifeMode::Turing ? make_float2(1.0f, 0.0f) : make_float2(0.0f, 0.0f);
+    if (lifeIsPicture(L.mode)) { dst[i] = c; return; }   // the pictures are computed, Rain starts from still water
     // Turing dense (eighty small squares: a sparse field is uneven where the partials read it --
     // measured 3 dB over while it grew from fourteen), Lenia a few large patches of noise.
     const int patches = L.mode == LifeMode::Turing ? 80 : 8;
@@ -501,8 +676,9 @@ __global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
  * @param node  this step's number in the block, 0 or 1
  * @param a     buffer A
  * @param b     buffer B
+ * @param land  the landscape (the animated pictures read it)
  */
-__global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, float2* b)
+__global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, float2* b, const float* land)
 {
     const LifeField& L = hdr->life;
     if (L.mode == LifeMode::Off || node >= L.steps) return;
@@ -512,7 +688,9 @@ __global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, floa
     const float2* src = fromB ? b : a;
     float2* dst = fromB ? a : b;
     const int x = i & (kLifeW - 1), y = i >> 8;
-    if (L.mode == LifeMode::Lenia) {
+    if (lifeIsPicture(L.mode)) {
+        dst[i] = pictureCell(hdr, land, src, x, y);
+    } else if (L.mode == LifeMode::Lenia) {
         constexpr int R = kLifeRadius, K = 2 * kLifeRadius + 1;
         float u = 0.0f;
         for (int dy = -R; dy <= R; ++dy) {
@@ -2202,8 +2380,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             cudaMemcpyAsync(m.dUpload, m.hUpload, m.uploadBytes(), cudaMemcpyHostToDevice, m.stream);
             constexpr unsigned lifeGrid = (kLifeCells + 255) / 256;
             lifeSeedKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB);
-            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dLifeA, m.dLifeB);
-            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB);
+            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dLifeA, m.dLifeB, m.dLand);
+            lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB, m.dLand);
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dSyncTheta, m.dSyncOrder);

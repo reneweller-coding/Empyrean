@@ -563,6 +563,9 @@ private:
     bool meltWasOn_ = false;                           ///< it ran in the last block (switching it on clears it)
     float binAngle_ = 0.0f;                            ///< the binaural cloud's orbit, radians
     double combPhase_ = 0.0;                           ///< the spectral comb's phase, notches
+    double pictureTime_ = 0.0;                         ///< the animated pictures' flow, in their units
+    double pictureAngle_ = 0.0;                        ///< their turn, radians
+    double pictureSeconds_ = 0.0;                      ///< their real seconds
     float paintTime_ = 0.0f;                           ///< seconds into the landscape's loop, for the painted hall
     float landLoop_ = 0.0f;                            ///< the landscape's loop, seconds
     std::mutex snapLock_;                              ///< guards snap_ (the worker only tries it: it never waits)
