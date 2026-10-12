@@ -19,13 +19,15 @@ const char* const kModSourceNames[kNumModSources] = { "Off", "LFO 1", "LFO 2", "
                                                       "Lenia 1", "Lenia 2", "Lenia 3", "Lenia 4", "Lorenz X", "Lorenz Y", "Lorenz Z",
                                                       "Roessler X", "Roessler Y", "Roessler Z", "Kura 1", "Kura 2", "Kura 3", "Kura 4",
                                                       "Beat", "Cascade", "Root Age", "Note", "Distance", "Random per Note",
-                                                      "Loudness", "Heard Brightness", "Change", "Roughness" };
+                                                      "Loudness", "Heard Brightness", "Change", "Roughness",
+                                                      "Reservoir 1", "Reservoir 2", "Reservoir 3", "Reservoir 4" };
 const char* const kModSourceTokens[kNumModSources] = { "off", "lfo1", "lfo2", "lfo3", "lfo4", "env1", "env2", "macro1", "macro2",
                                                        "macro3", "macro4", "wheel", "pressure", "velocity", "random",
                                                        "lenia1", "lenia2", "lenia3", "lenia4", "lorenz_x", "lorenz_y", "lorenz_z",
                                                        "rossler_x", "rossler_y", "rossler_z", "kura1", "kura2", "kura3", "kura4",
                                                        "beat", "cascade", "root_age", "note", "distance", "random_note",
-                                                       "loudness", "centroid", "flux", "roughness" };
+                                                       "loudness", "centroid", "flux", "roughness",
+                                                       "reservoir1", "reservoir2", "reservoir3", "reservoir4" };
 
 namespace {
 
@@ -396,6 +398,7 @@ void Modulators::advance(float dt, const ModInputs& in)
         heard_[k] += (1.0f - std::exp(-dt / tau[k])) * (target[k] - heard_[k]);
         values_[static_cast<int>(ModSource::Loudness) + k] = heard_[k];
     }
+    for (int k = 0; k < 4; ++k) values_[static_cast<int>(ModSource::Reservoir1) + k] = std::clamp(in.reservoir[k], -1.0f, 1.0f);
 }
 
 } // namespace additiv

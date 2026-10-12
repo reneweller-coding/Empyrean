@@ -55,7 +55,8 @@ public:
                     { "Envelopes", frame::Family::Envelope, { ParamId::Env1Shape, ParamId::Env1Rate, ParamId::Env2Shape, ParamId::Env2Rate } },
                     { "Macros", frame::Family::Source, { ParamId::Macro1, ParamId::Macro2, ParamId::Macro3, ParamId::Macro4 } },
                     { "Fields and Chaos", frame::Family::Motion, { ParamId::Coherence, ParamId::CoherenceRate, ParamId::LeniaRate,
-                                                                   ParamId::LeniaGrowth, ParamId::ChaosPeriod } } },
+                                                                   ParamId::LeniaGrowth, ParamId::ChaosPeriod } },
+                    { "Reservoir", frame::Family::Envelope, { ParamId::ReservoirChaos, ParamId::ReservoirMemory, ParamId::ReservoirInput } } },
                   live),
           matrix_(proc)
     {

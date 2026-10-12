@@ -1175,6 +1175,41 @@ int main()
               fmt("4th harmonic of the first note swings %.1f dB still, %.1f dB on the ripple; level %.1f / %.1f dBFS", sd[0], sd[1], level[0], level[1]));
     }
 
+    // 42. The reservoir: listening to the conductor its readout moves, inside its range, the same on
+    //     every run; left alone it comes to rest when its chaos is low and runs on by itself when high.
+    {
+        auto run = [&](float chaos, float input, bool conductor, std::vector<float>& seq) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::AutoRate, 5.0f);
+            e.setParam(ParamId::Brightness, 0.5f);
+            e.setParam(ParamId::ReservoirChaos, chaos);
+            e.setParam(ParamId::ReservoirInput, input);
+            e.setParam(ParamId::ReservoirMemory, 1.0f);
+            e.setModRow(0, { ModSource::Reservoir1, static_cast<int>(ParamId::Brightness), 0.5f });
+            if (!openOffline(e, conductor, 137)) return false;
+            render(e, 10.0);
+            for (int k = 0; k < 60; ++k) {
+                render(e, 0.5);
+                seq.push_back(e.playedNorm(ParamId::Brightness));
+            }
+            return true;
+        };
+        auto swing = [](const std::vector<float>& s) {
+            float lo = 1e9f, hi = -1e9f;
+            for (float v : s) { lo = std::min(lo, v); hi = std::max(hi, v); }
+            return hi - lo;
+        };
+        std::vector<float> a, b, calm, wild;
+        if (!run(0.95f, 1.0f, true, a) || !run(0.95f, 1.0f, true, b) || !run(0.6f, 0.0f, false, calm) || !run(1.4f, 0.0f, false, wild)) return 1;
+        bool sane = true;
+        for (float v : a) if (!std::isfinite(v) || v < -0.001f || v > 1.001f) sane = false;
+        check(sane && a == b && swing(a) > 0.05f && swing(calm) < 0.01f && swing(wild) > 0.05f,
+              "modulation: the reservoir listens, rests and runs on",
+              fmt("swing %.3f with the conductor (%s on a second run); alone %.4f at chaos 0.6, %.3f at 1.4",
+                  swing(a), a == b ? "the same" : "DIFFERENT", swing(calm), swing(wild)));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

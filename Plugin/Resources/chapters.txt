@@ -73,6 +73,8 @@ Fields and chaos are Noctuary's. Lenia is a living field -- Conway's Life made c
 
 Four sources are what the instrument hears of itself: Loudness, Heard Brightness (where its energy stands), Change (how fast its spectrum moves) and Roughness (how much its chord grinds, by Sethares' measure of how its voices' harmonics rub). Route them back into the sound and it regulates itself: roughness into Self-Tune, and the rougher it gets the harder it tunes; loudness against the far level, and it recedes when it swells.
 
+The reservoir is a small network of 2048 neurons on the graphics card, coupled at random, listening to what the instrument hears and plays (its loudness, brightness, change and roughness, the Beat, the note, the conductor's excitement, Lenia) -- each measured against its last half minute, so it hears what changes. Its four readouts, Reservoir 1-4, are smooth curves that never repeat and remember what was played. Chaos is how strongly its neurons drive each other: below 1 it forgets and follows the music, about 1 it rings on at the edge of chaos, above it runs on by itself. Memory is how slowly it moves, Input how closely it listens. It is only computed while a row of the matrix reads it.
+
 Every row of the matrix can have a via source: the depth is scaled by its amount, 0 to 1 -- an LFO that only moves the filter as far as the mod wheel allows, a Lorenz wander that opens with Root Age.
 
 == Presets | all | ==

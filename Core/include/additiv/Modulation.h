@@ -67,6 +67,11 @@ enum class ModSource : int {
     Centroid,   ///< where its energy stands, 0 at 20 Hz .. 1 at 20 kHz (log), over half a second
     Flux,       ///< how much its spectrum changes, 0 .. 1, over a fifth of a second
     Roughness,  ///< how rough its chord is (Sethares' dissonance of the voices' harmonics), 0 .. 1, over a second
+    // Phase 10g: the reservoir
+    Reservoir1, ///< the reservoir's first readout, -1 .. 1
+    Reservoir2, ///< its second
+    Reservoir3, ///< its third
+    Reservoir4, ///< its fourth
     Count       ///< number of sources
 };
 constexpr int kNumModSources = static_cast<int>(ModSource::Count);   ///< entries of kModSourceNames
@@ -152,6 +157,7 @@ struct ModInputs {
     float heardCentroid = 0.0f;              ///< the energy's centre heard, 0 .. 1
     float heardFlux = 0.0f;                  ///< the change heard, 0 .. 1
     float roughness = 0.0f;                  ///< the chord's roughness, 0 .. 1 (the engine finds it)
+    float reservoir[4] = {};                 ///< the reservoir's readouts, -1 .. 1 (from the GPU)
 };
 
 /** @brief The sources, advanced once per block on the renderer's thread. */

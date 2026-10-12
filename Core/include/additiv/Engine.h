@@ -404,6 +404,9 @@ private:
     float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
     double lorenz_[kFieldAttractors][3] = {};          ///< the field's attractors: eight Lorenz systems (x, y, z), wandering always
     bool flockWas_ = false;                            ///< the last block's field was the flock (else its state is taken afresh)
+    float resMean_[kReservoirInputs] = {};             ///< the reservoir's inputs: their running means
+    float resVar_[kReservoirInputs] = {};              ///< and running variances
+    bool resStarted_ = false;                          ///< the running statistics have their first values
     float rippleNow_[kRippleCells] = {};               ///< the ripple's string now
     float ripplePrev_[kRippleCells] = {};              ///< and a step before (the wave equation's leapfrog)
     float rippleStrikes_[64] = {};                     ///< the fundamentals of the notes that started this block

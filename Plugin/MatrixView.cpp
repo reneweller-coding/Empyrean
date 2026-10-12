@@ -22,6 +22,7 @@ MatrixView::MatrixView(AdditivProcessor& proc) : proc_(proc)
             if (s == static_cast<int>(ModSource::Lenia1)) { row->source.addSectionHeading("Fields and chaos"); row->via.addSectionHeading("Fields and chaos"); }
             if (s == static_cast<int>(ModSource::Beat)) { row->source.addSectionHeading("The piece"); row->via.addSectionHeading("The piece"); }
             if (s == static_cast<int>(ModSource::Loudness)) { row->source.addSectionHeading("What it hears"); row->via.addSectionHeading("What it hears"); }
+            if (s == static_cast<int>(ModSource::Reservoir1)) { row->source.addSectionHeading("Reservoir"); row->via.addSectionHeading("Reservoir"); }
             row->source.addItem(additiv::kModSourceNames[s], s + 1);
             row->via.addItem(s == 0 ? juce::String("-") : juce::String(additiv::kModSourceNames[s]), s + 1);
         }

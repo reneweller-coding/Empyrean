@@ -205,6 +205,10 @@ enum class ParamId : int {
     RippleDepth,    ///< 0 .. 1: how far the partials' loudness follows the wave
     RippleSpeed,    ///< octaves a second the wave runs along the spectrum
     RippleDecay,    ///< s: how long a strike rings on the string
+    // Phase 10g: the reservoir
+    ReservoirChaos, ///< its coupling's spectral radius: below 1 it forgets, about 1 the edge of chaos
+    ReservoirMemory,///< s: how slowly its state moves
+    ReservoirInput, ///< how strongly it hears the music
     Count           ///< number of parameters
 };
 

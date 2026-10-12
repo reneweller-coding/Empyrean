@@ -19,6 +19,7 @@
  *          --gpu-priority idle|below|normal|above|high|realtime  (the process's GPU scheduling class)
  *          --scene NAME (none)  --landscape FILE (picture or WAV/FLAC)  --loop S (30, a picture's length)
  *          --range DB (40)  --whiten X (0.7)  --seamless X (0.1)  --smooth S (0.15)
+ *          --reservoir  (the reservoir stepped every block too)
  */
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -74,6 +75,7 @@ struct Options {
     float whiten = 0.7f;                   ///< how far a recording's columns lose their own colour
     float seamless = 0.1f;                 ///< the share of a recording crossfaded into its beginning
     float smooth = 0.15f;                  ///< seconds a recording's landscape is smoothed over
+    bool reservoir = false;                ///< the reservoir stepped every block too
 };
 
 /**
@@ -366,6 +368,7 @@ void setLoad(CloudEngine& e, int partials, const Options& o)
 {
     for (int i = 0; i < e.config().voices; ++i)
         setNote(e.voice(i), noteHz(33 + (i * 7) % 48), partials, 100u + static_cast<std::uint32_t>(i), o);
+    e.reservoir().on = o.reservoir ? 1 : 0;
 }
 
 /**
@@ -1181,6 +1184,7 @@ int main(int argc, char** argv)
         else if (a == "--whiten" && hasValue) { o.whiten = number(); ++i; }
         else if (a == "--seamless" && hasValue) { o.seamless = number(); ++i; }
         else if (a == "--smooth" && hasValue) { o.smooth = number(); ++i; }
+        else if (a == "--reservoir") o.reservoir = true;
         else if (a == "--gpu-priority" && hasValue) {
             static const char* const kNames[] = { "idle", "below", "normal", "above", "high", "realtime" };
             for (int k = 0; k < 6; ++k) if (val == kNames[k]) o.gpuPriority = k;

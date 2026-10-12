@@ -69,6 +69,7 @@ struct BlockHeader {
     LifeField life;        ///< the living landscape for this block
     PartialSync sync;      ///< the partial sync for this block
     Ripple ripple;         ///< the ripple for this block
+    Reservoir reservoir;   ///< the reservoir for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -1487,6 +1488,84 @@ listenKernel(const BlockHeader* hdr, const float* io, float* hist, float* prev, 
 }
 
 /**
+ * @brief Fills the reservoir once: the coupling uniform in +-sqrt(3/N) (unit spectral radius, scaled
+ *        by `chaos` when it runs), the inputs' and the readouts' weights in +-1, a small start.
+ * @param w      the coupling, N x N
+ * @param win    the input weights, N x kReservoirInputs
+ * @param rout   the readouts, kReservoirOutputs x N
+ * @param x      the state, both buffers
+ */
+__global__ void reservoirInitKernel(float* w, float* win, float* rout, float* x)
+{
+    const size_t i = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const float a = sqrtf(3.0f / static_cast<float>(kReservoirN));
+    auto uni = [](size_t k, std::uint32_t salt) { return static_cast<float>(hash32(static_cast<std::uint32_t>(k) * 0x9E3779B9U ^ salt) >> 8) * (1.0f / 16777216.0f); };
+    if (i < static_cast<size_t>(kReservoirN) * kReservoirN) w[i] = a * (2.0f * uni(i, 0x52455330U) - 1.0f);
+    if (i < static_cast<size_t>(kReservoirN) * kReservoirInputs) win[i] = 2.0f * uni(i, 0x52455331U) - 1.0f;
+    if (i < static_cast<size_t>(kReservoirOutputs) * kReservoirN) rout[i] = 2.0f * uni(i, 0x52455332U) - 1.0f;
+    if (i < 2 * static_cast<size_t>(kReservoirN)) x[i] = 0.1f * (2.0f * uni(i % kReservoirN, 0x52455333U) - 1.0f);
+}
+
+/**
+ * @brief One block of the reservoir: a warp per neuron sums its row of the coupling against the last
+ *        state (lanes strided, then shuffled in a fixed order), adds its inputs, and leaks towards
+ *        tanh of it. Reads one buffer, writes the other (by the block's parity).
+ * @param hdr   the header
+ * @param w     the coupling
+ * @param win   the input weights
+ * @param x     the state, two buffers of N
+ */
+__global__ void reservoirStepKernel(const BlockHeader* hdr, const float* w, const float* win, float* x)
+{
+    const Reservoir& R = hdr->reservoir;
+    if (!R.on) return;
+    const int warp = static_cast<int>((blockIdx.x * blockDim.x + threadIdx.x) >> 5), lane = static_cast<int>(threadIdx.x & 31);
+    if (warp >= kReservoirN) return;
+    const bool odd = (hdr->blockIndex & 1U) != 0;
+    const float* xp = x + (odd ? kReservoirN : 0);
+    float* xn = x + (odd ? 0 : kReservoirN);
+    const float* row = w + static_cast<size_t>(warp) * kReservoirN;
+    float s = 0.0f;
+    for (int j = lane; j < kReservoirN; j += 32) s = fmaf(row[j], xp[j], s);
+    for (int off = 16; off > 0; off >>= 1) s += __shfl_down_sync(0xFFFFFFFFU, s, off);
+    if (lane == 0) {
+        float in = 0.0f;
+        for (int k = 0; k < kReservoirInputs; ++k) in += win[warp * kReservoirInputs + k] * R.u[k];
+        const float bias = 0.2f * (static_cast<float>(hash32(static_cast<std::uint32_t>(warp) ^ 0x42494153U) >> 8) * (1.0f / 16777216.0f) - 0.5f);
+        xn[warp] = (1.0f - R.leak) * xp[warp] + R.leak * tanhf(R.chaos * s + R.input * in + bias);
+    }
+}
+
+/**
+ * @brief The reservoir's readouts, one CUDA block: tanh of each fixed projection of the new state, summed in a fixed order.
+ * @param hdr    the header
+ * @param rout   the readouts
+ * @param x      the state, two buffers
+ * @param stats  receives the outputs at [5] .. [8]
+ */
+__global__ void reservoirReadKernel(const BlockHeader* hdr, const float* rout, const float* x, float* stats)
+{
+    __shared__ float red[256];
+    const Reservoir& R = hdr->reservoir;
+    if (!R.on) return;
+    const bool odd = (hdr->blockIndex & 1U) != 0;
+    const float* xn = x + (odd ? 0 : kReservoirN);
+    const int t = static_cast<int>(threadIdx.x);
+    for (int k = 0; k < kReservoirOutputs; ++k) {
+        float s = 0.0f;
+        for (int i = t; i < kReservoirN; i += 256) s += rout[k * kReservoirN + i] * xn[i];
+        red[t] = s;
+        __syncthreads();
+        for (int h = 128; h > 0; h >>= 1) {
+            if (t < h) red[t] += red[t + h];
+            __syncthreads();
+        }
+        if (t == 0) stats[5 + k] = tanhf(red[0] * 2.0f * rsqrtf(static_cast<float>(kReservoirN)));
+        __syncthreads();
+    }
+}
+
+/**
  * @brief Writes a failed CUDA call into `error`.
  * @param e      the call's result
  * @param what   the call, for the message
@@ -1559,6 +1638,11 @@ struct CloudEngine::Impl {
     float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasor
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
     Ripple ripple;                    ///< the host's copy of the ripple
+    Reservoir reservoir;              ///< the host's copy of the reservoir's settings
+    float* dResW = nullptr;           ///< device: the reservoir's coupling, N x N
+    float* dResIn = nullptr;          ///< device: its input weights
+    float* dResOut = nullptr;         ///< device: its readouts
+    float* dResX = nullptr;           ///< device: its state, two buffers
     float2* dLifeA = nullptr;         ///< device: the living field, buffer A
     float2* dLifeB = nullptr;         ///< device: buffer B
     float* dLifeStats = nullptr;      ///< device: its mean and mean square, then what was heard (level, centroid, flux)
@@ -1613,7 +1697,8 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap),
                          static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats),
                          static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder), static_cast<void*>(dFlockA), static_cast<void*>(dFlockB),
-                         static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState) })
+                         static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState),
+                         static_cast<void*>(dResW), static_cast<void*>(dResIn), static_cast<void*>(dResOut), static_cast<void*>(dResX) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -1624,6 +1709,7 @@ struct CloudEngine::Impl {
         dLifeA = dLifeB = nullptr; dLifeStats = nullptr; hLifeStats = nullptr; hLife = nullptr;
         dSyncTheta = nullptr; dSyncOrder = nullptr; dFlockA = nullptr; dFlockB = nullptr;
         dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
+        dResW = nullptr; dResIn = nullptr; dResOut = nullptr; dResX = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1740,7 +1826,11 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaHostAlloc(&m.hSnap, sizeof(float2) * (partialsTotal / kSnapStride), cudaHostAllocDefault), "cudaHostAlloc snapshot", error)
                 && ok(cudaMalloc(&m.dLifeA, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
                 && ok(cudaMalloc(&m.dLifeB, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
-                && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 8), "cudaMalloc life stats", error)
+                && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 12), "cudaMalloc life stats", error)
+                && ok(cudaMalloc(&m.dResW, sizeof(float) * kReservoirN * kReservoirN), "cudaMalloc reservoir", error)
+                && ok(cudaMalloc(&m.dResIn, sizeof(float) * kReservoirN * kReservoirInputs), "cudaMalloc reservoir", error)
+                && ok(cudaMalloc(&m.dResOut, sizeof(float) * kReservoirN * kReservoirOutputs), "cudaMalloc reservoir", error)
+                && ok(cudaMalloc(&m.dResX, sizeof(float) * 2 * kReservoirN), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dListenHist, sizeof(float) * 2 * kEchoN), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dListenPrev, sizeof(float) * kEchoBins), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dListenState, sizeof(int) * 2), "cudaMalloc listen", error)
@@ -1748,7 +1838,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dFlockA, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
                 && ok(cudaMalloc(&m.dFlockB, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
                 && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * partialsTotal), "cudaMalloc sync order", error)
-                && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 8, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
+                && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 12, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
                 && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
                 && ok(cudaMalloc(&m.dLand, sizeof(float) * landFloats), "cudaMalloc landscape", error)
@@ -1769,7 +1859,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dSnap, 0, sizeof(float2) * (partialsTotal / kSnapStride), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeA, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeB, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 8, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 12, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
@@ -1798,6 +1888,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
         for (float& k : kernel) k /= sum;
         good = ok(cudaMemcpyToSymbol(cLeniaKernel, kernel, sizeof(kernel)), "cudaMemcpyToSymbol lenia", error);
         m.lifeCells.assign(static_cast<size_t>(kLifeCells), 0.0f);
+        reservoirInitKernel<<<static_cast<unsigned>((static_cast<size_t>(kReservoirN) * kReservoirN + 255) / 256), 256, 0, m.stream>>>(m.dResW, m.dResIn, m.dResOut, m.dResX);
+        good = ok(cudaStreamSynchronize(m.stream), "reservoir init", error);
+        std::memset(m.hLifeStats, 0, sizeof(float) * 12);
     }
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
@@ -1828,7 +1921,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 hdr, m.dModalScratch, n, m.dOut);
             spectralEchoKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dEchoHist, m.dEchoAcc, m.dEchoRing, m.dEchoState);
             listenKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dListenHist, m.dListenPrev, m.dListenState, m.dLifeStats);
-            cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 8, cudaMemcpyDeviceToHost, m.stream);
+            reservoirStepKernel<<<static_cast<unsigned>(kReservoirN * 32 / 256), 256, 0, m.stream>>>(hdr, m.dResW, m.dResIn, m.dResX);
+            reservoirReadKernel<<<1, 256, 0, m.stream>>>(hdr, m.dResOut, m.dResX, m.dLifeStats);
+            cudaMemcpyAsync(m.hLifeStats, m.dLifeStats, sizeof(float) * 12, cudaMemcpyDeviceToHost, m.stream);
             cudaMemcpyAsync(m.hOut, m.dOut, sizeof(float) * kCloudOutChannels * n, cudaMemcpyDeviceToHost, m.stream);
             good = ok(cudaStreamEndCapture(m.stream, &m.graph), "cudaStreamEndCapture", error)
                 && ok(cudaGraphInstantiate(&m.exec, m.graph, 0), "cudaGraphInstantiate", error);
@@ -1890,6 +1985,13 @@ PartialSync& CloudEngine::sync() { return impl_->sync; }
 
 Ripple& CloudEngine::ripple() { return impl_->ripple; }
 
+Reservoir& CloudEngine::reservoir() { return impl_->reservoir; }
+
+void CloudEngine::reservoirOut(float* out) const
+{
+    for (int k = 0; k < kReservoirOutputs; ++k) out[k] = impl_->hLifeStats[5 + k];
+}
+
 void CloudEngine::lifeStats(float& mean, float& meanSq) const
 {
     mean = impl_->hLifeStats[0];
@@ -1939,6 +2041,7 @@ void CloudEngine::launch()
     m.echo.clear = 0;   // asked for once
     hdr->sync = m.sync;
     hdr->ripple = m.ripple;
+    hdr->reservoir = m.reservoir;
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);
     hdr->lifeParity = m.lifeParity;

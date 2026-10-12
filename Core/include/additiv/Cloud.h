@@ -330,6 +330,26 @@ struct Ripple {
 };
 static_assert(sizeof(Ripple) % 16 == 0, "Ripple rides in the block header");
 
+constexpr int kReservoirN = 2048;      ///< the reservoir's neurons
+constexpr int kReservoirInputs = 8;    ///< what it is fed
+constexpr int kReservoirOutputs = 4;   ///< what is read from it
+
+/**
+ * @brief The reservoir: an echo state network (Jaeger 2001) on the GPU -- kReservoirN neurons, a
+ *        fixed random coupling scaled to `chaos` (its spectral radius: below 1 it forgets, about 1
+ *        it rings at the edge of chaos, above it runs on by itself), leaking at `leak` a block,
+ *        driven by kReservoirInputs numbers about the music, read out by kReservoirOutputs fixed
+ *        random projections. Smooth, never periodic, with a memory of what was played.
+ */
+struct Reservoir {
+    int   on = 0;                       ///< 1: stepped this block (a matrix row reads it)
+    float chaos = 0.95f;                ///< the coupling's spectral radius
+    float leak = 0.001f;                ///< a block's share of the new state
+    float input = 0.7f;                 ///< the inputs' gain
+    float u[kReservoirInputs] = {};     ///< the inputs, about -1 .. 1
+};
+static_assert(sizeof(Reservoir) % 16 == 0, "Reservoir rides in the block header");
+
 constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
 constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
 constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
@@ -458,6 +478,12 @@ public:
 
     /** @brief The host's copy of the ripple, edited between wait() and the next launch(). @return the ripple */
     Ripple& ripple();
+
+    /** @brief The host's copy of the reservoir's settings, edited between wait() and the next launch(). @return the settings */
+    Reservoir& reservoir();
+
+    /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
+    void reservoirOut(float* out) const;
 
     /**
      * @brief The living field's mean and mean square (of what the partials read, 0 .. 1), measured by

@@ -451,6 +451,7 @@ void Engine::readParams()
             // Scaled so that a minor second, the roughest common interval, reads about 0.55 and a pure
             // fifth under 0.1 (most of the 64 pairs lie far apart and add nothing to the mean).
             in.roughness = weight > 1.0e-12 ? static_cast<float>(16.0 * rough / weight) : 0.0f;
+            if (prepared_) cloud_.reservoirOut(in.reservoir);
         }
         phraseStart_ = false;
         mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);
@@ -1177,6 +1178,34 @@ void Engine::renderBlock()
     }
 
     stepRipple(dtf);
+
+    // The reservoir: stepped only while a row reads it; fed with what the instrument hears and
+    // plays (the sources as the last block left them), each standardised against its last half
+    // minute -- the reservoir hears how the music departs from its recent self.
+    {
+        Reservoir& R = cloud_.reservoir();
+        R.on = 0;
+        for (int r = 0; r < kModRows; ++r) {
+            const ModRow row = unpackModRow(modRows_[static_cast<size_t>(r)].load(std::memory_order_relaxed));
+            auto isRes = [](ModSource s) { return s >= ModSource::Reservoir1 && s <= ModSource::Reservoir4; };
+            if (row.target >= 0 && row.depth != 0.0f && (isRes(row.source) || isRes(row.via))) R.on = 1;
+        }
+        R.chaos = cur(ParamId::ReservoirChaos);
+        R.leak = 1.0f - std::exp(-dtf / std::max(cur(ParamId::ReservoirMemory), 0.05f));
+        R.input = cur(ParamId::ReservoirInput);
+        const ModSource feed[kReservoirInputs] = { ModSource::Loudness, ModSource::Centroid, ModSource::Flux, ModSource::Roughness,
+                                                   ModSource::Beat, ModSource::Note, ModSource::Cascade, ModSource::Lenia1 };
+        const float a = 1.0f - std::exp(-dtf / 30.0f);
+        for (int k = 0; k < kReservoirInputs; ++k) {
+            const float v = mods_.value(feed[k]);
+            if (!resStarted_) { resMean_[k] = v; resVar_[k] = 0.0f; }
+            const float d = v - resMean_[k];
+            resMean_[k] += a * d;
+            resVar_[k] = (1.0f - a) * (resVar_[k] + a * d * d);
+            R.u[k] = std::clamp(0.5f * d / (std::sqrt(resVar_[k]) + 0.05f), -2.0f, 2.0f);
+        }
+        resStarted_ = true;
+    }
 
     // Partial sync: the coupling in units of the oscillators' own spread of rates -- 2.5 times it at
     // full Coupling, well past the critical strength (for a uniform spread about 1.3 times it).

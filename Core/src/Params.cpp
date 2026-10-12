@@ -305,6 +305,10 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::RippleDepth,    "ripple_depth",    "Ripple",       "Ripple", 0.f,  1.f,   0.f,   1.f,  ""),
     F(ParamId::RippleSpeed,    "ripple_speed",    "Ripple Speed", "Ripple", 0.1f, 4.f,   0.8f,  0.5f, "oct/s"),
     F(ParamId::RippleDecay,    "ripple_decay",    "Ripple Decay", "Ripple", 0.5f, 30.f,  6.f,   0.5f, "s"),
+
+    F(ParamId::ReservoirChaos,  "reservoir_chaos",  "Chaos",      "Modulation", 0.5f, 1.5f, 0.95f, 1.f,  ""),
+    F(ParamId::ReservoirMemory, "reservoir_memory", "Memory",     "Modulation", 0.3f, 30.f, 4.f,   0.4f, "s"),
+    F(ParamId::ReservoirInput,  "reservoir_input",  "Input",      "Modulation", 0.f,  2.f,  0.7f,  1.f,  ""),
 } };
 
 } // namespace
