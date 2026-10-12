@@ -42,6 +42,9 @@ constexpr int kEchoN = 1024;                 ///< the spectral echo's FFT size
 constexpr int kEchoBins = kEchoN / 2 + 1;    ///< its bands, 0 .. N/2
 constexpr int kEchoSlots = 2048;             ///< blocks each band's delay line holds (5.4 s at 128)
 constexpr int kEchoThreads = kEchoN / 2;     ///< threads of its one CUDA block: one butterfly each
+constexpr int kMeltBands = kMeltN / 2;       ///< the melt's bands that live, 0 .. N/2 - 1 (0, the DC, kept silent)
+constexpr int kMeltThreads = 1024;           ///< threads of its one CUDA block: two bands each
+static_assert(kMeltBands == 2 * kMeltThreads, "two bands a thread");
 constexpr int kLifeCells = kLifeW * kLifeH;  ///< cells of the living field
 static_assert((kLifeW & (kLifeW - 1)) == 0 && (kLifeH & (kLifeH - 1)) == 0, "the torus wraps by masks");
 /** @brief Lenia's ring kernel, normalised, set once at open(). */
@@ -70,6 +73,7 @@ struct BlockHeader {
     PartialSync sync;      ///< the partial sync for this block
     Ripple ripple;         ///< the ripple for this block
     Reservoir reservoir;   ///< the reservoir for this block
+    Melt melt;             ///< the melt for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -1407,6 +1411,257 @@ spectralEchoKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, f
 }
 
 /**
+ * @brief A 4096-point complex FFT in shared memory, by every thread of a kMeltThreads block:
+ *        bit-reversed order, then twelve stages of two butterflies per thread (unnormalised).
+ * @param a        the 4096 values, transformed in place
+ * @param inverse  true: the inverse transform (times 4096)
+ */
+__device__ void fft4096(float2* a, bool inverse)
+{
+    for (int i = threadIdx.x; i < kMeltN; i += kMeltThreads) {
+        const int j = static_cast<int>(__brev(static_cast<unsigned>(i)) >> 20);
+        if (j > i) { const float2 tmp = a[i]; a[i] = a[j]; a[j] = tmp; }
+    }
+    __syncthreads();
+    for (int len = 2; len <= kMeltN; len <<= 1) {
+        const int half = len >> 1;
+        for (int b = threadIdx.x; b < kMeltN / 2; b += kMeltThreads) {
+            const int pos = b & (half - 1);
+            const int i0 = (b / half) * len + pos, i1 = i0 + half;
+            float sn, cs;
+            sincospif((inverse ? 2.0f : -2.0f) * static_cast<float>(pos) / static_cast<float>(len), &sn, &cs);
+            const float2 u = a[i0], v = a[i1];
+            const float2 w = make_float2(v.x * cs - v.y * sn, v.x * sn + v.y * cs);
+            a[i0] = make_float2(u.x + w.x, u.y + w.y);
+            a[i1] = make_float2(u.x - w.x, u.y - w.y);
+        }
+        __syncthreads();
+    }
+}
+
+/**
+ * @brief A sum of two double-floats (a value as an unevaluated sum hi + lo of two floats, about 48
+ *        bits): Knuth's two-sum, then renormalised. Only additions -- nothing to contract or reorder.
+ * @param a  one (x the high part, y the low)
+ * @param b  the other
+ * @return   a + b
+ */
+__device__ float2 dfAdd(float2 a, float2 b)
+{
+    const float s = a.x + b.x;
+    const float bb = s - a.x;
+    const float e = (a.x - (s - bb)) + (b.x - bb) + a.y + b.y;
+    const float hi = s + e;
+    return make_float2(hi, e - (hi - s));
+}
+
+/** @brief The difference of two double-floats. @param a  one @param b  the other @return a - b */
+__device__ float2 dfSub(float2 a, float2 b) { return dfAdd(a, make_float2(-b.x, -b.y)); }
+
+/**
+ * @brief A cumulative sum below a point on the band axis, band b covering [b, b + 1): the
+ *        inclusive sums at whole bands, linear within one.
+ * @param c  the inclusive sums as double-floats, kMeltBands (c[b] = the sum over bands 0 .. b)
+ * @param x  the point, 0 .. kMeltBands
+ * @return   the sum below it
+ */
+__device__ float2 meltBelow(const float2* c, float x)
+{
+    const int j = min(static_cast<int>(x), kMeltBands);
+    const float2 lo = j > 0 ? c[j - 1] : make_float2(0.0f, 0.0f);
+    if (j >= kMeltBands) return lo;
+    const float2 d = dfSub(c[j], lo);
+    return dfAdd(lo, make_float2((x - static_cast<float>(j)) * (d.x + d.y), 0.0f));
+}
+
+/**
+ * @brief The melt, one CUDA block: the block into the history; every kMeltHop samples a frame --
+ *        Hann window, FFT (left real, right imaginary), each band's energy held and its heard
+ *        frequency tracked, the held energy blurred across the bands (each band scatters it evenly
+ *        over 1 + 2 kappa x bands around its centre x, gathered through a cumulative sum in double-float,
+ *        so nothing is gained or lost), sung again
+ *        at the tracked frequencies, inverse FFT, overlapped into the output; the oldest block of the
+ *        overlap finished and written to channels 8 and 9.
+ * @param hdr     the header (its `melt`)
+ * @param io      the block's frames: the voices read, channels 8 and 9 written
+ * @param hist    the input history, two rings of kMeltN
+ * @param acc     the overlap, two rings of kMeltN on the history's indices
+ * @param energy  the held energy per band, left then right
+ * @param omega   each band's sung frequency, radians a sample
+ * @param phase   each band's sung phase, left then right
+ * @param heard   each band's last heard phase, left then right
+ * @param st      the history's write index, the samples since the last frame
+ */
+__global__ void __launch_bounds__(kMeltThreads)
+meltKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, float* energy, float* omega, float* phase, float* heard, int* st)
+{
+    __shared__ float2 z[kMeltN];          // the frame; between the transforms the cumulative sums
+    __shared__ float2 warpSum[2][32];     // the scan's warp totals, per ear
+    const Melt& M = hdr->melt;
+    const int n = hdr->n;
+    const int t = static_cast<int>(threadIdx.x);
+    constexpr float kTwoPi = 6.28318531f;
+    if (M.clear) {
+        for (int i = t; i < 2 * kMeltN; i += kMeltThreads) { hist[i] = 0.0f; acc[i] = 0.0f; }
+        for (int b = t; b < kMeltBands; b += kMeltThreads) {
+            energy[b] = energy[kMeltBands + b] = 0.0f;
+            omega[b] = kTwoPi * static_cast<float>(b) / static_cast<float>(kMeltN);
+            phase[b] = kTwoPi * static_cast<float>(hash32(static_cast<std::uint32_t>(b) ^ 0x4D454C54U) >> 8) * (1.0f / 16777216.0f);
+            phase[kMeltBands + b] = kTwoPi * static_cast<float>(hash32(static_cast<std::uint32_t>(b) ^ 0x4D454C55U) >> 8) * (1.0f / 16777216.0f);
+            heard[b] = heard[kMeltBands + b] = 0.0f;
+        }
+        if (t == 0) { st[0] = 0; st[1] = 0; }
+        __syncthreads();
+    }
+    if (!M.on || n > kMeltHop) {   // off, or blocks longer than the hop: silent
+        for (int s = t; s < n; s += kMeltThreads) { io[s * kCloudOutChannels + 8] = 0.0f; io[s * kCloudOutChannels + 9] = 0.0f; }
+        return;
+    }
+    const int w0 = st[0], count = st[1] + n;
+    for (int s = t; s < n; s += kMeltThreads) {
+        const float* f = io + static_cast<size_t>(s) * kCloudOutChannels;
+        const int i = (w0 + s) & (kMeltN - 1);
+        hist[i] = f[0] + f[2];
+        hist[kMeltN + i] = f[1] + f[3];
+    }
+    __syncthreads();
+    const int start = (w0 + n) & (kMeltN - 1);   // the window's oldest sample
+    if (count >= kMeltHop) {
+        for (int k = t; k < kMeltN; k += kMeltThreads) {
+            const int i = (start + k) & (kMeltN - 1);
+            const float win = 0.5f - 0.5f * cospif(2.0f * static_cast<float>(k) / static_cast<float>(kMeltN));
+            z[k] = make_float2(win * hist[i], win * hist[kMeltN + i]);
+        }
+        __syncthreads();
+        fft4096(z, false);
+        // Each of the thread's two bands (2t, 2t + 1): heard, held, tracked.
+        const float hop = static_cast<float>(kMeltHop);
+        float held[2][2];   // [band][ear]
+        for (int q = 0; q < 2; ++q) {
+            const int b = 2 * t + q;
+            const float2 Zk = z[b], Zm = z[(kMeltN - b) & (kMeltN - 1)];
+            const float2 xl = make_float2(0.5f * (Zk.x + Zm.x), 0.5f * (Zk.y - Zm.y));
+            const float2 xr = make_float2(0.5f * (Zk.y + Zm.y), -0.5f * (Zk.x - Zm.x));
+            const float eL = b > 0 ? xl.x * xl.x + xl.y * xl.y : 0.0f;
+            const float eR = b > 0 ? xr.x * xr.x + xr.y * xr.y : 0.0f;
+            // The heard frequency: the phase's advance over the hop, beyond the band centre's, wrapped.
+            const float centre = kTwoPi * static_cast<float>(b) / static_cast<float>(kMeltN);
+            const float pL = atan2f(xl.y, xl.x), pR = atan2f(xr.y, xr.x);
+            float dL = pL - heard[b] - centre * hop, dR = pR - heard[kMeltBands + b] - centre * hop;
+            dL -= kTwoPi * rintf(dL / kTwoPi);
+            dR -= kTwoPi * rintf(dR / kTwoPi);
+            heard[b] = pL;
+            heard[kMeltBands + b] = pR;
+            const float wIn = eL + eR > 1.0e-20f ? centre + (eL * dL + eR * dR) / ((eL + eR) * hop) : centre;
+            held[q][0] = M.keep * energy[b] + (1.0f - M.keep) * eL;
+            held[q][1] = M.keep * energy[kMeltBands + b] + (1.0f - M.keep) * eR;
+            const float fresh = fminf(1.0f, (1.0f - M.keep) * (eL + eR) / (held[q][0] + held[q][1] + 1.0e-20f));
+            float w = omega[b];
+            w += fresh * (wIn - w);
+            w += M.pull * (centre - w);
+            omega[b] = w;
+        }
+        __syncthreads();   // every band read: z becomes the cumulative sums
+        // The blur scatters band x's energy evenly over [x - h, x + h], h = 0.5 + kappa x (x its
+        // centre): a density held / (1 + 2 kappa x). Band b then gathers the densities of the bands
+        // whose centres lie in [(x - 0.5) / (1 + kappa), (x + 0.5) / (1 - kappa)] -- the cumulative
+        // densities' difference. kappa 0 is the identity; the variance a frame is about (kappa x)^2 / 3.
+        const float kappa = 1.7320508f * M.widen;
+        float dens[2][2];
+        for (int q = 0; q < 2; ++q)
+            for (int ear = 0; ear < 2; ++ear)
+                dens[q][ear] = held[q][ear] / (1.0f + 2.0f * kappa * (static_cast<float>(2 * t + q) + 0.5f));
+        // Inclusive sums over the bands, per ear, in double-float: the thread's pair, a warp's scan by
+        // shuffles, the warps' totals by the first warp -- all in a fixed order.
+        float2* c = z;   // [ear * kMeltBands + b]
+        const int lane = t & 31, warp = t >> 5;
+        float2 excl[2], pair[2];
+        for (int ear = 0; ear < 2; ++ear) {
+            pair[ear] = dfAdd(make_float2(dens[0][ear], 0.0f), make_float2(dens[1][ear], 0.0f));
+            float2 s = pair[ear];
+            for (int off = 1; off < 32; off <<= 1) {
+                const float2 o = make_float2(__shfl_up_sync(0xFFFFFFFFU, s.x, off), __shfl_up_sync(0xFFFFFFFFU, s.y, off));
+                if (lane >= off) s = dfAdd(o, s);
+            }
+            if (lane == 31) warpSum[ear][warp] = s;
+            excl[ear] = dfSub(s, pair[ear]);
+        }
+        __syncthreads();
+        if (warp == 0) {
+            for (int ear = 0; ear < 2; ++ear) {
+                const float2 own = warpSum[ear][lane];
+                float2 s = own;
+                for (int off = 1; off < 32; off <<= 1) {
+                    const float2 o = make_float2(__shfl_up_sync(0xFFFFFFFFU, s.x, off), __shfl_up_sync(0xFFFFFFFFU, s.y, off));
+                    if (lane >= off) s = dfAdd(o, s);
+                }
+                warpSum[ear][lane] = dfSub(s, own);   // exclusive
+            }
+        }
+        __syncthreads();
+        for (int ear = 0; ear < 2; ++ear) {
+            const float2 base = dfAdd(warpSum[ear][warp], excl[ear]);
+            c[ear * kMeltBands + 2 * t] = dfAdd(base, make_float2(dens[0][ear], 0.0f));
+            c[ear * kMeltBands + 2 * t + 1] = dfAdd(base, pair[ear]);
+        }
+        __syncthreads();
+        float out[2][2];
+        for (int q = 0; q < 2; ++q) {
+            const int b = 2 * t + q;
+            const float x = static_cast<float>(b) + 0.5f;
+            const float lo = fmaxf(1.0f, (x - 0.5f) / (1.0f + kappa)), hi = fminf(static_cast<float>(kMeltBands), (x + 0.5f) / (1.0f - kappa));
+            for (int ear = 0; ear < 2; ++ear) {
+                const float2* ce = c + ear * kMeltBands;
+                float e = 0.0f;
+                if (b > 0 && hi > lo) {
+                    const float2 d = dfSub(meltBelow(ce, hi), meltBelow(ce, lo));
+                    e = d.x + d.y;
+                }
+                out[q][ear] = fmaxf(e, 0.0f);
+            }
+        }
+        __syncthreads();   // the sums read: z becomes the sung spectrum
+        for (int q = 0; q < 2; ++q) {
+            const int b = 2 * t + q;
+            energy[b] = out[q][0];
+            energy[kMeltBands + b] = out[q][1];
+            float2 y[2];
+            for (int ear = 0; ear < 2; ++ear) {
+                const float det = M.detune * (2.0f * static_cast<float>(hash32(static_cast<std::uint32_t>(b) ^ (ear ? 0x44455452U : 0x4445544CU)) >> 8) * (1.0f / 16777216.0f) - 1.0f);
+                float ph = phase[ear * kMeltBands + b] + (omega[b] + det) * hop;
+                ph -= kTwoPi * rintf(ph / kTwoPi);
+                phase[ear * kMeltBands + b] = ph;
+                float sn, cs;
+                __sincosf(ph, &sn, &cs);
+                const float mag = b > 0 ? sqrtf(out[q][ear]) : 0.0f;
+                y[ear] = make_float2(mag * cs, mag * sn);
+            }
+            z[b] = make_float2(y[0].x - y[1].y, y[0].y + y[1].x);
+            if (b > 0) z[kMeltN - b] = make_float2(y[0].x + y[1].y, -y[0].y + y[1].x);
+        }
+        if (t == 0) z[kMeltN / 2] = make_float2(0.0f, 0.0f);
+        __syncthreads();
+        fft4096(z, true);
+        const float norm = 1.0f / (static_cast<float>(kMeltN) * 0.375f * static_cast<float>(kMeltN) / hop);
+        for (int k = t; k < kMeltN; k += kMeltThreads) {
+            const int i = (start + k) & (kMeltN - 1);
+            const float win = (0.5f - 0.5f * cospif(2.0f * static_cast<float>(k) / static_cast<float>(kMeltN))) * norm;
+            acc[i] += win * z[k].x;
+            acc[kMeltN + i] += win * z[k].y;
+        }
+        __syncthreads();
+    }
+    for (int s = t; s < n; s += kMeltThreads) {   // the oldest block is finished: out, and cleared for the next
+        const int i = (start + s) & (kMeltN - 1);
+        io[s * kCloudOutChannels + 8] = acc[i];
+        io[s * kCloudOutChannels + 9] = acc[kMeltN + i];
+        acc[i] = 0.0f;
+        acc[kMeltN + i] = 0.0f;
+    }
+    if (t == 0) { st[0] = (w0 + n) & (kMeltN - 1); st[1] = count >= kMeltHop ? count - kMeltHop : count; }
+}
+
+/**
  * @brief The instrument listening to itself, one CUDA block: the voices' block into a history, a
  *        Hann-windowed frame through the FFT, and three numbers -- the level, the energy's centre
  *        on the log axis, the change (the magnitudes' rise against the last frame over their sum).
@@ -1639,6 +1894,14 @@ struct CloudEngine::Impl {
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
     Ripple ripple;                    ///< the host's copy of the ripple
     Reservoir reservoir;              ///< the host's copy of the reservoir's settings
+    Melt melt;                        ///< the host's copy of the melt's settings
+    float* dMeltHist = nullptr;       ///< device: the melt's input history, two rings of kMeltN
+    float* dMeltAcc = nullptr;        ///< device: its overlap, two rings of kMeltN
+    float* dMeltEnergy = nullptr;     ///< device: its held energy, per ear and band
+    float* dMeltOmega = nullptr;      ///< device: its bands' sung frequencies
+    float* dMeltPhase = nullptr;      ///< device: their sung phases, per ear
+    float* dMeltHeard = nullptr;      ///< device: their last heard phases, per ear
+    int* dMeltState = nullptr;        ///< device: its history index and the samples since its last frame
     float* dResW = nullptr;           ///< device: the reservoir's coupling, N x N
     float* dResIn = nullptr;          ///< device: its input weights
     float* dResOut = nullptr;         ///< device: its readouts
@@ -1698,7 +1961,9 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats),
                          static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder), static_cast<void*>(dFlockA), static_cast<void*>(dFlockB),
                          static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState),
-                         static_cast<void*>(dResW), static_cast<void*>(dResIn), static_cast<void*>(dResOut), static_cast<void*>(dResX) })
+                         static_cast<void*>(dResW), static_cast<void*>(dResIn), static_cast<void*>(dResOut), static_cast<void*>(dResX),
+                         static_cast<void*>(dMeltHist), static_cast<void*>(dMeltAcc), static_cast<void*>(dMeltEnergy),
+                         static_cast<void*>(dMeltOmega), static_cast<void*>(dMeltPhase), static_cast<void*>(dMeltHeard), static_cast<void*>(dMeltState) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -1710,6 +1975,7 @@ struct CloudEngine::Impl {
         dSyncTheta = nullptr; dSyncOrder = nullptr; dFlockA = nullptr; dFlockB = nullptr;
         dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
         dResW = nullptr; dResIn = nullptr; dResOut = nullptr; dResX = nullptr;
+        dMeltHist = dMeltAcc = dMeltEnergy = dMeltOmega = dMeltPhase = dMeltHeard = nullptr; dMeltState = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -1831,6 +2097,13 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dResIn, sizeof(float) * kReservoirN * kReservoirInputs), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dResOut, sizeof(float) * kReservoirN * kReservoirOutputs), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dResX, sizeof(float) * 2 * kReservoirN), "cudaMalloc reservoir", error)
+                && ok(cudaMalloc(&m.dMeltHist, sizeof(float) * 2 * kMeltN), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltAcc, sizeof(float) * 2 * kMeltN), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltEnergy, sizeof(float) * 2 * kMeltBands), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltOmega, sizeof(float) * kMeltBands), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltPhase, sizeof(float) * 2 * kMeltBands), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltHeard, sizeof(float) * 2 * kMeltBands), "cudaMalloc melt", error)
+                && ok(cudaMalloc(&m.dMeltState, sizeof(int) * 2), "cudaMalloc melt", error)
                 && ok(cudaMalloc(&m.dListenHist, sizeof(float) * 2 * kEchoN), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dListenPrev, sizeof(float) * kEchoBins), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dListenState, sizeof(int) * 2), "cudaMalloc listen", error)
@@ -1891,6 +2164,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
         reservoirInitKernel<<<static_cast<unsigned>((static_cast<size_t>(kReservoirN) * kReservoirN + 255) / 256), 256, 0, m.stream>>>(m.dResW, m.dResIn, m.dResOut, m.dResX);
         good = ok(cudaStreamSynchronize(m.stream), "reservoir init", error);
         std::memset(m.hLifeStats, 0, sizeof(float) * 12);
+        m.melt.clear = 1;   // the first block fills the melt's tables
     }
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
@@ -1920,6 +2194,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             modalReduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dModalScratch, n, m.dOut);
             spectralEchoKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dEchoHist, m.dEchoAcc, m.dEchoRing, m.dEchoState);
+            meltKernel<<<1, kMeltThreads, 0, m.stream>>>(hdr, m.dOut, m.dMeltHist, m.dMeltAcc, m.dMeltEnergy, m.dMeltOmega, m.dMeltPhase,
+                                                          m.dMeltHeard, m.dMeltState);
             listenKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dListenHist, m.dListenPrev, m.dListenState, m.dLifeStats);
             reservoirStepKernel<<<static_cast<unsigned>(kReservoirN * 32 / 256), 256, 0, m.stream>>>(hdr, m.dResW, m.dResIn, m.dResX);
             reservoirReadKernel<<<1, 256, 0, m.stream>>>(hdr, m.dResOut, m.dResX, m.dLifeStats);
@@ -1987,6 +2263,8 @@ Ripple& CloudEngine::ripple() { return impl_->ripple; }
 
 Reservoir& CloudEngine::reservoir() { return impl_->reservoir; }
 
+Melt& CloudEngine::melt() { return impl_->melt; }
+
 void CloudEngine::reservoirOut(float* out) const
 {
     for (int k = 0; k < kReservoirOutputs; ++k) out[k] = impl_->hLifeStats[5 + k];
@@ -2042,6 +2320,8 @@ void CloudEngine::launch()
     hdr->sync = m.sync;
     hdr->ripple = m.ripple;
     hdr->reservoir = m.reservoir;
+    hdr->melt = m.melt;
+    m.melt.clear = 0;   // asked for once
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);
     hdr->lifeParity = m.lifeParity;

@@ -187,6 +187,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                       ParamId::ModalPaint, ParamId::ModalFreeze } },
                       { "Spectral Echo", F::Space, Ids{ ParamId::SpecMix, ParamId::SpecTime, ParamId::SpecTilt, ParamId::SpecScatter,
                                                         ParamId::SpecFeedback, ParamId::SpecDamp, ParamId::SpecToFar } },
+                      { "Melt", F::Motion, Ids{ ParamId::MeltMix, ParamId::MeltTime, ParamId::MeltSpread, ParamId::MeltToFar } },
                       { "Memory", F::Envelope, Ids{ ParamId::MemoryLevel, ParamId::MemoryTime, ParamId::MemoryBloom, ParamId::MemoryBlur,
                                                     ParamId::MemorySink } } });
     {

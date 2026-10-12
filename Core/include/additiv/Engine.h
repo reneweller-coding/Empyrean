@@ -439,6 +439,11 @@ private:
     float prevSpecMix_ = 0.0f;                         ///< the spectral echo's level at the end of the last block
     float prevSpecToFar_ = 0.0f;                       ///< its send into the far plane, likewise
     bool specWasOn_ = false;                           ///< it ran in the last block (switching it on clears its lines)
+    std::vector<float> meltL_;                         ///< the melt's block from the GPU, left
+    std::vector<float> meltR_;                         ///< and right
+    float prevMeltMix_ = 0.0f;                         ///< the melt's level at the end of the last block
+    float prevMeltToFar_ = 0.0f;                       ///< its send into the far plane, likewise
+    bool meltWasOn_ = false;                           ///< it ran in the last block (switching it on clears it)
     float binAngle_ = 0.0f;                            ///< the binaural cloud's orbit, radians
     float paintTime_ = 0.0f;                           ///< seconds into the landscape's loop, for the painted hall
     float landLoop_ = 0.0f;                            ///< the landscape's loop, seconds

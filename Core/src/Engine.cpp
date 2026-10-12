@@ -205,7 +205,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     early_.prepare(cfg_.sampleRate);
     nearRev_.prepare(cfg_.sampleRate);
     midSide_.prepare(cfg_.sampleRate);
-    for (std::vector<float>* b : { &nearL_, &nearR_, &farL_, &farR_, &dryL_, &dryR_, &wetL_, &wetR_, &modalL_, &modalR_, &specL_, &specR_ })
+    for (std::vector<float>* b : { &nearL_, &nearR_, &farL_, &farR_, &dryL_, &dryR_, &wetL_, &wetR_, &modalL_, &modalR_, &specL_, &specR_, &meltL_, &meltR_ })
         b->assign(static_cast<size_t>(G), 0.0f);
     ghosts_.assign(static_cast<size_t>(std::max(0, cfg_.ghosts)), Ghost{});
     ghostRng_ = Rng(cfg_.seed ^ 0x47686F7374ull);
@@ -213,6 +213,8 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     randomNote_ = 0.0f;
     prevSpecMix_ = prevSpecToFar_ = 0.0f;
     specWasOn_ = false;
+    prevMeltMix_ = prevMeltToFar_ = 0.0f;
+    meltWasOn_ = false;
     binAngle_ = 0.0f;
     paintTime_ = 0.0f;
     prevDelayMix_ = prevDelayToFar_ = prevDelay2Mix_ = prevDelay2ToFar_ = prevModalLevel_ = 0.0f;
@@ -1238,6 +1240,21 @@ void Engine::renderBlock()
         se.scatter = cur(ParamId::SpecScatter);
         se.feedback = cur(ParamId::SpecFeedback);
         se.damp = cur(ParamId::SpecDamp);
+
+        // The melt: its time to -60 dB as the held energy's share kept a frame, the spread as a
+        // diffusion (after a second the standard deviation is Spread octaves), the bands' pull to
+        // their centres and their detuning growing with it.
+        Melt& me = cloud_.melt();
+        const bool meltOn = cur(ParamId::MeltMix) > 0.0f || prevMeltMix_ > 0.0f;
+        if (meltOn && !meltWasOn_) me.clear = 1;
+        meltWasOn_ = meltOn;
+        me.on = meltOn ? 1 : 0;
+        const float hopS = static_cast<float>(kMeltHop) / static_cast<float>(cfg_.sampleRate);
+        const float spread = cur(ParamId::MeltSpread);
+        me.keep = std::pow(10.0f, -6.0f * hopS / std::max(cur(ParamId::MeltTime), 0.1f));
+        me.widen = spread * 0.693147f * std::sqrt(hopS);
+        me.pull = 1.0f - std::exp(-2.0f * spread * hopS);
+        me.detune = (0.1f + 0.4f * std::min(spread, 1.0f)) * 6.2831853f / static_cast<float>(kMeltN);
     }
 
     // 5. The GPU: near and far, left and right, the modal hall and the spectral echo.
@@ -1279,6 +1296,8 @@ void Engine::renderBlock()
         modalR_[k] = f[5];
         specL_[k] = f[6];
         specR_[k] = f[7];
+        meltL_[k] = f[8];
+        meltR_[k] = f[9];
     }
     // A level from the last block's to this one's, across the block (no zipper when it is modulated).
     auto ramp = [G](float from, float to, int s) { return from + (to - from) * static_cast<float>(s + 1) / static_cast<float>(G); };
@@ -1327,6 +1346,17 @@ void Engine::renderBlock()
         }
         prevSpecMix_ = m3;
         prevSpecToFar_ = t3;
+    }
+    {   // the melt, from the GPU: onto the near plane and partly into the far
+        const float m4 = cur(ParamId::MeltMix), t4 = cur(ParamId::MeltToFar) * m4;
+        for (int s = 0; s < G; ++s) {
+            const size_t k = static_cast<size_t>(s);
+            const float m = ramp(prevMeltMix_, m4, s), tf = ramp(prevMeltToFar_, t4, s);
+            nearL_[k] += meltL_[k] * m;  nearR_[k] += meltR_[k] * m;
+            farL_[k] += meltL_[k] * tf;  farR_[k] += meltR_[k] * tf;
+        }
+        prevMeltMix_ = m4;
+        prevMeltToFar_ = t4;
     }
     nearRev_.setSpace(0.3f, 20000.0f, 80.0f);
     nearRev_.set(0.6f, cur(ParamId::NearDecay), cur(ParamId::NearDamp), 5.0f, false, cur(ParamId::NearMix));

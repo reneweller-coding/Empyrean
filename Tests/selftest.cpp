@@ -1210,6 +1210,43 @@ int main()
                   swing(a), a == b ? "the same" : "DIFFERENT", swing(calm), swing(wild)));
     }
 
+    // 43. The melt: a note let go lingers in it, about as loud as it was; without spread it stays on
+    //     its harmonics, with spread it melts into the space between them.
+    {
+        double dry = 0.0, tail[2] = { 0.0, 0.0 }, between[2] = { 0.0, 0.0 }, silent = 0.0;
+        for (int k = 0; k < 3; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.005f);
+            e.setParam(ParamId::Release, 0.03f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::MeltMix, k == 0 ? 0.0f : 1.0f);
+            e.setParam(ParamId::MeltToFar, 0.0f);
+            e.setParam(ParamId::MeltTime, 20.0f);
+            e.setParam(ParamId::MeltSpread, k == 2 ? 1.5f : 0.0f);
+            if (!openOffline(e, false, 139)) return 1;
+            e.noteOn(50, 0.8f, 0);
+            std::vector<float> lr = render(e, 3.0);
+            const double f1 = soundingHz(e);
+            e.noteOff(50, 0);
+            const std::vector<float> rest = render(e, 2.0);
+            lr.insert(lr.end(), rest.begin(), rest.end());
+            if (k == 0) {
+                dry = rmsDb(lr, 2 * 48000, 3 * 48000);
+                silent = rmsDb(lr, 3 * 48000 + 9600, 4 * 48000);
+                continue;
+            }
+            const size_t a = 3 * 48000 + 9600, b = 4 * 48000;   // 0.2 .. 1 s after the release
+            tail[k - 1] = rmsDb(lr, a, b);
+            // Between the 3rd and 4th harmonics against on them.
+            between[k - 1] = toneDb(lr, a, b, 3.5 * f1) - 0.5 * (toneDb(lr, a, b, 3.0 * f1) + toneDb(lr, a, b, 4.0 * f1));
+        }
+        check(tail[0] > silent + 30.0 && std::fabs(tail[0] - dry) < 4.0 && std::fabs(tail[1] - dry) < 4.0 && between[1] > between[0] + 10.0,
+              "melt: a note lingers, and melts between its harmonics",
+              fmt("held %.1f dBFS, after the release %.1f / %.1f dBFS spread (without the melt %.1f); between the harmonics %.1f dB still, %.1f dB spread",
+                  dry, tail[0], tail[1], silent, between[0], between[1]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

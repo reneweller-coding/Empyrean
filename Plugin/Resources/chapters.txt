@@ -60,6 +60,8 @@ The modal hall is a reverb made the way the instrument is made: sixty-five thous
 
 The spectral echo takes the sound apart into five hundred bands and gives each a delay line of its own. Tilt brings the high bands back later than the low ones (or earlier), Scatter gives every band a time of its own, Feedback and Damping set how long and how dark the repeats are, To Far how much of them recedes. An attack comes back as a cascade, a chord as a spreading shimmer.
 
+The melt holds the sound's spectrum and lets it melt: two thousand bands, each keeping what it heard and fading over Melt Time, while the held spectrum slowly flows into its neighbours (Spread: how many octaves it has spread after a second). What has been held longest is spread widest, so a chord leaves a glow that widens into the space between its notes. A phase vocoder sings it again, each band at the frequency it heard, drawn towards its own pitch as it melts, a little apart in each ear. To Far sends it into the far plane.
+
 Memory keeps a ghost of every note let go. It rises over Bloom once the note has gone, fades over Memory Time, and while it fades it widens, drifts and darkens (Blur) and recedes into the far plane (Sink): the harmony of the last minutes stands faintly behind the present one.
 
 == Modulation | Modulation | ==

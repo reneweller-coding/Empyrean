@@ -170,7 +170,7 @@ enum class FilterModel : int {
 constexpr int kNumFilterModels = static_cast<int>(FilterModel::Count);   ///< entries of kFilterModelNames
 
 constexpr int kCloudChannels = 4;      ///< the voices' channels on the GPU: near left, near right, far left, far right
-constexpr int kCloudOutChannels = 8;   ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right
+constexpr int kCloudOutChannels = 10;  ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right, the melt's left and right
 constexpr int kModalModes = 65536;     ///< the modal hall's resonances
 constexpr int kModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
 
@@ -234,7 +234,7 @@ static_assert(sizeof(Binaural) % 16 == 0, "Binaural rides in the block header");
  *
  * The voices (near and far) are taken apart every block by a 1024-point FFT (a Hann window, the
  * block as the hop), every band of each ear goes through a delay line of its own with feedback,
- * and the bands are put back together and overlapped (output: kCloudOutChannels' last two, 896
+ * and the bands are put back together and overlapped (output: channels 6 and 7, 896
  * samples after the input at 128 a block). The bands' times follow `tilt` (positive: the highs
  * later) and `scatter` (each band a time of its own), the feedback falls towards the top by
  * `damp`. Echoes then come back as cascades rather than as copies.
@@ -254,6 +254,31 @@ struct SpectralEcho {
     float pad4 = 0.0f;       ///< likewise
 };
 static_assert(sizeof(SpectralEcho) % 16 == 0, "SpectralEcho rides in the block header");
+
+constexpr int kMeltN = 4096;     ///< the melt's FFT size (11.7 Hz bands at 48 kHz)
+constexpr int kMeltHop = 512;    ///< samples between its frames
+
+/**
+ * @brief The melt: a spectral blur on the GPU (output: channels 8 and 9, kMeltN - block samples late).
+ *
+ * Every kMeltHop samples the voices (near and far) are taken apart by a kMeltN-point FFT. Each band's
+ * energy is held -- the new frame mixed in by 1 - `keep` -- and the held spectrum diffuses across the
+ * bands, a little every frame (`widen`, in octaves on a log axis), so what has been held longest is
+ * spread widest: a chord melts into the space between its notes. A phase vocoder sings it again:
+ * each band follows the frequency it hears (its partial's, not the band's centre), is pulled back
+ * to its own centre by `pull` as it melts, and is detuned a little, otherwise in each ear.
+ */
+struct Melt {
+    int   on = 0;              ///< 1: running (0: silent, nothing computed)
+    int   clear = 0;           ///< 1 for one block: everything emptied first (the engine asks when it switches on)
+    int   pad0 = 0;            ///< keeps the floats 16-byte aligned
+    int   pad1 = 0;            ///< likewise
+    float keep = 0.99f;        ///< per frame: the share of the held energy kept
+    float widen = 0.0f;        ///< per frame: the blur's standard deviation in bands, per band index
+    float pull = 0.0f;         ///< per frame: each band's frequency pulled towards its centre by this share
+    float detune = 0.0f;       ///< radians a sample: each band's offset at most (its own in each ear)
+};
+static_assert(sizeof(Melt) % 16 == 0, "Melt rides in the block header");
 
 constexpr int kSnapStride = 8;       ///< every eighth partial of every voice is in the picture's snapshot
 constexpr int kLifeW = 256;          ///< the living field's width, cells (across the spectrum)
@@ -482,6 +507,9 @@ public:
     /** @brief The host's copy of the reservoir's settings, edited between wait() and the next launch(). @return the settings */
     Reservoir& reservoir();
 
+    /** @brief The host's copy of the melt's settings, edited between wait() and the next launch(). @return the settings */
+    Melt& melt();
+
     /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
     void reservoirOut(float* out) const;
 
@@ -531,7 +559,7 @@ public:
 
     /**
      * @brief Waits for the launched block.
-     * @return  blockSize frames of kCloudOutChannels (near L, R, far L, R, modal hall L, R, spectral echo L, R), valid until the next launch()
+     * @return  blockSize frames of kCloudOutChannels (near L, R, far L, R, modal hall L, R, spectral echo L, R, melt L, R), valid until the next launch()
      */
     const float* wait();
 

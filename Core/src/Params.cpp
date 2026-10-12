@@ -309,6 +309,11 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::ReservoirChaos,  "reservoir_chaos",  "Chaos",      "Modulation", 0.5f, 1.5f, 0.95f, 1.f,  ""),
     F(ParamId::ReservoirMemory, "reservoir_memory", "Memory",     "Modulation", 0.3f, 30.f, 4.f,   0.4f, "s"),
     F(ParamId::ReservoirInput,  "reservoir_input",  "Input",      "Modulation", 0.f,  2.f,  0.7f,  1.f,  ""),
+
+    F(ParamId::MeltMix,         "melt_mix",         "Melt",       "Melt", 0.f,   1.f,  0.f,  1.f,  ""),
+    F(ParamId::MeltTime,        "melt_time",        "Melt Time",  "Melt", 0.5f,  60.f, 8.f,  0.4f, "s"),
+    F(ParamId::MeltSpread,      "melt_spread",      "Spread",     "Melt", 0.f,   2.f,  0.5f, 0.6f, "oct"),
+    F(ParamId::MeltToFar,       "melt_to_far",      "To Far",     "Melt", 0.f,   1.f,  0.4f, 1.f,  ""),
 } };
 
 } // namespace

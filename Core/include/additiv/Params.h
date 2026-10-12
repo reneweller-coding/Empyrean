@@ -209,6 +209,11 @@ enum class ParamId : int {
     ReservoirChaos, ///< its coupling's spectral radius: below 1 it forgets, about 1 the edge of chaos
     ReservoirMemory,///< s: how slowly its state moves
     ReservoirInput, ///< how strongly it hears the music
+    // Phase 10h: the melt
+    MeltMix,        ///< 0 .. 1: the melt on the near plane
+    MeltTime,       ///< s: how long the melted sound lingers (to -60 dB)
+    MeltSpread,     ///< octaves: how far a held sound has spread after a second
+    MeltToFar,      ///< 0 .. 1: its share into the far plane
     Count           ///< number of parameters
 };
 
