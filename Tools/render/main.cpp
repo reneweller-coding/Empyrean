@@ -6,17 +6,22 @@
  *
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
+ *                    [--route NAME|FILE] [--route-speed X]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
  * key of the parameter table (Core/include/additiv/Params.h) after it; a choice takes its index or its
  * name ("--set auto_mode=Free", "--set motion=Aurora"). --journey plays a journey (Journey.h): one that
  * comes with the instrument by its name ("Whole Night - Deep Space"), or a .journey file; each step
- * glides into its preset as the instrument does. The WAV is written as it is rendered; beyond an hour
+ * glides into its preset as the instrument does. --route walks a route over the preset map (Route.h):
+ * one that comes with the instrument by its name ("Dawn") or a .route file, the sound the blend of
+ * the presets round the cursor, followed over Map Glide. The WAV is written as it is rendered; beyond an hour
  * it is cut into files of an hour (render-01.wav, render-02.wav, ...).
  */
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/PresetMap.h"
+#include "additiv/Route.h"
 #include "additiv/Presets.h"
 
 #define NOMINMAX
@@ -32,6 +37,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -216,7 +222,8 @@ int main(int argc, char** argv)
     std::uint64_t seed = 0x5EEDu;
     std::vector<std::string> sets;
     std::vector<int> chord;
-    std::string presetName, journeyName;
+    std::string presetName, journeyName, routeName;
+    double routeSpeed = 1.0;
     std::uint64_t journeySeed = 1;
     bool brain = true;
     for (int i = 1; i < argc; ++i) {
@@ -231,6 +238,8 @@ int main(int argc, char** argv)
         else if (a == "--preset" && has) presetName = argv[++i];
         else if (a == "--journey" && has) journeyName = argv[++i];
         else if (a == "--journey-seed" && has) journeySeed = std::strtoull(argv[++i], nullptr, 10);
+        else if (a == "--route" && has) routeName = argv[++i];
+        else if (a == "--route-speed" && has) routeSpeed = std::atof(argv[++i]);
         else if (a == "--dump-params") { dumpParams(); return 0; }
         else if (a == "--chord" && has) {
             std::string s = argv[++i];
@@ -242,7 +251,7 @@ int main(int argc, char** argv)
             }
         } else {
             std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
-                                 "            [--journey NAME|FILE] [--journey-seed N]\n"
+                                 "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
                                  "empy_render --dump-params\n");
             return 1;
         }
@@ -264,6 +273,27 @@ int main(int argc, char** argv)
         double glide = 0.0;
         if (player.advance(0.0, st, glide) && findPreset(st.preset.c_str()) >= 0) e.loadPreset(findPreset(st.preset.c_str()));   // the first at once
         std::printf("journey %s: %zu steps, a pass about %s\n", journey.name.c_str(), journey.steps.size(), Journey::timeText(journey.meanLength()).c_str());
+    }
+    Route route;
+    MapBlender blender;
+    float mapX = -1.0f, mapY = -1.0f, mapR = -1.0f;
+    if (!routeName.empty()) {
+        std::string text;
+        for (int i = 0; i < numRoutePresets() && text.empty(); ++i)
+            if (routeName == routePreset(i).name) text = routePreset(i).points;
+        if (text.empty()) {
+            std::ifstream f(routeName, std::ios::binary);
+            std::stringstream ss;
+            ss << f.rdbuf();
+            text = ss.str();
+        }
+        if (!route.parse(text.c_str())) { std::fprintf(stderr, "empy_render: no route %s\n", routeName.c_str()); return 1; }
+        // Starting on the first waypoint's preset, the map on.
+        const Waypoint& w = route.point(0);
+        if (w.preset >= 0) e.loadPreset(w.preset);
+        route.start(w.x, w.y, w.radius, true);
+        e.setParam(ParamId::MapActive, 1.0f);
+        std::printf("route %s: %d waypoints\n", routeName.c_str(), route.count());
     }
     for (const std::string& s : sets)
         if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
@@ -304,6 +334,23 @@ int main(int argc, char** argv)
         if (!released && hold >= 0.0 && done >= static_cast<std::int64_t>(hold * c.sampleRate)) {
             for (int note : chord) e.noteOff(note, 0);
             released = true;
+        }
+        if (route.running()) {   // the route moves the cursor; a moved cursor is blended anew
+            const int seg = route.segment();
+            float x = 0.0f, y = 0.0f, r = 0.0f;
+            route.update(static_cast<float>(n / c.sampleRate * routeSpeed), x, y, r);
+            if (x != mapX || y != mapY || r != mapR) {
+                MorphState s;
+                blender.blend(x, y, r, s);
+                e.setMapTarget(s);
+                mapX = x;
+                mapY = y;
+                mapR = r;
+            }
+            if (route.segment() != seg) {
+                const Waypoint& w = route.point(route.segment());
+                std::printf("  %5.0f s: towards %d, %s\n", done / c.sampleRate, route.segment() + 1, w.preset >= 0 ? preset(w.preset).name : "a place");
+            }
         }
         if (player.running()) {   // the journey: a step glides into its preset
             JourneyStep st;
