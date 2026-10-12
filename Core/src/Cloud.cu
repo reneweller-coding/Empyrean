@@ -615,6 +615,77 @@ __global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices
 }
 
 /**
+ * @brief A member's place in its cloud in cents (its slice of the bell, jittered as the update
+ *        kernel places it).
+ * @param seed     the note's dice
+ * @param first    the cloud's first partial in the voice
+ * @param j        the member
+ * @param count    the cloud's members
+ * @param sigma    the cloud's width, cents per unit of the bell
+ * @return         cents from the cloud's centre
+ */
+__device__ __forceinline__ float memberCents(std::uint32_t seed, int first, int j, int count, float sigma)
+{
+    if (count <= 1) return 0.0f;
+    const std::uint32_t up = static_cast<std::uint32_t>(first + j);
+    return normcdfinvf((static_cast<float>(j) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(count)) * sigma;
+}
+
+/**
+ * @brief One block of the flock for one partial (Reynolds 1987, in frequency): its offset and
+ *        velocity steered by the three members on either side in its cloud -- towards their mean
+ *        offset (cohesion), towards their mean velocity (alignment), away from any that has come closer
+ *        than half their distance at home (separation: the cloud keeps its shape; a fixed distance of
+ *        six cents blew a cloud of 7 cents up to 20, its members lie a cent apart) -- plus its cloud's
+ *        wind, a spring home and drag.
+ *        Read from the last block's state, written into the other buffer: bit-identical.
+ * @param F        the field (spring; strength: the wind)
+ * @param prev     the last block's (offset, velocity) per partial
+ * @param next     this block's
+ * @param vbase    the voice's first partial in the tables
+ * @param first    the cloud's first partial in the voice
+ * @param count    its members
+ * @param k        this partial's member
+ * @param seed     the note's dice
+ * @param sigma    the cloud's width, cents per unit of the bell
+ * @param wind     its cloud's wind, cents per second squared
+ * @param now      the offset it has now (taken over when the flock is fresh)
+ * @param restart  a new note: offset and velocity 0
+ * @param dt       the block's length, seconds
+ * @return         the new offset, cents
+ */
+__device__ float flockStep(const SpectralField& F, const float2* prev, float2* next, size_t vbase, int first, int count, int k,
+                           std::uint32_t seed, float sigma, float wind, float now, bool restart, float dt)
+{
+    const size_t me = vbase + static_cast<size_t>(first + k);
+    if (restart) { next[me] = make_float2(0.0f, 0.0f); return 0.0f; }
+    if (F.flockFresh) { next[me] = make_float2(now, 0.0f); return now; }
+    const float2 s = prev[me];
+    const float myHome = memberCents(seed, first, k, count, sigma);
+    const float myX = myHome + s.x;
+    float sumPos = 0.0f, sumVel = 0.0f, push = 0.0f;
+    int nb = 0;
+    for (int d = -3; d <= 3; ++d) {
+        const int j = k + d;
+        if (d == 0 || j < 0 || j >= count) continue;
+        const float2 o = prev[vbase + static_cast<size_t>(first + j)];
+        sumPos += o.x;
+        sumVel += o.y;
+        ++nb;
+        const float home = memberCents(seed, first, j, count, sigma);
+        const float sep = 0.5f * fabsf(myHome - home);
+        const float dx = myX - (home + o.x);
+        if (fabsf(dx) < sep) push += (j < k ? 1.0f : -1.0f) * (sep - fabsf(dx));   // the order kept: a lower member stays below
+    }
+    float acc = wind + 40.0f * push - 1.5f * s.y - (0.5f + 4.0f * F.spring) * s.x;
+    if (nb > 0) acc += 4.0f * (sumPos / static_cast<float>(nb) - s.x) + 3.0f * (sumVel / static_cast<float>(nb) - s.y);
+    const float vel = fminf(fmaxf(s.y + acc * dt, -200.0f), 200.0f);
+    const float pos = fminf(fmaxf(s.x + vel * dt, -600.0f), 600.0f);
+    next[me] = make_float2(pos, vel);
+    return pos;
+}
+
+/**
  * @brief The ring of the voices' levels: this block's level of every voice written where the
  *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
  *        partial of the new note never hears the old one's level).
@@ -670,10 +741,13 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param lifeB   buffer B
  * @param theta   per partial the sync's phase
  * @param order   per voice and group the sync's mean phasor (syncOrderKernel)
+ * @param flockA  the flock's state, buffer A (even blocks read it)
+ * @param flockB  buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
-                             float2* snap, const float2* lifeA, const float2* lifeB, float* theta, const float2* order)
+                             float2* snap, const float2* lifeA, const float2* lifeB, float* theta, const float2* order,
+                             float2* flockA, float2* flockB)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -713,6 +787,8 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         int h = 1;
         float z = 0.0f, centre, amp0, sh, drift;
         float slot = 0.5f;   // the partial's place among its cloud's members, evenly 0 .. 1 (the living field's rows)
+        int groupFirst = 0, groupCount = 1, member = 0;   // its cloud in the voice, for the flock
+        float sigmaCents = 0.0f;                            // the cloud's width, cents per unit of the bell
         if (!isAir) {
             h = p / K + 1;
             const int k = p - (h - 1) * K;
@@ -721,6 +797,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             // always cover it evenly and only jitter within their own slice.
             if (K > 1) z = normcdfinvf((static_cast<float>(k) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(K));
             const float sigma = 0.5f * cv.width * __powf(static_cast<float>(h), cv.widthSlope);
+            groupFirst = (h - 1) * K;
+            groupCount = K;
+            member = k;
+            sigmaCents = sigma;
             const float stretch = stretchOf(h, cv.inharmonic);
             centre = cv.hz * static_cast<float>(h) * stretch * exp2f(z * sigma * (1.0f / 1200.0f));
             drift = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
@@ -736,6 +816,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             const int a = p - HP;
             slot = (static_cast<float>(a) + 0.5f) / static_cast<float>(max(A, 1));
             if (A > 1) z = normcdfinvf((static_cast<float>(a) + 0.5f + 0.9f * (hash01(seed, up, 1) - 0.5f)) / static_cast<float>(A));
+            groupFirst = HP;
+            groupCount = A;
+            member = a;
+            sigmaCents = 0.5f * cv.airWidth;
             centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f));
             const float j = cv.airJitter;
             drift = 40.0f * (0.6f * slowSine(j * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
@@ -806,8 +890,16 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
 
         // The field: the partial's offset moves towards what pulls it, from where it was.
         const float home = centre * exp2f(cents * (1.0f / 1200.0f));
-        fieldOff = fieldStep(hdr->field, log2f(fmaxf(home, 1.0f)) + fieldOff * (1.0f / 1200.0f), fieldOff, static_cast<float>(n) / fs,
-                             z * (2.0f / 1200.0f));
+        if (hdr->field.mode == FieldMode::Flock) {
+            // The flock: every cloud a flock of its own, blown by the wind of its own attractor.
+            const bool odd = (hdr->blockIndex & 1U) != 0;
+            const float wind = hdr->field.pos[(isAir ? 0 : h - 1) & (kFieldAttractors - 1)] * 0.2f * hdr->field.strength;
+            fieldOff = flockStep(hdr->field, odd ? flockB : flockA, odd ? flockA : flockB, static_cast<size_t>(v) * pcap, groupFirst, groupCount,
+                                 member, seed, sigmaCents, wind, fieldOff, cv.restart != 0, static_cast<float>(n) / fs);
+        } else {
+            fieldOff = fieldStep(hdr->field, log2f(fmaxf(home, 1.0f)) + fieldOff * (1.0f / 1200.0f), fieldOff, static_cast<float>(n) / fs,
+                                 z * (2.0f / 1200.0f));
+        }
         f = home * exp2f(fieldOff * (1.0f / 1200.0f));
         // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist.
         const float fade = fminf(fmaxf((0.47f * fs - f) / (0.04f * fs), 0.0f), 1.0f);
@@ -1453,6 +1545,8 @@ struct CloudEngine::Impl {
     float* dEchoAcc = nullptr;        ///< device: its overlap, two rings of kEchoN
     float2* dEchoRing = nullptr;      ///< device: its delay lines, per ear and band kEchoSlots spectra
     int* dEchoState = nullptr;        ///< device: its history index and frame count
+    float2* dFlockA = nullptr;        ///< device: the flock's state (offset, velocity), buffer A
+    float2* dFlockB = nullptr;        ///< device: buffer B
     float* dSyncTheta = nullptr;      ///< device: per partial the sync's phase
     float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasor
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
@@ -1509,7 +1603,7 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dAmpQ), static_cast<void*>(dEchoHist), static_cast<void*>(dEchoAcc),
                          static_cast<void*>(dEchoRing), static_cast<void*>(dEchoState), static_cast<void*>(dSnap),
                          static_cast<void*>(dLifeA), static_cast<void*>(dLifeB), static_cast<void*>(dLifeStats),
-                         static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder),
+                         static_cast<void*>(dSyncTheta), static_cast<void*>(dSyncOrder), static_cast<void*>(dFlockA), static_cast<void*>(dFlockB),
                          static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
@@ -1519,7 +1613,7 @@ struct CloudEngine::Impl {
         dAmpQ = nullptr; dEchoHist = nullptr; dEchoAcc = nullptr; dEchoRing = nullptr; dEchoState = nullptr;
         dSnap = nullptr; hSnap = nullptr;
         dLifeA = dLifeB = nullptr; dLifeStats = nullptr; hLifeStats = nullptr; hLife = nullptr;
-        dSyncTheta = nullptr; dSyncOrder = nullptr;
+        dSyncTheta = nullptr; dSyncOrder = nullptr; dFlockA = nullptr; dFlockB = nullptr;
         dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
     }
 
@@ -1642,6 +1736,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dListenPrev, sizeof(float) * kEchoBins), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dListenState, sizeof(int) * 2), "cudaMalloc listen", error)
                 && ok(cudaMalloc(&m.dSyncTheta, sizeof(float) * partialsTotal), "cudaMalloc sync", error)
+                && ok(cudaMalloc(&m.dFlockA, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
+                && ok(cudaMalloc(&m.dFlockB, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
                 && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * partialsTotal), "cudaMalloc sync order", error)
                 && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 8, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
                 && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
@@ -1669,6 +1765,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenState, 0, sizeof(int) * 2, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dSyncTheta, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dFlockA, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dFlockB, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dSyncOrder, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
@@ -1711,7 +1809,7 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dSyncTheta, m.dSyncOrder);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta, m.dSyncOrder);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta, m.dSyncOrder, m.dFlockA, m.dFlockB);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(

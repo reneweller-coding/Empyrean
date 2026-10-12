@@ -324,6 +324,7 @@ enum class FieldMode : std::int32_t {
     Scale,     ///< every partial pulled towards the nearest pitch of the scale: the cloud collapses into the key
     Swarm,     ///< a few attractors wander through the spectrum on chaotic paths and gather the partials near them
     Scatter,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
+    Flock,     ///< every cloud's members as a flock of starlings: cohesion, alignment, separation, a wind
     Count      ///< number of modes
 };
 
@@ -347,8 +348,8 @@ enum class FieldMode : std::int32_t {
  */
 struct SpectralField {
     FieldMode mode = FieldMode::Off;   ///< what pulls the partials
-    int   count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`
-    int   pad0 = 0;                    ///< keeps the floats 16-byte aligned
+    int   count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`; Flock: winds in `pos`
+    int   flockFresh = 0;              ///< Flock: 1 when the last block was no flock (its state is taken from where the partials are)
     int   pad1 = 0;                    ///< likewise
     float strength = 0.0f;             ///< cents a second a partial may move at most
     float radius = 60.0f;              ///< cents: an attractor's reach (the bell's width); the Scale field's stiffness

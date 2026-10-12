@@ -403,6 +403,7 @@ private:
     float modalTime_ = 0.0f;                           ///< the modal hall's drift clock, seconds, wrapped at 1000
     float srcDistance_ = 0.3f;                         ///< where the near room hears the voices: their mean distance, weighted by loudness
     double lorenz_[kFieldAttractors][3] = {};          ///< the field's attractors: eight Lorenz systems (x, y, z), wandering always
+    bool flockWas_ = false;                            ///< the last block's field was the flock (else its state is taken afresh)
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost {

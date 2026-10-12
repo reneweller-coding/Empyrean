@@ -1075,6 +1075,64 @@ int main()
                   quiet, loud, dark, bright, onset, held, pure, rough));
     }
 
+    // 40. The flock: a cloud's members move together -- the centre of the 4th harmonic's cloud wanders
+    //     over ten seconds by several cents -- but keep their spread (no collapse), at the same level.
+    {
+        double moved[2] = { 0.0, 0.0 }, spread[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::FieldMode, k == 1 ? 4.0f : 0.0f);   // Off, Flock
+            e.setParam(ParamId::FieldStrength, 0.8f);
+            e.setParam(ParamId::FieldRate, 0.3f);
+            if (!openOffline(e, false, 127)) return 1;
+            e.noteOn(62, 0.8f, 0);
+            // The 4th harmonic's points in the snapshot: their mean and spread in cents from it.
+            auto cloud4 = [&](double& mean, double& sd) {
+                std::vector<float> dots;
+                int per = 0;
+                e.partialSnapshot(dots, per);
+                const double f4 = 4.0 * soundingHz(e);
+                int voice = -1;
+                for (int i = 0; i < 16; ++i) if (e.voiceView(i).hz > 0.0f) voice = i;
+                double s = 0.0, s2 = 0.0;
+                int count = 0;
+                for (int i = 0; voice >= 0 && i < per; ++i) {
+                    const size_t at = 2 * (static_cast<size_t>(voice) * per + i);
+                    if (dots[at + 1] <= 0.0f) continue;
+                    const double c = 1200.0 * std::log2(dots[at] / f4);
+                    if (std::fabs(c) > 300.0) continue;   // another harmonic's
+                    s += c;
+                    s2 += c * c;
+                    ++count;
+                }
+                mean = count ? s / count : 0.0;
+                sd = count ? std::sqrt(std::max(0.0, s2 / count - mean * mean)) : 0.0;
+            };
+            // The centre twenty times over ten seconds: its span is how far the cloud has wandered.
+            std::vector<float> lr = render(e, 2.0);
+            double lo = 1e9, hi = -1e9, sd = 0.0;
+            for (int w = 0; w < 20; ++w) {
+                const std::vector<float> part = render(e, 0.5);
+                lr.insert(lr.end(), part.begin(), part.end());
+                double m = 0.0;
+                cloud4(m, sd);
+                lo = std::min(lo, m);
+                hi = std::max(hi, m);
+            }
+            moved[k] = hi - lo;
+            spread[k] = sd;
+            level[k] = rmsDb(lr, 2 * 48000, 12 * 48000);
+        }
+        check(moved[1] > 5.0 && moved[1] > moved[0] + 4.0 && spread[1] > 0.5 * spread[0] && std::fabs(level[1] - level[0]) < 1.5,
+              "field: Flock moves the clouds together, keeping them wide",
+              fmt("4th harmonic's centre wandered over %.1f ct (still %.1f), spread %.1f ct (still %.1f), level %.1f / %.1f dBFS",
+                  moved[1], moved[0], spread[1], spread[0], level[1], level[0]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

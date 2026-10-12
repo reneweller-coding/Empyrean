@@ -258,8 +258,8 @@ constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
 constexpr int kNumLifeModes = 3;    ///< entries of kLifeModeNames
 extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing" (Cloud.h LifeMode)
-constexpr int kNumFieldModes = 4;   ///< entries of kFieldModeNames
-extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter" (Cloud.h FieldMode)
+constexpr int kNumFieldModes = 5;   ///< entries of kFieldModeNames
+extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames
 extern const char* const kFarModeNames[kNumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
 extern const char* const kRootNames[12];                  ///< "C" .. "B"

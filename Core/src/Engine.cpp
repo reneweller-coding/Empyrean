@@ -1031,6 +1031,8 @@ void Engine::renderBlock()
         F.radius = cur(ParamId::FieldRadius);
         F.spring = 4.0f * spring * spring;
         F.dispersion = cur(ParamId::Dispersion);
+        F.flockFresh = (F.mode == FieldMode::Flock && !flockWas_) ? 1 : 0;
+        flockWas_ = F.mode == FieldMode::Flock;
         const double span = static_cast<double>(cur(ParamId::FieldRate)) * dt;
         const int steps = std::max(1, static_cast<int>(std::ceil(span / 0.002)));
         const double h = span / steps;
@@ -1050,6 +1052,10 @@ void Engine::renderBlock()
                 if (count == 0 || lf > F.pos[count - 1] + 1.0e-4f) F.pos[count++] = lf;
             }
             F.count = count;
+        } else if (F.mode == FieldMode::Flock) {
+            // The flock's winds: each cloud blown by one of the eight Lorenz systems' x (cloud h by h mod 8).
+            for (int k = 0; k < kFieldAttractors; ++k) F.pos[k] = std::clamp(static_cast<float>(lorenz_[k][0] / 22.0), -1.0f, 1.0f);
+            F.count = kFieldAttractors;
         } else if (F.mode != FieldMode::Off) {
             const int count = std::clamp(static_cast<int>(std::lround(cur(ParamId::FieldCount))), 1, kFieldAttractors);
             const float lo = std::log2(60.0f), octaves = std::log2(8000.0f / 60.0f);
