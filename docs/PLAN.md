@@ -449,6 +449,47 @@ Töne werden ohnehin neu erzeugt). Je Baustein ein Commit, ein Selbsttest, die H
 GPU-Last: langsamster Block 0,6–0,9 ms (Vorbereitung bis 0,39, GPU-Warten bis 0,57, Effekte bis 0,26); drei Starts
 ohne Unterlauf, Mindestfüllung in der ersten Sekunde 960–1056 von 1536 (vorher 224 und ein Unterlauf).
 
+## Phase 11: Morph und Journeys (gebaut, 12.10.2026)
+
+Der Nutzer: "In Noctuary haben wir doch auch diese tolle Möglichkeit zwischen Presets zu interpolieren und ganze
+Nächte lang Sleep-Konzerte laufen zu lassen ... bei rein additiver Synthese doch viel einfacher". Noctuary hat drei
+Dinge: Morph A/B (zwei Parameter-Schnappschüsse, lerp), die Preset-Karte mit Route, und Journeys (Presets in Reihe,
+Verweildauer und Überblendung gewürfelt, zyklisch) -- und dort überblendet ein Journey-Schritt zwei ganze Engines als
+Audio, weil Samples, Wavetables und Räume nicht interpolierbar sind. Hier wird jede Stimme jeden Block neu als
+Spektrum geschrieben, also kann der Klang selbst wandern. Ganz trivial ist es nicht: Auswahlparameter springen, und
+die Matrix ist keine Zahl. Deshalb:
+- **Morph.h** (`MorphState`: alle Parameter, der Anteil des Filters, bis 64 gewichtete Matrixzeilen; `blendMorph`):
+  Zahlen gleiten in ihrer eigenen (schiefen) Normierung; Auswahl und Schalter wechseln in der Mitte; eine Auswahl
+  mit Menge (Motion/Landscape über Motion Depth, Life über Life Depth, Field über Pull) blendet ihre Menge aus und
+  ein -- von Off sofort mit Menge 0, nach Off am Ende, zwischen zweien in der Mitte bei 0. Der **Filter** wird pro
+  Partial als Verstärkung gelesen (`filterGain` auf der GPU) und jetzt mit `filterMix` potenziert (in Dezibel
+  geteilt): ein Filter blendet aus, ein anderes ein, ohne Sprung -- das ist der additive Vorteil. Die **Matrix**
+  als zwei gewichtete Zeilensummen (gleiche Quelle/Ziel/Via werden addiert).
+- **Engine**: jeder Block zuerst `updateSound()`: Ziel = die Regler und die Matrix, oder mit Morph an die Mischung
+  der Slots A/B bei A - B; ein Gleiten (`beginMorph`) startet von dem, was der Block davor gespielt hat (`sound_`),
+  und folgt dem Ziel mit Smoothstep. Der Host bittet um das Gleiten und setzt dann das neue Preset: die Regler zeigen
+  das Ziel, ein gedrehter Regler ändert es. Kein Wettlauf: der Worker nimmt den Ausgangspunkt aus seinem eigenen
+  letzten Block. Während des Gleitens folgt die Stimmung langsam (ein Zehntel des Gleitens, höchstens 6 s): eine neue
+  Skala wird erreicht, indem die Partials hineingleiten. Morph an/aus und neue Slots gleiten ebenfalls (Glide, mind.
+  1 s). Neue Parameter `morph_active`, `morph_pos`, `preset_glide` (keptByPresets, keine Modulationsziele).
+- **Journey.h** aus Noctuary übernommen (Format, Zeitparser jetzt mit strtod, Player mit Seed); ein Schritt ist hier
+  ein Gleiten. **68 eingebaute Journeys** (`Tools/presets/make_journeys.py` → `Journeys.inc`): je Gruppe eine
+  Journey (zwölf verschiedene Gesichter per Farthest-Point-Sampling, als Kette nächster Nachbarn; 6–12 min, gleiten
+  1–2:30) und eine Night (die zwölf ruhigsten; 10–18 min, gleiten 2–4), dazu vier Whole Nights über Gruppen (24
+  Presets, die ruhigsten je Gruppe; 12–20 min, gleiten 2:30–5; eine Runde ≈ 6:24 h). Merkmale aus den
+  Preset-Parametern (es gibt hier keine vermessene Bibliothek).
+- **Oberfläche:** neue Seite Journey (Glide, Morph, A - B; Slots A/B aus dem Klang oder einem Preset; Journey-Box mit
+  Abschnitten, Start/Stopp, Status, + dieses Preset, Speichern nach Documents/Empyrean/Journeys); die Statuszeile
+  zeigt die Journey oder das Gleiten. Slots im Zustand gespeichert.
+- **empy_render** `--journey NAME|DATEI --journey-seed N`, schreibt die WAV fortlaufend und ab einer Stunde in
+  Stundendateien: eine ganze Nacht lässt sich offline rendern (11-fache Echtzeit).
+
+**Gemessen [M]:** Selbsttest 47/47. Gleiten 4 s von Breathe/ohne Filter/12-TET zu Aurora/LP 24/JI: Tilt auf dem Weg
+exakt in der Normierung, Filteranteil exakt w, Motion Depth 0,01 in der Mitte (Motion und Skala wechseln dort),
+größter Pegelschritt zwischen Zehntelsekunden 3,2 dB gleitend gegen 0,8 vorher und 5,6 danach (Aurora selbst);
+am Ende exakt das Ziel. A/B bei 0,25: Tilt und Filteranteil exakt. Journeys: 68 lesbar, 864 Schritte, alle Presets
+bekannt, gleich geseedete Player gleich.
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut

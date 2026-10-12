@@ -73,6 +73,9 @@ offline renderer and the manual, and a portable zip.
   instrument hears (loudness, brightness, change, roughness); a reservoir of 2048 neurons on the GPU -- through a
   matrix of sixteen rows, each with a via source, and every source drawn live.
 - **2048 presets** in 32 groups (sixteen of sounds, sixteen of living systems), levelled by their loudest second.
+- **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, the filter
+  fades from one into the other; a morph knob between two slots; and journeys, presets in a row glided into each
+  other for a whole night (68 come with it, sleep concerts among them).
 
 ## Build
 

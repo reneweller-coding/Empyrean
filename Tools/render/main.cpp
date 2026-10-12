@@ -1,17 +1,22 @@
 /**
  * @file main.cpp
  * @brief empy_render: the instrument offline, without a window -- the conductor alone for minutes
- *        or hours, or a chord played and held -- into a 24-bit WAV, with a line every ten seconds.
+ *        or hours, a chord played and held, or a journey for a whole night -- into 24-bit WAVs,
+ *        with a line every ten seconds.
  *
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
- *                    [--chord 50,57,62,66] [--hold S] [--no-brain]
+ *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
- * --preset loads a factory preset (its name, or its number 0 .. 1023) with its matrix; --set takes any
+ * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
  * key of the parameter table (Core/include/additiv/Params.h) after it; a choice takes its index or its
- * name ("--set auto_mode=Free", "--set motion=Aurora").
+ * name ("--set auto_mode=Free", "--set motion=Aurora"). --journey plays a journey (Journey.h): one that
+ * comes with the instrument by its name ("Whole Night - Deep Space"), or a .journey file; each step
+ * glides into its preset as the instrument does. The WAV is written as it is rendered; beyond an hour
+ * it is cut into files of an hour (render-01.wav, render-02.wav, ...).
  */
 #include "additiv/Engine.h"
+#include "additiv/Journey.h"
 #include "additiv/Presets.h"
 
 #define NOMINMAX
@@ -48,34 +53,67 @@ fs::path repoRoot()
     return fs::current_path();
 }
 
-/**
- * @brief Writes interleaved stereo as a 24-bit WAV.
- * @param path        the file
- * @param lr          interleaved stereo samples
- * @param sampleRate  Hz
- * @return            true when written
- */
-bool writeWav24(const fs::path& path, const std::vector<float>& lr, int sampleRate)
-{
-    const std::uint32_t dataBytes = static_cast<std::uint32_t>(lr.size() * 3);
-    std::vector<unsigned char> bytes;
-    bytes.reserve(44 + dataBytes);
-    auto tag = [&](const char* t) { bytes.insert(bytes.end(), t, t + 4); };
-    auto u32 = [&](std::uint32_t x) { for (int i = 0; i < 4; ++i) bytes.push_back(static_cast<unsigned char>(x >> (8 * i))); };
-    auto u16 = [&](std::uint16_t x) { bytes.push_back(static_cast<unsigned char>(x)); bytes.push_back(static_cast<unsigned char>(x >> 8)); };
-    tag("RIFF"); u32(36 + dataBytes); tag("WAVE");
-    tag("fmt "); u32(16); u16(1); u16(2); u32(static_cast<std::uint32_t>(sampleRate)); u32(static_cast<std::uint32_t>(sampleRate) * 6); u16(6); u16(24);
-    tag("data"); u32(dataBytes);
-    for (float x : lr) {
-        const std::int32_t q = static_cast<std::int32_t>(std::lround(std::clamp(x, -1.0f, 1.0f) * 8388607.0f));
-        bytes.push_back(static_cast<unsigned char>(q));
-        bytes.push_back(static_cast<unsigned char>(q >> 8));
-        bytes.push_back(static_cast<unsigned char>(q >> 16));
+/** @brief A 24-bit stereo WAV written as it comes: the header first with no length, the length set at close(). */
+class WavStream {
+public:
+    /**
+     * @brief Opens the file and writes a header.
+     * @param path        the file
+     * @param sampleRate  Hz
+     * @return            true when it is open
+     */
+    bool open(const fs::path& path, int sampleRate)
+    {
+        f_.open(path, std::ios::binary | std::ios::trunc);
+        frames_ = 0;
+        const std::uint32_t sr = static_cast<std::uint32_t>(sampleRate);
+        unsigned char h[44] = {};
+        auto put = [&](int at, const char* s) { std::memcpy(h + at, s, 4); };
+        auto u32 = [&](int at, std::uint32_t x) { for (int i = 0; i < 4; ++i) h[at + i] = static_cast<unsigned char>(x >> (8 * i)); };
+        auto u16 = [&](int at, std::uint16_t x) { h[at] = static_cast<unsigned char>(x); h[at + 1] = static_cast<unsigned char>(x >> 8); };
+        put(0, "RIFF"); put(8, "WAVE"); put(12, "fmt "); u32(16, 16); u16(20, 1); u16(22, 2); u32(24, sr); u32(28, sr * 6); u16(32, 6); u16(34, 24);
+        put(36, "data");
+        f_.write(reinterpret_cast<const char*>(h), 44);
+        return static_cast<bool>(f_);
     }
-    std::ofstream f(path, std::ios::binary);
-    f.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-    return static_cast<bool>(f);
-}
+    /** @brief Appends frames. @param L left @param R right @param n frames */
+    void write(const float* L, const float* R, int n)
+    {
+        buf_.resize(static_cast<size_t>(n) * 6);
+        for (int i = 0; i < n; ++i)
+            for (int c = 0; c < 2; ++c) {
+                const float x = c == 0 ? L[i] : R[i];
+                const std::int32_t q = static_cast<std::int32_t>(std::lround(std::clamp(x, -1.0f, 1.0f) * 8388607.0f));
+                unsigned char* o = &buf_[static_cast<size_t>(i) * 6 + static_cast<size_t>(c) * 3];
+                o[0] = static_cast<unsigned char>(q); o[1] = static_cast<unsigned char>(q >> 8); o[2] = static_cast<unsigned char>(q >> 16);
+            }
+        f_.write(reinterpret_cast<const char*>(buf_.data()), static_cast<std::streamsize>(buf_.size()));
+        frames_ += n;
+    }
+    /** @brief Sets the lengths in the header and closes. @return true when everything was written */
+    bool close()
+    {
+        const std::uint32_t data = static_cast<std::uint32_t>(frames_ * 6);
+        auto u32 = [&](std::streamoff at, std::uint32_t x) {
+            unsigned char b[4];
+            for (int i = 0; i < 4; ++i) b[i] = static_cast<unsigned char>(x >> (8 * i));
+            f_.seekp(at);
+            f_.write(reinterpret_cast<const char*>(b), 4);
+        };
+        u32(4, 36 + data);
+        u32(40, data);
+        const bool ok = static_cast<bool>(f_);
+        f_.close();
+        return ok;
+    }
+    /** @brief Frames written so far. @return the count */
+    std::int64_t frames() const { return frames_; }
+
+private:
+    std::ofstream f_;                       ///< the file
+    std::int64_t frames_ = 0;               ///< frames written
+    std::vector<unsigned char> buf_;        ///< a block's bytes
+};
 
 /**
  * @brief Applies one --set key=value: a number, or for a choice also its name.
@@ -141,18 +179,26 @@ void dumpParams()
  */
 int applyPreset(Engine& e, const std::string& what)
 {
-    int index = -1;
-    for (int i = 0; i < numPresets() && index < 0; ++i)
-        if (what == preset(i).name) index = i;
+    int index = findPreset(what.c_str());
     if (index < 0 && !what.empty() && what.find_first_not_of("0123456789") == std::string::npos) index = std::atoi(what.c_str());
     if (index < 0 || index >= numPresets()) return -1;
-    float values[kNumParams] = {};
-    std::string mod;
-    presetValues(index, values, &mod);
-    for (int i = 0; i < kNumParams; ++i)
-        if (!keptByPresets(static_cast<ParamId>(i))) e.setParam(static_cast<ParamId>(i), values[i]);
-    e.setModText(mod);
+    e.loadPreset(index);
     return index;
+}
+
+/**
+ * @brief A journey by name (one that comes with the instrument) or from a file.
+ * @param what  the name or the path
+ * @param j     receives it
+ * @return      true when it was found and read
+ */
+bool findJourney(const std::string& what, Journey& j)
+{
+    for (int i = 0; i < numBuiltinJourneys(); ++i) {
+        Journey b;
+        if (b.parse(builtinJourneyText(i)) && b.name == what) { j = b; return true; }
+    }
+    return j.load(what.c_str()) && !j.steps.empty();
 }
 
 } // namespace
@@ -170,7 +216,8 @@ int main(int argc, char** argv)
     std::uint64_t seed = 0x5EEDu;
     std::vector<std::string> sets;
     std::vector<int> chord;
-    std::string presetName;
+    std::string presetName, journeyName;
+    std::uint64_t journeySeed = 1;
     bool brain = true;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
@@ -182,6 +229,8 @@ int main(int argc, char** argv)
         else if (a == "--hold" && has) hold = std::atof(argv[++i]);
         else if (a == "--no-brain") brain = false;
         else if (a == "--preset" && has) presetName = argv[++i];
+        else if (a == "--journey" && has) journeyName = argv[++i];
+        else if (a == "--journey-seed" && has) journeySeed = std::strtoull(argv[++i], nullptr, 10);
         else if (a == "--dump-params") { dumpParams(); return 0; }
         else if (a == "--chord" && has) {
             std::string s = argv[++i];
@@ -193,6 +242,7 @@ int main(int argc, char** argv)
             }
         } else {
             std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
+                                 "            [--journey NAME|FILE] [--journey-seed N]\n"
                                  "empy_render --dump-params\n");
             return 1;
         }
@@ -204,6 +254,16 @@ int main(int argc, char** argv)
         const int index = applyPreset(e, presetName);
         if (index < 0) { std::fprintf(stderr, "empy_render: no preset %s\n", presetName.c_str()); return 1; }
         std::printf("preset %d: %s (%s)\n", index, preset(index).name, kPresetGroupNames[preset(index).group]);
+    }
+    Journey journey;
+    JourneyPlayer player;
+    if (!journeyName.empty()) {
+        if (!findJourney(journeyName, journey)) { std::fprintf(stderr, "empy_render: no journey %s\n", journeyName.c_str()); return 1; }
+        player.start(journey, journeySeed);
+        JourneyStep st;
+        double glide = 0.0;
+        if (player.advance(0.0, st, glide) && findPreset(st.preset.c_str()) >= 0) e.loadPreset(findPreset(st.preset.c_str()));   // the first at once
+        std::printf("journey %s: %zu steps, a pass about %s\n", journey.name.c_str(), journey.steps.size(), Journey::timeText(journey.meanLength()).c_str());
     }
     for (const std::string& s : sets)
         if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
@@ -222,8 +282,19 @@ int main(int argc, char** argv)
 
     const int n = 512;
     const std::int64_t total = static_cast<std::int64_t>(seconds * c.sampleRate);
-    std::vector<float> lr;
-    lr.reserve(static_cast<size_t>(total) * 2);
+    // Beyond an hour, a file an hour: name-01.wav, name-02.wav, ...
+    const std::int64_t perFile = static_cast<std::int64_t>(3600.0 * c.sampleRate);
+    const bool parts = total > perFile;
+    fs::create_directories(out.parent_path());
+    auto partPath = [&](int k) {
+        if (!parts) return out;
+        char suffix[16];
+        std::snprintf(suffix, sizeof(suffix), "-%02d", k);
+        return out.parent_path() / (out.stem().string() + suffix + out.extension().string());
+    };
+    WavStream wav;
+    int part = 1;
+    if (!wav.open(partPath(part), static_cast<int>(c.sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
     std::vector<float> L(n), R(n);
     double sq = 0.0, peak = 0.0, gpu = 0.0;
     int blocks = 0;
@@ -234,10 +305,22 @@ int main(int argc, char** argv)
             for (int note : chord) e.noteOff(note, 0);
             released = true;
         }
+        if (player.running()) {   // the journey: a step glides into its preset
+            JourneyStep st;
+            double glide = 0.0;
+            if (player.advance(n / c.sampleRate, st, glide)) {
+                const int index = findPreset(st.preset.c_str());
+                if (index >= 0) e.loadPreset(index, std::max(glide, 0.5));
+                std::printf("  %5.0f s: step %d, %s, glide %.0f s\n", done / c.sampleRate, player.step() + 1, st.preset.c_str(), glide);
+            }
+        }
         e.process(L.data(), R.data(), n);
+        if (wav.frames() >= perFile) {
+            wav.close();
+            wav.open(partPath(++part), static_cast<int>(c.sampleRate));
+        }
+        wav.write(L.data(), R.data(), n);
         for (int i = 0; i < n; ++i) {
-            lr.push_back(L[i]);
-            lr.push_back(R[i]);
             sq += 0.5 * (static_cast<double>(L[i]) * L[i] + static_cast<double>(R[i]) * R[i]);
             peak = std::max(peak, static_cast<double>(std::max(std::fabs(L[i]), std::fabs(R[i]))));
         }
@@ -253,9 +336,8 @@ int main(int argc, char** argv)
         }
     }
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    fs::create_directories(out.parent_path());
-    if (!writeWav24(out, lr, static_cast<int>(c.sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", out.string().c_str()); return 1; }
-    std::printf("%.0f s in %.1f s (%.0fx real time), late notes %llu -> %s\n", seconds, took, seconds / std::max(took, 1e-9),
-                static_cast<unsigned long long>(e.lateEvents()), out.string().c_str());
+    if (!wav.close()) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
+    std::printf("%.0f s in %.1f s (%.0fx real time), late notes %llu -> %s%s\n", seconds, took, seconds / std::max(took, 1e-9),
+                static_cast<unsigned long long>(e.lateEvents()), out.string().c_str(), parts ? " (in parts of an hour)" : "");
     return 0;
 }

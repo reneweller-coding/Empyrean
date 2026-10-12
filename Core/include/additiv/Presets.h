@@ -46,7 +46,8 @@ int presetValues(int i, float* values, std::string* modText);
 
 /**
  * @brief Whether a parameter belongs to the listener rather than to the sound: loading a preset
- *        leaves it as it is (Binaural: headphones or speakers are the listener's, not the preset's).
+ *        leaves it as it is (Binaural: headphones or speakers are the listener's, not the preset's;
+ *        the morph and the preset glide are how the player moves between presets).
  * @param id  the parameter
  * @return    true when a preset does not set it
  */
@@ -54,6 +55,9 @@ bool keptByPresets(ParamId id);
 
 /** @brief A preset's index within its group (for program change: bank = group, program = this). @param i the preset @return 0 .. */
 int presetIndexInGroup(int i);
+
+/** @brief A preset by its name. @param name as the bank spells it @return its index, -1 when there is none */
+int findPreset(const char* name);
 
 /** @brief The preset at a group and an index in it. @param group the group @param index the index @return the preset, -1 when there is none */
 int presetAt(int group, int index);

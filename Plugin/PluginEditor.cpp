@@ -5,6 +5,7 @@
 #include "PluginEditor.h"
 
 #include "AdditivData.h"
+#include "JourneyView.h"
 #include "SourcesView.h"
 
 #include "additiv/Landscape.h"
@@ -199,6 +200,11 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([m] { return m->describe(); });
         tabs_.addTab("Modulation", additivui::skin().panel, new ScrollPage(m, [m](int w) { return m->heightFor(w); }), true);
     }
+    {
+        auto* j = new JourneyPage(proc_, actions_, &live_);
+        describe_.push_back([j] { return j->describe(); });
+        tabs_.addTab("Journey", additivui::skin().panel, new ScrollPage(j, [j](int w) { return j->heightFor(w); }), true);
+    }
     tabs_.setTabBarDepth(32);
     tabs_.setOutline(0);
     sendLookAndFeelChange();
@@ -281,6 +287,9 @@ void AdditivEditor::timerCallback()
           << " played)   root " << kNames[((root % 12) + 12) % 12] << (root / 12 - 1) << "   GPU " << juce::String(e.lastGpuMs(), 3) << " ms   latency "
           << juce::String(e.latencySamples() * 1000.0 / std::max(e.config().sampleRate, 1.0), 1) << " ms   " << e.deviceName();
         if (e.underruns() > 0) s << "   underruns " << static_cast<int>(e.underruns());
+        const juce::String journey = proc_.journeyStatus();
+        if (journey.isNotEmpty()) s << "      Journey: " << journey;
+        else if (e.morphProgress() < 1.0f) s << "      gliding " << juce::roundToInt(100.0f * e.morphProgress()) << " %";
     }
     status_.setText(s, juce::dontSendNotification);
     cloud_.refresh();

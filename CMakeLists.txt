@@ -12,7 +12,7 @@
 # Built with CUDA 13.4 for the RTX 5090 (Blackwell, sm_120); the presets select CUDA 13.4 by its folder, whatever
 # CUDA_PATH or the nvcc on the PATH say. Windows only for now; no macOS path (user, 11.10.2026).
 cmake_minimum_required(VERSION 3.30)
-project(Empyrean VERSION 0.10.0 LANGUAGES C CXX CUDA)
+project(Empyrean VERSION 0.11.0 LANGUAGES C CXX CUDA)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake (the same file in
 # every repository of the family), CMakePresets.json and build.ps1.
@@ -55,6 +55,8 @@ add_library(AdditivCore STATIC
     Core/src/Effects.cpp
     Core/src/Modulation.cpp
     Core/src/Presets.cpp
+    Core/src/Morph.cpp
+    Core/src/Journeys.cpp
     Core/src/Engine.cpp)
 target_include_directories(AdditivCore PUBLIC Core/include PRIVATE ThirdParty/dr_libs)
 target_compile_definitions(AdditivCore PRIVATE $<$<COMPILE_LANGUAGE:CXX>:_WIN32_WINNT=0x0A00 UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS>)

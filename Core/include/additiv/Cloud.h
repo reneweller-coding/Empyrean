@@ -150,7 +150,7 @@ struct CloudVoice {
     int   harmonicPartials = 0;   ///< partials of the harmonic clouds; the rest up to `partials` are air
     float scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
     float airScale = 0.0f;        ///< amplitude of every air partial
-    float pad0 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float filterMix = 1.0f;       ///< 0 .. 1: the filter's gain raised to this (a morph fades one filter out and another in)
     float pad1 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
 };
 

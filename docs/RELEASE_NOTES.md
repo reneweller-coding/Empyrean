@@ -1,5 +1,25 @@
 # Release notes
 
+## 0.11.0 (12.10.2026, not released)
+
+Glide, morph and journeys: one sound becoming another, and sleep concerts for a whole night.
+
+- **Glide** (Journey page): a preset chosen -- arrows, list, program change, headset -- travels from the sound before
+  it over that many seconds instead of jumping. Every voice is a spectrum written afresh every block, so the sound
+  itself moves: every number on its way in its own range, the partials sliding into a new scale, the voice filter
+  (a gain at every partial) fading from one filter into the other, a motion or a living landscape fading out where
+  it changes and in again, the matrix as two weighted sums. The knobs show where it is going; a knob turned on the
+  way changes where it goes.
+- **Morph A/B:** two slots (the sound as it plays, or a preset); with Morph on, A - B moves the whole instrument
+  between them, the matrix included. Switching it on and off glides. The slots are kept with the project.
+- **Journeys:** presets in a row, each held for a time drawn from its range and glided into the next, round and
+  round -- Noctuary's format and player, but each step a glide rather than a crossfade of two engines. 68 come with
+  the instrument: for each group a Journey (twelve of its different faces) and a Night (its twelve stillest, ten to
+  eighteen minutes each, glides of two to four), and four Whole Nights across groups (about six and a half hours
+  round). Write your own with + and save them; the files are plain text.
+- **empy_render** plays journeys (`--journey`), and writes long renders as it goes, an hour a file: a whole night
+  offline in about forty minutes.
+
 ## 0.10.0 (12.10.2026, not released)
 
 Living systems: Noctuary's modulators, five new things on the GPU, and twice the presets.

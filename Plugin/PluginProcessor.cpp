@@ -80,6 +80,7 @@ void AdditivProcessor::timerCallback()
 {
     jam_.setRole(frame::Settings::of(kApp).jamRole());   // the family jam (Jam.h): Off, Lead or Follow, from the settings
     pollHeadset();
+    journeyTick();
 }
 
 void AdditivProcessor::pollHeadset()
@@ -167,17 +168,137 @@ const juce::String AdditivProcessor::getProgramName(int index)
     return juce::String(additiv::kPresetGroupNames[p.group]) + ": " + p.name;
 }
 
-void AdditivProcessor::applyPreset(int index)
+void AdditivProcessor::applyPreset(int index, double glide)
 {
     if (index < 0 || index >= additiv::numPresets()) return;
     float values[additiv::kNumParams];
     std::string mod;
     additiv::presetValues(index, values, &mod);
+    // The glide is asked for first: the engine starts it from what it played the block before,
+    // whatever of the new preset has reached it by then (Engine::beginMorph).
+    const double g = glide >= 0.0 ? glide : static_cast<double>(value(static_cast<int>(ParamId::PresetGlide)));
+    if (g > 0.0) engine_.beginMorph(g);
     for (int i = 0; i < additiv::kNumParams; ++i)
         if (!additiv::keptByPresets(static_cast<additiv::ParamId>(i))) setValue(i, values[i]);
     engine_.setModText(mod);
-    engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way)
+    if (g <= 0.0) engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way); a glide keeps the chord
     current_.store(index, std::memory_order_relaxed);
+}
+
+void AdditivProcessor::setSlotFromSound(int slot)
+{
+    slot &= 1;
+    slotValues_[slot].assign(static_cast<size_t>(additiv::kNumParams), 0.0f);
+    for (int i = 0; i < additiv::kNumParams; ++i) slotValues_[slot][static_cast<size_t>(i)] = value(i);
+    slotMods_[slot] = engine_.modText();
+    engine_.setMorphSlot(slot, slotValues_[slot].data(), slotMods_[slot]);
+    const int cp = currentPreset();
+    slotNames_[slot] = cp >= 0 ? juce::String("the sound of ") + additiv::preset(cp).name : juce::String("the sound");
+}
+
+void AdditivProcessor::setSlotFromPreset(int slot, int index)
+{
+    if (index < 0 || index >= additiv::numPresets()) return;
+    slot &= 1;
+    slotValues_[slot].assign(static_cast<size_t>(additiv::kNumParams), 0.0f);
+    additiv::presetValues(index, slotValues_[slot].data(), &slotMods_[slot]);
+    engine_.setMorphSlot(slot, slotValues_[slot].data(), slotMods_[slot]);
+    slotNames_[slot] = juce::String(additiv::kPresetGroupNames[additiv::preset(index).group]) + ": " + additiv::preset(index).name;
+}
+
+juce::File AdditivProcessor::journeyFolder()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Journeys");
+}
+
+std::vector<AdditivProcessor::JourneyEntry> AdditivProcessor::journeys() const
+{
+    std::vector<JourneyEntry> out;
+    for (int i = 0; i < additiv::numBuiltinJourneys(); ++i) {
+        additiv::Journey j;
+        if (!j.parse(additiv::builtinJourneyText(i))) continue;
+        JourneyEntry e;
+        e.name = j.name;
+        e.builtin = i;
+        out.push_back(e);
+    }
+    juce::Array<juce::File> files = journeyFolder().findChildFiles(juce::File::findFiles, false, "*.journey");
+    files.sort();
+    for (const juce::File& f : files) {
+        JourneyEntry e;
+        e.name = f.getFileNameWithoutExtension();
+        e.file = f;
+        out.push_back(e);
+    }
+    return out;
+}
+
+bool AdditivProcessor::startJourney(const JourneyEntry& entry)
+{
+    additiv::Journey j;
+    const bool read = entry.builtin >= 0 ? j.parse(additiv::builtinJourneyText(entry.builtin)) : j.load(entry.file.getFullPathName().toRawUTF8());
+    if (!read || j.steps.empty()) return false;
+    bool known = false;
+    for (const additiv::JourneyStep& st : j.steps) known = known || additiv::findPreset(st.preset.c_str()) >= 0;
+    if (!known) return false;
+    if (j.name.empty()) j.name = entry.name.toStdString();
+    journey_ = j;
+    // The A/B morph holds the sound between its slots: a journey that loads presets under it would
+    // seem to do nothing (Noctuary's lesson), so it lets go.
+    setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+    // Seeded from the clock: the same journey runs differently every night.
+    journeyPlayer_.start(journey_, static_cast<std::uint64_t>(juce::Time::currentTimeMillis()) | 1ull, 0);
+    journeyLastTick_ = 0.0;
+    journeyTick();   // the first step begins now
+    return true;
+}
+
+void AdditivProcessor::journeyTick()
+{
+    const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    if (journeyLastTick_ <= 0.0) journeyLastTick_ = now;
+    const double dt = juce::jlimit(0.0, 5.0, now - journeyLastTick_);
+    journeyLastTick_ = now;
+    if (!journeyPlayer_.running()) return;
+    additiv::JourneyStep st;
+    double glide = 60.0;
+    if (!journeyPlayer_.advance(dt, st, glide)) return;
+    const int index = additiv::findPreset(st.preset.c_str());
+    if (index >= 0) applyPreset(index, std::max(glide, 0.5));   // a name the bank no longer has: nothing changes until the next step
+}
+
+juce::String AdditivProcessor::journeyStatus() const
+{
+    if (!journeyPlayer_.running()) return {};
+    const int n = static_cast<int>(journey_.steps.size());
+    const int step = journeyPlayer_.step();
+    juce::String s = juce::String(journey_.name) + "   " + juce::String(step + 1) + "/" + juce::String(n);
+    if (step >= 0 && step < n) s << "   " << journey_.steps[static_cast<size_t>(step)].preset;
+    const float p = engine_.morphProgress();
+    if (p < 1.0f) s << "   gliding " << juce::roundToInt(100.0f * p) << " %";
+    s << "   next in " << additiv::Journey::timeText(std::max(0.0, journeyPlayer_.remaining()));
+    return s;
+}
+
+void AdditivProcessor::journeyAddCurrent()
+{
+    const int cp = currentPreset();
+    if (cp < 0) return;
+    additiv::JourneyStep st;
+    st.preset = additiv::preset(cp).name;
+    st.dwellLo = 480.0; st.dwellHi = 900.0; st.fadeLo = 90.0; st.fadeHi = 180.0;
+    draft_.steps.push_back(st);
+}
+
+bool AdditivProcessor::saveJourneyDraft(const juce::File& file)
+{
+    if (draft_.steps.empty()) return false;
+    additiv::Journey j = draft_;
+    j.name = file.getFileNameWithoutExtension().toStdString();
+    file.getParentDirectory().createDirectory();
+    if (!j.save(file.getFullPathName().toRawUTF8())) return false;
+    draft_ = additiv::Journey();
+    return true;
 }
 
 void AdditivProcessor::handleAsyncUpdate()
@@ -286,6 +407,14 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
     }
     xml.createNewChildElement("Mod")->setAttribute("rows", juce::String(engine_.modText()));
     xml.setAttribute("preset", current_.load(std::memory_order_relaxed));
+    for (int k = 0; k < 2; ++k) {   // the morph's slots, as their values and their matrix
+        if (slotValues_[k].size() != static_cast<size_t>(additiv::kNumParams)) continue;
+        auto* s = xml.createNewChildElement("Slot");
+        s->setAttribute("index", k);
+        s->setAttribute("name", slotNames_[k]);
+        s->setAttribute("rows", juce::String(slotMods_[k]));
+        for (const ParamDesc& d : additiv::paramTable()) s->setAttribute(juce::String("p_") + d.key, static_cast<double>(slotValues_[k][static_cast<size_t>(d.id)]));
+    }
     for (int cc = 0; cc < 128; ++cc) {
         const int id = ccMap_[static_cast<size_t>(cc)].load(std::memory_order_relaxed);
         if (id < 0) continue;
@@ -310,6 +439,16 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
     current_.store(xml->getIntAttribute("preset", -1), std::memory_order_relaxed);
     const juce::XmlElement* mod = xml->getChildByName("Mod");
     engine_.setModText(mod != nullptr ? mod->getStringAttribute("rows").toStdString() : std::string());   // no rows named: an empty matrix
+    for (auto* s : xml->getChildWithTagNameIterator("Slot")) {
+        const int k = s->getIntAttribute("index", -1);
+        if (k < 0 || k > 1) continue;
+        slotValues_[k].assign(static_cast<size_t>(additiv::kNumParams), 0.0f);
+        for (const ParamDesc& d : additiv::paramTable())
+            slotValues_[k][static_cast<size_t>(d.id)] = std::clamp(static_cast<float>(s->getDoubleAttribute(juce::String("p_") + d.key, d.def)), d.min, d.max);
+        slotMods_[k] = s->getStringAttribute("rows").toStdString();
+        slotNames_[k] = s->getStringAttribute("name");
+        engine_.setMorphSlot(k, slotValues_[k].data(), slotMods_[k]);
+    }
     for (auto& c : ccMap_) c.store(-1, std::memory_order_relaxed);
     for (auto* e : xml->getChildWithTagNameIterator("Learn")) {
         const int cc = e->getIntAttribute("cc", -1);

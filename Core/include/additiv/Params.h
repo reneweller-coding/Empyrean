@@ -214,6 +214,10 @@ enum class ParamId : int {
     MeltTime,       ///< s: how long the melted sound lingers (to -60 dB)
     MeltSpread,     ///< octaves: how far a held sound has spread after a second
     MeltToFar,      ///< 0 .. 1: its share into the far plane
+    // Phase 11: morph and journeys (the player's: presets never set them, Presets.h keptByPresets)
+    MorphActive,    ///< the sound is the blend of the morph's slots A and B (Morph.h)
+    MorphPos,       ///< 0 (A) .. 1 (B): where between them
+    PresetGlide,    ///< s: a preset chosen glides from the sound before it (0: it comes at once)
     Count           ///< number of parameters
 };
 

@@ -926,6 +926,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         const float absorb = sqrtf((1.0f + x0 * x0) / (1.0f + x * x));
         // The voice's colour and filter, each read at this partial's frequency.
         float colour = filterGain(cv.filterModel, f, cv.cutoff, cv.filterQ, cv.vowel);
+        if (cv.filterMix < 1.0f) colour = exp2f(cv.filterMix * log2f(fmaxf(colour, 1.0e-6f)));   // a share of the filter, in decibels
         if (!isAir) colour *= presenceGain(f, cv.presenceDb, dist) * lowCutGain(f, cv.lowCut);
         // The voice's level, as late as this partial's clock (the dispersion), from the ring.
         const float level = lateBy > 0.0f ? gainAgo(ring + static_cast<size_t>(v) * kGainRing, hdr->blockIndex, lateBy * fs / static_cast<float>(n))

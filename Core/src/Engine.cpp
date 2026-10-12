@@ -7,6 +7,7 @@
 
 #include "additiv/Landscape.h"
 #include "additiv/Motion.h"
+#include "additiv/Presets.h"
 #include "additiv/Shapes.h"
 #include "additiv/Spectrum.h"
 
@@ -188,6 +189,10 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     std::fill(std::begin(specKey_), std::end(specKey_), -1.0f);
     scaleChoice_ = -1;
     mods_.reset(cfg_.seed ^ 0x6D6F647363ull);
+    soundValid_ = false;
+    morphT_ = 1.0f;
+    morphSeen_ = morphAsked_.load(std::memory_order_acquire);
+    abWas_ = false;
     phraseStart_ = false;
     prevSounding_ = 0;
     readParams();
@@ -384,30 +389,115 @@ void Engine::drainEvents()
     qTail_.store(tail, std::memory_order_release);
 }
 
+void Engine::beginMorph(double seconds)
+{
+    morphSeconds_.store(static_cast<float>(std::max(seconds, 0.05)), std::memory_order_relaxed);
+    morphAsked_.fetch_add(1, std::memory_order_release);
+}
+
+void Engine::setMorphSlot(int slot, const float* values, const std::string& modText)
+{
+    ModRow rows[kModRows];
+    const int n = modRowsFromText(modText, rows, kModRows);
+    {
+        const std::lock_guard<std::mutex> lock(slotLock_);
+        pendingSlots_[slot & 1].set(values, rows, n);
+    }
+    slotSet_[static_cast<size_t>(slot & 1)].store(true, std::memory_order_relaxed);
+    slotVersion_.fetch_add(1, std::memory_order_release);
+}
+
+void Engine::loadPreset(int index, double glideSeconds)
+{
+    if (index < 0 || index >= numPresets()) return;
+    float values[kNumParams];
+    std::string mod;
+    presetValues(index, values, &mod);
+    if (glideSeconds > 0.0) beginMorph(glideSeconds);
+    for (int i = 0; i < kNumParams; ++i)
+        if (!keptByPresets(static_cast<ParamId>(i))) setParam(static_cast<ParamId>(i), values[i]);
+    setModText(mod);
+}
+
+void Engine::updateSound()
+{
+    const double dt = cfg_.gpuBlock / cfg_.sampleRate;
+    // The slots, when the editor chose one (taken only if the lock is free: the next block tries again).
+    bool slotsChanged = false;
+    const int version = slotVersion_.load(std::memory_order_acquire);
+    if (version != slotSeen_ && slotLock_.try_lock()) {
+        slots_[0] = pendingSlots_[0];
+        slots_[1] = pendingSlots_[1];
+        slotLock_.unlock();
+        slotSeen_ = version;
+        slotsChanged = true;
+    }
+    // Where the sound goes: the A/B blend, or the knobs and the matrix.
+    const bool ab = param(ParamId::MorphActive) >= 0.5f && morphSlotSet(0) && morphSlotSet(1);
+    if (ab) {
+        blendMorph(slots_[0], slots_[1], std::clamp(param(ParamId::MorphPos), 0.0f, 1.0f), target_);
+    } else {
+        float live[kNumParams];
+        for (int i = 0; i < kNumParams; ++i) live[i] = param(static_cast<ParamId>(i));
+        ModRow rows[kModRows];
+        for (int r = 0; r < kModRows; ++r) rows[r] = unpackModRow(modRows_[static_cast<size_t>(r)].load(std::memory_order_relaxed));
+        target_.set(live, rows, kModRows);
+    }
+    for (int i = 0; i < kNumParams; ++i)   // the listener's and the player's own stay as they are set
+        if (keptByPresets(static_cast<ParamId>(i)) || static_cast<ParamId>(i) == ParamId::AutoStep)
+            target_.values[i] = param(static_cast<ParamId>(i));
+    // A glide asked for, or the A/B morph switched or re-chosen: from what played the last block.
+    float len = -1.0f;
+    const int asked = morphAsked_.load(std::memory_order_acquire);
+    if (asked != morphSeen_) { morphSeen_ = asked; len = morphSeconds_.load(std::memory_order_relaxed); }
+    if (ab != abWas_ || (ab && slotsChanged)) {
+        if (len < 0.0f) len = std::max(param(ParamId::PresetGlide), 1.0f);
+        abWas_ = ab;
+    }
+    if (len > 0.0f && soundValid_) {
+        from_ = sound_;
+        morphT_ = 0.0f;
+        morphLen_ = len;
+    }
+    if (morphT_ < 1.0f) {
+        morphT_ = std::min(1.0f, morphT_ + static_cast<float>(dt) / morphLen_);
+        if (morphT_ < 1.0f) blendMorph(from_, target_, morphCurve(morphT_), sound_);
+        else sound_ = target_;
+    } else {
+        sound_ = target_;
+    }
+    soundValid_ = true;
+    morphProgress_.store(morphT_, std::memory_order_relaxed);
+    for (int i = 0; i < kNumParams; ++i) soundLive_[static_cast<size_t>(i)].store(sound_.values[i], std::memory_order_relaxed);
+    soundMix_.store(sound_.filterMix, std::memory_order_relaxed);
+}
+
 void Engine::readParams()
 {
+    // What plays before the matrix: the knobs, the A/B morph, or a glide between (Morph.h).
+    updateSound();
     // The modulation: the sources advance by a block, then every row adds its depth times its
     // source to its target in the target's normalised domain (Modulation.h).
     {
         ModInputs in;
         for (int i = 0; i < 4; ++i) {
-            in.lfoShape[i] = static_cast<int>(std::lround(param(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Shape) + 2 * i))));
-            in.lfoRate[i] = param(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Rate) + 2 * i));
+            in.lfoShape[i] = static_cast<int>(std::lround(base(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Shape) + 2 * i))));
+            in.lfoRate[i] = base(static_cast<ParamId>(static_cast<int>(ParamId::Lfo1Rate) + 2 * i));
         }
         for (int e = 0; e < 2; ++e) {
-            in.envShape[e] = static_cast<int>(std::lround(param(static_cast<ParamId>(static_cast<int>(ParamId::Env1Shape) + 2 * e))));
-            in.envRate[e] = param(static_cast<ParamId>(static_cast<int>(ParamId::Env1Rate) + 2 * e));
+            in.envShape[e] = static_cast<int>(std::lround(base(static_cast<ParamId>(static_cast<int>(ParamId::Env1Shape) + 2 * e))));
+            in.envRate[e] = base(static_cast<ParamId>(static_cast<int>(ParamId::Env1Rate) + 2 * e));
         }
-        for (int m = 0; m < 4; ++m) in.macro[m] = param(static_cast<ParamId>(static_cast<int>(ParamId::Macro1) + m));
+        for (int m = 0; m < 4; ++m) in.macro[m] = base(static_cast<ParamId>(static_cast<int>(ParamId::Macro1) + m));
         in.wheel = wheel_.load(std::memory_order_relaxed);
         in.pressure = pressure_.load(std::memory_order_relaxed);
         in.velocity = lastVelocity_;
         in.phraseStart = phraseStart_;
-        in.coherence = param(ParamId::Coherence);
-        in.coherenceRate = param(ParamId::CoherenceRate);
-        in.leniaRate = param(ParamId::LeniaRate);
-        in.leniaGrowth = param(ParamId::LeniaGrowth);
-        in.chaosPeriod = param(ParamId::ChaosPeriod);
+        in.coherence = base(ParamId::Coherence);
+        in.coherenceRate = base(ParamId::CoherenceRate);
+        in.leniaRate = base(ParamId::LeniaRate);
+        in.leniaGrowth = base(ParamId::LeniaGrowth);
+        in.chaosPeriod = base(ParamId::ChaosPeriod);
         in.excitation = static_cast<float>(brain_.excitation());
         in.rootAge = static_cast<float>(brain_.rootAgeSeconds());
         in.randomNote = randomNote_;
@@ -476,8 +566,8 @@ void Engine::readParams()
             sourceLive_[static_cast<size_t>(s)].store(mods_.value(static_cast<ModSource>(s)), std::memory_order_relaxed);
         float offset[kNumParams] = {};
         bool modded[kNumParams] = {};
-        for (int r = 0; r < kModRows; ++r) {
-            const ModRow row = unpackModRow(modRows_[static_cast<size_t>(r)].load(std::memory_order_relaxed));
+        for (int r = 0; r < sound_.rowCount; ++r) {   // the matrix where the sound stands (a glide weighs two)
+            const ModRow& row = sound_.rows[r];
             if (row.source == ModSource::Off || row.target < 0 || row.target >= kNumParams || row.depth == 0.0f) continue;
             const float amount = row.via == ModSource::Off ? 1.0f : viaAmount(row.via, mods_.value(row.via));
             offset[row.target] += row.depth * amount * mods_.value(row.source);
@@ -485,7 +575,7 @@ void Engine::readParams()
         }
         for (int i = 0; i < kNumParams; ++i) {
             const ParamDesc& d = paramTable()[static_cast<size_t>(i)];
-            const float base = param(d.id);
+            const float base = this->base(d.id);
             if (!modded[i]) {
                 cur_[static_cast<size_t>(i)] = base;
                 played_[static_cast<size_t>(i)].store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
@@ -600,7 +690,7 @@ void Engine::refreshSpectrum()
 
 void Engine::refreshScale()
 {
-    const int choice = static_cast<int>(std::lround(param(ParamId::Scale)));
+    const int choice = static_cast<int>(std::lround(base(ParamId::Scale)));
     if (choice != scaleChoice_) {
         FixedScale s;
         // The Timbre scale (Sethares) is the one a timbre asks for: here the cloud's own spectrum.
@@ -609,13 +699,13 @@ void Engine::refreshScale()
         else if (scaleChoice_ < 0) makeBuiltinScale(0, scale_);   // the Scala slot comes with the editor: 12-TET until then
         scaleChoice_ = choice;
     }
-    rootPc_ = std::clamp(static_cast<int>(std::lround(param(ParamId::RootNote))), 0, 11);
-    snapKeys_ = std::lround(param(ParamId::KeyMap)) == 0;
+    rootPc_ = std::clamp(static_cast<int>(std::lround(base(ParamId::RootNote))), 0, 11);
+    snapKeys_ = std::lround(base(ParamId::KeyMap)) == 0;
 }
 
 void Engine::refreshLandscape()
 {
-    const int choice = std::clamp(static_cast<int>(std::lround(param(ParamId::Landscape))), 0, kNumFactoryLandscapes - 1);
+    const int choice = std::clamp(static_cast<int>(std::lround(base(ParamId::Landscape))), 0, kNumFactoryLandscapes - 1);
     if (choice == landChoice_) return;
     const FactoryLandscapes& f = factoryLandscapes();
     const Landscape& l = f.land[static_cast<size_t>(choice)];
@@ -868,7 +958,10 @@ void Engine::renderBlock()
     brainRoot_.store(brain_.root(), std::memory_order_relaxed);
 
     // 3. The voices: envelope, place, frequency, colour, filter, air, motion.
-    const double follow = 1.0 - std::exp(-dt / kGlideSeconds);
+    // While the sound glides, the tuning follows slowly: a new scale is reached by the partials
+    // sliding into it over seconds (a tenth of the glide, at most six).
+    const double glideSeconds = morphT_ < 1.0f ? std::clamp(0.1 * morphLen_, kGlideSeconds, 6.0) : kGlideSeconds;
+    const double follow = 1.0 - std::exp(-dt / glideSeconds);
     const double tideMul = std::pow(2.0, blk_.tide * tide_.update(dtf, 1.0f / (blk_.tidePeriod * 60.0f), side_) / 1200.0);
     // Self-tuning: where a harmonic of one voice nearly meets a harmonic of another (within Reach),
     // the two pull together -- weighted by their loudness, by a bell over the distance and by how low
@@ -975,6 +1068,7 @@ void Engine::renderBlock()
         cv.presenceDb = blk_.presence;
         cv.lowCut = blk_.padLowCut;
         cv.filterModel = static_cast<int>(model);
+        cv.filterMix = sound_.filterMix;
         cv.cutoff = fc;
         cv.filterQ = q;
         cv.vowel = 4.0f * std::clamp(std::log(fc / 40.0f) / std::log(18000.0f / 40.0f), 0.0f, 1.0f);

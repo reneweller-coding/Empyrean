@@ -17,7 +17,7 @@ juce_add_plugin(Empyrean
     VERSION                     ${PROJECT_VERSION}
     PRODUCT_NAME                "Empyrean"
     ICON_BIG                    "${CMAKE_SOURCE_DIR}/Deploy/empyrean.png")
-target_sources(Empyrean PRIVATE PluginProcessor.cpp PluginEditor.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp SourcesView.cpp Theme.cpp Frame.cpp Jam.cpp)
+target_sources(Empyrean PRIVATE PluginProcessor.cpp PluginEditor.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp SourcesView.cpp JourneyView.cpp Theme.cpp Frame.cpp Jam.cpp)
 # The help's prose (frame::HelpView).
 juce_add_binary_data(AdditivData
     HEADER_NAME AdditivData.h

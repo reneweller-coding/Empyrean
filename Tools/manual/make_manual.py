@@ -37,6 +37,7 @@ TABS = {
     "Space": ["Space", "Master", "Binaural"],
     "Effects": ["Echo", "Room", "Modal", "Spectral Echo", "Melt", "Memory"],
     "Modulation": ["Modulation"],
+    "Journey": ["Morph"],
 }
 
 CSS = """

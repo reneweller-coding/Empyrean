@@ -314,6 +314,10 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::MeltTime,        "melt_time",        "Melt Time",  "Melt", 0.5f,  60.f, 8.f,  0.4f, "s"),
     F(ParamId::MeltSpread,      "melt_spread",      "Spread",     "Melt", 0.f,   2.f,  0.5f, 0.6f, "oct"),
     F(ParamId::MeltToFar,       "melt_to_far",      "To Far",     "Melt", 0.f,   1.f,  0.4f, 1.f,  ""),
+
+    B(ParamId::MorphActive,     "morph_active",     "Morph",      "Morph", false),
+    F(ParamId::MorphPos,        "morph_pos",        "A - B",      "Morph", 0.f,   1.f,  0.f,  1.f,  ""),
+    F(ParamId::PresetGlide,     "preset_glide",     "Glide",      "Morph", 0.f,   600.f, 0.f, 0.4f, "s"),
 } };
 
 } // namespace

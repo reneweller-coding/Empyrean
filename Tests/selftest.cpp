@@ -6,6 +6,7 @@
  *        GPU; the cloud's own measurements are probe's selftest.
  */
 #include "additiv/Engine.h"
+#include "additiv/Journey.h"
 #include "additiv/Presets.h"
 #include "additiv/Spectrum.h"
 
@@ -19,6 +20,7 @@
 #include <complex>
 #include <cstdarg>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -1245,6 +1247,163 @@ int main()
               "melt: a note lingers, and melts between its harmonics",
               fmt("held %.1f dBFS, after the release %.1f / %.1f dBFS spread (without the melt %.1f); between the harmonics %.1f dB still, %.1f dB spread",
                   dry, tail[0], tail[1], silent, between[0], between[1]));
+    }
+
+    // 44. The glide: one sound becomes another. Every number on its way in its own domain, the
+    //     filter fading in by its share, the motion through nothing where it changes, the level
+    //     stepping no more than either sound does by itself; and at the end exactly the new sound.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.2f);
+        e.setParam(ParamId::Tilt, 0.6f);
+        e.setParam(ParamId::Brightness, 0.9f);
+        e.setParam(ParamId::CloudWidth, 10.0f);
+        e.setParam(ParamId::Motion, 4.0f);   // Breathe
+        e.setParam(ParamId::MotionDepth, 0.8f);
+        e.setParam(ParamId::Scale, 0.0f);    // 12-TET
+        if (!openOffline(e, false, 141)) return 1;
+        e.noteOn(50, 0.8f, 0);
+        e.noteOn(57, 0.8f, 0);
+        render(e, 1.0);
+        // The level in windows of a tenth of a second: its largest step from one to the next.
+        double prevDb = 0.0;
+        bool first = true;
+        auto window = [&](double& worst) {
+            const std::vector<float> part = render(e, 0.1);
+            const double db = rmsDb(part, 0, part.size() / 2);
+            if (!first) worst = std::max(worst, std::fabs(db - prevDb));
+            first = false;
+            prevDb = db;
+            return db;
+        };
+        double stepA = 0.0, stepGlide = 0.0, stepB = 0.0;
+        for (int k = 0; k < 10; ++k) window(stepA);
+        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
+        e.beginMorph(4.0);
+        e.setParam(ParamId::Tilt, 2.0f);
+        e.setParam(ParamId::Brightness, 0.4f);
+        e.setParam(ParamId::CloudWidth, 40.0f);
+        e.setParam(ParamId::FilterModel, 3.0f);   // LP 24
+        e.setParam(ParamId::Cutoff, 600.0f);
+        e.setParam(ParamId::Motion, 6.0f);        // Aurora
+        e.setParam(ParamId::MotionDepth, 0.6f);
+        e.setParam(ParamId::Scale, 3.0f);         // JI 7-limit
+        double worstTilt = 0.0, worstMix = 0.0, depthMid = 1.0;
+        bool switchedAtMiddle = true;
+        for (int k = 0; k < 45; ++k) {   // until it arrives (the request is served by the next block)
+            window(stepGlide);
+            const float w = morphCurve(e.morphProgress());
+            const float want = fromNorm(tilt, toNorm(tilt, 0.6f) + (toNorm(tilt, 2.0f) - toNorm(tilt, 0.6f)) * w);
+            worstTilt = std::max(worstTilt, static_cast<double>(std::fabs(e.soundValue(ParamId::Tilt) - want)));
+            worstMix = std::max(worstMix, static_cast<double>(std::fabs(e.soundFilterMix() - (e.morphProgress() < 1.0f ? w : 1.0f))));
+            if (std::fabs(w - 0.5f) < 0.06f) depthMid = std::min(depthMid, static_cast<double>(e.soundValue(ParamId::MotionDepth)));
+            const bool aurora = std::lround(e.soundValue(ParamId::Motion)) == 6;
+            const bool pure = std::lround(e.soundValue(ParamId::Scale)) == 3;
+            if (e.morphProgress() < 1.0f && (aurora != (w >= 0.5f) || pure != (w >= 0.5f))) switchedAtMiddle = false;
+            if (e.morphProgress() >= 1.0f) break;
+        }
+        const bool arrived = e.morphProgress() >= 1.0f && e.soundValue(ParamId::Tilt) == 2.0f && e.soundValue(ParamId::Cutoff) == 600.0f
+                          && e.soundFilterMix() == 1.0f && e.soundValue(ParamId::Motion) == 6.0f && e.soundValue(ParamId::MotionDepth) == 0.6f
+                          && e.soundValue(ParamId::Scale) == 3.0f;
+        for (int k = 0; k < 60; ++k) window(stepB);
+        check(arrived && worstTilt < 1.0e-4 && worstMix < 1.0e-4 && depthMid < 0.1 && switchedAtMiddle && stepGlide < std::max(stepA, stepB) + 1.5,
+              "morph: a glide from one sound into another",
+              fmt("tilt on its way within %.1e, the filter's share within %.1e, motion depth %.2f at the middle (motion and scale switched there: %s); "
+                  "largest step between tenths of a second %.1f dB gliding, %.1f before, %.1f after; arrived: %s", worstTilt, worstMix, depthMid,
+                  switchedAtMiddle ? "yes" : "NO", stepGlide, stepA, stepB, arrived ? "yes" : "NO"));
+    }
+
+    // 45. The A/B morph: the sound is the blend of two slots at A - B (matrix included); switching
+    //     it on and off glides; off, the knobs play again.
+    {
+        Engine e;
+        quietEffects(e);
+        if (!openOffline(e, false, 143)) return 1;
+        float a[kNumParams], b[kNumParams];
+        for (const ParamDesc& d : paramTable()) a[static_cast<size_t>(d.id)] = b[static_cast<size_t>(d.id)] = d.def;
+        a[static_cast<size_t>(ParamId::Tilt)] = 0.5f;
+        b[static_cast<size_t>(ParamId::Tilt)] = 2.5f;
+        b[static_cast<size_t>(ParamId::FilterModel)] = 2.0f;   // LP 12
+        b[static_cast<size_t>(ParamId::Cutoff)] = 800.0f;
+        e.setMorphSlot(0, a, "lfo1>cutoff:0.3");
+        e.setMorphSlot(1, b, "lfo2>brightness:0.4");
+        e.setParam(ParamId::MorphPos, 0.25f);
+        e.setParam(ParamId::MorphActive, 1.0f);
+        e.noteOn(55, 0.8f, 0);
+        render(e, 1.5);   // switching on glides a second
+        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
+        const float want = fromNorm(tilt, toNorm(tilt, 0.5f) + (toNorm(tilt, 2.5f) - toNorm(tilt, 0.5f)) * 0.25f);
+        const float tiltQuarter = e.soundValue(ParamId::Tilt), mixQuarter = e.soundFilterMix();
+        const bool quarter = std::fabs(tiltQuarter - want) < 1.0e-4f && std::fabs(mixQuarter - 0.25f) < 1.0e-4f
+                          && e.soundValue(ParamId::FilterModel) == 2.0f;
+        e.setParam(ParamId::MorphPos, 1.0f);
+        render(e, 0.1);
+        const bool atB = e.soundValue(ParamId::Tilt) == 2.5f && e.soundFilterMix() == 1.0f;
+        e.setParam(ParamId::MorphActive, 0.0f);
+        render(e, 0.5);
+        const float halfway = e.soundValue(ParamId::Tilt);
+        render(e, 1.0);
+        const bool back = e.soundValue(ParamId::Tilt) == e.param(ParamId::Tilt) && halfway != e.param(ParamId::Tilt) && halfway != 2.5f;
+        check(quarter && atB && back, "morph: A/B between two slots, gliding on and off",
+              fmt("at 0.25 tilt %.3f (want %.3f), filter share %.2f; at B %s; off: %.3f half a second later, then the knob's %.3f",
+                  tiltQuarter, want, mixQuarter, atB ? "exact" : "NOT", halfway, e.param(ParamId::Tilt)));
+    }
+
+    // 46. The journeys: every one that comes with the instrument reads, names presets the bank has
+    //     and reads back from its text; a seeded player repeats; a journey played offline glides into
+    //     each of its presets in turn.
+    {
+        int bad = 0, unknown = 0, steps = 0;
+        for (int i = 0; i < numBuiltinJourneys(); ++i) {
+            Journey j, k;
+            if (!j.parse(builtinJourneyText(i)) || j.steps.empty() || !k.parse(j.text().c_str()) || k.steps.size() != j.steps.size()) ++bad;
+            for (const JourneyStep& st : j.steps) {
+                ++steps;
+                if (findPreset(st.preset.c_str()) < 0) ++unknown;
+            }
+        }
+        Journey j;
+        j.parse("journey test\ncyclic on\nVelvet Dreaming | 0:03 | 0:01\nTeeming Garden | 0:03 | 0:01\nFading Frost | 0:03-0:04 | 0:01-0:02\n");
+        JourneyPlayer p1, p2;
+        p1.start(j, 7);
+        p2.start(j, 7);
+        bool same = true;
+        for (int k = 0; k < 40; ++k) {
+            JourneyStep s1, s2;
+            double f1 = 0.0, f2 = 0.0;
+            const bool b1 = p1.advance(0.5, s1, f1), b2 = p2.advance(0.5, s2, f2);
+            if (b1 != b2 || (b1 && (s1.preset != s2.preset || f1 != f2))) same = false;
+        }
+        // Played: each step's preset reached (its tilt and its master gain) before the next begins.
+        Engine e;
+        if (!openOffline(e, true, 149)) return 1;
+        JourneyPlayer p;
+        p.start(j, 11);
+        int reached = 0, begun = 0, current = -1;
+        bool checked = true;
+        for (int k = 0; k < 140; ++k) {
+            JourneyStep st;
+            double fade = 0.0;
+            if (p.advance(0.1, st, fade)) {
+                if (current >= 0 && checked) ++reached;
+                current = findPreset(st.preset.c_str());
+                e.loadPreset(current, fade);
+                ++begun;
+                checked = false;
+            }
+            render(e, 0.1);
+            if (!checked && current >= 0 && e.morphProgress() >= 1.0f) {
+                float values[kNumParams];
+                presetValues(current, values, nullptr);
+                checked = e.soundValue(ParamId::Tilt) == values[static_cast<size_t>(ParamId::Tilt)]
+                       && e.soundValue(ParamId::MasterGain) == values[static_cast<size_t>(ParamId::MasterGain)];
+            }
+        }
+        check(bad == 0 && unknown == 0 && numBuiltinJourneys() >= 68 && same && begun >= 4 && reached >= 3 && p.passes() >= 1,
+              "journeys: read, repeatable, played as glides",
+              fmt("%d journeys, %d steps, %d unreadable, %d unknown presets; seeded players %s; played: %d steps begun, %d reached, %d passes",
+                  numBuiltinJourneys(), steps, bad, unknown, same ? "agree" : "DIFFER", begun, reached, p.passes()));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

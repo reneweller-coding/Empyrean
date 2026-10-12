@@ -12,6 +12,7 @@
 #include "Jam.h"
 
 #include "additiv/Engine.h"
+#include "additiv/Journey.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -95,7 +96,48 @@ public:
      *        preset says nothing), the whole matrix replaced. Message thread.
      * @param index  the preset
      */
-    void applyPreset(int index);
+    void applyPreset(int index) { applyPreset(index, -1.0); }
+    /**
+     * @brief Applies a factory preset, gliding into it (Morph.h): the knobs go to the preset at once,
+     *        the sound follows over `glide` seconds.
+     * @param index  the preset
+     * @param glide  seconds; below 0 the Glide knob's; 0 at once (and the conductor fills its chord)
+     */
+    void applyPreset(int index, double glide);
+
+    /** @name The A/B morph's slots (Morph.h) @{ */
+    /** @brief A slot takes the sound as it plays now: every knob and the matrix. @param slot 0 (A) or 1 (B) */
+    void setSlotFromSound(int slot);
+    /** @brief A slot takes a factory preset. @param slot 0 or 1 @param index the preset */
+    void setSlotFromPreset(int slot, int index);
+    /** @brief What a slot holds, in words. @param slot 0 or 1 @return a preset's name, "the sound of ...", or "empty" */
+    juce::String slotName(int slot) const { return slotNames_[slot & 1].isEmpty() ? juce::String("empty") : slotNames_[slot & 1]; }
+    /** @} */
+
+    /** @name Journeys (Journey.h) @{ */
+    /** @brief A journey to choose: one that comes with the instrument, or a file of the player's. */
+    struct JourneyEntry {
+        juce::String name;    ///< as the box shows it
+        int builtin = -1;     ///< the built-in journey, -1 for a file
+        juce::File file;      ///< the file, for the player's own
+    };
+    /** @brief Where the player's journeys live: Documents/Empyrean/Journeys. @return the folder */
+    static juce::File journeyFolder();
+    /** @brief The journeys to choose from: the ones that come with the instrument, then the player's files. @return them */
+    std::vector<JourneyEntry> journeys() const;
+    /** @brief Starts a journey from its first step (the A/B morph lets go: it would hold the sound). @param entry which @return false when it cannot be read or names no known preset */
+    bool startJourney(const JourneyEntry& entry);
+    /** @brief Stops the journey; the preset playing stays. */
+    void stopJourney() { journeyPlayer_.stop(); }
+    /** @brief The journey under way in words (name, step, preset, time left), empty when none is. @return the text */
+    juce::String journeyStatus() const;
+    /** @brief Appends the preset playing to the journey being written. */
+    void journeyAddCurrent();
+    /** @brief How many presets the journey being written has. @return the count */
+    int journeyDraftSteps() const { return static_cast<int>(draft_.steps.size()); }
+    /** @brief Writes the journey being written to a file (named after it when it has no name). @param file where @return false when it cannot */
+    bool saveJourneyDraft(const juce::File& file);
+    /** @} */
     /** @brief The preset last applied. @return its index, -1 none */
     int currentPreset() const { return current_.load(std::memory_order_relaxed); }
 
@@ -120,6 +162,8 @@ private:
     void timerCallback() override;
     /** @brief The hands' moves in the family's grammar, on the macros every preset shares. */
     void pollHeadset();
+    /** @brief The journey's pump: the seconds since the last tick, and the preset a step glides into. */
+    void journeyTick();
 
     frame::JamBus jam_{ kApp };                            ///< the family jam's bus
     frame::Headset headset_;                               ///< the hands from the Quest app (bridge mode)
@@ -127,6 +171,13 @@ private:
     int jamPostedScale_ = -1;                              ///< leading: the scale posted last
 
     std::atomic<int> current_{ -1 };                       ///< the preset last applied, -1 none
+    juce::String slotNames_[2];                            ///< what the morph's slots hold, in words
+    std::vector<float> slotValues_[2];                     ///< the slots' parameters (for the state), empty when unset
+    std::string slotMods_[2];                              ///< the slots' matrices (for the state)
+    additiv::Journey journey_;                             ///< the journey under way
+    additiv::JourneyPlayer journeyPlayer_;                 ///< its clock and step
+    double journeyLastTick_ = 0.0;                         ///< seconds of the last tick, 0 before the first
+    additiv::Journey draft_;                               ///< the journey being written
     mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)
     std::string engineError_;                              ///< why the engine did not open, empty when it runs
     const bool muted_ = juce::SystemStats::getEnvironmentVariable("ADDITIV_MUTE", {}).isNotEmpty();   ///< ADDITIV_MUTE: silent output

@@ -23,7 +23,10 @@ namespace {
 constexpr int kCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));   ///< presets in the table
 } // namespace
 
-bool keptByPresets(ParamId id) { return id == ParamId::Binaural; }
+bool keptByPresets(ParamId id)
+{
+    return id == ParamId::Binaural || id == ParamId::MorphActive || id == ParamId::MorphPos || id == ParamId::PresetGlide;
+}
 
 int numPresets() { return kCount; }
 
@@ -60,6 +63,13 @@ int presetIndexInGroup(int i)
     for (int k = 0; k < std::clamp(i, 0, kCount - 1); ++k)
         if (kPresets[k].group == g) ++index;
     return index;
+}
+
+int findPreset(const char* name)
+{
+    for (int k = 0; k < kCount && name != nullptr; ++k)
+        if (std::strcmp(kPresets[k].name, name) == 0) return k;
+    return -1;
 }
 
 int presetAt(int group, int index)

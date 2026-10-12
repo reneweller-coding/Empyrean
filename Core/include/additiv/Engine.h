@@ -29,6 +29,7 @@
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
 #include "additiv/Modulation.h"
+#include "additiv/Morph.h"
 #include "additiv/Params.h"
 #include "additiv/Tuning.h"
 
@@ -150,6 +151,47 @@ public:
     std::string modText() const;
     /** @brief The matrix from text; rows it does not name are emptied. @param text the text */
     void setModText(const std::string& text);
+
+    /**
+     * @name Morph (Morph.h)
+     * A glide: from the next block the engine travels, over `seconds`, from what it played the
+     * block before to whatever the parameters and the matrix are then -- so a host asks for the
+     * glide and then sets the new preset (the knobs show where the sound is going; a knob turned on
+     * the way changes where it goes). The A/B morph: with Morph on and both slots chosen, the sound
+     * is the blend of the slots at A - B instead of the knobs; switching it on or off glides
+     * (Glide seconds, at least one).
+     * @{ */
+    /** @brief Glide from what plays now to what is set next. Any thread. @param seconds how long (at least 0.05) */
+    void beginMorph(double seconds);
+    /** @brief How far the glide has come. Any thread. @return 0 .. 1; 1 when none runs */
+    float morphProgress() const { return morphProgress_.load(std::memory_order_relaxed); }
+    /**
+     * @brief Chooses a slot of the A/B morph. Message thread.
+     * @param slot     0 for A, 1 for B
+     * @param values   kNumParams values
+     * @param modText  its matrix (Modulation.h)
+     */
+    void setMorphSlot(int slot, const float* values, const std::string& modText);
+    /** @brief Whether a slot has been chosen. Any thread. @param slot 0 or 1 @return true then */
+    bool morphSlotSet(int slot) const { return slotSet_[static_cast<size_t>(slot & 1)].load(std::memory_order_relaxed); }
+    /**
+     * @brief A parameter where the sound stands, before the matrix: the knob's, or the morph's or
+     *        the glide's way between. Any thread.
+     * @param id  the parameter
+     * @return    its value in its own units
+     */
+    float soundValue(ParamId id) const { return soundLive_[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
+    /** @brief The voice filter's share where the sound stands (Morph.h). Any thread. @return 0 .. 1 */
+    float soundFilterMix() const { return soundMix_.load(std::memory_order_relaxed); }
+    /**
+     * @brief Loads a factory preset: every parameter but the listener's (keptByPresets) and the
+     *        matrix, gliding into it when `glideSeconds` is above 0 (a host with its own parameters
+     *        does this itself; the render tool and the tests use this).
+     * @param index         the preset
+     * @param glideSeconds  0: at once
+     */
+    void loadPreset(int index, double glideSeconds = 0.0);
+    /** @} */
     /** @brief The mod wheel (CC 1). Any thread. @param v 0 .. 1 */
     void setModWheel(float v) { wheel_.store(v, std::memory_order_relaxed); }
     /** @brief Channel pressure. Any thread. @param v 0 .. 1 */
@@ -394,6 +436,31 @@ private:
     float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
     bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
     Modulators mods_;                                  ///< the modulation sources
+    // The morph (Morph.h). The worker owns sound_, from_, target_ and slots_; the editor hands
+    // slots over through pendingSlots_ under slotLock_, which the worker only tries.
+    /** @brief What plays this block before the matrix: the knobs, the A/B morph, or a glide between. */
+    void updateSound();
+    /** @brief A parameter where the sound stands this block (the worker's). @param id the parameter @return its value */
+    float base(ParamId id) const { return sound_.values[static_cast<size_t>(id)]; }
+    MorphState sound_;                                 ///< what plays this block, before the matrix
+    MorphState from_;                                  ///< what played when the glide began
+    MorphState target_;                                ///< where the glide goes: the knobs, or the A/B blend
+    MorphState slots_[2];                              ///< the A/B morph's slots, as the worker has them
+    MorphState pendingSlots_[2];                       ///< the slots as the editor last set them
+    std::mutex slotLock_;                              ///< guards pendingSlots_ (the worker only tries it)
+    std::atomic<int> slotVersion_{ 0 };                ///< bumped by setMorphSlot
+    int slotSeen_ = 0;                                 ///< the version the worker has
+    std::array<std::atomic<bool>, 2> slotSet_{};       ///< a slot has been chosen
+    std::atomic<int> morphAsked_{ 0 };                 ///< bumped by beginMorph
+    int morphSeen_ = 0;                                ///< the request the worker has served
+    std::atomic<float> morphSeconds_{ 1.0f };          ///< the glide asked for
+    float morphT_ = 1.0f;                              ///< 0 .. 1 of the glide's time; 1 when none runs
+    float morphLen_ = 1.0f;                            ///< the glide's seconds
+    bool abWas_ = false;                               ///< the A/B morph played the last block
+    bool soundValid_ = false;                          ///< sound_ holds a block (else a glide has nothing to start from)
+    std::atomic<float> morphProgress_{ 1.0f };         ///< morphT_, for any thread
+    std::array<std::atomic<float>, kNumParams> soundLive_{};   ///< sound_'s values, for any thread
+    std::atomic<float> soundMix_{ 1.0f };              ///< sound_'s filter share, for any thread
     std::array<std::atomic<std::uint64_t>, kModRows> modRows_{};   ///< the matrix, a packed row per word (packModRow)
     std::array<float, kNumParams> cur_{};              ///< every parameter's effective value this block
     std::array<std::atomic<float>, kNumModSources> sourceLive_{};   ///< every source's value after the last block, for the panel
