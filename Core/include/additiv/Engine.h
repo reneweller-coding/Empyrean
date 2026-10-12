@@ -365,6 +365,18 @@ private:
     bool realtime_ = true;                             ///< worker mode
     int latency_ = 0;                                  ///< samples the timeline runs ahead
     int startReserve_ = 0;                             ///< samples rendered beyond it before the first callback, used up over as many
+    /**
+     * @brief Where an event from the host lands on the timeline: the latency ahead of what the
+     *        callback has taken, and while the start reserve is not used up, its rest too (what is
+     *        rendered already reaches that far; an event there would come late).
+     * @param offset  samples into the host's block
+     * @return        the event's sample on the timeline
+     */
+    std::int64_t stampFor(int offset) const
+    {
+        const std::int64_t out = outPos_.load(std::memory_order_relaxed);
+        return out + std::max(offset, 0) + latency_ + std::max<std::int64_t>(0, startReserve_ - out);
+    }
     std::array<std::atomic<float>, kNumParams> params_; ///< the parameters, any thread
 
     CloudEngine cloud_;                                ///< the GPU

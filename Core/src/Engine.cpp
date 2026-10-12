@@ -243,8 +243,9 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     // The start reserve: as much again rendered before the first callback and not replaced while it
     // is used up, so the first callbacks may come in a burst (a device starting fills its buffer at
     // once: the standalone's ring fell to 224 of 1536 in its first second, with an underrun) while
-    // the first GPU blocks are still slow. The latency the host is told stays.
-    startReserve_ = latency_;
+    // the first GPU blocks are still slow. The latency the host is told stays; an event in the
+    // reserve's first stretch comes up to the reserve later (stampFor), never late.
+    startReserve_ = realtime_ ? latency_ : 0;   // offline, process() renders what it takes: nothing runs ahead
     const std::int64_t frames = nextPow2(static_cast<std::int64_t>(latency_) + startReserve_ + cfg_.maxHostBlock + 2 * G);
     ring_.assign(static_cast<size_t>(frames) * 2, 0.0f);
     ringMask_ = frames - 1;
@@ -321,7 +322,7 @@ void Engine::noteOn(int note, float velocity, int offset)
 {
     const std::uint32_t head = qHead_.load(std::memory_order_relaxed);
     if (!prepared_ || head - qTail_.load(std::memory_order_acquire) >= kQueueSize) return;
-    queue_[head & (kQueueSize - 1)] = { 0, note, std::clamp(velocity, 0.0f, 1.0f), outPos_.load(std::memory_order_relaxed) + std::max(offset, 0) + latency_ };
+    queue_[head & (kQueueSize - 1)] = { 0, note, std::clamp(velocity, 0.0f, 1.0f), stampFor(offset) };
     qHead_.store(head + 1, std::memory_order_release);
 }
 
@@ -329,7 +330,7 @@ void Engine::noteOff(int note, int offset)
 {
     const std::uint32_t head = qHead_.load(std::memory_order_relaxed);
     if (!prepared_ || head - qTail_.load(std::memory_order_acquire) >= kQueueSize) return;
-    queue_[head & (kQueueSize - 1)] = { 1, note, 0.0f, outPos_.load(std::memory_order_relaxed) + std::max(offset, 0) + latency_ };
+    queue_[head & (kQueueSize - 1)] = { 1, note, 0.0f, stampFor(offset) };
     qHead_.store(head + 1, std::memory_order_release);
 }
 
@@ -337,7 +338,7 @@ void Engine::allNotesOff()
 {
     const std::uint32_t head = qHead_.load(std::memory_order_relaxed);
     if (!prepared_ || head - qTail_.load(std::memory_order_acquire) >= kQueueSize) return;
-    queue_[head & (kQueueSize - 1)] = { 2, 0, 0.0f, outPos_.load(std::memory_order_relaxed) + latency_ };
+    queue_[head & (kQueueSize - 1)] = { 2, 0, 0.0f, stampFor(0) };
     qHead_.store(head + 1, std::memory_order_release);
 }
 
