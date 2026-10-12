@@ -1,4 +1,4 @@
-"""make_presets.py: the factory bank -- 48 groups of 64 presets -- into Core/src/Presets.inc.
+"""make_presets.py: the factory bank -- 64 groups of 64 presets -- into Core/src/Presets.inc.
 
 Every group is a recipe: the ranges its sound lives in, drawn by a seeded die, so the bank is the
 same on every run. A preset names only what it changes (Presets.h). The four macros mean the same
@@ -16,6 +16,10 @@ sounds, made slow, dark and without anything sudden (sleepy()), and moved by mod
 for the night -- a breath of five to seven a minute, tides of minutes, a smooth wander, chaos
 over half an hour, Kuramoto in step, slow Lenia, the night deepening while the harmony stands
 (Root Age), calming answers to what is heard, a reservoir with a long memory.
+
+The fourth sixteen are visions (13.10.2026): the animated pictures of the living landscape
+(KaleidoscopeEnhanced's transforms), the spectral comb, Stretch and Shift, each group with one in
+front. Phase 13 was added to the first forty-eight too, drawn after everything else.
 
 Levelling: Tools/presets (additiv_presets) renders every preset and writes work/presets/levels.json;
 run this script again and every preset's master_gain brings it to the bank's common level.
@@ -46,7 +50,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Resonant Halls", "Ghosts & Memory", "Strange Attractors", "Reservoir Minds", "Self-Listening", "Gravity Wells",
           "Smear & Dispersion", "Lattices & Beats", "Night Gardens",
           "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain", "Ocean Sleep", "Cradle",
-          "Starfield", "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow"]
+          "Starfield", "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow",
+          "Kaleidoscopes", "Tunnels", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
+          "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -145,6 +151,38 @@ NAMES = {
                    ["Ebb", "Flow", "Estuary", "Mudflats", "Shallows", "Sandbar", "Inlet", "Waterline"]),
     "Afterglow": (["Lingering", "Golden", "Fading", "Embered", "Rosy", "Dimming", "Last", "Sunset"],
                   ["Glow", "Afterglow", "Embers", "Light", "Dusk", "Horizon", "Warmth", "Evening"]),
+    "Kaleidoscopes": (["Folded", "Mirrored", "Faceted", "Turning", "Jewelled", "Hexagonal", "Radiant", "Symmetric"],
+                      ["Kaleidoscope", "Rosette", "Mandala", "Facets", "Mosaic", "Snowflake", "Medallion", "Lantern"]),
+    "Tunnels": (["Endless", "Boring", "Hollow", "Rushing", "Receding", "Curving", "Burrowing", "Spinning"],
+                ["Tunnel", "Passage", "Corridor", "Tube", "Shaft", "Wormhole", "Burrow", "Conduit"]),
+    "Spirals": (["Coiling", "Winding", "Unwinding", "Whorled", "Nautilus", "Golden", "Logarithmic", "Droste"],
+                ["Spiral", "Helix", "Vortex", "Whorl", "Coil", "Shell", "Galaxy", "Fern"]),
+    "Ink & Flow": (["Swirling", "Flowing", "Streaming", "Curling", "Eddying", "Pooling", "Seeping", "Drifting"],
+                   ["Ink", "Marble", "Smoke", "Silk", "Dye", "Eddies", "Plumes", "Currents"]),
+    "Feedback Loops": (["Recursive", "Iterated", "Self-Similar", "Fractal", "Nested", "Regressing", "Returning", "Folding"],
+                       ["Loop", "Recursion", "Iteration", "Cascade", "Regress", "Abyss", "Repetition", "Echoes"]),
+    "Raindrops": (["Splashing", "Beading", "Trickling", "Rainy", "Glistening", "Wet", "Tapping", "Spattering"],
+                  ["Raindrops", "Droplets", "Pond", "Ripples", "Splash", "Rings", "Dew", "Beads"]),
+    "Star Streams": (["Streaming", "Warping", "Hyperspace", "Rushing", "Shooting", "Comet", "Stellar", "Interstellar"],
+                     ["Stars", "Comets", "Meteors", "Lightspeed", "Stardust", "Photons", "Starlight", "Trails"]),
+    "Moire Veils": (["Interfering", "Shimmering", "Overlaid", "Rippled", "Gauzy", "Sheer", "Layered", "Silken"],
+                    ["Veil", "Moire", "Gauze", "Organza", "Tulle", "Screen", "Mesh", "Curtain"]),
+    "Stretched Worlds": (["Elongated", "Warped", "Alien", "Elastic", "Distended", "Strange", "Otherworldly", "Tensile"],
+                         ["World", "Harmony", "Octave", "Planet", "Realm", "Horizon", "Spectrum", "Continent"]),
+    "Shifted Metals": (["Shifted", "Metallic", "Ringing", "Clanging", "Brazen", "Tinny", "Steel", "Chrome"],
+                       ["Metal", "Gong", "Plate", "Chime", "Anvil", "Wire", "Cymbal", "Girder"]),
+    "Comb Phasers": (["Phasing", "Combed", "Notched", "Sweeping", "Swirled", "Whooshing", "Flanged", "Filtered"],
+                     ["Phaser", "Comb", "Jet", "Notch", "Sweep", "Wash", "Swirl", "Flanger"]),
+    "Barber Poles": (["Ever-Rising", "Ever-Falling", "Unending", "Circling", "Barber", "Escalating", "Perpetual", "Revolving"],
+                     ["Pole", "Stair", "Climb", "Descent", "Helix", "Illusion", "Paradox", "Ascension"]),
+    "Painted Light": (["Painted", "Brushed", "Gilded", "Washed", "Tinted", "Glazed", "Luminous", "Pastel"],
+                      ["Light", "Canvas", "Fresco", "Window", "Glass", "Icon", "Panel", "Lantern"]),
+    "Prisms": (["Prismatic", "Refracting", "Splitting", "Chromatic", "Beaming", "Rainbowed", "Angled", "Bent"],
+               ["Prisms", "Spectrum", "Rays", "Beams", "Colours", "Bands", "Shards", "Lights"]),
+    "Alien Harmony": (["Xenial", "Extraterrestrial", "Foreign", "Unearthly", "Martian", "Exotic", "Uncanny", "Outlandish"],
+                      ["Harmony", "Chord", "Choir", "Hymn", "Anthem", "Consonance", "Concord", "Song"]),
+    "Dream Machines": (["Dreaming", "Clockwork", "Humming", "Whirring", "Lucid", "Mechanical", "Electric", "Somnambulant"],
+                       ["Machine", "Engine", "Automaton", "Device", "Contraption", "Apparatus", "Loom", "Orrery"]),
 }
 
 
@@ -1259,6 +1297,258 @@ RECIPES = RECIPES + [s_lullaby, s_breath, s_deep, s_dream, s_moon, s_rain, s_oce
                      s_star, s_hypna, s_choirs, s_warm, s_snow, s_forest, s_tides, s_afterglow]
 
 
+# ---- Phase 13 (13.10.2026): the animated pictures, the spectral comb, Stretch and Shift.
+
+PIC = {"Kaleidoscope": 3, "Tunnel": 4, "Spiral": 5, "Flow": 6, "Feedback": 7, "Rain": 8, "Starfield": 9, "Moire": 10}
+
+
+def set_picture(r, mode, depth=(0.5, 0.85), rate=(0.1, 0.5), turn=(0.2, 1.5), sides=(3, 12), character=(0.0, 0.6)):
+    """An animated picture in the living landscape (over the preset's landscape)."""
+    r.set("life_mode", PIC[mode])
+    r.set("life_depth", f(r.u(*depth), 2))
+    r.set("life_rate", f(r.u(*rate), 2))
+    r.set("life_turn", f(r.u(*turn) * r.pick(1, -1), 2))
+    r.set("life_sides", r.rng.randint(*sides))
+    r.set("life_character", f(r.u(*character), 2))
+    r.set("life_zoom", f(r.u(0.6, 1.0), 2))
+
+
+def set_comb(r, depth=(0.3, 0.7), density=(1, 4), sweep=(0.02, 0.2), stereo=(0.2, 0.8), direction=None):
+    """The spectral comb (a sweep up or down, or the given direction)."""
+    r.set("comb_depth", f(r.u(*depth), 2))
+    r.set("comb_density", f(r.lg(*density), 2))
+    r.set("comb_sweep", f(r.lg(*sweep) * (direction if direction else r.pick(1, -1)), 3))
+    r.set("comb_stereo", f(r.u(*stereo), 2))
+
+
+# What the first forty-eight groups take, drawn last: comb = (p, depth, density, sweep, stereo);
+# stretch = (p, cents an octave); shift = (p, Hz, either way); picture = (p, modes, depth, rate, turn).
+SLOW_PIC = ((0.3, 0.6), (0.03, 0.15), (0.05, 0.3))   # the sleep concerts' pictures: depth, rate, turn
+SLOW_COMB = ((0.2, 0.5), (0.5, 2), (0.01, 0.04), (0.2, 0.6))
+P13_FX = {
+    "Sleep Concert":   dict(picture=(0.15, ["Kaleidoscope", "Spiral", "Flow"], (0.3, 0.5), (0.05, 0.2), (0.1, 0.3))),
+    "Choirs":          dict(comb=(0.2, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.3, 0.7))),
+    "Glass":           dict(comb=(0.3, (0.4, 0.8), (2, 6), (0.05, 0.3), (0.3, 0.8)), stretch=(0.3, (1180, 1240)), shift=(0.15, (3, 25))),
+    "Bells":           dict(stretch=(0.4, (1170, 1250)), shift=(0.2, (2, 20))),
+    "Strings":         dict(comb=(0.15, (0.3, 0.5), (1, 2), (0.02, 0.08), (0.2, 0.6))),
+    "Organs":          dict(comb=(0.2, (0.3, 0.6), (2, 4), (0.03, 0.1), (0.3, 0.8))),
+    "Air & Noise":     dict(comb=(0.3, (0.5, 0.9), (1, 4), (0.05, 0.3), (0.3, 0.8)), picture=(0.2, ["Flow", "Rain"], (0.4, 0.7), (0.1, 0.4), (0.2, 1.0))),
+    "Deep Space":      dict(picture=(0.25, ["Starfield", "Spiral", "Tunnel"], (0.3, 0.6), (0.05, 0.25), (0.1, 0.5)), shift=(0.1, (1, 8))),
+    "Glissandi":       dict(comb=(0.2, (0.3, 0.6), (1, 3), (0.05, 0.2), (0.3, 0.7)), picture=(0.15, ["Spiral", "Tunnel"], (0.4, 0.7), (0.1, 0.4), (0.2, 1.0))),
+    "Pendulums":       dict(picture=(0.15, ["Moire"], (0.4, 0.7), (0.1, 0.3), (0.2, 0.8))),
+    "Waves":           dict(picture=(0.2, ["Rain", "Flow"], (0.4, 0.7), (0.1, 0.3), (0.1, 0.5)), comb=(0.15, (0.3, 0.6), (1, 2), (0.02, 0.1), (0.2, 0.6))),
+    "Shepard & Tides": dict(comb=(0.35, (0.4, 0.8), (1, 2), (0.03, 0.12), (0.2, 0.6)), picture=(0.2, ["Spiral"], (0.4, 0.7), (0.05, 0.3), (0.1, 0.5))),
+    "Shimmer":         dict(comb=(0.3, (0.4, 0.8), (2, 6), (0.05, 0.3), (0.4, 0.9)), picture=(0.2, ["Kaleidoscope", "Moire"], (0.4, 0.7), (0.2, 0.5), (0.3, 1.5))),
+    "Dark Drones":     dict(shift=(0.15, (2, 15)), picture=(0.15, ["Feedback", "Flow"], (0.3, 0.6), (0.05, 0.2), (0.1, 0.4))),
+    "Microtonal":      dict(stretch=(0.3, (1150, 1260))),
+    "Keys":            dict(comb=(0.15, (0.3, 0.5), (1, 3), (0.03, 0.1), (0.2, 0.6)), stretch=(0.25, (1195, 1215))),
+    "Living Fields":   dict(comb=(0.15, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.2, 0.6))),
+    "Turing Gardens":  dict(comb=(0.15, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.2, 0.6))),
+    "Synchrony":       dict(comb=(0.15, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.2, 0.6))),
+    "Flocks":          dict(picture=(0.2, ["Flow"], (0.4, 0.7), (0.1, 0.4), (0.2, 1.0))),
+    "Ripples":         dict(picture=(0.25, ["Rain"], (0.4, 0.7), (0.1, 0.4), (0.1, 0.5))),
+    "Melting Spectra": dict(comb=(0.2, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.2, 0.6)), picture=(0.15, ["Feedback"], (0.3, 0.6), (0.05, 0.2), (0.1, 0.5))),
+    "Spectral Cascades": dict(comb=(0.3, (0.4, 0.8), (2, 6), (0.05, 0.3), (0.3, 0.8)), stretch=(0.2, (1180, 1240))),
+    "Resonant Halls":  dict(stretch=(0.25, (1170, 1250)), shift=(0.1, (2, 12))),
+    "Ghosts & Memory": dict(picture=(0.15, ["Feedback", "Flow"], (0.3, 0.6), (0.05, 0.2), (0.1, 0.4))),
+    "Strange Attractors": dict(shift=(0.2, (2, 15)), picture=(0.2, ["Feedback"], (0.4, 0.7), (0.1, 0.3), (0.2, 1.0))),
+    "Reservoir Minds": dict(comb=(0.2, (0.3, 0.6), (1, 4), (0.03, 0.15), (0.2, 0.7))),
+    "Self-Listening":  dict(comb=(0.2, (0.3, 0.6), (1, 4), (0.03, 0.15), (0.2, 0.7))),
+    "Gravity Wells":   dict(stretch=(0.3, (1170, 1250))),
+    "Smear & Dispersion": dict(comb=(0.3, (0.4, 0.8), (1, 4), (0.05, 0.25), (0.3, 0.8)), shift=(0.15, (2, 15))),
+    "Lattices & Beats": dict(stretch=(0.3, (1180, 1230)), comb=(0.15, (0.3, 0.6), (1, 3), (0.02, 0.1), (0.2, 0.6))),
+    "Night Gardens":   dict(picture=(0.3, ["Kaleidoscope", "Flow", "Starfield"], (0.3, 0.6), (0.05, 0.2), (0.1, 0.4))),
+    "Lullabies":       dict(picture=(0.2, ["Kaleidoscope", "Moire"]) + SLOW_PIC),
+    "Slow Breath":     dict(comb=(0.2,) + SLOW_COMB),
+    "Deep Sleep":      dict(picture=(0.2, ["Feedback", "Flow"]) + SLOW_PIC),
+    "Dream Drift":     dict(picture=(0.35, ["Flow", "Spiral", "Feedback"]) + SLOW_PIC),
+    "Moonlight":       dict(picture=(0.35, ["Kaleidoscope", "Moire"]) + SLOW_PIC, comb=(0.2,) + SLOW_COMB),
+    "Night Rain":      dict(picture=(0.5, ["Rain"]) + SLOW_PIC),
+    "Ocean Sleep":     dict(picture=(0.35, ["Rain", "Flow"]) + SLOW_PIC),
+    "Cradle":          dict(picture=(0.2, ["Moire"]) + SLOW_PIC),
+    "Starfield":       dict(picture=(0.6, ["Starfield", "Spiral"]) + SLOW_PIC),
+    "Hypnagogia":      dict(picture=(0.4, ["Feedback", "Flow", "Kaleidoscope"]) + SLOW_PIC),
+    "Twilight Choirs": dict(comb=(0.2,) + SLOW_COMB),
+    "Warm Drones":     dict(comb=(0.2,) + SLOW_COMB, stretch=(0.15, (1190, 1215))),
+    "Snowfall":        dict(picture=(0.4, ["Starfield", "Rain"]) + SLOW_PIC, comb=(0.15,) + SLOW_COMB),
+    "Forest Night":    dict(comb=(0.15,) + SLOW_COMB),
+    "Slow Tides":      dict(picture=(0.3, ["Spiral", "Flow"]) + SLOW_PIC, comb=(0.2,) + SLOW_COMB),
+    "Afterglow":       dict(picture=(0.2, ["Feedback"]) + SLOW_PIC),
+}
+
+
+def p13_effects(r, group):
+    """Phase 13 in one of the first forty-eight groups, drawn after everything else."""
+    fx = P13_FX.get(group, {})
+    if "comb" in fx:
+        p, depth, density, sweep, stereo = fx["comb"]
+        if r.rng.random() < p:
+            set_comb(r, depth, density, sweep, stereo)
+    if "stretch" in fx:
+        p, cents = fx["stretch"]
+        if r.rng.random() < p:
+            r.set("stretch", f(r.u(*cents), 1))
+    if "shift" in fx:
+        p, hz = fx["shift"]
+        if r.rng.random() < p:
+            r.set("shift", f(r.u(*hz) * r.pick(1, -1), 2))
+    if "picture" in fx:
+        p, modes, depth, rate, turn = fx["picture"]
+        if r.rng.random() < p and num(r, "life_mode", 0) == 0:   # a living landscape that grows stays
+            set_picture(r, r.pick(*modes), depth, rate, turn, character=(0.0, 0.5))
+
+
+# ---- The visions: sixteen groups, each from one of the first sixteen's sounds, one new means in front.
+
+VISION_POOLS = {
+    "turn": [("lfo2", "life_turn", (0.04, 0.12))],
+    "depth": [("kura2", "life_depth", (0.08, 0.18)), ("rossler_x", "life_depth", (0.08, 0.18))],
+    "comb": [("kura1", "comb_density", (0.05, 0.12)), ("lorenz_x", "comb_depth", (0.1, 0.2)), ("lfo3", "comb_depth", (0.1, 0.2))],
+    "shift": [("lfo3", "shift", (0.008, 0.025))],
+}
+
+
+def vision_rows(r, kinds, count, via_p=0.25):
+    """Rows onto the new means' knobs, their sources set slowly (the sleep concerts' setups)."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*VISION_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        elif src.startswith("kura"):
+            setup(r, "kura")
+        elif src.startswith(("lorenz", "rossler")):
+            setup(r, "chaos")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def landscape_any(r):
+    """A factory landscape for a picture to be made of."""
+    r.set("landscape", r.pick(*LAND.values()))
+
+
+def v_pictured(mode, bases, comb_p=0.3, **ranges):
+    """A recipe: the sound of one of `bases`, the picture `mode` in front, now and then a slow comb."""
+    def recipe(r):
+        based(r, *bases)
+        landscape_any(r)
+        set_picture(r, mode, **ranges)
+        if r.rng.random() < comb_p:
+            set_comb(r, (0.2, 0.5), (1, 3), (0.02, 0.1), (0.2, 0.6))
+        vision_rows(r, ["turn", "depth"], 2)
+        rows_from(r, ["kura", "lenia", "chaos"], 1)
+    return recipe
+
+
+v_kaleido = v_pictured("Kaleidoscope", ("Shimmer", "Glass", "Choirs", "Sleep Concert", "Strings", "Air & Noise"))
+v_tunnel = v_pictured("Tunnel", ("Deep Space", "Glissandi", "Shepard & Tides", "Dark Drones", "Air & Noise"))
+v_spiral = v_pictured("Spiral", ("Shepard & Tides", "Glissandi", "Waves", "Deep Space", "Shimmer"), comb_p=0.4)
+v_flow = v_pictured("Flow", ("Air & Noise", "Choirs", "Strings", "Sleep Concert", "Waves"), character=(0.2, 0.8))
+v_feedback = v_pictured("Feedback", ("Dark Drones", "Deep Space", "Organs", "Sleep Concert", "Strings"))
+v_rain = v_pictured("Rain", ("Glass", "Bells", "Keys", "Air & Noise", "Waves"), comb_p=0.15, rate=(0.2, 0.7), character=(0.2, 0.9))
+v_stars = v_pictured("Starfield", ("Deep Space", "Glass", "Shimmer", "Bells", "Sleep Concert"), comb_p=0.15)
+v_moire = v_pictured("Moire", ("Organs", "Strings", "Choirs", "Pendulums", "Shimmer"), sides=(3, 8))
+
+
+def v_stretched(r):
+    based(r, "Bells", "Glass", "Microtonal", "Organs", "Strings", "Choirs")
+    r.set("stretch", f(r.u(1100, 1300), 1))
+    r.set("scale", SCALE["Timbre"])   # the tuning made from the stretched spectrum: consonant again
+    r.set("purity", 1)
+    if r.rng.random() < 0.4:
+        set_sync(r, (0.2, 0.4), (0.5, 0.9), (0.1, 0.8), (0.1, 0.4))
+    rows_from(r, ["kura", "chaos"], 2)
+
+
+def v_metals(r):
+    based(r, "Bells", "Glass", "Dark Drones", "Organs", "Keys")
+    r.set("shift", f(r.u(5, 80) * r.pick(1, 1, -1), 1))
+    if r.rng.random() < 0.4:
+        r.set("stretch", f(r.u(1170, 1240), 1))
+    vision_rows(r, ["shift"], 1)
+    rows_from(r, ["kura", "chaos"], 1)
+
+
+def v_comb(r):
+    based(r, "Organs", "Strings", "Choirs", "Air & Noise", "Shimmer", "Keys")
+    set_comb(r, (0.5, 1.0), (1, 6), (0.05, 0.5), (0.3, 1.0))
+    vision_rows(r, ["comb"], 2)
+    rows_from(r, ["kura", "heard"], 1)
+
+
+def v_barber(r):
+    based(r, "Shepard & Tides", "Glissandi", "Organs", "Choirs", "Strings")
+    up = r.pick(1, -1)   # the comb and the spiral travel the same way: a rise (or fall) without end
+    set_comb(r, (0.5, 0.9), (0.5, 2), (0.04, 0.2), (0.1, 0.5), direction=up)
+    if r.rng.random() < 0.6:
+        landscape_any(r)
+        set_picture(r, "Spiral", depth=(0.4, 0.7), rate=(0.1, 0.4), turn=(0.1, 0.6))
+    vision_rows(r, ["depth"], 1)
+    rows_from(r, ["kura"], 1)
+
+
+def v_painted(r):
+    based(r, "Sleep Concert", "Choirs", "Air & Noise", "Shimmer", "Waves")
+    r.set("motion", MOTION["Aurora"])
+    r.set("motion_depth", f(r.u(0.4, 0.8), 2))
+    landscape_any(r)
+    set_picture(r, r.pick("Kaleidoscope", "Flow"), depth=(0.3, 0.6), rate=(0.05, 0.3), turn=(0.1, 0.6))
+    if r.rng.random() < 0.4:
+        set_comb(r, (0.2, 0.5), (1, 3), (0.02, 0.1), (0.2, 0.6))
+    vision_rows(r, ["turn"], 1)
+    rows_from(r, ["lenia", "kura"], 1)
+
+
+def v_prism(r):
+    based(r, "Glass", "Shimmer", "Bells", "Keys")
+    set_comb(r, (0.4, 0.8), (2, 6), (0.03, 0.2), (0.4, 1.0))
+    r.set("stretch", f(r.u(1185, 1225), 1))
+    landscape_any(r)
+    set_picture(r, "Kaleidoscope", depth=(0.4, 0.7), rate=(0.1, 0.4), turn=(0.3, 1.5), sides=(6, 12))
+    vision_rows(r, ["comb", "turn"], 2)
+
+
+def v_alien(r):
+    based(r, "Choirs", "Strings", "Organs", "Sleep Concert", "Deep Space")
+    r.set("stretch", f(r.u(1120, 1280), 1))
+    r.set("scale", SCALE["Timbre"])
+    r.set("purity", 1)
+    set_sync(r, (0.2, 0.45), (0.5, 0.9), (0.1, 0.6), (0.1, 0.4))
+    r.set("memory_level", f(r.u(0.2, 0.5), 2))
+    r.set("memory_time", f(r.lg(60, 200), 0))
+    rows_from(r, ["kura", "reservoir"], 2)
+    if any(row.startswith("reservoir") for row in r.rows):
+        set_reservoir(r, (0.9, 1.1), (3, 15), (0.4, 1.0))
+
+
+def v_machine(r):
+    based(r, *ALL)
+    landscape_any(r)
+    set_picture(r, r.pick(*PIC), depth=(0.3, 0.7), rate=(0.1, 0.5), turn=(0.2, 1.2))
+    if r.rng.random() < 0.6:
+        set_comb(r, (0.3, 0.7), (1, 4), (0.03, 0.2), (0.2, 0.8))
+    if r.rng.random() < 0.4:
+        r.set("stretch", f(r.u(1170, 1240), 1))
+    if r.rng.random() < 0.3:
+        r.set("shift", f(r.u(2, 20) * r.pick(1, -1), 1))
+    vision_rows(r, ["turn", "depth", "comb", "shift"], 2)
+    rows_from(r, ["reservoir", "kura"], 1)
+    if any(row.startswith("reservoir") for row in r.rows):
+        set_reservoir(r, (0.9, 1.1), (3, 15), (0.4, 1.0))
+
+
+RECIPES = RECIPES + [v_kaleido, v_tunnel, v_spiral, v_flow, v_feedback, v_rain, v_stars, v_moire,
+                     v_stretched, v_metals, v_comb, v_barber, v_painted, v_prism, v_alien, v_machine]
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -1275,6 +1565,8 @@ def build():
                 motion_effects(r, group)
                 p9_effects(r, group)
                 p10_effects(r, group)
+            if g < 48:   # phase 13 drawn last: what the preset had stays as it was
+                p13_effects(r, group)
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
@@ -1289,7 +1581,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 48 groups of 64 (Presets.h).",
+             "/// The factory presets: 64 groups of 64 (Presets.h).",
              "const Preset kPresets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

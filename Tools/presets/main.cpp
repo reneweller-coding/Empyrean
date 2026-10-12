@@ -3,7 +3,10 @@
  * @brief additiv_presets: measures every factory preset's level, so make_presets.py can bring the
  *        bank to one level (Noctuary's level matching, done once for the bank).
  *
- *     additiv_presets [--from N] [--to M] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
+ *     additiv_presets [--from N] [--to M] [--names FILE] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
+ *
+ * --names measures only the presets a file names, one a line (those a change of the bank touched);
+ * what levels.json held for the others stays.
  *
  * Each preset plays the same chord (D3 A3 D4 F#4) with the conductor off, its attack shortened to
  * at most half a second and the master at 0 dB; the level is the RMS of its loudest second.
@@ -98,6 +101,7 @@ double measure(int index, double seconds, std::string* error)
 int main(int argc, char** argv)
 {
     int from = 0, to = numPresets() - 1;
+    std::string namesFile;
     double seconds = 14.0;
     fs::path out = repoRoot() / "work" / "presets" / "levels.json";
     for (int i = 1; i < argc; ++i) {
@@ -107,22 +111,38 @@ int main(int argc, char** argv)
         else if (a == "--to" && has) to = std::atoi(argv[++i]);
         else if (a == "--seconds" && has) seconds = std::atof(argv[++i]);
         else if (a == "--out" && has) out = argv[++i];
-        else { std::fprintf(stderr, "additiv_presets [--from N] [--to M] [--seconds S] [--out FILE]\n"); return 1; }
+        else if (a == "--names" && has) namesFile = argv[++i];
+        else { std::fprintf(stderr, "additiv_presets [--from N] [--to M] [--names FILE] [--seconds S] [--out FILE]\n"); return 1; }
     }
     from = std::clamp(from, 0, numPresets() - 1);
     to = std::clamp(to, from, numPresets() - 1);
+    std::vector<int> which;
+    if (!namesFile.empty()) {
+        std::ifstream in(namesFile);
+        std::string line;
+        while (std::getline(in, line)) {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+            if (line.empty()) continue;
+            const int index = findPreset(line.c_str());
+            if (index < 0) { std::fprintf(stderr, "additiv_presets: no preset %s\n", line.c_str()); return 1; }
+            which.push_back(index);
+        }
+    } else {
+        for (int i = from; i <= to; ++i) which.push_back(i);
+    }
     const auto t0 = std::chrono::steady_clock::now();
     std::vector<std::pair<std::string, double>> levels;
     double lo = 1e9, hi = -1e9;
-    for (int i = from; i <= to; ++i) {
+    for (size_t k = 0; k < which.size(); ++k) {
+        const int i = which[k];
         std::string error;
         const double db = measure(i, seconds, &error);
         if (std::isnan(db)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
         levels.emplace_back(preset(i).name, db);
         lo = std::min(lo, db);
         hi = std::max(hi, db);
-        if ((i - from) % 64 == 63 || i == to)
-            std::printf("  %4d / %d  %-14s %-24s %6.1f dBFS (so far %.1f .. %.1f)\n", i + 1, numPresets(), kPresetGroupNames[preset(i).group],
+        if (k % 64 == 63 || k + 1 == which.size())
+            std::printf("  %4zu / %zu  %-14s %-24s %6.1f dBFS (so far %.1f .. %.1f)\n", k + 1, which.size(), kPresetGroupNames[preset(i).group],
                         preset(i).name, db, lo, hi);
         std::fflush(stdout);
     }
