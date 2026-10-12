@@ -82,6 +82,7 @@ void AdditivProcessor::timerCallback()
     jam_.setRole(frame::Settings::of(kApp).jamRole());   // the family jam (Jam.h): Off, Lead or Follow, from the settings
     pollHeadset();
     journeyTick();
+    mapTick();
 }
 
 void AdditivProcessor::pollHeadset()
@@ -178,7 +179,15 @@ void AdditivProcessor::applyPreset(int index, double glide)
     // The glide is asked for first: the engine starts it from what it played the block before,
     // whatever of the new preset has reached it by then (Engine::beginMorph).
     const double g = glide >= 0.0 ? glide : static_cast<double>(value(static_cast<int>(ParamId::PresetGlide)));
-    if (g > 0.0) engine_.beginMorph(g);
+    // With the map on, a preset chosen is a place: the cursor goes there and the sound follows it.
+    if (value(static_cast<int>(ParamId::MapActive)) >= 0.5f && !route_.running()) {
+        float x = 0.0f, y = 0.0f;
+        additiv::presetMapPosition(index, x, y);
+        setValue(static_cast<int>(ParamId::MapX), x);
+        setValue(static_cast<int>(ParamId::MapY), y);
+    } else if (g > 0.0) {
+        engine_.beginMorph(g);
+    }
     for (int i = 0; i < additiv::kNumParams; ++i)
         if (!additiv::keptByPresets(static_cast<additiv::ParamId>(i))) setValue(i, values[i]);
     engine_.setModText(mod);
@@ -233,6 +242,145 @@ bool AdditivProcessor::loadLandscape(const juce::File& file, bool letItSound, ju
     return true;
 }
 
+void AdditivProcessor::moveCursor(float x, float y)
+{
+    route_.stop();
+    setValue(static_cast<int>(ParamId::MapActive), 1.0f);
+    setValue(static_cast<int>(ParamId::MapX), juce::jlimit(0.0f, 1.0f, x));
+    setValue(static_cast<int>(ParamId::MapY), juce::jlimit(0.0f, 1.0f, y));
+}
+
+int AdditivProcessor::nearestPreset(float x, float y) const
+{
+    const additiv::MapNeighbours b = additiv::mapNeighbours(x, y, 0.01f);
+    return b.count > 0 ? b.index[0] : 0;
+}
+
+void AdditivProcessor::leaveMap(bool keepSound)
+{
+    route_.stop();
+    if (value(static_cast<int>(ParamId::MapActive)) < 0.5f) { mapOnWas_ = false; return; }
+    setValue(static_cast<int>(ParamId::MapActive), 0.0f);
+    mapOnWas_ = false;
+    if (keepSound)
+        applyPreset(nearestPreset(value(static_cast<int>(ParamId::MapX)), value(static_cast<int>(ParamId::MapY))),
+                    std::max(1.0, static_cast<double>(value(static_cast<int>(ParamId::MapGlide)))));
+}
+
+void AdditivProcessor::mapTick()
+{
+    const double now = juce::Time::getMillisecondCounterHiRes() * 0.001;
+    const double dt = mapLastTick_ > 0.0 ? juce::jlimit(0.0, 1.0, now - mapLastTick_) : 0.0;
+    mapLastTick_ = now;
+    // The route walks the cursor (its times divided by Route Speed); the map plays while it does.
+    if (route_.running()) {
+        float x = 0.0f, y = 0.0f, r = 0.0f;
+        route_.update(static_cast<float>(dt) * value(static_cast<int>(ParamId::RouteSpeed)), x, y, r);
+        if (value(static_cast<int>(ParamId::MapActive)) < 0.5f) setValue(static_cast<int>(ParamId::MapActive), 1.0f);
+        setValue(static_cast<int>(ParamId::MapX), x);
+        setValue(static_cast<int>(ParamId::MapY), y);
+        setValue(static_cast<int>(ParamId::MapRadius), r);
+    }
+    const bool on = value(static_cast<int>(ParamId::MapActive)) >= 0.5f;
+    if (!on) {
+        if (mapOnWas_) leaveMap(true);   // switched off by hand: the sound stays near where it was
+        return;
+    }
+    mapOnWas_ = true;
+    const float x = value(static_cast<int>(ParamId::MapX)), y = value(static_cast<int>(ParamId::MapY)), r = value(static_cast<int>(ParamId::MapRadius));
+    if (x == mapX_ && y == mapY_ && r == mapR_ && engine_.mapTargetSet()) return;
+    mapX_ = x;
+    mapY_ = y;
+    mapR_ = r;
+    additiv::MorphState s;
+    blender_.blend(x, y, r, s);
+    engine_.setMapTarget(s);
+}
+
+juce::File AdditivProcessor::routeFolder()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Routes");
+}
+
+std::vector<AdditivProcessor::RouteEntry> AdditivProcessor::routes() const
+{
+    std::vector<RouteEntry> out;
+    for (int i = 0; i < additiv::numRoutePresets(); ++i) {
+        RouteEntry e;
+        e.name = additiv::routePreset(i).name;
+        e.builtin = i;
+        out.push_back(e);
+    }
+    juce::Array<juce::File> files = routeFolder().findChildFiles(juce::File::findFiles, false, "*.route");
+    files.sort();
+    for (const juce::File& f : files) {
+        RouteEntry e;
+        e.name = f.getFileNameWithoutExtension();
+        e.file = f;
+        out.push_back(e);
+    }
+    return out;
+}
+
+bool AdditivProcessor::loadRoute(const RouteEntry& entry)
+{
+    const juce::String text = entry.builtin >= 0 ? juce::String(additiv::routePreset(entry.builtin).points) : entry.file.loadFileAsString();
+    additiv::Route r;
+    if (!r.parse(text.toRawUTF8())) return false;
+    route_ = r;
+    routeName_ = entry.name;
+    return true;
+}
+
+bool AdditivProcessor::startRoute()
+{
+    if (route_.count() == 0) return false;
+    journeyPlayer_.stop();
+    setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+    setValue(static_cast<int>(ParamId::MapActive), 1.0f);
+    route_.start(value(static_cast<int>(ParamId::MapX)), value(static_cast<int>(ParamId::MapY)), value(static_cast<int>(ParamId::MapRadius)), routeLoop_);
+    return true;
+}
+
+void AdditivProcessor::addWaypoint(float x, float y, int preset)
+{
+    additiv::Waypoint w;
+    w.x = juce::jlimit(0.0f, 1.0f, x);
+    w.y = juce::jlimit(0.0f, 1.0f, y);
+    w.preset = preset;
+    if (preset >= 0) additiv::presetMapPosition(preset, w.x, w.y);
+    w.radius = value(static_cast<int>(ParamId::MapRadius));
+    w.travel = route_.count() == 0 ? 20.0f : 120.0f;
+    w.hold = 60.0f;
+    route_.stop();
+    route_.add(w);
+}
+
+bool AdditivProcessor::saveRoute(const juce::File& file)
+{
+    if (route_.count() == 0) return false;
+    std::vector<char> buf(static_cast<size_t>(route_.count()) * 200 + 64);
+    if (route_.write(buf.data(), buf.size()) <= 0) return false;
+    // One waypoint a line, under a line that says what the fields are.
+    const juce::String text = juce::String("# Empyrean route: <preset or x,y> | travel s | hold s | radius\n")
+                            + juce::String(buf.data()).replace(";", "\n") + "\n";
+    file.getParentDirectory().createDirectory();
+    if (!file.replaceWithText(text)) return false;
+    routeName_ = file.getFileNameWithoutExtension();
+    return true;
+}
+
+juce::String AdditivProcessor::routeStatus() const
+{
+    if (!route_.running()) return {};
+    const int i = route_.segment();
+    const additiv::Waypoint& w = route_.point(i);
+    juce::String s = routeName_.isNotEmpty() ? routeName_ + "   " : juce::String();
+    s << (i + 1) << "/" << route_.count() << "   " << (w.preset >= 0 ? juce::String(additiv::preset(w.preset).name) : juce::String("a place")) << "   "
+      << juce::roundToInt(100.0f * route_.progress()) << " %";
+    return s;
+}
+
 juce::File AdditivProcessor::journeyFolder()
 {
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Journeys");
@@ -270,9 +418,10 @@ bool AdditivProcessor::startJourney(const JourneyEntry& entry)
     if (!known) return false;
     if (j.name.empty()) j.name = entry.name.toStdString();
     journey_ = j;
-    // The A/B morph holds the sound between its slots: a journey that loads presets under it would
-    // seem to do nothing (Noctuary's lesson), so it lets go.
+    // The A/B morph holds the sound between its slots, the map plays the blend at its cursor: a
+    // journey that loads presets under either would seem to do nothing (Noctuary's lesson), so both let go.
     setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+    leaveMap(false);
     // Seeded from the clock: the same journey runs differently every night.
     journeyPlayer_.start(journey_, static_cast<std::uint64_t>(juce::Time::currentTimeMillis()) | 1ull, 0);
     journeyLastTick_ = 0.0;
@@ -435,6 +584,15 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
     xml.createNewChildElement("Mod")->setAttribute("rows", juce::String(engine_.modText()));
     xml.setAttribute("preset", current_.load(std::memory_order_relaxed));
     if (userLandFile_ != juce::File()) xml.setAttribute("landscapeFile", userLandFile_.getFullPathName());
+    if (route_.count() > 0) {   // the route being played or written (not whether it runs)
+        std::vector<char> buf(static_cast<size_t>(route_.count()) * 200 + 64);
+        if (route_.write(buf.data(), buf.size()) > 0) {
+            auto* r = xml.createNewChildElement("Route");
+            r->setAttribute("points", juce::String(buf.data()));
+            r->setAttribute("name", routeName_);
+            r->setAttribute("loop", routeLoop_);
+        }
+    }
     for (int k = 0; k < 2; ++k) {   // the morph's slots, as their values and their matrix
         if (slotValues_[k].size() != static_cast<size_t>(additiv::kNumParams)) continue;
         auto* s = xml.createNewChildElement("Slot");
@@ -476,6 +634,15 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
     }
     const juce::XmlElement* mod = xml->getChildByName("Mod");
     engine_.setModText(mod != nullptr ? mod->getStringAttribute("rows").toStdString() : std::string());   // no rows named: an empty matrix
+    if (const juce::XmlElement* r = xml->getChildByName("Route")) {
+        additiv::Route rt;
+        if (rt.parse(r->getStringAttribute("points").toRawUTF8())) {
+            route_ = rt;
+            routeName_ = r->getStringAttribute("name");
+            routeLoop_ = r->getBoolAttribute("loop", true);
+        }
+    }
+    mapX_ = -1.0f;   // the cursor is blended anew
     for (auto* s : xml->getChildWithTagNameIterator("Slot")) {
         const int k = s->getIntAttribute("index", -1);
         if (k < 0 || k > 1) continue;

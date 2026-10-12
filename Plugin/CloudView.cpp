@@ -156,7 +156,7 @@ void CloudView::paint(juce::Graphics& g)
         if (v.hz > 0.0f && v.gain > 0.0f) { firstTime = v.time; break; }
 
     // The landscape, and where the voices are in its loop (when the Aurora motion reads it).
-    const bool reading = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(proc_.value(static_cast<int>(ParamId::Motion)))));
+    const bool reading = additiv::motionUsesLandscape(static_cast<additiv::MotionKind>(juce::roundToInt(proc_.engine().soundValue(ParamId::Motion))));
     const bool living = !lifeCells_.empty() && life_.isValid();
     if (living) {   // the living landscape takes the panel while it lives
         g.drawImage(life_, landArea, juce::RectanglePlacement::stretchToFit);
@@ -168,7 +168,7 @@ void CloudView::paint(juce::Graphics& g)
     g.setColour(skin.edge);
     g.drawRect(landArea, 1.0f);
     g.setColour(skin.dim);
-    const int lifeMode = juce::roundToInt(proc_.value(static_cast<int>(ParamId::LifeMode)));
+    const int lifeMode = juce::roundToInt(proc_.engine().soundValue(ParamId::LifeMode));
     if (living)
         g.drawText(juce::String("Living landscape: ") + additiv::kLifeModeNames[juce::jlimit(0, additiv::kNumLifeModes - 1, lifeMode)],
                    landArea.withHeight(14.0f).translated(0.0f, -1.0f), juce::Justification::centredLeft);
@@ -184,7 +184,7 @@ void CloudView::paint(juce::Graphics& g)
         g.drawText("click: your own picture or recording", landArea.withTrimmedTop(landArea.getHeight() - 14.0f), juce::Justification::centredRight);
     }
     if (reading && !living && firstTime >= 0.0f) {
-        const float rate = proc_.value(static_cast<int>(ParamId::MotionRate));
+        const float rate = proc_.engine().soundValue(ParamId::MotionRate);
         float u = firstTime * rate / std::max(landLoop_, 0.1f);
         u -= std::floor(u);
         g.setColour(skin.onset);

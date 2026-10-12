@@ -6,6 +6,7 @@
 
 #include "AdditivData.h"
 #include "JourneyView.h"
+#include "MapView.h"
 #include "SourcesView.h"
 
 #include "additiv/Landscape.h"
@@ -207,6 +208,11 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([j] { return j->describe(); });
         tabs_.addTab("Journey", additivui::skin().panel, new ScrollPage(j, [j](int w) { return j->heightFor(w); }), true);
     }
+    {
+        auto* m = new MapPage(proc_, actions_, &live_);
+        describe_.push_back([m] { return m->describe(); });
+        tabs_.addTab("Map", additivui::skin().panel, new ScrollPage(m, [m](int w) { return m->heightFor(w); }), true);
+    }
     tabs_.setTabBarDepth(32);
     tabs_.setOutline(0);
     sendLookAndFeelChange();
@@ -325,6 +331,10 @@ void AdditivEditor::shootStep()
             if (want == additiv::preset(i).name) index = i;
         if (index < 0 && want.containsOnly("0123456789") && want.isNotEmpty()) index = want.getIntValue();
         if (index >= 0) proc_.applyPreset(index);
+        // ADDITIV_ROUTE: a route by name, walked from the start.
+        const juce::String routeName = juce::SystemStats::getEnvironmentVariable("ADDITIV_ROUTE", {});
+        for (const auto& r : proc_.routes())
+            if (routeName.isNotEmpty() && r.name == routeName && proc_.loadRoute(r)) proc_.startRoute();
         // ADDITIV_LANDSCAPE: a picture or a recording as the player's own landscape.
         const juce::String land = juce::SystemStats::getEnvironmentVariable("ADDITIV_LANDSCAPE", {});
         if (land.isNotEmpty()) {

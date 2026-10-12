@@ -3,7 +3,7 @@
  * @brief The panel, on the family's frame (Frame.h): the header (logo and name; Autoplay's play and
  *        stop, its mode and Step; scale, root, motion, landscape; the status; undo, redo, help,
  *        settings), the cloud picture (CloudView), and the pages -- Cloud, Motion, Filter, Tuning,
- *        Conductor, Space, Effects, Modulation, Journey. The family's keys (Space, Ctrl+Z/Y, F1, F11, Esc), its right-click menu
+ *        Conductor, Space, Effects, Modulation, Journey, Map. The family's keys (Space, Ctrl+Z/Y, F1, F11, Esc), its right-click menu
  *        on every control (MIDI learn, forget, default) and its window size (1280 x 860).
  */
 #pragma once

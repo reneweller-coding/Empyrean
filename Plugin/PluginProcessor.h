@@ -14,6 +14,8 @@
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
 #include "additiv/Landscape.h"
+#include "additiv/PresetMap.h"
+#include "additiv/Route.h"
 
 #include <juce_audio_utils/juce_audio_utils.h>
 
@@ -133,6 +135,51 @@ public:
     juce::File userLandscapeFile() const { return userLandFile_; }
     /** @} */
 
+    /** @name The preset map (PresetMap.h) and its routes (Route.h) @{ */
+    /** @brief The map's cursor moves there (the map switched on, a route stopped: the hand has it). @param x across @param y up */
+    void moveCursor(float x, float y);
+    /** @brief The preset nearest a place on the map. @param x across @param y up @return its index */
+    int nearestPreset(float x, float y) const;
+    /** @brief The route being played or written. @return it */
+    const additiv::Route& route() const { return route_; }
+    /** @brief Its name (a built-in's, a file's, or empty). @return the name */
+    juce::String routeName() const { return routeName_; }
+    /** @brief A route to choose: one that comes with the instrument, or a file of the player's. */
+    struct RouteEntry {
+        juce::String name;    ///< as the list shows it
+        int builtin = -1;     ///< the built-in route, -1 for a file
+        juce::File file;      ///< the file, for the player's own
+    };
+    /** @brief Where the player's routes live: Documents/Empyrean/Routes. @return the folder */
+    static juce::File routeFolder();
+    /** @brief The routes to choose from: the built-ins, then the player's files. @return them */
+    std::vector<RouteEntry> routes() const;
+    /** @brief Loads a route (it does not start). @param entry which @return false when it cannot be read */
+    bool loadRoute(const RouteEntry& entry);
+    /** @brief Starts the route from where the cursor is (the map on; a journey stops). @return false when it is empty */
+    bool startRoute();
+    /** @brief Stops the route; the cursor stays. */
+    void stopRoute() { route_.stop(); }
+    /** @brief Whether a route is being walked. @return true then */
+    bool routeRunning() const { return route_.running(); }
+    /** @brief Whether the route starts over after its last point. @return true then */
+    bool routeLoop() const { return routeLoop_; }
+    /** @brief Sets whether it loops (from the next start). @param on loop */
+    void setRouteLoop(bool on) { routeLoop_ = on; }
+    /** @brief Appends a waypoint: a preset's place (index >= 0) or a free one. @param x across @param y up @param preset the preset, -1 none */
+    void addWaypoint(float x, float y, int preset);
+    /** @brief Changes a waypoint (its times, its radius). @param i which @param w the point */
+    void setWaypoint(int i, const additiv::Waypoint& w) { route_.set(i, w); }
+    /** @brief Removes a waypoint. @param i which */
+    void removeWaypoint(int i) { route_.remove(i); }
+    /** @brief Empties the route. */
+    void clearRoute() { route_.clear(); routeName_.clear(); }
+    /** @brief Writes the route to a file (one waypoint a line). @param file where @return false when it cannot */
+    bool saveRoute(const juce::File& file);
+    /** @brief The route under way in words, empty when none is. @return the text */
+    juce::String routeStatus() const;
+    /** @} */
+
     /** @name Journeys (Journey.h) @{ */
     /** @brief A journey to choose: one that comes with the instrument, or a file of the player's. */
     struct JourneyEntry {
@@ -183,6 +230,14 @@ private:
     void pollHeadset();
     /** @brief The journey's pump: the seconds since the last tick, and the preset a step glides into. */
     void journeyTick();
+    /** @brief The map's pump: the route moves the cursor, a moved cursor is blended anew. */
+    void mapTick();
+    /**
+     * @brief Leaves the map: the knobs go to the preset nearest the cursor (so the sound stays near
+     *        where the map left it), the route stops.
+     * @param keepSound  apply that preset (false: a journey takes over at once)
+     */
+    void leaveMap(bool keepSound);
 
     frame::JamBus jam_{ kApp };                            ///< the family jam's bus
     frame::Headset headset_;                               ///< the hands from the Quest app (bridge mode)
@@ -198,6 +253,15 @@ private:
     double journeyLastTick_ = 0.0;                         ///< seconds of the last tick, 0 before the first
     additiv::Journey draft_;                               ///< the journey being written
     additiv::Landscape userLand_;                          ///< the player's own landscape, as read
+    additiv::MapBlender blender_;                          ///< the map's blend (keeps the presets it has read)
+    float mapX_ = -1.0f;                                   ///< the cursor last blended at, across (-1: none yet)
+    float mapY_ = -1.0f;                                   ///< likewise, up
+    float mapR_ = -1.0f;                                   ///< likewise, the radius
+    bool mapOnWas_ = false;                                ///< the map was on at the last tick
+    double mapLastTick_ = 0.0;                             ///< seconds of the last map tick
+    additiv::Route route_;                                 ///< the route being played or written
+    bool routeLoop_ = true;                                ///< it starts over after its last point
+    juce::String routeName_;                               ///< its name
     juce::File userLandFile_;                              ///< where it came from
     int userLandVersion_ = 0;                              ///< bumped when it changes
     mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)
