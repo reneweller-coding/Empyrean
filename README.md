@@ -72,11 +72,17 @@ offline renderer and the manual, and a portable zip.
   curve; Noctuary's Lenia, Lorenz, Roessler and Kuramoto; the Beat, the conductor's Cascade, Root Age; what the
   instrument hears (loudness, brightness, change, roughness); a reservoir of 2048 neurons on the GPU -- through a
   matrix of sixteen rows, each with a via source, and every source drawn live.
-- **3072 presets** in 48 groups (sixteen of sounds, sixteen of living systems, sixteen of sleep concerts with slow
-  modulations made for the night), levelled by their loudest second.
+- **Spectral means only an additive instrument has:** Stretch (Sethares' stretched timbres, with a tuning made from
+  them), Shift (a frequency shifter), a spectral comb whose notches travel without end, your own picture or recording
+  as a landscape, and animated pictures after the Kaleidoscope visualizer -- kaleidoscope, tunnel, endless spiral,
+  flow, feedback, rain, starfield, moire -- read by every partial.
+- **The preset map:** every preset on a square (darker to brighter, still to moving); the cursor blends the presets
+  round it, routes walk it with a travel and a hold time for each waypoint.
+- **4096 presets** in 64 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, the filter
   fades from one into the other; a morph knob between two slots; and journeys, presets in a row glided into each
-  other for a whole night (102 come with it, six of them whole nights).
+  other for a whole night (135 come with it, seven of them whole nights).
 
 ## Build
 

@@ -1,5 +1,34 @@
 # Release notes
 
+## 0.13.0 (13.10.2026, not released)
+
+Spectral means, moving pictures, the preset map, and 1024 more presets.
+
+- **Stretch** (Cloud page): every octave of the harmonics spans that many cents -- with the Timbre scale, which is
+  made from the spectrum, a stretched spectrum gets the stretched tuning in which it is consonant again.
+  **Shift** moves every partial by the same number of hertz: harmonic sounds turn metallic and bell-like.
+- **The spectral comb** (Filter page): notches evenly spaced per octave, read at every partial; Sweep moves them
+  through the spectrum without end (a phaser that rises or falls for ever), Stereo combs left and right apart. The
+  level is kept over the sweep.
+- **Your own landscape:** click the landscape beside the picture and open a picture or a recording.
+- **Animated pictures** in the living landscape, after the continuous transforms of the Kaleidoscope visualizer:
+  Kaleidoscope (your landscape folded into turning mirror wedges), Tunnel, Spiral (an endless zoom: patterns travel
+  through the spectrum without end), Flow (like ink in water), Feedback, Rain (rings on a pond), Starfield and
+  Moire, with Sides and Turn. Every partial reads the picture: across it is heard as the colour wandering, along
+  it as the cloud's shimmer and width. They cost next to nothing on the GPU.
+- **The preset map** (Map page): every preset on a square, across from darker to brighter, up from still to
+  moving. With Map on, the sound is the blend of the presets round the cursor, followed over Map Glide. Click to go
+  to a preset, drag to wander. **Routes** walk the cursor: waypoints with a travel time (how long the sound takes to
+  turn into the next), a hold time and a radius; twelve come with it, yours are saved as text. empy_render plays
+  them too (`--route`).
+- **4096 presets:** sixteen new groups of visions (Kaleidoscopes, Tunnels, Spirals, Ink & Flow, Feedback Loops,
+  Raindrops, Star Streams, Moire Veils, Stretched Worlds, Shifted Metals, Comb Phasers, Barber Poles, Painted
+  Light, Prisms, Alien Harmony, Dream Machines); 899 of the presets before use the new means where they fit (every
+  value they had stays). 135 journeys.
+- Not built: a "coherent start" (every partial starting in phase). In a cloud the hundreds of members of a harmonic
+  lie within cents of each other, so in phase they add in amplitude -- measured 19 dB louder for half a second, and
+  a plain sine rather than a pulse.
+
 ## 0.12.0 (12.10.2026, not released)
 
 Sleep concerts: 1024 more presets, sixteen groups made for the night.

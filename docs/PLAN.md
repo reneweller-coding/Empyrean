@@ -506,6 +506,44 @@ eine Atemrate zwischen Raumatem, Partial-Sync und LFO 4. 1024 Presets mit 11–1
 Via; die alten 2048 unverändert. Zwei neue Whole Nights (Lullabies, Deep Sleep): 102 Journeys. Gemessen wurden nur
 die neuen (`additiv_presets --from 2048 --to 3071`, führt in levels.json zusammen).
 
+## Phase 13: spektrale Mittel und bewegte Bilder (gebaut, 13.10.2026)
+
+Ein Text über fehlende Funktionen im Vergleich zu Razor/Alchemy/Loom; meine Einschätzung: Phase und Partial-Limit
+bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon, gebaut wurde:
+- **13a Stretch und Shift:** `partialRatio(h, B, s)` = h^s · √(1+Bh²) überall (GPU, Obertonzahl per Halbierung,
+  Leistungssumme, Timbre-Skala, Selbststimmung, Rauheit); Shift in Hz auf jeden Partial, unter 20 Hz ausgeblendet.
+  Der kohärente Anfang wurde gebaut, gemessen und verworfen: phasengleiche Mitglieder addieren sich in der Amplitude
+  (+19 dB über eine halbe Sekunde, ein Sinus statt eines Impulses; als Sinus gestartet sogar Sägezahn-Crest 4 dB).
+- **13b Spektraler Kamm:** erhöhter Kosinus über log2 f · Dichte + Phase (+ Stereo · Platz/4), Ausgleich exakt
+  1/√((1−d/2)² + d²/8); über zwei Durchläufe −26,2 gegen −26,7 dBFS.
+- **13c Eigene Landschaft:** `setUserLandscape` (lange Aufnahmen auf 8192 Zeilen gemittelt), Wahl „Your Own“, Klick
+  auf das Landschaftsfeld, Pfad im Zustand.
+- **13d Animierte Bilder:** acht Life-Modi, berechnet in `lifeStepKernel` über `pictureCell` mit den Transformationen
+  aus KaleidoscopeEnhanced (Scene2D/ChainKaleidoTunnel.frag: tKaleido, tTunnel, tSpiral, tWarp/fbm, mirrorUV), Quelle
+  die hochgeladene Landschaft (Helligkeit auf 40 dB); Feedback und Rain lesen den Puffer davor (375 Schritte/s:
+  Zoom 0,15–0,6/s, Vergessen ~3 s; Rain 0,5–30 Tropfen/s); Starfield mit Grundschimmer (sonst 2 dB unter dem Pegel).
+  GPU ≤ 0,005 ms pro Block. Regler Sides, Turn.
+- **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
+  `additiv_presets --names` misst nur die geänderten und neuen (1923).
+
+## Phase 14: die Preset-Karte und ihre Pfade (gebaut, 13.10.2026)
+
+Der Nutzer: "eine Preset-Karte wie in Noctuary ... Pfade definieren ... Zeiten für die Dauer der Morphs".
+- **Karte** (`make_map.py` → `PresetMap.inc`): quer dunkel→hell, hoch still→bewegt (Rang, hoch innerhalb von 32
+  Helligkeitsstreifen, damit keine Ecken leer bleiben; 40 Abstoßungsschritte).
+- **Mischung** (`PresetMap.cpp`): sechs nächste Nachbarn mit Gauß-Gewichten, in Lücken wächst der Radius (Noctuary);
+  `MapBlender` mischt sie nacheinander mit `blendMorph` (gewichtetes Mittel), Nachbarn unter 2 % bleiben weg. Die
+  Engine bekommt das Ziel als dritten Slot und folgt ihm blockweise (`approachMorph`, Map Glide), ganze Zahlen und
+  Umschalter sofort (das Mischen hat ihre Mengen schon durch null geführt).
+- **Pfade** (`Route.h` aus Noctuary, gleiches Textformat): Wegpunkte (Preset oder x,y) mit Reise-, Haltezeit und
+  Radius; zwölf mitgelieferte aus `make_map.py`, eigene in Documents/Empyrean/Routes. Der Processor läuft sie im
+  30-Hz-Takt ab (Route Speed). `empy_render --route`.
+- **Seite Map:** Karte (Klick, Ziehen, Shift-Klick für Wegpunkte, Nachbarn markiert, Name unter der Maus) und
+  Pfad-Editor (m:ss). Preset-Wahl bei eingeschalteter Karte fährt den Cursor hin, Karte aus lässt die Regler beim
+  nächsten Preset, eine Journey verlässt die Karte.
+
+**Gemessen [M]:** Selbsttest 51/51 (47 Stretch/Shift, 48 Kamm, 49 eigene Landschaft, 50 Bilder, 51 Karte).
+
 ## Phasen (Vorschlag)
 
 0. Messprogramm und Hörvergleich: gebaut, 20.000 entschieden. 0b. Hüllkurven pro Partial: gebaut, vom Nutzer gut
