@@ -325,6 +325,10 @@ void AdditivEditor::shootStep()
     const int start = 15 * std::max(3, juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_AFTER", "3").getIntValue());
     // ADDITIV_PRESET (a name or a number): the preset the pictures show, loaded before the engine is heard.
     if (shotPrefix_.isNotEmpty() && shotTick_ == 0) {
+        // From the defaults, whatever the standalone's last session left (the map on, a morph, a
+        // radius): the pictures are the same every time. What it left is given back before quitting.
+        proc_.getStateInformation(shotSaved_);
+        for (int i = 0; i < additiv::kNumParams; ++i) proc_.resetToDefault(i);
         const juce::String want = juce::SystemStats::getEnvironmentVariable("ADDITIV_PRESET", {});
         int index = -1;
         for (int i = 0; i < additiv::numPresets() && index < 0 && want.isNotEmpty(); ++i)
@@ -368,6 +372,7 @@ void AdditivEditor::shootStep()
                 setSize(getWidth(), std::clamp(getHeight() - sp->getMaximumVisibleHeight() + sp->pageHeight() + 16, 860, 3100));
     } else {
         shotPrefix_ = {};
+        if (shotSaved_.getSize() > 0) proc_.setStateInformation(shotSaved_.getData(), static_cast<int>(shotSaved_.getSize()));
         if (standalone()) juce::JUCEApplicationBase::quit();
     }
 }

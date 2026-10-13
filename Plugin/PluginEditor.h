@@ -106,6 +106,7 @@ private:
     int headerBottom_ = 0;                                     ///< where the header ends, for the backdrop
     juce::String shotPrefix_;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png (ADDITIV_PRESET first), then the standalone quits
     int shotTick_ = 0;                                         ///< timer ticks since the screenshots were asked for
+    juce::MemoryBlock shotSaved_;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
     int logTick_ = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
     /** @brief One step of the screenshot mode (ADDITIV_SHOT), from the timer. */
     void shootStep();
