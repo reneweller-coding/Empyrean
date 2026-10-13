@@ -355,6 +355,7 @@ bool AdditivProcessor::startRoute()
     journeyPlayer_.stop();
     setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
     setValue(static_cast<int>(ParamId::MapActive), 1.0f);
+    setValue(static_cast<int>(ParamId::BrainOn), 1.0f);   // a route is listened to: the conductor plays (the map keeps it so)
     route_.start(value(static_cast<int>(ParamId::MapX)), value(static_cast<int>(ParamId::MapY)), value(static_cast<int>(ParamId::MapRadius)), routeLoop_);
     return true;
 }
@@ -458,6 +459,9 @@ void AdditivProcessor::journeyTick()
     if (!journeyPlayer_.advance(dt, st, glide)) return;
     const int index = additiv::findPreset(st.preset.c_str());
     if (index >= 0) applyPreset(index, std::max(glide, 0.5));   // a name the bank no longer has: nothing changes until the next step
+    // A journey is listened to, not played: the conductor plays on through a preset made for the
+    // hands (it would stop for the whole of that step).
+    if (index >= 0) setValue(static_cast<int>(ParamId::BrainOn), 1.0f);
 }
 
 juce::String AdditivProcessor::journeyStatus() const

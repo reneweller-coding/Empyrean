@@ -99,8 +99,8 @@ def features(table, params):
         out["motion_depth"] = 0.0
     if get("life_mode") == 0:
         out["life_depth"] = 0.0
-    if get("brain_on") < 0.5:
-        out["auto_rate"] = 1.0   # no conductor: as still as the slowest
+    # A preset made for the hands is played by the conductor in a journey (the instrument keeps it
+    # playing), at its own pace: it counts as it is set, not as the stillest.
     return out
 
 

@@ -271,7 +271,10 @@ int main(int argc, char** argv)
         player.start(journey, journeySeed);
         JourneyStep st;
         double glide = 0.0;
-        if (player.advance(0.0, st, glide) && findPreset(st.preset.c_str()) >= 0) e.loadPreset(findPreset(st.preset.c_str()));   // the first at once
+        if (player.advance(0.0, st, glide) && findPreset(st.preset.c_str()) >= 0) {   // the first at once
+            e.loadPreset(findPreset(st.preset.c_str()));
+            e.setParam(ParamId::BrainOn, 1.0f);   // a journey keeps the conductor playing (as the instrument does)
+        }
         std::printf("journey %s: %zu steps, a pass about %s\n", journey.name.c_str(), journey.steps.size(), Journey::timeText(journey.meanLength()).c_str());
     }
     Route route;
@@ -291,6 +294,7 @@ int main(int argc, char** argv)
         // Starting on the first waypoint's preset, the map on.
         const Waypoint& w = route.point(0);
         if (w.preset >= 0) e.loadPreset(w.preset);
+        e.setParam(ParamId::BrainOn, 1.0f);   // a route keeps the conductor playing (as the instrument does)
         route.start(w.x, w.y, w.radius, true);
         e.setParam(ParamId::MapActive, 1.0f);
         std::printf("route %s: %d waypoints\n", routeName.c_str(), route.count());
@@ -357,7 +361,7 @@ int main(int argc, char** argv)
             double glide = 0.0;
             if (player.advance(n / c.sampleRate, st, glide)) {
                 const int index = findPreset(st.preset.c_str());
-                if (index >= 0) e.loadPreset(index, std::max(glide, 0.5));
+                if (index >= 0) { e.loadPreset(index, std::max(glide, 0.5)); e.setParam(ParamId::BrainOn, 1.0f); }
                 std::printf("  %5.0f s: step %d, %s, glide %.0f s\n", done / c.sampleRate, player.step() + 1, st.preset.c_str(), glide);
             }
         }

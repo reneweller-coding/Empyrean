@@ -468,6 +468,9 @@ void Engine::updateSound()
     for (int i = 0; i < kNumParams; ++i)   // the listener's and the player's own stay as they are set
         if (keptByPresets(static_cast<ParamId>(i)) || static_cast<ParamId>(i) == ParamId::AutoStep)
             target_.values[i] = param(static_cast<ParamId>(i));
+    // On the map the conductor plays or rests as the player set it: a preset made for the hands among
+    // the neighbours would otherwise stop it where its weight passes the middle.
+    if (map) target_.values[static_cast<size_t>(ParamId::BrainOn)] = param(ParamId::BrainOn);
     // A glide asked for, or the A/B morph switched or re-chosen: from what played the last block.
     float len = -1.0f;
     const int asked = morphAsked_.load(std::memory_order_acquire);
