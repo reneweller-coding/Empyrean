@@ -153,7 +153,7 @@ struct CloudVoice {
     float filterMix = 1.0f;       ///< 0 .. 1: the filter's gain raised to this (a morph fades one filter out and another in)
     float stretch = 1.0f;         ///< harmonic h at h^stretch (partialRatio)
     float shift = 0.0f;           ///< Hz added to every partial (below 20 Hz they fade out)
-    float pad4 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float turbulence = 0.0f;      ///< the energy cascade's drive for this note, per second (0: none; Turbulence)
     float pad2 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
     float pad3 = 0.0f;            ///< likewise
 };
@@ -310,6 +310,26 @@ struct SpectralComb {
     float pad2 = 0.0f;      ///< likewise
 };
 static_assert(sizeof(SpectralComb) % 16 == 0, "SpectralComb rides in the block header");
+
+/**
+ * @brief Turbulence: the energy cascade of a struck gong or tam-tam, along every voice's harmonics.
+ *
+ * In a plate or a shell the modes are not alone: struck hard they hand their energy on to modes
+ * above them, the more the louder they are -- the bloom of a tam-tam a second after the strike
+ * (Bilbao's nonlinear plates). Here every harmonic of a voice has a power that starts where its
+ * spectrum puts it; each block it hands drive p^2 of it on -- the drive by the cube of the note's and the instrument's loudness -- (seven tenths to the next harmonic,
+ * three to its octave), so only the loud ones cascade, and it settles back to the spectrum's own
+ * shape over `settle` seconds, the higher harmonics faster. The power moves, it is not made: a soft
+ * chord stays pure, a dense loud swell breaks slowly into a shimmering glow above itself without
+ * growing louder.
+ */
+struct Turbulence {
+    float on = 0.0f;        ///< 1 when any voice cascades (else nothing is computed)
+    float settle = 6.0f;    ///< s: how long the harmonics take to settle back
+    float pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
+    float pad1 = 0.0f;      ///< likewise
+};
+static_assert(sizeof(Turbulence) % 16 == 0, "Turbulence rides in the block header");
 
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeMode : std::int32_t {
@@ -602,6 +622,8 @@ public:
 
     /** @brief The host's copy of the spectral comb, edited between wait() and the next launch(). @return the settings */
     SpectralComb& comb();
+    /** @brief The energy cascade's settings for the next block (the voices carry their drives). @return them */
+    Turbulence& turbulence();
 
     /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
     void reservoirOut(float* out) const;

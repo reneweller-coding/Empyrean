@@ -1974,6 +1974,58 @@ int main()
                   atNotes, rest, moved, same ? "the same" : "DIFFERENT", fluidDb, bEarly, bLate, islesDb, plainDb));
     }
 
+    // 55. Turbulence (Phase 16c): a loud chord's energy climbs its harmonics -- its partials' centroid
+    //     (power-weighted, from the picture's snapshot) rises -- without the chord growing louder; a soft
+    //     chord's climbs far less; turned off, the spectrum settles back.
+    {
+        // The centroid in octaves above 20 Hz, averaged over the snapshots of a stretch, and the level.
+        struct Heard { double centroid = 0.0, db = 0.0, back = 0.0; };
+        auto listen = [&](float turbulence, float velocity, bool thenOff, Heard& h) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.3f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Tilt, 1.2f);
+            e.setParam(ParamId::Turbulence, turbulence);
+            e.setParam(ParamId::TurbulenceTime, 4.0f);
+            if (!openOffline(e, false, 175)) return false;
+            for (int note : { 48, 55, 60, 64 }) e.noteOn(note, velocity, 0);
+            std::vector<float> L(128), R(128), dots, lr;
+            int per = 0;
+            double sum = 0.0, back = 0.0;
+            int count = 0, backCount = 0;
+            for (int k = 0; k < 375 * 30; ++k) {   // 30 s; off at 10 s when asked
+                if (thenOff && k == 375 * 10) e.setParam(ParamId::Turbulence, 0.0f);
+                e.process(L.data(), R.data(), 128);
+                if (k >= 375 * 8 && k < 375 * 10)
+                    for (int i = 0; i < 128; ++i) { lr.push_back(L[static_cast<size_t>(i)]); lr.push_back(R[static_cast<size_t>(i)]); }
+                if (!e.partialSnapshot(dots, per)) continue;
+                double w = 0.0, m = 0.0;
+                for (size_t i = 0; i + 1 < dots.size(); i += 2)
+                    if (dots[i] > 20.0f && dots[i + 1] > 0.0f) {
+                        const double p = static_cast<double>(dots[i + 1]) * dots[i + 1];
+                        w += p;
+                        m += p * std::log2(dots[i] / 20.0);
+                    }
+                if (w <= 0.0) continue;
+                if (k >= 375 * 8 && k < 375 * 10) { sum += m / w; ++count; }
+                if (k >= 375 * 28) { back += m / w; ++backCount; }
+            }
+            h.centroid = count > 0 ? sum / count : 0.0;
+            h.back = backCount > 0 ? back / backCount : 0.0;
+            h.db = rmsDb(lr, 0, lr.size() / 2);
+            return count > 0;
+        };
+        Heard plain, loud, soft, softPlain, settled;
+        const bool ran = listen(0.0f, 0.9f, false, plain) && listen(1.0f, 0.9f, false, loud) && listen(1.0f, 0.15f, false, soft)
+                      && listen(0.0f, 0.15f, false, softPlain) && listen(1.0f, 0.9f, true, settled);
+        const double rise = loud.centroid - plain.centroid, softRise = soft.centroid - softPlain.centroid;
+        check(ran && rise > 0.3 && std::fabs(loud.db - plain.db) < 1.5 && softRise < 0.6 * rise && std::fabs(settled.back - plain.centroid) < 0.1,
+              "turbulence: a loud chord's energy climbs, a soft one's hardly",
+              fmt("centroid %.2f octaves higher loud (%.1f against %.1f dBFS), %.2f soft; turned off, %.2f octaves from the plain chord after 20 s",
+                  rise, loud.db, plain.db, softRise, settled.back - plain.centroid));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

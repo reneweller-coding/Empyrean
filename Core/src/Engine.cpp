@@ -1199,6 +1199,10 @@ void Engine::renderBlock()
         cv.inharmonic = blk_.inharmonicB;
         cv.stretch = blk_.stretch;
         cv.shift = blk_.shift;
+        // Turbulence: the cascade's drive, by the cube of the note's strength (with how loud the
+        // instrument is, below): a soft chord stays pure.
+        const float strength = 0.4f + 0.6f * v.velocity;
+        cv.turbulence = turbDrive_ * strength * strength * strength;
         cv.presenceDb = blk_.presence;
         cv.lowCut = blk_.padLowCut;
         cv.filterModel = static_cast<int>(model);
@@ -1489,6 +1493,19 @@ void Engine::renderBlock()
     }
 
     stepRipple(dtf);
+
+    // Turbulence: drive 7 T^2 a second at full strength, by the cube of how loud the instrument sounds; the
+    // cascade keeps running for twice its settling time after it is turned off, so the harmonics
+    // come back to rest before it stops.
+    {
+        const float T = cur(ParamId::Turbulence);
+        Turbulence& tb = cloud_.turbulence();
+        tb.settle = cur(ParamId::TurbulenceTime);
+        const float loud = 0.25f + 0.75f * mods_.value(ModSource::Loudness);
+        turbDrive_ = 7.0f * T * T * loud * loud * loud;
+        turbAfter_ = T > 0.0f ? 2.0f * tb.settle : std::max(0.0f, turbAfter_ - dtf);
+        tb.on = (T > 0.0f || turbAfter_ > 0.0f) ? 1.0f : 0.0f;
+    }
 
     // The spectral comb: its phase runs on at the sweep (kept within a notch), and the make-up is
     // exact -- the raised cosine's mean square is (1 - d/2)^2 + d^2/8 over the notches.

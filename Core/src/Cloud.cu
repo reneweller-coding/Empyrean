@@ -75,6 +75,7 @@ struct BlockHeader {
     Reservoir reservoir;   ///< the reservoir for this block
     Melt melt;             ///< the melt for this block
     SpectralComb comb;     ///< the spectral comb for this block
+    Turbulence turb;       ///< the energy cascade for this block
     std::int32_t lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t lpad0;        ///< keeps the header 16-byte aligned
     std::int32_t lpad1;        ///< likewise
@@ -1110,6 +1111,48 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
 }
 
 /**
+ * @brief The energy cascade (Turbulence, Cloud.h), one thread a harmonic of a voice: its power p
+ *        (against harmonic 1's at rest) loses drive p^2 and gains seven tenths of what the one below
+ *        lost and three tenths of what its half lost, and settles back to the spectrum's own over
+ *        settle / (1 + h / 8) seconds. Kept as the power against the spectrum's at rest, q = p / p0,
+ *        read by the update kernel as sqrt(q) on the harmonic's amplitude. Reads one buffer, writes
+ *        the other (by the block's parity); a new note starts at rest.
+ * @param hdr     the header
+ * @param voices  the voices
+ * @param pcap    partials per voice in the tables (room for every harmonic)
+ * @param qa      per voice and harmonic its q, buffer A
+ * @param qb      buffer B
+ */
+__global__ void cascadeKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, float* qa, float* qb)
+{
+    if (hdr->turb.on <= 0.0f) return;
+    const int gid = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    const int v = gid / pcap, k = gid - v * pcap;   // harmonic k + 1
+    if (v >= hdr->voices) return;
+    const CloudVoice& cv = voices[v];
+    const int H = cv.harmonics;
+    if (!cv.active || k >= H) return;
+    const bool odd = (hdr->blockIndex & 1U) != 0;
+    const float* src = (odd ? qb : qa) + static_cast<size_t>(v) * pcap;
+    float* dst = (odd ? qa : qb) + static_cast<size_t>(v) * pcap;
+    // Kept as q - 1, so a table cleared to nothing is at rest.
+    if (cv.restart) { dst[k] = 0.0f; return; }
+    const float s1 = fmaxf(harmonicShape(1, cv.tilt, cv.oddEven, cv.brightness), 1.0e-9f);
+    auto rest = [&](int h) { const float s = harmonicShape(h, cv.tilt, cv.oddEven, cv.brightness) / s1; return fmaxf(s * s, 1.0e-12f); };
+    auto power = [&](int h) { return (1.0f + src[h - 1]) * rest(h); };
+    const int h = k + 1;
+    const float drive = cv.turbulence * cv.gain * cv.gain;
+    const float dt = static_cast<float>(hdr->n) / hdr->sampleRate;
+    const float p0 = rest(h), p = power(h);
+    float in = 0.0f;
+    if (h > 1) { const float pb = power(h - 1); in += 0.7f * drive * pb * pb; }
+    if ((h & 1) == 0) { const float ph = power(h / 2); in += 0.3f * drive * ph * ph; }
+    const float settle = fminf(1.0f, dt * (1.0f + static_cast<float>(h) * 0.125f) / fmaxf(hdr->turb.settle, 0.1f));
+    const float next = fmaxf(p + dt * (in - drive * p * p) + (p0 - p) * settle, 0.0f);
+    dst[k] = fminf(next / p0, 1000.0f) - 1.0f;
+}
+
+/**
  * @brief The update kernel: every partial's frequency glide, amplitude ramps and start phase for this block.
  * @param hdr     the block header (device copy)
  * @param voices  the voices (device copy)
@@ -1131,11 +1174,13 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param plane   the planes' distance
  * @param flockA  the flock's state, buffer A (even blocks read it)
  * @param flockB  buffer B
+ * @param qa      the energy cascade, buffer A (cascadeKernel)
+ * @param qb      buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
                              float2* snap, const float2* lifeA, const float2* lifeB, float* theta, float* sx, const float2* order,
-                             size_t plane, float2* flockA, float2* flockB)
+                             size_t plane, float2* flockA, float2* flockB, const float* qa, const float* qb)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1195,6 +1240,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
                                                  + 0.3f * slowSine(cv.shimmerRate * (1.3f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
             amp0 = cv.scale * harmonicShape(h, cv.tilt, cv.oddEven, cv.brightness);
+            if (hdr->turb.on > 0.0f && !cv.restart) {   // the cascade's power against the spectrum's (this block's, cascadeKernel)
+                const float* q = ((hdr->blockIndex & 1U) ? qa : qb) + static_cast<size_t>(v) * pcap;
+                amp0 *= sqrtf(fmaxf(1.0f + q[h - 1], 0.0f));
+            }
         } else {
             // Air (Noctuary's band-passed noise around a multiple of the fundamental): a wide cloud
             // whose partials flicker in pitch and level at audio-near rates -- dense random sines in
@@ -2351,6 +2400,9 @@ struct CloudEngine::Impl {
     Reservoir reservoir;              ///< the host's copy of the reservoir's settings
     Melt melt;                        ///< the host's copy of the melt's settings
     SpectralComb comb;                ///< the host's copy of the spectral comb
+    Turbulence turb;                  ///< the host's copy of the energy cascade's settings
+    float* dCascadeA = nullptr;       ///< device: per voice and harmonic its power against the spectrum's, buffer A (even blocks read it)
+    float* dCascadeB = nullptr;       ///< device: buffer B
     float* dMeltHist = nullptr;       ///< device: the melt's input history, two rings of kMeltN
     float* dMeltAcc = nullptr;        ///< device: its overlap, two rings of kMeltN
     float* dMeltEnergy = nullptr;     ///< device: its held energy, per ear and band
@@ -2423,7 +2475,8 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dResW), static_cast<void*>(dResIn), static_cast<void*>(dResOut), static_cast<void*>(dResX),
                          static_cast<void*>(dMeltHist), static_cast<void*>(dMeltAcc), static_cast<void*>(dMeltEnergy),
                          static_cast<void*>(dMeltOmega), static_cast<void*>(dMeltPhase), static_cast<void*>(dMeltHeard), static_cast<void*>(dMeltState),
-                         static_cast<void*>(dSyncX), static_cast<void*>(dFluidA), static_cast<void*>(dFluidB), static_cast<void*>(dIsles) })
+                         static_cast<void*>(dSyncX), static_cast<void*>(dFluidA), static_cast<void*>(dFluidB), static_cast<void*>(dIsles),
+                         static_cast<void*>(dCascadeA), static_cast<void*>(dCascadeB) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -2436,7 +2489,7 @@ struct CloudEngine::Impl {
         dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
         dResW = nullptr; dResIn = nullptr; dResOut = nullptr; dResX = nullptr;
         dMeltHist = dMeltAcc = dMeltEnergy = dMeltOmega = dMeltPhase = dMeltHeard = nullptr; dMeltState = nullptr;
-        dSyncX = nullptr; dFluidA = dFluidB = nullptr; dIsles = nullptr;
+        dSyncX = nullptr; dFluidA = dFluidB = nullptr; dIsles = nullptr; dCascadeA = dCascadeB = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -2563,6 +2616,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dFluidA, sizeof(float) * 9 * kLifeCells), "cudaMalloc fluid", error)
                 && ok(cudaMalloc(&m.dFluidB, sizeof(float) * 9 * kLifeCells), "cudaMalloc fluid", error)
                 && ok(cudaMalloc(&m.dIsles, sizeof(float) * kIsleW * kIsleH), "cudaMalloc islands", error)
+                && ok(cudaMalloc(&m.dCascadeA, sizeof(float) * partialsTotal), "cudaMalloc cascade", error)
+                && ok(cudaMalloc(&m.dCascadeB, sizeof(float) * partialsTotal), "cudaMalloc cascade", error)
                 && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 12), "cudaMalloc life stats", error)
                 && ok(cudaMalloc(&m.dResW, sizeof(float) * kReservoirN * kReservoirN), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dResIn, sizeof(float) * kReservoirN * kReservoirInputs), "cudaMalloc reservoir", error)
@@ -2607,6 +2662,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dFluidA, 0, sizeof(float) * 9 * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dFluidB, 0, sizeof(float) * 9 * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dIsles, 0, sizeof(float) * kIsleW * kIsleH, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dCascadeA, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dCascadeB, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 12, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
@@ -2663,11 +2720,12 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             islandsKernel<<<1, 1024, 0, m.stream>>>(hdr, m.dIsles, m.dLifeA, m.dLifeB);
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
+            cascadeKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dCascadeA, m.dCascadeB);
             syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dSyncTheta, m.dSyncX, m.dSyncOrder, partialsTotal);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta,
-                m.dSyncX, m.dSyncOrder, partialsTotal, m.dFlockA, m.dFlockB);
+                m.dSyncX, m.dSyncOrder, partialsTotal, m.dFlockA, m.dFlockB, m.dCascadeA, m.dCascadeB);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
@@ -2747,6 +2805,8 @@ Reservoir& CloudEngine::reservoir() { return impl_->reservoir; }
 
 Melt& CloudEngine::melt() { return impl_->melt; }
 
+Turbulence& CloudEngine::turbulence() { return impl_->turb; }
+
 SpectralComb& CloudEngine::comb() { return impl_->comb; }
 
 void CloudEngine::reservoirOut(float* out) const
@@ -2806,6 +2866,7 @@ void CloudEngine::launch()
     hdr->reservoir = m.reservoir;
     hdr->melt = m.melt;
     hdr->comb = m.comb;
+    hdr->turb = m.turb;
     m.melt.clear = 0;   // asked for once
     hdr->life = m.life;
     hdr->life.steps = m.life.mode == LifeMode::Off ? 0 : std::clamp(m.life.steps, 0, 2);

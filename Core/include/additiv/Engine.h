@@ -609,6 +609,8 @@ private:
     float lifeAcc_ = 0.0f;                             ///< its steps owed, carried between blocks
     double lifeSeconds_ = 0.0;                         ///< seconds the field has lived (the Fluid's jets lean by it)
     double islandDrift_ = 0.0;                         ///< the Islands' drift across, cells of their grid
+    float turbDrive_ = 0.0f;                           ///< Turbulence: the cascade's drive this block, per second, before each note's strength
+    float turbAfter_ = 0.0f;                           ///< s the cascade keeps settling after Turbulence went to nothing
     float lifeQuiet_ = 0.0f;                           ///< seconds since it was last seeded (it is not seeded again sooner than 2 s)
     float lifeMakeup_ = 1.0f;                          ///< the make-up as it glides (half a second), so a seeding does not jump
     /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */
