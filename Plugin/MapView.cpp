@@ -415,18 +415,33 @@ MapPage::MapPage(AdditivProcessor& proc, const frame::ControlActions& actions, f
     addAndMakeVisible(route_);
 }
 
-/** @brief The map's side at a page width: a square, at most 600 pixels. @param w the page's width @return pixels */
+/** @brief The smallest side the map is given before the page scrolls. */
+constexpr int kMapMin = 360;
+
+/** @brief The map's largest side at a page width: a square, at most 600 pixels. @param w the page's width @return pixels */
 static int mapSide(int w) { return std::min(600, (w - 30) * 55 / 100); }
 
-int MapPage::heightFor(int w) const { return params_.heightFor(w) + std::max(mapSide(w), route_.idealHeight()) + 10; }
+/** @brief The right column's width beside a map. @param w the page's width @param side the map's side @return pixels */
+static int rightWidth(int w, int side) { return w - 20 - side; }
+
+int MapPage::heightFor(int w) const
+{
+    // Only the least it needs: the viewport makes the page as high as the window shows, and the
+    // map takes that height (resized).
+    const int right = params_.heightFor(rightWidth(w, mapSide(w))) + route_.idealHeight();
+    return std::max(10 + std::min(kMapMin, mapSide(w)), right) + 10;
+}
 
 void MapPage::resized()
 {
-    const int top = params_.heightFor(getWidth());
-    params_.setBounds(0, 0, getWidth(), top);
-    const int side = mapSide(getWidth());
-    map_.setBounds(10, top, side, side);
-    route_.setBounds(20 + side, top, getWidth() - 30 - side, std::max(route_.idealHeight(), side));
+    // The map from the top and as large as the page's height allows, so that the whole square is
+    // seen without scrolling; the knobs and the routes beside it.
+    const int side = juce::jlimit(std::min(kMapMin, mapSide(getWidth())), mapSide(getWidth()), getHeight() - 20);
+    map_.setBounds(10, 10, side, side);
+    const int x = 10 + side, w = rightWidth(getWidth(), side);
+    const int top = params_.heightFor(w);
+    params_.setBounds(x, 0, w, top);
+    route_.setBounds(x + 10, top, w - 20, std::max(route_.idealHeight(), getHeight() - 10 - top));
 }
 
 juce::String MapPage::describe() const

@@ -105,7 +105,7 @@ private:
     int tick_ = 0;                                             ///< timer ticks
 };
 
-/** @brief The Map page: its knobs above, the map and the route editor below. */
+/** @brief The Map page: the map on the left, its knobs and the route editor beside it. */
 class MapPage final : public juce::Component {
 public:
     /**
@@ -117,7 +117,7 @@ public:
     MapPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
     int heightFor(int w) const;
-    /** @brief The knobs above; the map left, the routes right. */
+    /** @brief The map left from the top, the knobs and the routes right. */
     void resized() override;
     /** @brief The page in words. @return the text */
     juce::String describe() const;
