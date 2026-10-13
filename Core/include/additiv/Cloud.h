@@ -288,6 +288,9 @@ constexpr int kSnapStride = 8;       ///< every eighth partial of every voice is
 constexpr int kLifeW = 256;          ///< the living field's width, cells (across the spectrum)
 constexpr int kLifeH = 128;          ///< its height, cells (across a cloud's members)
 constexpr int kLifeRadius = 10;      ///< Lenia's ring kernel radius, cells
+constexpr int kLifeJets = 16;        ///< the Fluid's jets: two for each of the eight loudest notes
+constexpr int kIsleW = 64;           ///< Islands: its grid across (each cell four of the field's)
+constexpr int kIsleH = 32;           ///< Islands: its grid along
 
 /**
  * @brief The spectral comb: notches evenly spaced per octave, read at every partial's frequency
@@ -365,8 +368,19 @@ struct LifeField {
     float seconds = 0.0f;            ///< pictures: real seconds, for the centre's slow wander
     float drops = 0.0f;              ///< Rain: the chance a cell is struck this block
     float turnStep = 0.0f;           ///< pictures: the turn this block, radians (Feedback turns by it)
+    float fade = 0.999f;             ///< Fluid: the share of the ink kept each step
+    float tau = 0.53f;               ///< Fluid: the lattice's relaxation time (its viscosity: (tau - 1/2) / 3)
+    float push = 0.004f;             ///< Fluid: the jets' force, lattice units at full strength
+    int   substeps = 1;              ///< Islands: steps of the separation this block
+    float mean = 0.0f;               ///< Islands: the field's mean (0: a labyrinth; below: islands of the minority)
+    float eps = 0.001f;              ///< Islands: Oono and Puri's long-range term (more: smaller domains, which stop growing)
+    float drift = 0.0f;              ///< Islands: how far the field has drifted across, cells of its grid
     float pad1 = 0.0f;               ///< keeps the table 16-byte aligned
     float pad2 = 0.0f;               ///< likewise
+    float pad3 = 0.0f;               ///< likewise
+    float jetX[kLifeJets] = {};      ///< Fluid: where each jet blows, cells across (the notes' frequencies)
+    float jetAmt[kLifeJets] = {};    ///< Fluid: how strongly, 0 .. 1 (0: none)
+    float jetSway[kLifeJets] = {};   ///< Fluid: its lean, sideways share of its push
 };
 static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 

@@ -681,7 +681,7 @@ __global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
 __global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, float2* b, const float* land)
 {
     const LifeField& L = hdr->life;
-    if (L.mode == LifeMode::Off || node >= L.steps) return;
+    if (L.mode == LifeMode::Off || L.mode == LifeMode::Fluid || L.mode == LifeMode::Islands || node >= L.steps) return;   // those two: their own kernels
     const int i = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
     if (i >= kLifeCells) return;
     const bool fromB = ((hdr->lifeParity + node) & 1) != 0;
@@ -711,6 +711,183 @@ __global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, floa
         const float uvv = c.x * c.y * c.y;
         dst[i] = make_float2(fminf(fmaxf(c.x + 0.2097f * lapU - uvv + L.feed * (1.0f - c.x), 0.0f), 1.0f),
                              fminf(fmaxf(c.y + 0.105f * lapV + uvv - (L.feed + L.kill) * c.y, 0.0f), 1.0f));
+    }
+}
+
+// ---- The Fluid: a lattice Boltzmann fluid (D2Q9, BGK) on the field's torus, with ink ----
+
+__constant__ int cLbmX[9] = { 0, 1, 0, -1, 0, 1, -1, -1, 1 };                    ///< the lattice's directions, across
+__constant__ int cLbmY[9] = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };                    ///< and along
+__constant__ float cLbmW[9] = { 4.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f,
+                                1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f };   ///< their weights
+
+/** @brief One direction's equilibrium. @param k the direction @param rho the density @param ux the velocity across @param uy along @return f_eq */
+__device__ __forceinline__ float lbmEq(int k, float rho, float ux, float uy)
+{
+    const float eu = static_cast<float>(cLbmX[k]) * ux + static_cast<float>(cLbmY[k]) * uy;
+    return cLbmW[k] * rho * (1.0f + 3.0f * eu + 4.5f * eu * eu - 1.5f * (ux * ux + uy * uy));
+}
+
+/** @brief The shortest way round the torus. @param d a difference @param n the size @return it within -n/2 .. n/2 */
+__device__ __forceinline__ float torusDelta(float d, float n)
+{
+    return d - n * rintf(d / n);
+}
+
+/**
+ * @brief Seeds the Fluid when asked: at rest but for six eddies of either turn (from the salt).
+ * @param hdr  the header
+ * @param fa   the lattice, buffer A
+ * @param fb   buffer B
+ */
+__global__ void fluidSeedKernel(const BlockHeader* hdr, float* fa, float* fb)
+{
+    const LifeField& L = hdr->life;
+    if (!L.reseed || L.mode != LifeMode::Fluid) return;
+    const int i = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= kLifeCells) return;
+    float* dst = (hdr->lifeParity & 1) ? fb : fa;
+    const int x = i & (kLifeW - 1), y = i >> 8;
+    const std::uint32_t salt = static_cast<std::uint32_t>(L.salt) * 0x9E3779B9U;
+    float ux = 0.0f, uy = 0.0f;
+    for (int k = 0; k < 6; ++k) {
+        const std::uint32_t h = hash32(salt + 104729U * static_cast<std::uint32_t>(k + 1));
+        const float cx = static_cast<float>(h & (kLifeW - 1)), cy = static_cast<float>((h >> 8) & (kLifeH - 1));
+        const float turn = (h >> 20) & 1U ? 1.0f : -1.0f;
+        const float dx = torusDelta(static_cast<float>(x) - cx, static_cast<float>(kLifeW));
+        const float dy = torusDelta(static_cast<float>(y) - cy, static_cast<float>(kLifeH));
+        const float g = 0.006f * turn * __expf(-(dx * dx + dy * dy) * (1.0f / 128.0f));   // an eddy eight cells across
+        ux -= g * dy;
+        uy += g * dx;
+    }
+    for (int k = 0; k < 9; ++k) dst[static_cast<size_t>(k) * kLifeCells + i] = lbmEq(k, 1.0f, ux, uy);
+}
+
+/**
+ * @brief One step of the Fluid, cell by cell: the lattice streamed (pulled from the neighbours),
+ *        pushed by the jets (the velocity shifted by tau F / rho), relaxed to its equilibrium; the
+ *        ink carried back along the flow, the jets' ink added, a little of it fading. Reads one
+ *        buffer, writes the other, as the field's steps do.
+ * @param hdr    the header
+ * @param node   this step's number in the block, 0 or 1
+ * @param fa     the lattice, buffer A
+ * @param fb     buffer B
+ * @param lifeA  the field (the ink), buffer A
+ * @param lifeB  buffer B
+ */
+__global__ void fluidStepKernel(const BlockHeader* hdr, int node, float* fa, float* fb, float2* lifeA, float2* lifeB)
+{
+    const LifeField& L = hdr->life;
+    if (L.mode != LifeMode::Fluid || node >= L.steps) return;
+    const int i = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
+    if (i >= kLifeCells) return;
+    const bool fromB = ((hdr->lifeParity + node) & 1) != 0;
+    const float* src = fromB ? fb : fa;
+    float* dst = fromB ? fa : fb;
+    const float2* ink = fromB ? lifeB : lifeA;
+    float2* inkOut = fromB ? lifeA : lifeB;
+    const int x = i & (kLifeW - 1), y = i >> 8;
+    float f[9], rho = 0.0f, ux = 0.0f, uy = 0.0f;
+    for (int k = 0; k < 9; ++k) {
+        const int sx = (x - cLbmX[k]) & (kLifeW - 1), sy = (y - cLbmY[k]) & (kLifeH - 1);
+        f[k] = src[static_cast<size_t>(k) * kLifeCells + sy * kLifeW + sx];
+        rho += f[k];
+        ux += f[k] * static_cast<float>(cLbmX[k]);
+        uy += f[k] * static_cast<float>(cLbmY[k]);
+    }
+    if (!(rho > 0.05f && rho < 20.0f)) {   // a lattice that left the world: at rest again
+        rho = 1.0f;
+        ux = uy = 0.0f;
+        for (int k = 0; k < 9; ++k) f[k] = lbmEq(k, 1.0f, 0.0f, 0.0f);
+    } else {
+        ux /= rho;
+        uy /= rho;
+    }
+    // The jets: a little above the bottom, each where its note lies across, blowing up with its lean.
+    float fx = 0.0f, fy = 0.0f, inkIn = 0.0f;
+    for (int j = 0; j < kLifeJets; ++j) {
+        const float amt = L.jetAmt[j];
+        if (amt <= 0.0f) continue;
+        const float dx = torusDelta(static_cast<float>(x) - L.jetX[j], static_cast<float>(kLifeW));
+        const float dy = torusDelta(static_cast<float>(y) - 6.0f, static_cast<float>(kLifeH));
+        const float g = amt * __expf(-(dx * dx + dy * dy) * (1.0f / 18.0f));   // three cells wide
+        fx += g * L.jetSway[j];
+        fy += g;
+        inkIn += g;
+    }
+    const float tau = fmaxf(L.tau, 0.502f);
+    float vx = ux + tau * L.push * fx / rho, vy = uy + tau * L.push * fy / rho;
+    const float speed = sqrtf(vx * vx + vy * vy);
+    if (speed > 0.12f) { vx *= 0.12f / speed; vy *= 0.12f / speed; }   // under a tenth of the lattice's sound: it stays a fluid
+    for (int k = 0; k < 9; ++k) dst[static_cast<size_t>(k) * kLifeCells + i] = f[k] - (f[k] - lbmEq(k, rho, vx, vy)) / tau;
+    // The ink, from where the flow brought it (bilinear on the torus).
+    const float px = static_cast<float>(x) - ux, py = static_cast<float>(y) - uy;
+    const int x0 = static_cast<int>(floorf(px)), y0 = static_cast<int>(floorf(py));
+    const float ax = px - static_cast<float>(x0), ay = py - static_cast<float>(y0);
+    auto at = [&](int cx, int cy) { return ink[(cy & (kLifeH - 1)) * kLifeW + (cx & (kLifeW - 1))].x; };
+    const float top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * ax;
+    const float bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * ax;
+    const float d = fminf((top + (bottom - top) * ay) * L.fade + 0.03f * inkIn, 1.0f);
+    inkOut[i] = make_float2(d, 10.0f * sqrtf(ux * ux + uy * uy));
+}
+
+// ---- Islands: Cahn-Hilliard separation with Oono and Puri's long-range term, on a coarse grid ----
+
+/**
+ * @brief The Islands, in one CUDA block: its 64 x 32 grid in shared memory, `substeps` explicit
+ *        steps of dc = lap(c^3 - c - g lap c) - eps (c - mean) (g 0.6, a fiftieth of a unit each, a
+ *        grain of noise so it never quite freezes), then the field drawn from it: each of its cells
+ *        read bilinearly, drifted across, as 0.5 + 0.5 tanh(2.5 c). Seeded with a little noise about
+ *        the mean when asked.
+ * @param hdr    the header
+ * @param isles  the grid, kept between blocks
+ * @param lifeA  the field, buffer A
+ * @param lifeB  buffer B
+ */
+__global__ void __launch_bounds__(1024) islandsKernel(const BlockHeader* hdr, float* isles, float2* lifeA, float2* lifeB)
+{
+    const LifeField& L = hdr->life;
+    if (L.mode != LifeMode::Islands || L.steps < 1) return;
+    constexpr int N = kIsleW * kIsleH;
+    __shared__ float c[N], mu[N];
+    const int t = static_cast<int>(threadIdx.x);
+    const std::uint32_t salt = static_cast<std::uint32_t>(L.salt) * 0x9E3779B9U;
+    for (int k = t; k < N; k += blockDim.x)
+        c[k] = L.reseed ? L.mean + 0.2f * (static_cast<float>(hash32(salt ^ (static_cast<std::uint32_t>(k) * 2654435761U)) >> 8) * (1.0f / 16777216.0f) - 0.5f)
+                        : isles[k];
+    __syncthreads();
+    constexpr float g = 0.6f, dt = 0.02f;
+    for (int s = 0; s < L.substeps; ++s) {
+        for (int k = t; k < N; k += blockDim.x) {
+            const int x = k & (kIsleW - 1), y = k / kIsleW;
+            const float lap = c[y * kIsleW + ((x + 1) & (kIsleW - 1))] + c[y * kIsleW + ((x - 1) & (kIsleW - 1))]
+                            + c[((y + 1) & (kIsleH - 1)) * kIsleW + x] + c[((y - 1) & (kIsleH - 1)) * kIsleW + x] - 4.0f * c[k];
+            mu[k] = c[k] * c[k] * c[k] - c[k] - g * lap;
+        }
+        __syncthreads();
+        for (int k = t; k < N; k += blockDim.x) {
+            const int x = k & (kIsleW - 1), y = k / kIsleW;
+            const float lap = mu[y * kIsleW + ((x + 1) & (kIsleW - 1))] + mu[y * kIsleW + ((x - 1) & (kIsleW - 1))]
+                            + mu[((y + 1) & (kIsleH - 1)) * kIsleW + x] + mu[((y - 1) & (kIsleH - 1)) * kIsleW + x] - 4.0f * mu[k];
+            const std::uint32_t h = hash32((hdr->blockIndex * 16U + static_cast<std::uint32_t>(s)) * 2654435761U ^ static_cast<std::uint32_t>(k) ^ salt);
+            const float noise = 0.004f * (static_cast<float>(h >> 8) * (1.0f / 16777216.0f) - 0.5f);
+            c[k] = fminf(fmaxf(c[k] + dt * (lap - L.eps * (c[k] - L.mean)) + noise, -1.5f), 1.5f);
+        }
+        __syncthreads();
+    }
+    for (int k = t; k < N; k += blockDim.x) isles[k] = c[k];
+    // The field (the buffer this block's one step leads to), drawn from the grid.
+    float2* dst = (hdr->lifeParity & 1) ? lifeA : lifeB;
+    constexpr float sx = static_cast<float>(kIsleW) / static_cast<float>(kLifeW), sy = static_cast<float>(kIsleH) / static_cast<float>(kLifeH);
+    for (int i = t; i < kLifeCells; i += blockDim.x) {
+        const float px = (static_cast<float>(i & (kLifeW - 1)) + 0.5f) * sx - 0.5f + L.drift, py = (static_cast<float>(i >> 8) + 0.5f) * sy - 0.5f;
+        const int x0 = static_cast<int>(floorf(px)), y0 = static_cast<int>(floorf(py));
+        const float ax = px - static_cast<float>(x0), ay = py - static_cast<float>(y0);
+        auto at = [&](int cx, int cy) { return c[(cy & (kIsleH - 1)) * kIsleW + (cx & (kIsleW - 1))]; };
+        const float top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * ax;
+        const float bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * ax;
+        const float v = top + (bottom - top) * ay;
+        dst[i] = make_float2(0.5f + 0.5f * tanhf(2.5f * v), v);
     }
 }
 
@@ -2187,6 +2364,9 @@ struct CloudEngine::Impl {
     float* dResX = nullptr;           ///< device: its state, two buffers
     float2* dLifeA = nullptr;         ///< device: the living field, buffer A
     float2* dLifeB = nullptr;         ///< device: buffer B
+    float* dFluidA = nullptr;         ///< device: the Fluid's lattice, nine directions a cell, buffer A
+    float* dFluidB = nullptr;         ///< device: buffer B
+    float* dIsles = nullptr;          ///< device: the Islands' grid
     float* dLifeStats = nullptr;      ///< device: its mean and mean square, then what was heard (level, centroid, flux)
     float* dListenHist = nullptr;     ///< device: the listening's history, two rings of kEchoN
     float* dListenPrev = nullptr;     ///< device: its last frame's magnitudes
@@ -2242,7 +2422,8 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dListenHist), static_cast<void*>(dListenPrev), static_cast<void*>(dListenState),
                          static_cast<void*>(dResW), static_cast<void*>(dResIn), static_cast<void*>(dResOut), static_cast<void*>(dResX),
                          static_cast<void*>(dMeltHist), static_cast<void*>(dMeltAcc), static_cast<void*>(dMeltEnergy),
-                         static_cast<void*>(dMeltOmega), static_cast<void*>(dMeltPhase), static_cast<void*>(dMeltHeard), static_cast<void*>(dMeltState) })
+                         static_cast<void*>(dMeltOmega), static_cast<void*>(dMeltPhase), static_cast<void*>(dMeltHeard), static_cast<void*>(dMeltState),
+                         static_cast<void*>(dSyncX), static_cast<void*>(dFluidA), static_cast<void*>(dFluidB), static_cast<void*>(dIsles) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -2255,6 +2436,7 @@ struct CloudEngine::Impl {
         dListenHist = nullptr; dListenPrev = nullptr; dListenState = nullptr;
         dResW = nullptr; dResIn = nullptr; dResOut = nullptr; dResX = nullptr;
         dMeltHist = dMeltAcc = dMeltEnergy = dMeltOmega = dMeltPhase = dMeltHeard = nullptr; dMeltState = nullptr;
+        dSyncX = nullptr; dFluidA = dFluidB = nullptr; dIsles = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -2378,6 +2560,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaHostAlloc(&m.hSnap, sizeof(float2) * (partialsTotal / kSnapStride), cudaHostAllocDefault), "cudaHostAlloc snapshot", error)
                 && ok(cudaMalloc(&m.dLifeA, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
                 && ok(cudaMalloc(&m.dLifeB, sizeof(float2) * kLifeCells), "cudaMalloc life", error)
+                && ok(cudaMalloc(&m.dFluidA, sizeof(float) * 9 * kLifeCells), "cudaMalloc fluid", error)
+                && ok(cudaMalloc(&m.dFluidB, sizeof(float) * 9 * kLifeCells), "cudaMalloc fluid", error)
+                && ok(cudaMalloc(&m.dIsles, sizeof(float) * kIsleW * kIsleH), "cudaMalloc islands", error)
                 && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 12), "cudaMalloc life stats", error)
                 && ok(cudaMalloc(&m.dResW, sizeof(float) * kReservoirN * kReservoirN), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dResIn, sizeof(float) * kReservoirN * kReservoirInputs), "cudaMalloc reservoir", error)
@@ -2419,6 +2604,9 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dSnap, 0, sizeof(float2) * (partialsTotal / kSnapStride), m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeA, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeB, 0, sizeof(float2) * kLifeCells, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dFluidA, 0, sizeof(float) * 9 * kLifeCells, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dFluidB, 0, sizeof(float) * 9 * kLifeCells, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dIsles, 0, sizeof(float) * kIsleW * kIsleH, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 12, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
@@ -2469,6 +2657,10 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             lifeSeedKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB);
             lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dLifeA, m.dLifeB, m.dLand);
             lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB, m.dLand);
+            fluidSeedKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, m.dFluidA, m.dFluidB);
+            fluidStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 0, m.dFluidA, m.dFluidB, m.dLifeA, m.dLifeB);
+            fluidStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dFluidA, m.dFluidB, m.dLifeA, m.dLifeB);
+            islandsKernel<<<1, 1024, 0, m.stream>>>(hdr, m.dIsles, m.dLifeA, m.dLifeB);
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
             syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(

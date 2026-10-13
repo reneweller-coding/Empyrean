@@ -1890,6 +1890,90 @@ int main()
                   "scattered by %.1f ct (widest %.1f) when like phases gather, %.1f ct (widest %.1f) when they part", c, cApart, f, gSpread, gWide, pSpread, pWide));
     }
 
+    // 54. The Fluid and the Islands (Phase 16b). The Fluid: the ink comes where the notes blow it
+    //     (their columns hold more of it than the rest after a few seconds), the flow carries it on,
+    //     the level holds, and two runs are the same bit for bit. The Islands: the field gathers --
+    //     fewer borders along its rows after forty seconds than after five -- and the level holds.
+    {
+        auto run = [&](int mode, float character, double seconds, std::vector<float>& early, std::vector<float>& late,
+                       std::vector<float>& out) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::LifeMode, static_cast<float>(mode));
+            e.setParam(ParamId::LifeDepth, 0.8f);
+            e.setParam(ParamId::LifeRate, 1.0f);
+            e.setParam(ParamId::LifeCharacter, character);
+            if (!openOffline(e, false, 173)) return false;
+            for (int note : { 45, 57, 64 }) e.noteOn(note, 0.8f, 0);
+            std::vector<float> L(128), R(128), dots;
+            int per = 0;
+            out.clear();
+            const int blocks = static_cast<int>(seconds * 375.0);
+            for (int k = 0; k < blocks; ++k) {
+                e.process(L.data(), R.data(), 128);
+                for (int i = 0; i < 128; ++i) { out.push_back(L[static_cast<size_t>(i)]); out.push_back(R[static_cast<size_t>(i)]); }
+                if (e.partialSnapshot(dots, per)) {   // the field comes with the snapshot
+                    if (k < static_cast<int>(5.0 * 375.0)) e.lifeSnapshot(early);
+                    e.lifeSnapshot(late);
+                }
+            }
+            return early.size() == static_cast<size_t>(kLifeW * kLifeH) && late.size() == early.size();
+        };
+        // The Fluid.
+        std::vector<float> early, late, out1, out2, e2, l2;
+        const bool fluidRan = run(11, 0.6f, 20.0, early, late, out1) && run(11, 0.6f, 20.0, e2, l2, out2);
+        const bool same = out1 == out2;
+        // The ink atNotes the notes' columns (a fundamental and its octave each, +-3 cells) against the rest, at five seconds.
+        double atNotes = 0.0, rest = 0.0;
+        int atNotesCells = 0, restCells = 0;
+        std::vector<bool> column(static_cast<size_t>(kLifeW), false);
+        for (int note : { 45, 57, 64 }) {
+            const double hz = 440.0 * std::pow(2.0, (note - 69) / 12.0);
+            for (double f : { hz, 2.0 * hz }) {
+                const int x = static_cast<int>(std::log2(f / 20.0) / std::log2(1000.0) * kLifeW);
+                for (int d = -3; d <= 3; ++d) column[static_cast<size_t>((x + d) & (kLifeW - 1))] = true;
+            }
+        }
+        for (int i = 0; fluidRan && i < kLifeW * kLifeH; ++i) {
+            if (column[static_cast<size_t>(i & (kLifeW - 1))]) { atNotes += early[static_cast<size_t>(i)]; ++atNotesCells; }
+            else { rest += early[static_cast<size_t>(i)]; ++restCells; }
+        }
+        atNotes /= std::max(1, atNotesCells);
+        rest /= std::max(1, restCells);
+        double moved = 0.0;
+        for (size_t i = 0; fluidRan && i < early.size(); ++i) moved += std::fabs(late[i] - early[i]);
+        moved /= std::max<size_t>(1, early.size());
+        const size_t frames = out1.size() / 2;
+        const double fluidDb = rmsDb(out1, frames / 2, frames);
+        // The Islands: borders along the rows (where the field crosses its middle).
+        auto borders = [](const std::vector<float>& f) {
+            int n = 0;
+            for (int y = 0; y < kLifeH; ++y)
+                for (int x = 0; x < kLifeW; ++x)
+                    n += (f[static_cast<size_t>(y * kLifeW + x)] > 0.5f) != (f[static_cast<size_t>(y * kLifeW + ((x + 1) & (kLifeW - 1)))] > 0.5f);
+            return n;
+        };
+        std::vector<float> ie, il, iout;
+        const bool islesRan = run(12, 0.8f, 40.0, ie, il, iout);
+        const int bEarly = islesRan ? borders(ie) : 0, bLate = islesRan ? borders(il) : 0;
+        const size_t iframes = iout.size() / 2;
+        const double islesDb = rmsDb(iout, iframes / 2, iframes);
+        // Without a living field, for the level.
+        std::vector<float> oe, ol, plain;
+        run(0, 0.5f, 10.0, oe, ol, plain);
+        const double plainDb = rmsDb(plain, plain.size() / 4, plain.size() / 2);
+        // The level within 4 dB: the field's make-up is measured over the whole field, and the Fluid's ink lies
+        // where the loud low harmonics read it (about 3 dB over); a preset is levelled by measurement anyway.
+        check(fluidRan && same && atNotes > 2.0 * rest && moved > 0.01 && islesRan && bLate < bEarly && bLate > 0 && std::fabs(fluidDb - plainDb) < 4.0
+                  && std::fabs(islesDb - plainDb) < 4.0,
+              "life: the Fluid and the Islands",
+              fmt("Fluid: ink %.3f at the notes, %.3f elsewhere after 5 s, %.3f moved by 20 s, twice %s, %.1f dBFS; Islands: %d borders "
+                  "after 5 s, %d after 40 s, %.1f dBFS; without a field %.1f dBFS",
+                  atNotes, rest, moved, same ? "the same" : "DIFFERENT", fluidDb, bEarly, bLate, islesDb, plainDb));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

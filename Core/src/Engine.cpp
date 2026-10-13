@@ -1408,12 +1408,23 @@ void Engine::renderBlock()
                 L.character = std::clamp(cur(ParamId::LifeCharacter), 0.0f, 1.0f);
                 L.drops = static_cast<float>((0.5 + 30.0 * static_cast<double>(rate) * rate) * dt / (kLifeW * kLifeH));   // drops a second, over every cell
                 L.turnStep = static_cast<float>(2.0 * 3.14159265358979 * static_cast<double>(cur(ParamId::LifeTurn)) / 60.0 * dt);
+            } else if (L.mode == LifeMode::Islands) {
+                // The separation: the field drawn every block, Life Rate's substeps of it (squared: slow
+                // at the bottom), drifting across.
+                L.steps = 1;
+                L.substeps = std::clamp(1 + static_cast<int>(std::lround(15.0f * rate * rate)), 1, 16);
+                islandDrift_ = std::fmod(islandDrift_ + (0.05 + 0.6 * static_cast<double>(rate)) * dt, static_cast<double>(kIsleW));
+                L.drift = static_cast<float>(islandDrift_);
             } else {
-                lifeAcc_ += (L.mode == LifeMode::Lenia ? 2.0f + 38.0f * rate : 20.0f + 730.0f * rate) * dtf;
+                // Lenia 2 to 40 steps a second, the Fluid 30 to 430, the Turing field 20 to 750.
+                const float perSecond = L.mode == LifeMode::Lenia ? 2.0f + 38.0f * rate : (L.mode == LifeMode::Fluid ? 30.0f + 400.0f * rate : 20.0f + 730.0f * rate);
+                lifeAcc_ += perSecond * dtf;
                 const int steps = std::min(2, static_cast<int>(lifeAcc_));
                 lifeAcc_ = std::min(lifeAcc_ - static_cast<float>(steps), 2.0f);
                 L.steps = steps;
+                L.fade = std::exp(-1.0f / (25.0f * perSecond));   // the Fluid's ink lasts about 25 s
             }
+            lifeSeconds_ += dt;
             const float ch = std::clamp(cur(ParamId::LifeCharacter), 0.0f, 1.0f);
             L.lenMu = 0.12f + 0.08f * ch;
             L.lenSigma = 0.012f + 0.012f * ch;
@@ -1423,6 +1434,40 @@ void Engine::renderBlock()
             const float fr = at - static_cast<float>(seg);
             L.feed = kF[seg] + (kF[seg + 1] - kF[seg]) * fr;
             L.kill = kK[seg] + (kK[seg + 1] - kK[seg]) * fr;
+            // The Fluid: Character from syrup to turbulence. The Islands: from a fine labyrinth to a
+            // few large islands of the minority (the mean moved off the middle, Oono and Puri's term
+            // weakened so the domains keep growing).
+            L.tau = 0.56f - 0.055f * ch;
+            L.mean = -0.4f * ch;
+            L.eps = 0.0015f * (1.0f - ch) + 0.00005f;
+            // The Fluid's jets: the eight loudest notes, each blowing at its frequency and at its
+            // octave, leaning slowly to and fro.
+            std::fill(std::begin(L.jetAmt), std::end(L.jetAmt), 0.0f);
+            if (L.mode == LifeMode::Fluid) {
+                std::array<int, 64> loud{};
+                int blowing = 0;
+                for (int i = 0; i < static_cast<int>(voices_.size()) && blowing < static_cast<int>(loud.size()); ++i) {
+                    const Voice& v = voices_[static_cast<size_t>(i)];
+                    if (v.note >= 0 && v.lastGain > 0.001f && v.hz > 0.0) loud[static_cast<size_t>(blowing++)] = i;
+                }
+                std::stable_sort(loud.begin(), loud.begin() + blowing, [this](int a, int b) {
+                    return voices_[static_cast<size_t>(a)].lastGain > voices_[static_cast<size_t>(b)].lastGain;
+                });
+                const int count = std::min(blowing, kLifeJets / 2);
+                for (int j = 0; j < count; ++j) {
+                    const Voice& v = voices_[static_cast<size_t>(loud[j])];
+                    const float across = L.zoom * static_cast<float>(kLifeW) / std::log2(1000.0f);
+                    const float x = std::log2(std::max(static_cast<float>(v.hz), 20.0f) / 20.0f) * across;
+                    const float amt = std::min(1.0f, 1.5f * v.lastGain);
+                    const float sway = 0.35f * static_cast<float>(std::sin(0.13 * lifeSeconds_ + 1.7 * v.note));
+                    L.jetX[2 * j] = x;
+                    L.jetAmt[2 * j] = amt;
+                    L.jetSway[2 * j] = sway;
+                    L.jetX[2 * j + 1] = x + across;   // the octave
+                    L.jetAmt[2 * j + 1] = 0.6f * amt;
+                    L.jetSway[2 * j + 1] = -sway;
+                }
+            }
             L.depth = cur(ParamId::LifeDepth);
             L.zoom = cur(ParamId::LifeZoom);
             float mean = 0.0f, meanSq = 0.0f;
