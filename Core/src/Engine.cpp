@@ -1495,7 +1495,13 @@ void Engine::renderBlock()
         S.depth = cur(ParamId::SyncDepth);
         S.rate = cur(ParamId::SyncRate);
         S.spread = cur(ParamId::SyncSpread);
+        S.mode = static_cast<SyncMode>(std::clamp(static_cast<int>(std::lround(cur(ParamId::SyncMode))), 0, kNumSyncModes - 1));
         S.coupling = cur(ParamId::SyncCoupling) * 2.5f * kTwoPi * S.rate * (S.spread + 0.05f);
+        // Chimera and Swarm live on their own time, a couple of the rate's turns: in units of it.
+        if (S.mode != SyncMode::Global) S.coupling = cur(ParamId::SyncCoupling) * 2.0f * kTwoPi * std::max(S.rate, 0.05f);
+        S.swarm = cur(ParamId::SyncSwarm) * 2.0f * kTwoPi * std::max(S.rate, 0.05f);
+        S.reach = cur(ParamId::SyncReach);
+        S.lag = 1.25f + 0.3f * std::clamp(cur(ParamId::SyncLag), 0.0f, 1.0f);   // 1.39 (Abrams and Strogatz) at about 0.47
     }
 
     // The binaural cloud (its orbit turns the whole of it) and the spectral echo (its lines

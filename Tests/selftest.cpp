@@ -1784,6 +1784,112 @@ int main()
                   gliding[0], before[0], gliding[1], after[1], depthAtSwitch, partialsJump, amountAtSwitch, lifeAtSwitch));
     }
 
+    // 53. Chimeras and swarms (Phase 16a). One high note, so that its first harmonic's cloud has a
+    //     thousand members, every eighth of them watched through the picture's snapshot. Uncoupled
+    //     each pulses on its own; as a chimera an ordered part lies beside a disordered one: some
+    //     neighbours' loudness moves alike, others' does not. As a swarm their pitch moves on their
+    //     circles by no more than the reach: when like phases gather they all stand as far from the
+    //     middle (one place, or two opposite -- the ring model counts them alike, and they pulse
+    //     against each other), when they part they scatter round the circle.
+    {
+        struct Watch {
+            std::vector<std::vector<float>> amp;   // per watched member its loudness over time
+            std::vector<float> hz;                 // its last frequency
+        };
+        auto watch = [&](int mode, float coupling, float spread, float swarm, float reach, Watch& w) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.05f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::SyncDepth, 1.0f);
+            e.setParam(ParamId::SyncRate, 0.5f);
+            e.setParam(ParamId::SyncSpread, spread);
+            e.setParam(ParamId::SyncCoupling, coupling);
+            e.setParam(ParamId::SyncMode, static_cast<float>(mode));
+            e.setParam(ParamId::SyncSwarm, swarm);
+            e.setParam(ParamId::SyncReach, reach);
+            e.setParam(ParamId::SyncLag, 0.47f);
+            if (!openOffline(e, false, 171)) return false;
+            e.noteOn(84, 0.8f, 0);
+            std::vector<float> L(128), R(128), dots;
+            int per = 0, members = 0;
+            for (int k = 0; k < 375 * 24; ++k) {   // 24 s
+                e.process(L.data(), R.data(), 128);
+                if (k < 375 * 4 || !e.partialSnapshot(dots, per)) continue;   // after four seconds, as the snapshots come
+                // The voice that sounds; its first cloud: the watched members up to where the frequency jumps an octave.
+                for (int v = 0; per > 0 && v * per * 2 < static_cast<int>(dots.size()); ++v) {
+                    const float* d = dots.data() + static_cast<size_t>(v) * per * 2;
+                    if (d[0] <= 0.0f) continue;
+                    if (members == 0) {
+                        while (members + 1 < per && d[2 * (members + 1)] < 1.5f * d[0]) ++members;
+                        ++members;
+                        w.amp.assign(static_cast<size_t>(members), {});
+                    }
+                    w.hz.assign(static_cast<size_t>(members), 0.0f);
+                    for (int j = 0; j < members; ++j) {
+                        w.amp[static_cast<size_t>(j)].push_back(d[2 * j + 1]);
+                        w.hz[static_cast<size_t>(j)] = d[2 * j];
+                    }
+                    break;
+                }
+            }
+            return members > 8;
+        };
+        // The share of neighbouring watched members whose loudness correlates over 0.8 (and under 0.5).
+        auto together = [](const Watch& w, double* apart = nullptr) {
+            int pairs = 0, alike = 0, unlike = 0;
+            for (size_t j = 0; j + 1 < w.amp.size(); ++j) {
+                const std::vector<float>& a = w.amp[j];
+                const std::vector<float>& b = w.amp[j + 1];
+                const size_t n = std::min(a.size(), b.size());
+                double ma = 0.0, mb = 0.0;
+                for (size_t i = 0; i < n; ++i) { ma += a[i]; mb += b[i]; }
+                ma /= std::max<double>(1.0, static_cast<double>(n));
+                mb /= std::max<double>(1.0, static_cast<double>(n));
+                double ab = 0.0, aa = 0.0, bb = 0.0;
+                for (size_t i = 0; i < n; ++i) { ab += (a[i] - ma) * (b[i] - mb); aa += (a[i] - ma) * (a[i] - ma); bb += (b[i] - mb) * (b[i] - mb); }
+                ++pairs;
+                const double r = aa > 0.0 && bb > 0.0 ? ab / std::sqrt(aa * bb) : 0.0;
+                if (r > 0.8) ++alike;
+                if (r < 0.5) ++unlike;
+            }
+            if (apart != nullptr) *apart = pairs > 0 ? static_cast<double>(unlike) / pairs : -1.0;
+            return pairs > 0 ? static_cast<double>(alike) / pairs : -1.0;
+        };
+        Watch chimera, free, base, gather, part;
+        const bool ran = watch(1, 1.0f, 0.0f, 0.0f, 0.0f, chimera) && watch(0, 0.0f, 0.3f, 0.0f, 0.0f, free)
+                      && watch(2, 1.0f, 0.1f, 1.0f, 0.0f, base) && watch(2, 1.0f, 0.1f, 1.0f, 40.0f, gather) && watch(2, 1.0f, 0.1f, -1.0f, 40.0f, part);
+        double cApart = 0.0;
+        const double c = together(chimera, &cApart), f = together(free);
+        // The swarm's pitch against the same cloud without it: cents per watched member.
+        auto offsets = [&](const Watch& w, double& spread, double& widest) {
+            std::vector<double> d;
+            for (size_t j = 0; j < w.hz.size() && j < base.hz.size(); ++j)
+                if (w.hz[j] > 0.0f && base.hz[j] > 0.0f) d.push_back(1200.0 * std::log2(static_cast<double>(w.hz[j]) / base.hz[j]));
+            double m = 0.0;
+            for (double x : d) m += x;
+            m /= std::max<double>(1.0, static_cast<double>(d.size()));
+            // How far from the middle each stands: the spread of |offset| (the ring counts opposite places alike).
+            double ma = 0.0;
+            for (double x : d) ma += std::fabs(x);
+            ma /= std::max<double>(1.0, static_cast<double>(d.size()));
+            spread = 0.0;
+            widest = 0.0;
+            for (double x : d) { spread += (std::fabs(x) - ma) * (std::fabs(x) - ma); widest = std::max(widest, std::fabs(x)); }
+            spread = std::sqrt(spread / std::max<double>(1.0, static_cast<double>(d.size())));
+            (void)m;
+        };
+        double gSpread = 0.0, gWide = 0.0, pSpread = 0.0, pWide = 0.0;
+        offsets(gather, gSpread, gWide);
+        offsets(part, pSpread, pWide);
+        check(ran && f < 0.3 && c > 0.15 && c < 0.9 && cApart > 0.05 && gSpread < 0.15 * 40.0 && pSpread > 0.2 * 40.0 && gWide < 41.0 && pWide < 41.0,
+              "sync: chimeras and swarms",
+              fmt("neighbours pulsing alike: %.2f as a chimera (%.2f not at all), %.2f free; a swarm of reach 40 ct: distance from the middle "
+                  "scattered by %.1f ct (widest %.1f) when like phases gather, %.1f ct (widest %.1f) when they part", c, cApart, f, gSpread, gWide, pSpread, pWide));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

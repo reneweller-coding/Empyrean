@@ -42,7 +42,9 @@ const char* const kBrainModeNames[kNumBrainModes] = { "Free", "Chords" };
 const char* const kMotionNames[kNumMotions] = { "None", "Random", "Wave", "Pendulum", "Breathe", "Glissando", "Aurora" };
 const char* const kFilterModelNames[kNumFilterModels] = { "Off", "LP 6", "LP 12", "LP 24", "HP 12", "BP 12", "Notch", "Peak", "Formant" };
 const char* const kLifeModeNames[kNumLifeModes] = { "Off", "Lenia", "Turing", "Kaleidoscope", "Tunnel", "Spiral", "Flow", "Feedback",
-                                                     "Rain", "Starfield", "Moire" };
+                                                     "Rain", "Starfield", "Moire", "Fluid", "Islands" };
+const char* const kSyncModeNames[kNumSyncModes] = { "Global", "Chimera", "Swarm" };
+const char* const kMpeTargetNames[kNumMpeTargets] = { "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion" };
 const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock" };
 const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
@@ -334,6 +336,18 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::MapRadius,       "map_radius",       "Radius",     "Map", 0.1f,  4.f,   0.4f,  0.45f, ""),
     F(ParamId::MapGlide,        "map_glide",        "Map Glide",  "Map", 0.1f,  60.f,  3.f,   0.4f, "s"),
     F(ParamId::RouteSpeed,      "route_speed",      "Route Speed", "Map", 0.25f, 4.f,  1.f,   0.5f, "x"),
+    C(ParamId::SyncMode,        "sync_mode",        "Sync Mode",  "Sync", kSyncModeNames, kNumSyncModes, 0),
+    F(ParamId::SyncSwarm,       "sync_swarm",       "Swarm",      "Sync", -1.f,  1.f,   0.5f,  1.f,  ""),
+    F(ParamId::SyncReach,       "sync_reach",       "Reach",      "Sync", 0.f,   100.f, 20.f,  0.6f, "ct"),
+    F(ParamId::SyncLag,         "sync_lag",         "Lag",        "Sync", 0.f,   1.f,   0.5f,  1.f,  ""),
+    F(ParamId::Turbulence,      "turbulence",       "Turbulence", "Turbulence", 0.f, 1.f, 0.f,  1.f,  ""),
+    F(ParamId::TurbulenceTime,  "turbulence_time",  "Settle",     "Turbulence", 0.5f, 60.f, 6.f, 0.4f, "s"),
+    B(ParamId::MpeOn,           "mpe",              "MPE",        "MPE", true),
+    I(ParamId::MpeBend,         "mpe_bend",         "Bend Range", "MPE", 1.f,   96.f,  48.f, "st"),
+    C(ParamId::MpePress,        "mpe_press",        "Press",      "MPE", kMpeTargetNames, kNumMpeTargets, 1),
+    F(ParamId::MpePressDepth,   "mpe_press_depth",  "Press Depth", "MPE", 0.f,  1.f,   0.5f,  1.f,  ""),
+    C(ParamId::MpeSlide,        "mpe_slide",        "Slide",      "MPE", kMpeTargetNames, kNumMpeTargets, 3),
+    F(ParamId::MpeSlideDepth,   "mpe_slide_depth",  "Slide Depth", "MPE", 0.f,  1.f,   0.5f,  1.f,  ""),
 } };
 
 } // namespace

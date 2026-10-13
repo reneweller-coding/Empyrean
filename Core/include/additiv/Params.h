@@ -234,6 +234,19 @@ enum class ParamId : int {
     MapRadius,      ///< the blend's width on the map
     MapGlide,       ///< s: how fast the sound follows the cursor
     RouteSpeed,     ///< times: how fast a route is walked (its travel and hold times divided by it)
+    // Phase 16 (14.10.2026): swarms and chimeras, turbulence, MPE
+    SyncMode,       ///< how the partials' oscillators couple: Global (Kuramoto), Chimera (to their neighbours), Swarm (swarmalators)
+    SyncSwarm,      ///< -1 .. 1: Swarm: how a partial's place follows its phase (positive: like phases gather, negative: they part)
+    SyncReach,      ///< cents: Swarm: how far a partial wanders in pitch (and with it across the field) on its circle
+    SyncLag,        ///< 0 .. 1: Chimera: the coupling's phase lag (more: more of the cloud falls out of step)
+    Turbulence,     ///< 0 .. 1: the energy cascade: a loud harmonic hands its energy upwards, the louder the more
+    TurbulenceTime, ///< s: how long the cascade takes to settle back when the sound grows soft
+    MpeOn,          ///< MPE: notes on channels 2 .. 16 carry their own bend, pressure and slide (the lower zone)
+    MpeBend,        ///< semitones: a member channel's full bend (48 by the MPE standard; an RPN 0 from the controller sets it)
+    MpePress,       ///< what a note's pressure moves (kMpeTargetNames)
+    MpePressDepth,  ///< 0 .. 1: how far
+    MpeSlide,       ///< what a note's slide (CC 74 on its channel) moves
+    MpeSlideDepth,  ///< 0 .. 1: how far
     Count           ///< number of parameters
 };
 
@@ -289,8 +302,15 @@ constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven table
 constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
 constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
 extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
-constexpr int kNumLifeModes = 11;   ///< entries of kLifeModeNames
-extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing", the animated pictures (Cloud.h LifeMode)
+constexpr int kNumLifeModes = 13;   ///< entries of kLifeModeNames
+extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing", the animated pictures, "Fluid", "Islands" (Cloud.h LifeMode)
+constexpr int kNumSyncModes = 3;   ///< entries of kSyncModeNames
+extern const char* const kSyncModeNames[kNumSyncModes];     ///< "Global", "Chimera", "Swarm" (Cloud.h SyncMode)
+constexpr int kNumMpeTargets = 8;  ///< entries of kMpeTargetNames
+extern const char* const kMpeTargetNames[kNumMpeTargets];   ///< "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion"
+
+/** @brief What a note's pressure or slide moves (MPE), in kMpeTargetNames' order. */
+enum class MpeTarget : int { Off = 0, Level, Filter, Brightness, Width, Nearer, Shimmer, Motion };
 constexpr int kNumFieldModes = 5;   ///< entries of kFieldModeNames
 extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames

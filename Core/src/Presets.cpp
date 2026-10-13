@@ -31,7 +31,7 @@ bool keptByPresets(ParamId id)
 {
     return id == ParamId::Binaural || id == ParamId::MorphActive || id == ParamId::MorphPos || id == ParamId::PresetGlide
         || id == ParamId::MapActive || id == ParamId::MapX || id == ParamId::MapY || id == ParamId::MapRadius || id == ParamId::MapGlide
-        || id == ParamId::RouteSpeed;
+        || id == ParamId::RouteSpeed || id == ParamId::MpeOn || id == ParamId::MpeBend;   // the player's controller
 }
 
 int numPresets() { return kCount; }

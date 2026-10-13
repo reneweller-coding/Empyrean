@@ -767,14 +767,19 @@ __device__ float lifeAt(const BlockHeader* hdr, const float2* cur, float fx, flo
 
 /**
  * @brief The partial sync's mean fields: for every harmonic of every voice (and its air band, as one
- *        more group) the mean of its members' phasors from the last block, summed in member order.
+ *        more group) the means of its members' phasors from the last block, summed in member order.
+ *        Global: e^(iθ). Chimera: e^(iθ), e^(i(θ - x)), e^(i(θ + x)) with x the member's place round
+ *        the ring. Swarm: e^(i(x + θ)), e^(i(x - θ)) with x its place on its circle.
  * @param hdr    the header
  * @param voices the voices
  * @param pcap   partials per voice in the tables
  * @param theta  per partial its phase
- * @param order  per voice and group the mean phasor (R cos ψ, R sin ψ)
+ * @param sx     per partial its place on its circle (Swarm)
+ * @param order  per voice and group the mean phasors, three planes `plane` apart
+ * @param plane  the planes' distance (all the partials)
  */
-__global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const float* theta, float2* order)
+__global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const float* theta, const float* sx, float2* order,
+                                size_t plane)
 {
     if (hdr->sync.depth <= 0.0f) return;
     const int gid = static_cast<int>(blockIdx.x) * blockDim.x + threadIdx.x;
@@ -787,16 +792,35 @@ __global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices
     if (g < H) { first = g * K; count = K; }
     else if (g == H && cv.partials > HP) { first = HP; count = cv.partials - HP; }
     else return;
-    float sx = 0.0f, sy = 0.0f;
+    const SyncMode mode = hdr->sync.mode;
+    float2 z0 = make_float2(0.0f, 0.0f), z1 = z0, z2 = z0;
     const float* th = theta + static_cast<size_t>(v) * pcap + first;
+    const float* xs = sx + static_cast<size_t>(v) * pcap + first;
+    const float ring = 6.2831853f / static_cast<float>(max(count, 1));
     for (int j = 0; j < count; ++j) {
         float s, c;
+        if (mode == SyncMode::Swarm) {
+            __sincosf(xs[j] + th[j], &s, &c);
+            z1.x += c; z1.y += s;
+            __sincosf(xs[j] - th[j], &s, &c);
+            z2.x += c; z2.y += s;
+            continue;
+        }
         __sincosf(th[j], &s, &c);
-        sx += c;
-        sy += s;
+        z0.x += c; z0.y += s;
+        if (mode == SyncMode::Chimera) {
+            const float x = ring * (static_cast<float>(j) + 0.5f);
+            __sincosf(th[j] - x, &s, &c);
+            z1.x += c; z1.y += s;
+            __sincosf(th[j] + x, &s, &c);
+            z2.x += c; z2.y += s;
+        }
     }
     const float inv = 1.0f / static_cast<float>(max(count, 1));
-    order[static_cast<size_t>(v) * pcap + g] = make_float2(sx * inv, sy * inv);
+    const size_t at = static_cast<size_t>(v) * pcap + g;
+    order[at] = make_float2(z0.x * inv, z0.y * inv);
+    order[at + plane] = make_float2(z1.x * inv, z1.y * inv);
+    order[at + 2 * plane] = make_float2(z2.x * inv, z2.y * inv);
 }
 
 /**
@@ -925,14 +949,16 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  * @param lifeA   the living field, buffer A
  * @param lifeB   buffer B
  * @param theta   per partial the sync's phase
- * @param order   per voice and group the sync's mean phasor (syncOrderKernel)
+ * @param sx      per partial its place on its circle (Swarm)
+ * @param order   per voice and group the sync's mean phasors (syncOrderKernel), three planes `plane` apart
+ * @param plane   the planes' distance
  * @param flockA  the flock's state, buffer A (even blocks read it)
  * @param flockB  buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
-                             float2* snap, const float2* lifeA, const float2* lifeB, float* theta, const float2* order,
-                             float2* flockA, float2* flockB)
+                             float2* snap, const float2* lifeA, const float2* lifeB, float* theta, float* sx, const float2* order,
+                             size_t plane, float2* flockA, float2* flockB)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1044,22 +1070,79 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             depth = fminf(fmaxf(depth, 0.0f), 1.0f);
             env = 1.0f - depth + depth * e;
         }
-        // Partial sync: the phase turns at its own rate and is pulled to its harmonic's mean phase.
+        // Partial sync: the phase turns at its own rate and is pulled to its cloud (Global), to its
+        // neighbours round the ring (Chimera), or with its place on its circle (Swarm).
+        float swarmCents = 0.0f, swarmSide = 0.0f;
         if (hdr->sync.depth > 0.0f) {
             const PartialSync& S = hdr->sync;
-            float th = cv.restart ? 6.2831853f * hash01(seed, up, 13) : theta[gid];
-            const float w = 6.2831853f * S.rate * (1.0f + S.spread * (2.0f * hash01(seed, up, 12) - 1.0f));
-            float pull = 0.0f;
+            const float dtb = static_cast<float>(n) / fs;
+            const float ringX = 6.2831853f * (static_cast<float>(member) + 0.5f) / static_cast<float>(max(groupCount, 1));
+            float th;
             if (!cv.restart) {
-                const float2 z = order[static_cast<size_t>(v) * pcap + (isAir ? H : h - 1)];
-                float s, co;
-                __sincosf(th, &s, &co);
-                pull = S.coupling * (z.y * co - z.x * s);   // K R sin(ψ - θ)
+                th = theta[gid];
+            } else if (S.mode == SyncMode::Chimera) {
+                // Abrams and Strogatz's start: ordered round the middle of the ring, scattered at its ends.
+                const float xc = ringX - 3.1415927f;
+                th = 6.0f * (hash01(seed, up, 13) - 0.5f) * __expf(-0.76f * xc * xc);
+            } else {
+                th = 6.2831853f * hash01(seed, up, 13);
             }
-            th += (w + pull) * static_cast<float>(n) / fs;
-            th -= 6.2831853f * floorf(th * 0.15915494f);
-            theta[gid] = th;
-            env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(th)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
+            const float u = 2.0f * hash01(seed, up, 12) - 1.0f;
+            const size_t at = static_cast<size_t>(v) * pcap + (isAir ? H : h - 1);
+            float s, co;
+            __sincosf(th, &s, &co);
+            if (S.mode == SyncMode::Swarm) {
+                // In the frame turning at the rate: what is left of each rate, and the place's own drift.
+                float x = cv.restart ? 6.2831853f * hash01(seed, up, 14) : sx[gid];
+                float dth = 6.2831853f * S.rate * S.spread * u, dx = 3.1415927f * S.rate * S.spread * (2.0f * hash01(seed, up, 15) - 1.0f);
+                if (!cv.restart) {
+                    const float2 wp = order[at + plane], wm = order[at + 2 * plane];
+                    float sp, cp, sm, cm;
+                    __sincosf(x + th, &sp, &cp);
+                    __sincosf(x - th, &sm, &cm);
+                    const float ap = wp.y * cp - wp.x * sp;   // S+ sin(Φ+ - (x + θ))
+                    const float am = wm.y * cm - wm.x * sm;   // S- sin(Φ- - (x - θ))
+                    dx += 0.5f * S.swarm * (ap + am);
+                    dth += 0.5f * S.coupling * (ap - am);
+                }
+                x += dx * dtb;
+                x -= 6.2831853f * floorf(x * 0.15915494f);
+                sx[gid] = x;
+                th += dth * dtb;
+                th -= 6.2831853f * floorf(th * 0.15915494f);
+                theta[gid] = th;
+                float sxs, sxc;
+                __sincosf(x, &sxs, &sxc);
+                swarmCents = S.reach * sxc;
+                swarmSide = 0.5f * fminf(S.reach * (1.0f / 30.0f), 1.0f) * sxs;
+                // The heard phase turns on at the rate.
+                const float heard = th + 6.2831853f * S.rate * cv.time;
+                env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(heard)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
+            } else {
+                const float w = 6.2831853f * S.rate * (1.0f + S.spread * u);
+                float pull = 0.0f;
+                if (!cv.restart) {
+                    const float2 z = order[at];
+                    if (S.mode == SyncMode::Chimera) {
+                        // Σ G(x_i - x_j) e^(iθ_j) / N with G = 1 + A cos: the mean, and the two harmonics of the ring.
+                        const float2 zm = order[at + plane], zp = order[at + 2 * plane];
+                        float rs, rc;
+                        __sincosf(ringX, &rs, &rc);
+                        const float A = 0.4975f;   // A / 2, A = 0.995
+                        const float cx = z.x + A * ((rc * zm.x - rs * zm.y) + (rc * zp.x + rs * zp.y));
+                        const float cy = z.y + A * ((rc * zm.y + rs * zm.x) + (rc * zp.y - rs * zp.x));
+                        float ls, lc;
+                        __sincosf(th + S.lag, &ls, &lc);
+                        pull = S.coupling * (cy * lc - cx * ls);   // K Im(C e^(-i(θ + α)))
+                    } else {
+                        pull = S.coupling * (z.y * co - z.x * s);   // K R sin(ψ - θ)
+                    }
+                }
+                th += (w + pull) * dtb;
+                th -= 6.2831853f * floorf(th * 0.15915494f);
+                theta[gid] = th;
+                env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(th)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
+            }
         }
         // The ripple: the wave along the spectrum at this partial's frequency.
         if (hdr->ripple.depth > 0.0f) {
@@ -1076,7 +1159,8 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             const float v = lifeAt(hdr, lifeCurrent(hdr, lifeA, lifeB), c.src[1] * L.zoom * static_cast<float>(kLifeW), slot * static_cast<float>(kLifeH));
             env *= 1.0f - L.depth + L.depth * v * L.makeup;
         }
-        float cents = drift;
+        float cents = drift + swarmCents;
+        if (swarmSide != 0.0f) place = fminf(fmaxf(place + swarmSide, -1.0f), 1.0f);
         if (cv.pitch.amount != 0.0f) cents += laneValue(cv.pitch, c, 40, true, depth) * depth;
         if (cv.pan.amount != 0.0f) place = fminf(fmaxf(place + laneValue(cv.pan, c, 50, true, depth) * depth, -1.0f), 1.0f);
 
@@ -2083,7 +2167,8 @@ struct CloudEngine::Impl {
     float2* dFlockA = nullptr;        ///< device: the flock's state (offset, velocity), buffer A
     float2* dFlockB = nullptr;        ///< device: buffer B
     float* dSyncTheta = nullptr;      ///< device: per partial the sync's phase
-    float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasor
+    float* dSyncX = nullptr;          ///< device: per partial its place on its circle (Swarm)
+    float2* dSyncOrder = nullptr;     ///< device: per voice and group the sync's mean phasors, three planes
     PartialSync sync;                 ///< the host's copy of the partial sync's settings
     Ripple ripple;                    ///< the host's copy of the ripple
     Reservoir reservoir;              ///< the host's copy of the reservoir's settings
@@ -2311,7 +2396,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dSyncTheta, sizeof(float) * partialsTotal), "cudaMalloc sync", error)
                 && ok(cudaMalloc(&m.dFlockA, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
                 && ok(cudaMalloc(&m.dFlockB, sizeof(float2) * partialsTotal), "cudaMalloc flock", error)
-                && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * partialsTotal), "cudaMalloc sync order", error)
+                && ok(cudaMalloc(&m.dSyncOrder, sizeof(float2) * 3 * partialsTotal), "cudaMalloc sync order", error)
+                && ok(cudaMalloc(&m.dSyncX, sizeof(float) * partialsTotal), "cudaMalloc sync places", error)
                 && ok(cudaHostAlloc(&m.hLifeStats, sizeof(float) * 12, cudaHostAllocDefault), "cudaHostAlloc life stats", error)
                 && ok(cudaHostAlloc(&m.hLife, sizeof(float2) * kLifeCells, cudaHostAllocDefault), "cudaHostAlloc life", error)
                 && ok(cudaMalloc(&m.dShapes, sizeof(EnvShape) * kEnvShapes), "cudaMalloc shapes", error)
@@ -2340,7 +2426,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dSyncTheta, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dFlockA, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dFlockB, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
-                && ok(cudaMemsetAsync(m.dSyncOrder, 0, sizeof(float2) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dSyncOrder, 0, sizeof(float2) * 3 * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dSyncX, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dShapes, 0, sizeof(EnvShape) * kEnvShapes, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLand, 0, sizeof(float) * landFloats, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dModal, 0, sizeof(float2) * kModalModes, m.stream), "cudaMemsetAsync", error)
@@ -2384,9 +2471,11 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
             lifeStepKernel<<<lifeGrid, 256, 0, m.stream>>>(hdr, 1, m.dLifeA, m.dLifeB, m.dLand);
             lifeStatsKernel<<<1, 256, 0, m.stream>>>(hdr, m.dLifeA, m.dLifeB, m.dLifeStats);
             gainRingKernel<<<static_cast<unsigned>(config.voices), 256, 0, m.stream>>>(hdr, voices, m.dGainRing);
-            syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(hdr, voices, m.pcap, m.dSyncTheta, m.dSyncOrder);
+            syncOrderKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
+                hdr, voices, m.pcap, m.dSyncTheta, m.dSyncX, m.dSyncOrder, partialsTotal);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
-                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta, m.dSyncOrder, m.dFlockA, m.dFlockB);
+                hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta,
+                m.dSyncX, m.dSyncOrder, partialsTotal, m.dFlockA, m.dFlockB);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(

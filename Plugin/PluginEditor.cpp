@@ -155,14 +155,16 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                          ParamId::Stretch, ParamId::Shift } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
                                                ParamId::ShimmerRate, ParamId::Stereo } },
-                    { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter } } });
+                    { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter } },
+                    { "Turbulence", F::Source, Ids{ ParamId::Turbulence, ParamId::TurbulenceTime } } });
     page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape } },
                      { "Field", F::Motion, Ids{ ParamId::FieldMode, ParamId::FieldStrength, ParamId::FieldRadius, ParamId::FieldSpring,
                                                 ParamId::FieldRate, ParamId::FieldCount } },
                      { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } },
                      { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
                                                            ParamId::LifeZoom, ParamId::LifeSides, ParamId::LifeTurn } },
-                     { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread } },
+                     { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncMode, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread,
+                                                         ParamId::SyncSwarm, ParamId::SyncReach, ParamId::SyncLag } },
                      { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
@@ -177,7 +179,9 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                         { "Harmony", F::Motion, Ids{ ParamId::BrainConsonance, ParamId::BrainWander, ParamId::AutoLead, ParamId::AutoTension,
                                                      ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::AutoStep } },
                         { "Brain 2", F::Envelope, Ids{ ParamId::Brain2On, ParamId::Brain2Interval, ParamId::Brain2Density, ParamId::Brain2Rate,
-                                                       ParamId::Brain2Depth } } });
+                                                       ParamId::Brain2Depth } },
+                        { "MPE", F::Filter, Ids{ ParamId::MpeOn, ParamId::MpeBend, ParamId::MpePress, ParamId::MpePressDepth, ParamId::MpeSlide,
+                                                 ParamId::MpeSlideDepth } } });
     page("Space", { { "Planes", F::Space, Ids{ ParamId::Depth, ParamId::KeysDepth, ParamId::Breath, ParamId::BreathRate, ParamId::Doppler } },
                     { "Near", F::Space, Ids{ ParamId::Presence, ParamId::PadLowCut } },
                     { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp, ParamId::FarDiffuse,

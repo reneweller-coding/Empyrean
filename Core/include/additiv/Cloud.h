@@ -323,6 +323,9 @@ enum class LifeMode : std::int32_t {
     Rain,           ///< drops on a pond: a damped 2D wave, rings spreading and crossing
     Starfield,      ///< stars streaming out of the middle (log-polar: they speed up as they go)
     Moire,          ///< two turning line gratings, their slow interference bands
+    // Phase 16: two more fields that live
+    Fluid,     ///< a fluid (lattice Boltzmann): the notes played blow plumes of ink into it, which roll up into eddies
+    Islands,   ///< Cahn-Hilliard separation (Oono-Puri): a fine-grained field gathers into a few large islands that drift
     Count      ///< number of modes
 };
 
@@ -330,7 +333,7 @@ enum class LifeMode : std::int32_t {
 #if defined(__CUDACC__)
 __host__ __device__
 #endif
-inline bool lifeIsPicture(LifeMode m) { return m >= LifeMode::Kaleidoscope && m < LifeMode::Count; }
+inline bool lifeIsPicture(LifeMode m) { return m >= LifeMode::Kaleidoscope && m <= LifeMode::Moire; }
 
 /**
  * @brief The living landscape: a field on a torus the GPU steps every block, and every partial reads.
@@ -367,6 +370,13 @@ struct LifeField {
 };
 static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 
+/** @brief How the partials' oscillators couple (PartialSync::mode). */
+enum class SyncMode : std::int32_t {
+    Global = 0,   ///< Kuramoto: every member to its cloud's mean
+    Chimera,      ///< to its neighbours round the cloud, with a phase lag: an ordered part beside a disordered one
+    Swarm,        ///< swarmalators: the phase and a place on a circle in pitch and pan pull each other
+};
+
 /**
  * @brief Partial sync: a Kuramoto oscillator for every partial, coupled to its own cloud.
  *
@@ -377,12 +387,31 @@ static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header"
  * out in the harmonic; coupled past the critical strength they fall into step and the whole cloud
  * pulses as one -- fireflies, pacemaker cells, applause. The mean power is kept whatever happens:
  * the factor is (1 + depth sin θ) / sqrt(1 + depth^2 / 2).
+ *
+ * Chimera (Kuramoto and Battogtokh 2002, Abrams and Strogatz 2004): the members sit round a ring in
+ * their order across the cloud and pull only their neighbours, by 1 + A cos(distance) with A
+ * 0.995, through a phase lag a little under a quarter turn. From a start that is ordered in one
+ * part and not in the other, the two stay side by side: a coherent pulsing core in a cloud that
+ * flickers -- and in a finite cloud the border wanders. Three mean phasors a cloud carry it.
+ *
+ * Swarm (O'Keeffe, Hong and Strogatz 2017; on a ring, O'Keeffe, Ceron and Petrungaro 2022): every
+ * partial also has a place x on a circle -- its pitch moved by reach cos x, its side by up to half
+ * the field with sin x -- and place and phase pull each other: dx = v + J/2 (S+ sin(Φ+ - (x + θ))
+ * + S- sin(Φ- - (x - θ))), dθ = ω + K/2 (S+ sin(Φ+ - (x + θ)) - S- sin(Φ- - (x - θ))), with
+ * S± e^(iΦ±) the mean of e^(i(x ± θ)) over the cloud, in the frame turning at the rate. Its states:
+ * the cloud gathered and pulsing as one; scattered and flickering; a phase wave, where each place
+ * has its phase and the loudest part of the cloud circles through pitch and field at the rate; and
+ * a phase wave broken into several, pulsing against each other.
  */
 struct PartialSync {
     float depth = 0.0f;      ///< 0 .. 1: how far the loudness follows the phase (0: nothing computed)
     float coupling = 0.0f;   ///< K, rad/s
     float rate = 0.5f;       ///< Hz: the oscillators' middle rate
     float spread = 0.3f;     ///< 0 .. 1: each rate scattered by up to this share either way
+    SyncMode mode = SyncMode::Global;   ///< how they couple
+    float swarm = 0.0f;      ///< Swarm: J, rad/s (positive: like phases gather)
+    float reach = 0.0f;      ///< Swarm: cents a partial is moved on its circle
+    float lag = 1.39f;       ///< Chimera: the phase lag, radians
 };
 static_assert(sizeof(PartialSync) % 16 == 0, "PartialSync rides in the block header");
 
