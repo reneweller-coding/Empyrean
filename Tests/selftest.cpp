@@ -1659,7 +1659,8 @@ int main()
     //     on the brightness, quick steps on the width) and modulate the motion's depth while the
     //     motion changes: every modulated number moves per block no more than the modulation
     //     itself does, the motion changes where its depth -- modulation included -- is nothing,
-    //     and the map's cursor jumping far does not make the partials or the motion jump.
+    //     the map's cursor jumping far does not make the partials or the motion jump, and a
+    //     picture's landscape changes where the picture is at nothing.
     {
         Engine e;
         quietEffects(e);
@@ -1745,14 +1746,42 @@ int main()
                 prevKind[j] = kind;
             }
         }
+        // A picture over one landscape glides into the same picture over another: where the
+        // landscape changes, the picture -- pushed by the matrix too -- is at nothing.
+        double lifeAtSwitch = 1.0;
+        {
+            Engine f;
+            quietEffects(f);
+            f.setParam(ParamId::LifeMode, 3.0f);   // Kaleidoscope
+            f.setParam(ParamId::LifeDepth, 0.8f);
+            f.setParam(ParamId::Landscape, 0.0f);
+            f.setParam(ParamId::Macro1, 1.0f);
+            f.setModText("macro1>life_depth:0.2");
+            if (!openOffline(f, false, 169)) return 1;
+            f.noteOn(55, 0.8f, 0);
+            for (int k = 0; k < 400; ++k) f.process(L.data(), R.data(), 128);
+            f.beginMorph(2.0);
+            f.setParam(ParamId::Landscape, 2.0f);
+            int land = 0;
+            for (int k = 0; k < 1000; ++k) {
+                f.process(L.data(), R.data(), 128);
+                const int now = static_cast<int>(std::lround(f.soundValue(ParamId::Landscape)));
+                if (now != land) {
+                    const float n = f.playedNorm(ParamId::LifeDepth);
+                    lifeAtSwitch = std::isnan(n) ? f.soundValue(ParamId::LifeDepth) : n;
+                }
+                land = now;
+            }
+        }
         // The brightness is moved only by A's sine, the width only by B's steps: gliding, neither may
         // move faster than its own modulator does.
         const bool smooth = gliding[0] < 1.5 * before[0] + 1.0e-3 && gliding[1] < 1.5 * after[1] + 1.0e-3;
-        check(smooth && depthAtSwitch < 0.02 && partialsJump < 0.02 && amountAtSwitch < 0.02,
+        check(smooth && depthAtSwitch < 0.02 && partialsJump < 0.02 && amountAtSwitch < 0.02 && lifeAtSwitch < 0.02,
               "morph: modulation glides without steps",
               fmt("largest move per block: brightness %.4f gliding (%.4f by A's LFO), width %.4f gliding (%.4f by B's); motion depth %.3f where "
-                  "the motion changed; the map's far jump: partials %.3f of their range in a block, an amount %.3f where its kind changed",
-                  gliding[0], before[0], gliding[1], after[1], depthAtSwitch, partialsJump, amountAtSwitch));
+                  "the motion changed; the map's far jump: partials %.3f of their range in a block, an amount %.3f where its kind changed; "
+                  "a picture's depth %.3f where its landscape changed",
+                  gliding[0], before[0], gliding[1], after[1], depthAtSwitch, partialsJump, amountAtSwitch, lifeAtSwitch));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

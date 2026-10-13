@@ -16,7 +16,9 @@
  * at nothing, to Off it switches at the end, and between two others at the middle, where both
  * are faded out. The fade is also kept as a gate, which the engine applies to the amount after
  * the matrix: a row that pushes the depth would otherwise keep it from nothing where the kind
- * changes. Every other choice and switch changes at the middle.
+ * changes. The landscape is read by Aurora and by the animated pictures: where it changes, every
+ * one of them that reads it fades through nothing at the middle, and it changes there. Every
+ * other choice and switch changes at the middle.
  *
  * Each sound brings its own LFOs and envelopes (ModSetup): a blend keeps the setups of the sounds
  * in it, and every row the setup it came with, so the engine runs one set of modulators per setup

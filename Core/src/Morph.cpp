@@ -4,6 +4,7 @@
  */
 #include "additiv/Morph.h"
 
+#include "additiv/Cloud.h"
 #include "additiv/Motion.h"
 
 #include <algorithm>
@@ -55,19 +56,20 @@ struct Side {
  * @param ga    the gate at 0
  * @param gb    the gate at 1
  * @param off   the choice that means off, -1 when none does
- * @param same  the two count as the same (then the amount simply glides)
+ * @param same    the two count as the same (then the amount simply glides)
+ * @param middle  change at the middle even from or to off (the landscape it reads changes there)
  * @param w     0 .. 1
  * @param a     the sound at 0
  * @param b     the sound at 1
  * @return      the side, the amount and the gate
  */
-Side side(int ca, int cb, float na, float nb, float ga, float gb, int off, bool same, float w, const MorphState& a, const MorphState& b)
+Side side(int ca, int cb, float na, float nb, float ga, float gb, int off, bool same, bool middle, float w, const MorphState& a, const MorphState& b)
 {
-    if (ca == off) na = 0.0f;
-    if (cb == off) nb = 0.0f;
+    if (ca == off) { na = 0.0f; ga = 0.0f; }
+    if (cb == off) { nb = 0.0f; gb = 0.0f; }
     if (same) return { nullptr, na + (nb - na) * w, ga + (gb - ga) * w };
-    if (ca == off) return { &b, w * nb, w * gb };
-    if (cb == off) return { &a, (1.0f - w) * na, (1.0f - w) * ga };
+    if (!middle && ca == off) return { &b, w * nb, w * gb };
+    if (!middle && cb == off) return { &a, (1.0f - w) * na, (1.0f - w) * ga };
     return w < 0.5f ? Side{ &a, na * (1.0f - 2.0f * w), ga * (1.0f - 2.0f * w) } : Side{ &b, nb * (2.0f * w - 1.0f), gb * (2.0f * w - 1.0f) };
 }
 
@@ -88,20 +90,31 @@ struct Pair {
 
 /** @brief The choices with an amount, in the order blendMorph and approachMorph take them. */
 const Pair kPairs[] = {
-    { ParamId::Motion, ParamId::MotionDepth, 0, { ParamId::Landscape, ParamId::Landscape }, 1 },
+    { ParamId::Motion, ParamId::MotionDepth, 0, { ParamId::Motion, ParamId::Motion }, 0 },
     { ParamId::LifeMode, ParamId::LifeDepth, 1, { ParamId::LifeMode, ParamId::LifeMode }, 0 },
     { ParamId::FieldMode, ParamId::FieldStrength, 2, { ParamId::FieldMode, ParamId::FieldMode }, 0 },
     { ParamId::FilterModel, ParamId::Count, -1, { ParamId::Cutoff, ParamId::Resonance }, 2 },
 };
 
-/** @brief Whether two sounds have the same kind for a pair (the motion also the same landscape, if it reads one). @param p the pair @param a one @param b the other @return true then */
+/** @brief Whether a pair's kind reads the landscape (Aurora, the animated pictures). @param p the pair @param kind its choice @return true then */
+bool readsLandscape(const Pair& p, int kind)
+{
+    if (p.choice == ParamId::Motion) return motionUsesLandscape(static_cast<MotionKind>(kind));
+    if (p.choice == ParamId::LifeMode) return lifeIsPicture(static_cast<LifeMode>(kind));
+    return false;
+}
+
+/** @brief Whether the landscape changes between two sounds for a pair that reads it on either side. @param p the pair @param a one @param b the other @return true then */
+bool landChanges(const Pair& p, const MorphState& a, const MorphState& b)
+{
+    return choiceOf(a, ParamId::Landscape) != choiceOf(b, ParamId::Landscape)
+        && (readsLandscape(p, choiceOf(a, p.choice)) || readsLandscape(p, choiceOf(b, p.choice)));
+}
+
+/** @brief Whether two sounds have the same kind for a pair (and the same landscape, if it reads one). @param p the pair @param a one @param b the other @return true then */
 bool sameKind(const Pair& p, const MorphState& a, const MorphState& b)
 {
-    const int ca = choiceOf(a, p.choice);
-    if (ca != choiceOf(b, p.choice)) return false;
-    if (p.choice == ParamId::Motion && motionUsesLandscape(static_cast<MotionKind>(ca)))
-        return choiceOf(a, ParamId::Landscape) == choiceOf(b, ParamId::Landscape);
-    return true;
+    return choiceOf(a, p.choice) == choiceOf(b, p.choice) && !landChanges(p, a, b);
 }
 
 /** @brief A pair's amount, normalised. @param p the pair @param s the sound @return 0 .. 1 */
@@ -215,7 +228,10 @@ void approachMorph(const MorphState& cur, const MorphState& target, float coef, 
     for (int g = 0; g < kMorphGates; ++g) out.gate[g] = cur.gate[g] + (target.gate[g] - cur.gate[g]) * coef;
     // A kind that differs: its amount and gate fade out (twice the pace), its companions stay; it
     // changes when nothing of it is heard. From off it changes at once, with nothing of it yet.
+    // The landscape changes when nothing that reads it is heard: until then those that read it
+    // stay at nothing.
     const float fade = std::max(0.0f, 1.0f - 2.0f * coef);
+    out.values[static_cast<size_t>(ParamId::Landscape)] = cur.values[static_cast<size_t>(ParamId::Landscape)];
     for (const Pair& p : kPairs) {
         if (sameKind(p, cur, target)) continue;
         if (choiceOf(cur, p.choice) == 0) {
@@ -232,6 +248,10 @@ void approachMorph(const MorphState& cur, const MorphState& target, float coef, 
             setAmount(p, out, amountOf(p, cur) * fade, gate);
         }
     }
+    bool heard = false;
+    for (const Pair& p : kPairs)
+        heard = heard || (readsLandscape(p, choiceOf(out, p.choice)) && gateOf(p, out) >= 0.005f);
+    if (!heard) out.values[static_cast<size_t>(ParamId::Landscape)] = target.values[static_cast<size_t>(ParamId::Landscape)];
     out.rowCount = 0;
     out.setupCount = 0;
     for (int i = 0; i < cur.rowCount; ++i) addRow(out, cur, cur.rows[i], 1.0f - coef);
@@ -253,12 +273,13 @@ void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& o
         out.values[i] = d.kind == ParamKind::Float || d.kind == ParamKind::Int ? lerpParam(d, a.values[i], b.values[i], w)
                                                                                 : (w < 0.5f ? a.values[i] : b.values[i]);
     }
-    // The choices with an amount (the motion with the landscape it reads, the living landscape, the
-    // field, the voice filter with its cutoff and resonance -- an Off filter's are not heard and
-    // should not sweep): the amount and the gate by the rule, the kind from the side in use.
+    // The choices with an amount (the motion, the living landscape, the field, the voice filter with
+    // its cutoff and resonance -- an Off filter's are not heard and should not sweep): the amount
+    // and the gate by the rule, the kind from the side in use. Where the landscape changes (at the
+    // middle, a plain choice), those that read it pass through nothing there, even from or to off.
     for (const Pair& p : kPairs) {
         const Side s = side(choiceOf(a, p.choice), choiceOf(b, p.choice), amountOf(p, a), amountOf(p, b), gateOf(p, a), gateOf(p, b), 0,
-                            sameKind(p, a, b), w, a, b);
+                            sameKind(p, a, b), landChanges(p, a, b), w, a, b);
         setAmount(p, out, s.amount, s.gate);
         if (s.from != nullptr) takeKind(p, *s.from, out);
     }
