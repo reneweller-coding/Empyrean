@@ -189,6 +189,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     std::fill(std::begin(specKey_), std::end(specKey_), -1.0f);
     scaleChoice_ = -1;
     mods_.reset(cfg_.seed ^ 0x6D6F647363ull);
+    for (OwnUnit& o : own_) o.live = false;
     soundValid_ = false;
     morphT_ = 1.0f;
     morphSeen_ = morphAsked_.load(std::memory_order_acquire);
@@ -502,6 +503,56 @@ void Engine::updateSound()
     soundMix_.store(sound_.filterMix, std::memory_order_relaxed);
 }
 
+void Engine::runOwnModulators(float dt)
+{
+    bool read[kMorphSetups] = {};
+    float weight[kMorphSetups] = {};
+    for (int r = 0; r < sound_.rowCount; ++r) {
+        const ModRow& row = sound_.rows[r];
+        if ((isOwnSource(row.source) || isOwnSource(row.via)) && row.setup >= 0 && row.setup < sound_.setupCount) {
+            read[row.setup] = true;
+            weight[row.setup] += std::fabs(row.depth);
+        }
+    }
+    bool wanted[kOwnUnits] = {};
+    int unmatched[kMorphSetups];
+    int pending = 0, strongest = -1;
+    float strongestWeight = -1.0f;
+    for (int k = 0; k < sound_.setupCount; ++k) {
+        ownOf_[k] = -1;
+        if (!read[k]) continue;
+        for (int u = 0; u < kOwnUnits; ++u)
+            if (own_[static_cast<size_t>(u)].live && !wanted[u] && own_[static_cast<size_t>(u)].setup == sound_.setups[k]) {
+                ownOf_[k] = u;
+                wanted[u] = true;
+                break;
+            }
+        if (ownOf_[k] < 0) unmatched[pending++] = k;
+        else if (weight[k] > strongestWeight) { strongestWeight = weight[k]; strongest = ownOf_[k]; }
+    }
+    for (int j = 0; j < pending; ++j) {
+        const int k = unmatched[j];
+        int u = -1;
+        for (int v = 0; v < kOwnUnits && u < 0; ++v)   // one no row reads any more runs on with the new settings
+            if (own_[static_cast<size_t>(v)].live && !wanted[v]) u = v;
+        if (u < 0) {
+            for (int v = 0; v < kOwnUnits && u < 0; ++v)
+                if (!own_[static_cast<size_t>(v)].live) u = v;
+            if (u < 0) continue;   // all running: its rows read the panel's (rare: a blend of blends of many sounds)
+            own_[static_cast<size_t>(u)].mods = strongest >= 0 ? own_[static_cast<size_t>(strongest)].mods : mods_.own();
+            own_[static_cast<size_t>(u)].live = true;
+        }
+        own_[static_cast<size_t>(u)].setup = sound_.setups[k];
+        ownOf_[k] = u;
+        wanted[u] = true;
+    }
+    for (int u = 0; u < kOwnUnits; ++u) {
+        OwnUnit& o = own_[static_cast<size_t>(u)];
+        if (!wanted[u]) { o.live = false; continue; }
+        o.mods.advance(dt, mods_.envTime(), o.setup);
+    }
+}
+
 void Engine::readParams()
 {
     // What plays before the matrix: the knobs, the A/B morph, or a glide between (Morph.h).
@@ -593,22 +644,32 @@ void Engine::readParams()
         }
         phraseStart_ = false;
         mods_.advance(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate), in);
+        runOwnModulators(static_cast<float>(cfg_.gpuBlock / cfg_.sampleRate));
         for (int s = 1; s < kNumModSources; ++s)
             sourceLive_[static_cast<size_t>(s)].store(mods_.value(static_cast<ModSource>(s)), std::memory_order_relaxed);
+        // A source as a row reads it: an LFO or envelope from the modulators of the sound the row came with.
+        auto source = [this](ModSource s, int setup) {
+            if (isOwnSource(s) && setup >= 0 && setup < sound_.setupCount && ownOf_[setup] >= 0)
+                return own_[static_cast<size_t>(ownOf_[setup])].mods.value(s);
+            return mods_.value(s);
+        };
         float offset[kNumParams] = {};
         bool modded[kNumParams] = {};
         for (int r = 0; r < sound_.rowCount; ++r) {   // the matrix where the sound stands (a glide weighs two)
             const ModRow& row = sound_.rows[r];
             if (row.source == ModSource::Off || row.target < 0 || row.target >= kNumParams || row.depth == 0.0f) continue;
-            const float amount = row.via == ModSource::Off ? 1.0f : viaAmount(row.via, mods_.value(row.via));
-            offset[row.target] += row.depth * amount * mods_.value(row.source);
+            const float amount = row.via == ModSource::Off ? 1.0f : viaAmount(row.via, source(row.via, row.setup));
+            offset[row.target] += row.depth * amount * source(row.source, row.setup);
             modded[row.target] = true;
         }
+        // A gated amount is heard by its gate, the matrix's push too: nothing where its kind changes.
+        for (int g = 0; g < kMorphGates; ++g) offset[static_cast<int>(kGatedAmounts[g])] *= sound_.gate[g];
         for (int i = 0; i < kNumParams; ++i) {
             const ParamDesc& d = paramTable()[static_cast<size_t>(i)];
             const float base = this->base(d.id);
             if (!modded[i]) {
-                cur_[static_cast<size_t>(i)] = base;
+                // Whole numbers glide unrounded while the map's cursor is followed: rounded here.
+                cur_[static_cast<size_t>(i)] = d.kind == ParamKind::Int ? std::round(base) : base;
                 played_[static_cast<size_t>(i)].store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
                 continue;
             }

@@ -1655,6 +1655,106 @@ int main()
                   reachedA ? "yes" : "NO", reachedB ? "yes" : "NO", looped ? "yes" : "NO"));
     }
 
+    // 52. A glide with modulation has no steps. Two sounds use the same LFO differently (a slow sine
+    //     on the brightness, quick steps on the width) and modulate the motion's depth while the
+    //     motion changes: every modulated number moves per block no more than the modulation
+    //     itself does, the motion changes where its depth -- modulation included -- is nothing,
+    //     and the map's cursor jumping far does not make the partials or the motion jump.
+    {
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Attack, 0.2f);
+        e.setParam(ParamId::Motion, 4.0f);        // Breathe
+        e.setParam(ParamId::MotionDepth, 0.5f);
+        e.setParam(ParamId::Lfo1Shape, 0.0f);     // sine
+        e.setParam(ParamId::Lfo1Rate, 0.3f);
+        e.setParam(ParamId::Lfo2Shape, 1.0f);     // triangle
+        e.setParam(ParamId::Lfo2Rate, 0.2f);
+        e.setParam(ParamId::Macro1, 1.0f);       // a constant push on the depth: at the change it must be faded too
+        e.setModText("lfo1>brightness:0.4;macro1>motion_depth:0.3");
+        if (!openOffline(e, false, 167)) return 1;
+        e.noteOn(50, 0.8f, 0);
+        e.noteOn(57, 0.8f, 0);
+        std::vector<float> L(128), R(128);
+        // The played value of a number: modulated, or as it stands.
+        auto played = [&](ParamId id) {
+            const float n = e.playedNorm(id);
+            return std::isnan(n) ? toNorm(paramDesc(id), e.soundValue(id)) : n;
+        };
+        // Each number's largest move per block: before (A's slow sine on the brightness), gliding,
+        // after (B's quick steps on the width).
+        const ParamId watched[] = { ParamId::Brightness, ParamId::CloudWidth };
+        float last[2] = {};
+        double before[2] = {}, gliding[2] = {}, after[2] = {}, ignore[2] = {};
+        auto step = [&](double* worst) {
+            e.process(L.data(), R.data(), 128);
+            for (int k = 0; k < 2; ++k) {
+                const float v = played(watched[k]);
+                worst[k] = std::max(worst[k], static_cast<double>(std::fabs(v - last[k])));
+                last[k] = v;
+            }
+        };
+        for (int k = 0; k < 1500; ++k) step(k < 10 ? ignore : before);   // 4 s
+        e.beginMorph(4.0);
+        e.setParam(ParamId::Motion, 6.0f);        // Aurora
+        e.setParam(ParamId::MotionDepth, 0.6f);
+        e.setParam(ParamId::Lfo1Shape, 6.0f);     // steps
+        e.setParam(ParamId::Lfo1Rate, 2.0f);
+        e.setModText("lfo1>cloud_width:0.4;macro1>motion_depth:0.3");
+        double depthAtSwitch = 0.0;
+        int prevMotion = 4;
+        for (int k = 0; k < 1700; ++k) {          // the glide and a little
+            step(gliding);
+            const int motion = static_cast<int>(std::lround(e.soundValue(ParamId::Motion)));
+            if (motion != prevMotion) depthAtSwitch = std::max(depthAtSwitch, static_cast<double>(played(ParamId::MotionDepth)));
+            prevMotion = motion;
+        }
+        for (int k = 0; k < 1500; ++k) step(after);
+        // The map: on, then its target far away -- the other end of the bank.
+        float va[kNumParams], vb[kNumParams];
+        std::string ma, mb;
+        presetValues(0, va, &ma);
+        presetValues(numPresets() - 1, vb, &mb);
+        ModRow ra[kModRows], rb[kModRows];
+        MorphState here, yonder;
+        here.set(va, ra, modRowsFromText(ma, ra, kModRows));
+        yonder.set(vb, rb, modRowsFromText(mb, rb, kModRows));
+        here.values[static_cast<size_t>(ParamId::Partials)] = 2000.0f;   // far apart in what can only step
+        yonder.values[static_cast<size_t>(ParamId::Partials)] = 20000.0f;
+        e.setParam(ParamId::MapGlide, 2.0f);
+        e.setMapTarget(here);
+        e.setParam(ParamId::MapActive, 1.0f);
+        for (int k = 0; k < 2000; ++k) e.process(L.data(), R.data(), 128);   // the map takes over, gliding
+        e.setMapTarget(yonder);
+        double partialsJump = 0.0, amountAtSwitch = 0.0;
+        float prevPartials = e.soundValue(ParamId::Partials);
+        int prevKind[3] = { static_cast<int>(std::lround(e.soundValue(ParamId::Motion))), static_cast<int>(std::lround(e.soundValue(ParamId::LifeMode))),
+                            static_cast<int>(std::lround(e.soundValue(ParamId::FieldMode))) };
+        const ParamId amounts[3] = { ParamId::MotionDepth, ParamId::LifeDepth, ParamId::FieldStrength };
+        const ParamId kinds[3] = { ParamId::Motion, ParamId::LifeMode, ParamId::FieldMode };
+        const float partialsSpan = paramDesc(ParamId::Partials).max - paramDesc(ParamId::Partials).min;
+        for (int k = 0; k < 4000; ++k) {
+            const float amountBefore[3] = { played(amounts[0]), played(amounts[1]), played(amounts[2]) };
+            e.process(L.data(), R.data(), 128);
+            const float p = e.soundValue(ParamId::Partials);
+            partialsJump = std::max(partialsJump, static_cast<double>(std::fabs(p - prevPartials) / partialsSpan));
+            prevPartials = p;
+            for (int j = 0; j < 3; ++j) {
+                const int kind = static_cast<int>(std::lround(e.soundValue(kinds[j])));
+                if (kind != prevKind[j] && prevKind[j] != 0) amountAtSwitch = std::max(amountAtSwitch, static_cast<double>(amountBefore[j]));
+                prevKind[j] = kind;
+            }
+        }
+        // The brightness is moved only by A's sine, the width only by B's steps: gliding, neither may
+        // move faster than its own modulator does.
+        const bool smooth = gliding[0] < 1.5 * before[0] + 1.0e-3 && gliding[1] < 1.5 * after[1] + 1.0e-3;
+        check(smooth && depthAtSwitch < 0.02 && partialsJump < 0.02 && amountAtSwitch < 0.02,
+              "morph: modulation glides without steps",
+              fmt("largest move per block: brightness %.4f gliding (%.4f by A's LFO), width %.4f gliding (%.4f by B's); motion depth %.3f where "
+                  "the motion changed; the map's far jump: partials %.3f of their range in a block, an amount %.3f where its kind changed",
+                  gliding[0], before[0], gliding[1], after[1], depthAtSwitch, partialsJump, amountAtSwitch));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

@@ -459,6 +459,23 @@ private:
     float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
     bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
     Modulators mods_;                                  ///< the modulation sources
+    /** @brief One setup of sound_'s own LFOs and envelopes, running (Morph.h: each row reads the modulators of the sound it came from). */
+    struct OwnUnit {
+        ModSetup setup;                                ///< whose settings
+        OwnModulators mods;                            ///< running
+        bool live = false;                             ///< in use
+    };
+    static constexpr int kOwnUnits = 24;               ///< setups that run at once (a glide's start and its end hold sixteen each at most)
+    std::array<OwnUnit, kOwnUnits> own_{};             ///< the running setups
+    int ownOf_[kMorphSetups] = {};                     ///< for each of sound_'s setups the unit that runs it this block, -1 none
+    /**
+     * @brief Runs a unit for every setup sound_'s rows read: the one already running it; else one no
+     *        row reads any more takes the new settings on and runs on from where it is (a knob turned,
+     *        a preset taken without a glide); else a new one starts where the strongest running one
+     *        stands, so a sound joining a blend does not start its LFOs from nothing.
+     * @param dt  seconds of the block
+     */
+    void runOwnModulators(float dt);
     // The morph (Morph.h). The worker owns sound_, from_, target_ and slots_; the editor hands
     // slots over through pendingSlots_ under slotLock_, which the worker only tries.
     /** @brief What plays this block before the matrix: the knobs, the A/B morph, or a glide between. */

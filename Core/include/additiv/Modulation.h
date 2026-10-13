@@ -13,6 +13,11 @@
  * Every source moves without steps: ramps and the square return over 7 % of a cycle, random
  * shapes glide. The envelopes run on a phrase clock: they restart when a note arrives into
  * silence, not on every note of a cluster, or a shape spanning a minute would never get anywhere.
+ *
+ * The LFOs and the envelopes belong to a sound (ModSetup, OwnModulators): when two sounds blend
+ * (Morph.h), each row keeps running on the modulators of the sound it came from -- a slow sine on
+ * the brightness stays a slow sine while it fades, though the sound it fades into uses LFO 1 for
+ * quick steps on the width. The other sources are the instrument's, one of each.
  */
 #pragma once
 
@@ -86,6 +91,56 @@ struct ModRow {
     int target = -1;                     ///< the ParamId it moves, -1 none
     float depth = 0.0f;                  ///< -1 .. 1 of the target's normalised range
     ModSource via = ModSource::Off;      ///< a second source that scales the depth as an amount 0 .. 1 (Off: depth as it is)
+    int setup = 0;                       ///< whose LFOs and envelopes it reads: an index into its sound's setups (MorphState); 0 in a plain matrix
+};
+
+/** @brief Whether a source is one of a sound's own modulators (the four LFOs, the two envelopes). @param s the source @return true then */
+inline bool isOwnSource(ModSource s) { return s >= ModSource::Lfo1 && s <= ModSource::Env2; }
+
+/** @brief The settings of a sound's own modulators: its LFOs' and envelopes' shapes and rates. */
+struct ModSetup {
+    int lfoShape[4] = { 0, 1, 5, 6 };                     ///< each LFO's shape (kLfoShapeNames)
+    float lfoRate[4] = { 0.05f, 0.08f, 0.13f, 0.21f };   ///< each LFO's rate, Hz
+    int envShape[2] = { 2, 0 };                           ///< each envelope's factory shape
+    float envRate[2] = { 0.25f, 0.1f };                   ///< each envelope's speed
+    /** @brief The same settings. @param o the other @return true when every one is equal */
+    bool operator==(const ModSetup& o) const;
+    /** @brief Different settings. @param o the other @return true when any one differs */
+    bool operator!=(const ModSetup& o) const { return !(*this == o); }
+};
+
+/** @brief A sound's own modulators as its parameters set them. @param values kNumParams values @return the setup */
+ModSetup modSetupFrom(const float* values);
+
+/**
+ * @brief A sound's own modulators running: four LFOs (their phases, random curves and steps) and
+ *        two envelopes on the phrase clock. A copy runs on exactly as the original would, so a
+ *        sound that joins a blend starts where the one already playing stands.
+ */
+class OwnModulators {
+public:
+    /** @brief Back to the start. @param seed the dice of the random shapes */
+    void reset(std::uint64_t seed);
+    /**
+     * @brief Advances by a block.
+     * @param dt       seconds
+     * @param envTime  seconds since the phrase began (the envelopes' clock, the instrument's)
+     * @param s        the settings
+     */
+    void advance(float dt, double envTime, const ModSetup& s);
+    /** @brief An LFO's or envelope's value after the last advance. @param s the source @return its value, 0 for any other */
+    float value(ModSource s) const;
+
+private:
+    /** @brief One LFO's value at its phase. @param i the LFO @param shape kLfoShapeNames @return -1 .. 1 */
+    float lfoValue(int i, int shape) const;
+
+    double phase_[4] = { 0.0, 0.0, 0.0, 0.0 };      ///< each LFO's phase, 0 .. 1
+    Drifter random_[4];                              ///< each LFO's random curve (Random shape)
+    float stepFrom_[4] = { 0.0f, 0.0f, 0.0f, 0.0f }; ///< each LFO's Steps: the value it glides from
+    float stepTo_[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   ///< and to
+    Rng rng_;                                        ///< its own dice, so a copy draws what the original would
+    float values_[6] = {};                           ///< LFO 1 .. 4, Env 1 and 2
 };
 
 /**
@@ -173,15 +228,12 @@ public:
     void advance(float dt, const ModInputs& in);
     /** @brief A source's value after the last advance. @param s the source @return its value */
     float value(ModSource s) const { const int i = static_cast<int>(s); return i > 0 && i < kNumModSources ? values_[i] : 0.0f; }
+    /** @brief The LFOs and envelopes as the parameters set them (a sound's own copies start from these). @return them */
+    const OwnModulators& own() const { return own_; }
+    /** @brief The phrase clock: seconds since a note arrived into silence. @return seconds */
+    double envTime() const { return envTime_; }
 
 private:
-    /**
-     * @brief One LFO's value at its phase.
-     * @param i      the LFO
-     * @param shape  kLfoShapeNames
-     * @return       -1 .. 1
-     */
-    float lfoValue(int i, int shape) const;
     /** @brief One block of the Lenia field (Noctuary's: rows stepped at the rate, a dead or full field seeded again). @param dt seconds @param rate fields per second @param mu growth centre */
     void stepLenia(float dt, float rate, float mu);
     /** @brief A few soft blobs on an empty torus, from the field's own dice. */
@@ -189,10 +241,7 @@ private:
     /** @brief One block of the two attractors (fourth-order Runge-Kutta in their own time). @param dt seconds @param period the chaos period */
     void stepChaos(float dt, float period);
 
-    double phase_[4] = { 0.0, 0.0, 0.0, 0.0 };      ///< each LFO's phase, 0 .. 1
-    Drifter random_[4];                              ///< each LFO's random curve (Random shape)
-    float stepFrom_[4] = { 0.0f, 0.0f, 0.0f, 0.0f }; ///< each LFO's Steps: the value it glides from
-    float stepTo_[4] = { 0.0f, 0.0f, 0.0f, 0.0f };   ///< and to
+    OwnModulators own_;                              ///< the LFOs and envelopes on the parameters (the panel's, and where a sound's own begin)
     Drifter slow_;                                   ///< the Random source
     double envTime_ = 0.0;                           ///< seconds since the phrase began
     Rng rng_;                                        ///< the dice

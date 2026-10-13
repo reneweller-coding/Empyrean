@@ -37,7 +37,11 @@ struct MapNeighbours {
 /**
  * @brief The presets closest to a place and their Gaussian weights. The radius is the Gaussian's
  *        width; where the nearest preset is further away than it (the cursor in a gap), it grows
- *        to reach the third, so the blend never collapses onto one point by accident (Noctuary's rule).
+ *        towards the third, so the blend never collapses onto one point by accident (Noctuary's rule).
+ *        Every weight is continuous in the place, so a cursor that moves never makes the sound jump:
+ *        the width grows smoothly, the weight the seventh nearest would have is taken off the six
+ *        (a preset enters and leaves the six at nothing), and so are 2 % of the whole (a neighbour
+ *        too faint to be heard enters at nothing rather than at 2 %).
  * @param x       across, 0 .. 1
  * @param y       up, 0 .. 1
  * @param radius  the width, 0.01 .. 0.3

@@ -166,7 +166,30 @@ int modRowsFromText(const std::string& text, ModRow* rows, int n)
     return count;
 }
 
-void Modulators::reset(std::uint64_t seed)
+bool ModSetup::operator==(const ModSetup& o) const
+{
+    for (int i = 0; i < 4; ++i)
+        if (lfoShape[i] != o.lfoShape[i] || lfoRate[i] != o.lfoRate[i]) return false;
+    for (int e = 0; e < 2; ++e)
+        if (envShape[e] != o.envShape[e] || envRate[e] != o.envRate[e]) return false;
+    return true;
+}
+
+ModSetup modSetupFrom(const float* values)
+{
+    ModSetup s;
+    for (int i = 0; i < 4; ++i) {
+        s.lfoShape[i] = static_cast<int>(std::lround(values[static_cast<int>(ParamId::Lfo1Shape) + 2 * i]));
+        s.lfoRate[i] = values[static_cast<int>(ParamId::Lfo1Rate) + 2 * i];
+    }
+    for (int e = 0; e < 2; ++e) {
+        s.envShape[e] = static_cast<int>(std::lround(values[static_cast<int>(ParamId::Env1Shape) + 2 * e]));
+        s.envRate[e] = values[static_cast<int>(ParamId::Env1Rate) + 2 * e];
+    }
+    return s;
+}
+
+void OwnModulators::reset(std::uint64_t seed)
 {
     rng_.seed(seed);
     for (int i = 0; i < 4; ++i) {
@@ -174,6 +197,38 @@ void Modulators::reset(std::uint64_t seed)
         random_[i].init(rng_);
         stepFrom_[i] = stepTo_[i] = rng_.bipolar();
     }
+    std::fill(std::begin(values_), std::end(values_), 0.0f);
+}
+
+void OwnModulators::advance(float dt, double envTime, const ModSetup& s)
+{
+    for (int i = 0; i < 4; ++i) {
+        const float rate = std::max(s.lfoRate[i], 0.0f);
+        phase_[i] += static_cast<double>(rate) * dt;
+        if (phase_[i] >= 1.0) {
+            phase_[i] -= std::floor(phase_[i]);
+            stepFrom_[i] = stepTo_[i];
+            stepTo_[i] = rng_.bipolar();
+        }
+        random_[i].update(dt, rate, rng_);
+        values_[i] = lfoValue(i, s.lfoShape[i]);
+    }
+    const std::vector<EnvShape>& b = bank();
+    for (int e = 0; e < 2; ++e) {
+        const int shape = std::clamp(s.envShape[e], 0, static_cast<int>(b.size()) - 1);
+        values_[4 + e] = shapeAt(b[static_cast<size_t>(shape)], envTime * std::max(s.envRate[e], 0.0f));
+    }
+}
+
+float OwnModulators::value(ModSource s) const
+{
+    return isOwnSource(s) ? values_[static_cast<int>(s) - static_cast<int>(ModSource::Lfo1)] : 0.0f;
+}
+
+void Modulators::reset(std::uint64_t seed)
+{
+    rng_.seed(seed);
+    own_.reset(seed ^ 0x4F574E4D4F44ull);
     slow_.init(rng_);
     envTime_ = 0.0;
     std::fill(std::begin(values_), std::end(values_), 0.0f);
@@ -298,7 +353,7 @@ void Modulators::stepChaos(float dt, float period)
     if (!finite3(rossler_)) { rossler_[0] = 1.0; rossler_[1] = 1.0; rossler_[2] = 1.0; }
 }
 
-float Modulators::lfoValue(int i, int shape) const
+float OwnModulators::lfoValue(int i, int shape) const
 {
     const float p = static_cast<float>(phase_[i]);
     switch (shape) {
@@ -323,23 +378,15 @@ float Modulators::lfoValue(int i, int shape) const
 
 void Modulators::advance(float dt, const ModInputs& in)
 {
-    for (int i = 0; i < 4; ++i) {
-        const float rate = std::max(in.lfoRate[i], 0.0f);
-        phase_[i] += static_cast<double>(rate) * dt;
-        if (phase_[i] >= 1.0) {
-            phase_[i] -= std::floor(phase_[i]);
-            stepFrom_[i] = stepTo_[i];
-            stepTo_[i] = rng_.bipolar();
-        }
-        random_[i].update(dt, rate, rng_);
-        values_[static_cast<int>(ModSource::Lfo1) + i] = lfoValue(i, in.lfoShape[i]);
-    }
     if (in.phraseStart) envTime_ = 0.0;
     envTime_ += dt;
-    const std::vector<EnvShape>& b = bank();
-    for (int e = 0; e < 2; ++e) {
-        const int shape = std::clamp(in.envShape[e], 0, static_cast<int>(b.size()) - 1);
-        values_[static_cast<int>(ModSource::Env1) + e] = shapeAt(b[static_cast<size_t>(shape)], envTime_ * std::max(in.envRate[e], 0.0f));
+    {
+        ModSetup s;
+        for (int i = 0; i < 4; ++i) { s.lfoShape[i] = in.lfoShape[i]; s.lfoRate[i] = in.lfoRate[i]; }
+        for (int e = 0; e < 2; ++e) { s.envShape[e] = in.envShape[e]; s.envRate[e] = in.envRate[e]; }
+        own_.advance(dt, envTime_, s);
+        for (int k = static_cast<int>(ModSource::Lfo1); k <= static_cast<int>(ModSource::Env2); ++k)
+            values_[k] = own_.value(static_cast<ModSource>(k));
     }
     for (int m = 0; m < 4; ++m) values_[static_cast<int>(ModSource::Macro1) + m] = in.macro[m];
     values_[static_cast<int>(ModSource::ModWheel)] = in.wheel;

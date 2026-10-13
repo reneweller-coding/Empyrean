@@ -28,29 +28,50 @@ MapNeighbours mapNeighbours(float x, float y, float radius)
 {
     MapNeighbours b;
     const int n = std::min(kPlaces, numPresets());
-    float dist[MapNeighbours::kMax] = {};
-    for (int i = 0; i < n; ++i) {   // the closest kMax by squared distance, in a small sorted list
+    // The closest kMax + 1 by squared distance, in a small sorted list (the last only to fade the others by).
+    constexpr int kList = MapNeighbours::kMax + 1;
+    float dist[kList] = {};
+    int index[kList] = {};
+    int count = 0;
+    for (int i = 0; i < n; ++i) {
         const float dx = kPresetMap[i][0] - x, dy = kPresetMap[i][1] - y;
         const float d = dx * dx + dy * dy;
-        int pos = b.count;
+        int pos = count;
         while (pos > 0 && dist[pos - 1] > d) --pos;
-        if (pos >= MapNeighbours::kMax) continue;
-        for (int k = std::min(b.count, MapNeighbours::kMax - 1); k > pos; --k) { dist[k] = dist[k - 1]; b.index[k] = b.index[k - 1]; }
+        if (pos >= kList) continue;
+        for (int k = std::min(count, kList - 1); k > pos; --k) { dist[k] = dist[k - 1]; index[k] = index[k - 1]; }
         dist[pos] = d;
-        b.index[pos] = i;
-        if (b.count < MapNeighbours::kMax) ++b.count;
+        index[pos] = i;
+        if (count < kList) ++count;
     }
-    // In a gap (the nearest further than the radius) the width grows to reach the third neighbour;
-    // on a preset's own point it is that preset alone.
+    b.count = std::min(count, MapNeighbours::kMax);
+    for (int k = 0; k < b.count; ++k) b.index[k] = index[k];
+    if (b.count == 0) return b;
+    // In a gap (the nearest further than the radius) the width grows towards the third neighbour,
+    // smoothly over one more radius; on a preset's own point it is that preset alone.
     const float sigma = std::max(radius, 1.0e-3f);
-    const float d0 = b.count > 0 ? std::sqrt(dist[0]) : 0.0f, d3 = std::sqrt(dist[b.count >= 3 ? 2 : 0]);
-    const float sig = (b.count > 0 && d0 > sigma) ? std::max(sigma, 0.7f * d3) : sigma;
+    const float d0 = std::sqrt(dist[0]), d3 = std::sqrt(dist[b.count >= 3 ? 2 : 0]);
+    const float g = std::clamp((d0 - sigma) / sigma, 0.0f, 1.0f);
+    const float sig = sigma + g * g * (3.0f - 2.0f * g) * std::max(0.0f, 0.7f * d3 - sigma);
+    // Relative to the nearest (no underflow in a gap), less what the seventh would weigh.
+    const float floor = count > MapNeighbours::kMax ? std::exp(-(dist[MapNeighbours::kMax] - dist[0]) / (2.0f * sig * sig)) : 0.0f;
     float sum = 0.0f;
     for (int k = 0; k < b.count; ++k) {
-        b.weight[k] = std::exp(-dist[k] / (2.0f * sig * sig));
+        b.weight[k] = std::max(0.0f, std::exp(-(dist[k] - dist[0]) / (2.0f * sig * sig)) - floor);
         sum += b.weight[k];
     }
-    for (int k = 0; k < b.count; ++k) b.weight[k] = sum > 1.0e-12f ? b.weight[k] / sum : (k == 0 ? 1.0f : 0.0f);
+    if (sum <= 1.0e-12f) {   // the six as far as the seventh: the nearest alone
+        for (int k = 0; k < b.count; ++k) b.weight[k] = k == 0 ? 1.0f : 0.0f;
+        return b;
+    }
+    // A neighbour under 2 % changes nothing heard but could switch on a living landscape or a
+    // filter at a thousandth of its depth: 2 % come off each, so it enters at nothing.
+    float rest = 0.0f;
+    for (int k = 0; k < b.count; ++k) {
+        b.weight[k] = std::max(0.0f, b.weight[k] / sum - 0.02f);
+        rest += b.weight[k];
+    }
+    for (int k = 0; k < b.count; ++k) b.weight[k] /= rest;
     return b;
 }
 
@@ -74,14 +95,13 @@ void MapBlender::blend(float x, float y, float radius, MorphState& out, MapNeigh
     if (around != nullptr) *around = b;
     if (b.count == 0) return;
     // One neighbour after another, each by its share of the weight so far: the running blend is
-    // the weighted mean (the numbers exactly, the choices by the heavier side). A neighbour under
-    // 2 % is left out: it would change nothing heard, but could switch on a living landscape or a
-    // filter at a thousandth of its depth.
+    // the weighted mean (the numbers exactly, the choices by the heavier side). A neighbour of no
+    // weight (mapNeighbours took 2 % off each) is left out.
     out = state(b.index[0]);
     float acc = b.weight[0];
     MorphState next;
     for (int k = 1; k < b.count; ++k) {
-        if (b.weight[k] < 0.02f) continue;
+        if (b.weight[k] <= 0.0f) continue;
         acc += b.weight[k];
         blendMorph(out, state(b.index[k]), b.weight[k] / acc, next);
         out = next;
