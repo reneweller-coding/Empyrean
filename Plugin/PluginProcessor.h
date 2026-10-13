@@ -52,6 +52,8 @@ public:
     bool acceptsMidi() const override { return true; }
     /** @brief It sends none. @return false */
     bool producesMidi() const override { return false; }
+    /** @brief MPE: every played note may come on its own channel with its own bend, pressure and slide. @return true */
+    bool supportsMPE() const override { return true; }
     /** @brief The far reverb rings on. @return seconds */
     double getTailLengthSeconds() const override { return 30.0; }
 
@@ -281,6 +283,19 @@ private:
     int bankGroup_ = 0;                                    ///< the group bank select (CC 0) chose
     bool sustain_ = false;                                 ///< the hold pedal (CC 64) is down
     std::bitset<128> held_;                                ///< notes let go while the pedal was down, released with it
+    float masterBend_ = 2.0f;                              ///< MPE: the master channel's bend range, semitones (its RPN 0)
+    int rpn_[16] = { 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF,
+                     0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF };   ///< each channel's chosen RPN (CC 101 and 100), 0x3FFF none
+    /**
+     * @brief MPE's controllers on a channel: the RPN chosen (CC 101 / 100), and its value (CC 6):
+     *        RPN 0 a bend range (the master's on channel 1, the member channels' elsewhere), RPN 6 on
+     *        channel 1 the zone (MPE on with members, off without). Audio thread.
+     * @param ch     the channel, 0 .. 15
+     * @param cc     the controller
+     * @param value  its value, 0 .. 127
+     * @return       true when it was one of these
+     */
+    bool mpeController(int ch, int cc, int value);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AdditivProcessor)
 };

@@ -114,6 +114,7 @@ Engine::Engine()
     resetParams();
     for (auto& r : modRows_) r.store(packModRow(ModRow{}), std::memory_order_relaxed);
     for (auto& p : played_) p.store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
+    for (auto& s : chanSlide_) s.store(0.5f, std::memory_order_relaxed);   // MPE: a slide at rest
 }
 
 void Engine::setModRow(int i, const ModRow& row)
@@ -325,19 +326,19 @@ void Engine::workerLoop()
     if (timer) CloseHandle(timer);
 }
 
-void Engine::noteOn(int note, float velocity, int offset)
+void Engine::noteOn(int note, float velocity, int offset, int channel)
 {
     const std::uint32_t head = qHead_.load(std::memory_order_relaxed);
     if (!prepared_ || head - qTail_.load(std::memory_order_acquire) >= kQueueSize) return;
-    queue_[head & (kQueueSize - 1)] = { 0, note, std::clamp(velocity, 0.0f, 1.0f), stampFor(offset) };
+    queue_[head & (kQueueSize - 1)] = { 0, note, std::clamp(velocity, 0.0f, 1.0f), stampFor(offset), std::clamp(channel, -1, 15) };
     qHead_.store(head + 1, std::memory_order_release);
 }
 
-void Engine::noteOff(int note, int offset)
+void Engine::noteOff(int note, int offset, int channel)
 {
     const std::uint32_t head = qHead_.load(std::memory_order_relaxed);
     if (!prepared_ || head - qTail_.load(std::memory_order_acquire) >= kQueueSize) return;
-    queue_[head & (kQueueSize - 1)] = { 1, note, 0.0f, stampFor(offset) };
+    queue_[head & (kQueueSize - 1)] = { 1, note, 0.0f, stampFor(offset), std::clamp(channel, -1, 15) };
     qHead_.store(head + 1, std::memory_order_release);
 }
 
@@ -866,12 +867,16 @@ float Engine::brainDistance()
     return rng_.uniform() < 0.4f ? blk_.depth * 0.15f * u : blk_.depth * (0.55f + 0.45f * u);
 }
 
-void Engine::beginOn(int i, int note, float velocity, float distance, int source, int onset)
+void Engine::beginOn(int i, int note, float velocity, float distance, int source, int onset, int channel)
 {
     Voice& v = voices_[static_cast<size_t>(i)];
     lastVelocity_ = velocity;
     v.note = note;
     v.source = source;
+    v.channel = source == 0 ? channel : -1;
+    v.bend = v.channel >= 0 ? chanBend_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed) : 0.0f;
+    v.press = v.channel >= 0 ? chanPress_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed) : 0.0f;
+    v.slide = v.channel >= 0 ? chanSlide_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed) : 0.5f;
     v.velocity = velocity;
     v.place = std::clamp(distance, 0.0f, 1.0f);
     v.distance = v.place;
@@ -895,11 +900,11 @@ void Engine::beginOn(int i, int note, float velocity, float distance, int source
     cloud_.voice(i).releaseAt = -1.0f;
 }
 
-void Engine::startNote(int note, float velocity, float distance, int source, int onset)
+void Engine::startNote(int note, float velocity, float distance, int source, int onset, int channel)
 {
     const int count = static_cast<int>(voices_.size());
     for (int i = 0; i < count; ++i)
-        if (voices_[static_cast<size_t>(i)].note < 0 && !voices_[static_cast<size_t>(i)].stealing) { beginOn(i, note, velocity, distance, source, onset); return; }
+        if (voices_[static_cast<size_t>(i)].note < 0 && !voices_[static_cast<size_t>(i)].stealing) { beginOn(i, note, velocity, distance, source, onset, channel); return; }
     // Every voice sounds: take the quietest released one, else the oldest. It fades to silence
     // over one block (a restart from full level would click) and the new note begins after it.
     int best = -1;
@@ -919,17 +924,18 @@ void Engine::startNote(int note, float velocity, float distance, int source, int
     Voice& v = voices_[static_cast<size_t>(best)];
     v.stealing = true;
     v.stealBlocks = 1;
-    v.next = { 0, note, velocity, 0 };
+    v.next = { 0, note, velocity, 0, channel };
     v.nextSource = source;
     v.nextDistance = distance;
 }
 
-void Engine::stopNote(int note, int source)
+void Engine::stopNote(int note, int source, int channel)
 {
     for (size_t i = 0; i < voices_.size(); ++i) {
         Voice& v = voices_[i];
-        if (v.stealing && v.next.type == 0 && v.next.note == note && v.nextSource == source) { v.next.type = -1; return; }
-        if (v.note == note && v.source == source && !v.released && !v.stealing) {
+        const bool ours = channel < 0 || v.channel < 0 || v.channel == channel;
+        if (v.stealing && v.next.type == 0 && v.next.note == note && v.nextSource == source && (channel < 0 || v.next.channel == channel)) { v.next.type = -1; return; }
+        if (v.note == note && v.source == source && ours && !v.released && !v.stealing) {
             v.released = true;
             v.env.noteOff();
             CloudVoice& cv = cloud_.voice(static_cast<int>(i));
@@ -1055,8 +1061,8 @@ void Engine::renderBlock()
         pending_.erase(pending_.begin() + static_cast<std::ptrdiff_t>(i));
         if (e.stamp < pos) late_.fetch_add(1, std::memory_order_relaxed);
         const int onset = static_cast<int>(std::clamp<std::int64_t>(e.stamp - pos, 0, G - 1));
-        if (e.type == 0) startNote(e.note, e.velocity, blk_.keysDepth, 0, onset);
-        else if (e.type == 1) stopNote(e.note, 0);
+        if (e.type == 0) startNote(e.note, e.velocity, blk_.keysDepth, 0, onset, e.channel);
+        else if (e.type == 1) stopNote(e.note, 0, e.channel);
         else
             for (const Voice& v : voices_)
                 if (v.note >= 0 && v.source == 0 && !v.released) stopNote(v.note, 0);
@@ -1156,7 +1162,7 @@ void Engine::renderBlock()
         if (v.stealing) {
             if (v.stealBlocks > 0) { --v.stealBlocks; cv.gain = 0.0f; v.env.kill(); ++sounding; continue; }
             v.stealing = false;
-            if (v.next.type == 0) beginOn(i, v.next.note, v.next.velocity, v.nextDistance, v.nextSource, 0);
+            if (v.next.type == 0) beginOn(i, v.next.note, v.next.velocity, v.nextDistance, v.nextSource, 0, v.next.channel);
             else v.note = -1;
         }
         if (v.note < 0) { cv.active = 0; continue; }
@@ -1183,9 +1189,27 @@ void Engine::renderBlock()
         v.prevDistance = v.distance;
         const double target = frequencyOf(v.note) * tideMul * std::exp2(static_cast<double>(v.tuneCents) / 1200.0);
         v.hz = v.restart ? target : v.hz * std::pow(target / v.hz, follow);
-        // The filter's cutoff: key tracking, the envelope, and its own drift of up to an octave.
+        // MPE: a played note's own bend, pressure and slide while it is held (kept as they were once it
+        // is let go, so a channel used again moves only its new note), and the master's bend. Each of
+        // pressure and slide moves its target: pressure from nothing up, slide either way about its rest.
+        float mpeBend = 0.0f;
+        float mpe[kNumMpeTargets] = {};
+        if (v.source == 0) {
+            if (!v.released && v.channel >= 0) {
+                v.bend = chanBend_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed);
+                v.press = chanPress_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed);
+                v.slide = chanSlide_[static_cast<size_t>(v.channel)].load(std::memory_order_relaxed);
+            }
+            mpeBend = chanBend_[16].load(std::memory_order_relaxed) + v.bend;
+            if (v.channel >= 0) {
+                mpe[std::clamp(static_cast<int>(std::lround(cur(ParamId::MpePress))), 0, kNumMpeTargets - 1)] += cur(ParamId::MpePressDepth) * v.press;
+                mpe[std::clamp(static_cast<int>(std::lround(cur(ParamId::MpeSlide))), 0, kNumMpeTargets - 1)] += cur(ParamId::MpeSlideDepth) * (2.0f * v.slide - 1.0f);
+            }
+        }
+        auto expr = [&mpe](MpeTarget t) { return mpe[static_cast<int>(t)]; };
+        // The filter's cutoff: key tracking, the envelope, its own drift of up to an octave, and MPE's up to three.
         const float oct = blk_.keyTrack * static_cast<float>(v.note - 60) / 12.0f + blk_.filterEnv * gain
-                        + blk_.filterDrift * v.cutoffDrift.update(dtf, 0.05f, side_);
+                        + blk_.filterDrift * v.cutoffDrift.update(dtf, 0.05f, side_) + 3.0f * expr(MpeTarget::Filter);
         const float fc = std::clamp(blk_.cutoff * std::exp2(oct), 20.0f, 20000.0f);
         const FilterModel model = static_cast<FilterModel>(std::clamp(blk_.filterModel, 0, kNumFilterModels - 1));
         float q = 0.707f + blk_.resonance * blk_.resonance * 11.3f;   // up to Q 12
@@ -1193,11 +1217,13 @@ void Engine::renderBlock()
         if (model == FilterModel::Formant) q = 4.0f + 16.0f * blk_.resonance;
 
         float level = kVoiceLevel * (v.source != 0 ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
-        cv.hz = static_cast<float>(v.hz * doppler);
-        cv.level = level * landMakeup;
+        cv.hz = static_cast<float>(v.hz * doppler * std::exp2(static_cast<double>(mpeBend) / 12.0));
+        cv.level = level * landMakeup * std::exp2(expr(MpeTarget::Level));   // up to 6 dB
         cv.gain = gain;
-        cv.tilt = blk_.tilt;
-        cv.brightness = blk_.brightness;
+        // MPE's Brightness: the tilt flattened (or steepened) by up to 0.6 and the window opened by up
+        // to a half -- the window alone moves little under a falling spectrum.
+        cv.tilt = std::max(0.0f, blk_.tilt - 0.6f * expr(MpeTarget::Brightness));
+        cv.brightness = std::clamp(blk_.brightness + 0.5f * expr(MpeTarget::Brightness), 0.0f, 1.0f);
         cv.oddEven = blk_.oddEven;
         cv.inharmonic = blk_.inharmonicB;
         cv.stretch = blk_.stretch;
@@ -1248,15 +1274,15 @@ void Engine::renderBlock()
         cv.airCenter = blk_.airCenter;
         cv.airWidth = blk_.airWidth;
         cv.airJitter = blk_.airJitter;
-        cv.width = blk_.width;
+        cv.width = blk_.width * std::exp2(1.5f * expr(MpeTarget::Width));
         cv.widthSlope = blk_.widthSlope;
         cv.drift = blk_.drift;
         cv.driftRate = blk_.driftRate;
-        cv.shimmer = blk_.shimmer;
+        cv.shimmer = std::clamp(blk_.shimmer + 0.5f * expr(MpeTarget::Shimmer), 0.0f, 1.0f);
         cv.shimmerRate = blk_.shimmerRate;
         cv.stereo = blk_.stereo;
         cv.partials = blk_.partials;
-        cv.distance = v.distance;
+        cv.distance = std::clamp(v.distance - 0.5f * expr(MpeTarget::Nearer), 0.0f, 1.0f);
         srcW += gain * level;
         srcD += gain * level * v.distance;
         cv.airAbsorb = 1.0f;
@@ -1265,7 +1291,7 @@ void Engine::renderBlock()
         cv.restart = v.restart ? 1 : 0;
         if (v.restart && rippleStrikeCount_ < 64) rippleStrikes_[rippleStrikeCount_++] = static_cast<float>(v.hz);
         cv.onset = v.restart ? v.onset : 0;
-        applyMotion(motion, cv, blk_.motionRate, blk_.motionDepth);
+        applyMotion(motion, cv, blk_.motionRate, std::clamp(blk_.motionDepth * (1.0f + expr(MpeTarget::Motion)), 0.0f, 1.0f));
         v.restart = false;
         v.onset = 0;
         v.age += dt;

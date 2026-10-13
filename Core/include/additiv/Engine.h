@@ -128,15 +128,26 @@ public:
      * @param note      MIDI note
      * @param velocity  0 .. 1
      * @param offset    samples into the coming process() block
+     * @param channel   MPE: the member channel (0 .. 15) whose bend, pressure and slide are this note's; -1 none
      */
-    void noteOn(int note, float velocity, int offset);
+    void noteOn(int note, float velocity, int offset, int channel = -1);
 
     /**
      * @brief A played note is let go. Audio thread.
-     * @param note    MIDI note
-     * @param offset  samples into the coming process() block
+     * @param note     MIDI note
+     * @param offset   samples into the coming process() block
+     * @param channel  MPE: its member channel, -1 any
      */
-    void noteOff(int note, int offset);
+    void noteOff(int note, int offset, int channel = -1);
+
+    /** @name MPE: what each member channel's note does after it has begun. Any thread. @{ */
+    /** @brief A channel's pitch bend. @param channel 0 .. 15, or -1 for the master (every played note) @param semitones the bend */
+    void setChannelBend(int channel, float semitones) { chanBend_[static_cast<size_t>(channel < 0 ? 16 : std::min(channel, 15))].store(semitones, std::memory_order_relaxed); }
+    /** @brief A channel's pressure. @param channel 0 .. 15 @param pressure 0 .. 1 */
+    void setChannelPressure(int channel, float pressure) { chanPress_[static_cast<size_t>(std::clamp(channel, 0, 15))].store(pressure, std::memory_order_relaxed); }
+    /** @brief A channel's slide (CC 74). @param channel 0 .. 15 @param slide 0 .. 1 (0.5 at rest) */
+    void setChannelSlide(int channel, float slide) { chanSlide_[static_cast<size_t>(std::clamp(channel, 0, 15))].store(slide, std::memory_order_relaxed); }
+    /** @} */
 
     /** @brief Every played note is let go (the conductor's notes stay). Audio thread. */
     void allNotesOff();
@@ -348,12 +359,17 @@ private:
         int note = 0;              ///< MIDI note
         float velocity = 0.0f;     ///< 0 .. 1 (note on)
         std::int64_t stamp = 0;    ///< the timeline sample it takes effect at
+        int channel = -1;          ///< MPE: its member channel, -1 none
     };
 
     /** @brief One voice on the host side: the note, its envelope, its place, and what the GPU voice is told. */
     struct Voice {
         int note = -1;             ///< MIDI note, -1 when free
         int source = 0;            ///< 0 played, 1 the conductor, 2 the second conductor
+        int channel = -1;          ///< MPE: its member channel, -1 none
+        float bend = 0.0f;         ///< MPE: its own bend, semitones (its channel's while held, kept once let go)
+        float press = 0.0f;        ///< MPE: its pressure, 0 .. 1
+        float slide = 0.5f;        ///< MPE: its slide, 0 .. 1 (0.5 at rest)
         float velocity = 0.0f;     ///< 0 .. 1
         float distance = 0.0f;     ///< where it stands now, 0 at the ear .. 1 far (its place plus the breath)
         float place = 0.0f;        ///< where it was put
@@ -393,8 +409,9 @@ private:
      * @param distance   0 at the ear .. 1 far
      * @param source     0 played, 1 the conductor, 2 the second conductor
      * @param onset      sample of the block it begins at
+     * @param channel    MPE: the played note's member channel, -1 none
      */
-    void startNote(int note, float velocity, float distance, int source, int onset);
+    void startNote(int note, float velocity, float distance, int source, int onset, int channel = -1);
     /**
      * @brief Begins a note on a voice now (the voice is free or has just faded).
      * @param i          the voice
@@ -403,14 +420,16 @@ private:
      * @param distance   0 .. 1
      * @param source     0 played, 1 the conductor, 2 the second conductor
      * @param onset      sample of the block it begins at
+     * @param channel    MPE: the played note's member channel, -1 none
      */
-    void beginOn(int i, int note, float velocity, float distance, int source, int onset);
+    void beginOn(int i, int note, float velocity, float distance, int source, int onset, int channel = -1);
     /**
      * @brief Lets a note go.
      * @param note    MIDI note
      * @param source  whose note: 0 played, 1 the conductor, 2 the second conductor
+     * @param channel MPE: the played note's member channel, -1 any
      */
-    void stopNote(int note, int source);
+    void stopNote(int note, int source, int channel = -1);
     /** @brief Where a conductor's note stands: Noctuary's two planes, 40 % close and 60 % deep. @return 0 .. 1 */
     float brainDistance();
     /** @brief Loads the landscape the Landscape parameter names when it changed, and its RMS. */
@@ -512,6 +531,9 @@ private:
     std::atomic<bool> sourcesWatched_{ false };        ///< the panel shows the sources (setSourcesWatched)
     std::array<std::atomic<float>, kNumParams> played_{};   ///< where each plays after the matrix, normalised (NaN: unmodulated)
     std::atomic<float> wheel_{ 0.0f };                 ///< the mod wheel
+    std::array<std::atomic<float>, 17> chanBend_{};    ///< MPE: each channel's bend in semitones, [16] the master's
+    std::array<std::atomic<float>, 16> chanPress_{};   ///< MPE: each channel's pressure
+    std::array<std::atomic<float>, 16> chanSlide_{};   ///< MPE: each channel's slide (set to 0.5 in the constructor)
     std::atomic<float> pressure_{ 0.0f };              ///< channel pressure
     float lastVelocity_ = 0.0f;                        ///< the last note's velocity
     std::atomic<int> jamRoot_{ -1 };                   ///< the jam leader's root (pitch class), -1 none

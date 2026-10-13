@@ -500,22 +500,51 @@ void AdditivProcessor::handleAsyncUpdate()
     if (index >= 0) choosePreset(index);
 }
 
+bool AdditivProcessor::mpeController(int ch, int cc, int value)
+{
+    if (cc == 99 || cc == 98) { rpn_[ch] = 0x3FFF; return false; }   // an NRPN: what follows is not ours
+    if (cc == 101) { rpn_[ch] = (rpn_[ch] & 0x7F) | (value << 7); return true; }
+    if (cc == 100) { rpn_[ch] = (rpn_[ch] & 0x3F80) | value; return true; }
+    if (cc != 6 || rpn_[ch] == 0x3FFF) return false;
+    if (rpn_[ch] == 0) {   // the bend range
+        if (ch == 0) masterBend_ = static_cast<float>(value);
+        else setValue(static_cast<int>(ParamId::MpeBend), static_cast<float>(std::max(value, 1)));
+    } else if (rpn_[ch] == 6 && ch == 0) {   // MPE's configuration message: the lower zone with `value` member channels
+        setValue(static_cast<int>(ParamId::MpeOn), value > 0 ? 1.0f : 0.0f);
+    }
+    return true;
+}
+
 void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
+    // MPE (the lower zone): with it on, a note on channels 2 .. 16 has that channel's bend, pressure
+    // and slide (CC 74) for its own; channel 1 is the master, its bend moves every played note.
+    const bool mpe = value(static_cast<int>(ParamId::MpeOn)) >= 0.5f;
+    const float memberBend = value(static_cast<int>(ParamId::MpeBend));
     for (const auto meta : midi) {
         const juce::MidiMessage m = meta.getMessage();
         const int pos = meta.samplePosition;
+        const int ch = std::clamp(m.getChannel() - 1, 0, 15);
+        const bool member = mpe && ch >= 1;
         if (m.isNoteOn()) {
             held_.reset(static_cast<size_t>(m.getNoteNumber()));
-            engine_.noteOn(m.getNoteNumber(), m.getFloatVelocity(), pos);
+            engine_.noteOn(m.getNoteNumber(), m.getFloatVelocity(), pos, member ? ch : -1);
         } else if (m.isNoteOff()) {
             // The hold pedal keeps a note sounding until it comes up (the family's CC 64).
             if (sustain_) held_.set(static_cast<size_t>(m.getNoteNumber()));
-            else engine_.noteOff(m.getNoteNumber(), pos);
+            else engine_.noteOff(m.getNoteNumber(), pos, member ? ch : -1);
         } else if (m.isAllNotesOff() || m.isAllSoundOff()) {
             held_.reset();
             engine_.allNotesOff();
+        } else if (m.isPitchWheel()) {
+            const float x = static_cast<float>(m.getPitchWheelValue() - 8192) / 8192.0f;
+            if (member) engine_.setChannelBend(ch, x * memberBend);
+            else engine_.setChannelBend(-1, x * masterBend_);
+        } else if (m.isController() && mpeController(ch, m.getControllerNumber(), m.getControllerValue())) {
+            // an RPN: taken
+        } else if (m.isController() && member && m.getControllerNumber() == 74) {
+            engine_.setChannelSlide(ch, static_cast<float>(m.getControllerValue()) / 127.0f);   // a note's slide (never learned)
         } else if (m.isController()) {
             const int cc = m.getControllerNumber();
             const float x = static_cast<float>(m.getControllerValue()) / 127.0f;
@@ -547,6 +576,8 @@ void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
             // Bank select (CC 0) chooses the group, the program its preset: applied on the message thread.
             const int index = additiv::presetAt(bankGroup_, m.getProgramChangeNumber());
             if (index >= 0) { pendingProgram_.store(index, std::memory_order_relaxed); triggerAsyncUpdate(); }
+        } else if (m.isChannelPressure() && member) {
+            engine_.setChannelPressure(ch, static_cast<float>(m.getChannelPressureValue()) / 127.0f);   // a note's pressure
         } else if (m.isChannelPressure()) {
             engine_.setPressure(static_cast<float>(m.getChannelPressureValue()) / 127.0f);
         } else if (m.isAftertouch()) {

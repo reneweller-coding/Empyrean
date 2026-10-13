@@ -2095,6 +2095,81 @@ int main()
                   db(lo[0]), db(mid[0]), db(hi[0]), db(lo[1]), db(mid[1]), db(hi[1]), db(lo[2]), db(mid[2]), db(hi[2])));
     }
 
+    // 57. MPE (Phase 16e): two notes on two member channels. A bend on one channel moves its note
+    //     alone; a note let go keeps its bend when its channel is bent again for the next; the
+    //     master's bend moves every played note. Pressure on Level lifts a note by up to 2^depth
+    //     (3 dB at 0.5), slide on Brightness makes it brighter.
+    {
+        auto pitches = [](const Engine& e) {
+            std::vector<double> hz;
+            for (int i = 0; i < 16; ++i)
+                if (e.voiceView(i).hz > 0.0f && e.voiceView(i).source == 0) hz.push_back(e.voiceView(i).hz);
+            std::sort(hz.begin(), hz.end());
+            return hz;
+        };
+        Engine e;
+        quietEffects(e);
+        e.setParam(ParamId::Motion, 0.0f);
+        e.setParam(ParamId::Release, 2.0f);
+        bool good = openOffline(e, false, 179);
+        e.noteOn(60, 0.8f, 0, 1);
+        e.noteOn(67, 0.8f, 0, 2);
+        render(e, 0.5);
+        const std::vector<double> before = pitches(e);
+        e.setChannelBend(1, 2.0f);
+        render(e, 0.2);
+        const std::vector<double> bent = pitches(e);
+        e.noteOff(67, 0, 2);
+        render(e, 0.05);
+        e.setChannelBend(2, 5.0f);   // the channel's next note would be bent; the released one stays
+        render(e, 0.2);
+        const std::vector<double> released = pitches(e);
+        e.setChannelBend(-1, -1.0f);   // the master
+        render(e, 0.2);
+        const std::vector<double> master = pitches(e);
+        auto cents = [](double a, double b) { return 1200.0 * std::log2(a / b); };
+        const bool sizes = before.size() == 2 && bent.size() == 2 && released.size() == 2 && master.size() == 2;
+        const bool pitch = sizes && std::fabs(cents(bent[0], before[0]) - 200.0) < 2.0 && std::fabs(cents(bent[1], before[1])) < 2.0
+                        && std::fabs(cents(released[1], before[1])) < 2.0 && std::fabs(cents(master[0], before[0]) - 100.0) < 2.0
+                        && std::fabs(cents(master[1], before[1]) + 100.0) < 2.0;
+        // Pressure on Level, slide on Brightness: a note on channel 3 pressed fully against not at all,
+        // slid up against at rest.
+        auto play = [&](float press, float slide, double& db, double& centroid) {
+            Engine x;
+            quietEffects(x);
+            x.setParam(ParamId::Motion, 0.0f);
+            x.setParam(ParamId::MpePress, static_cast<float>(MpeTarget::Level));
+            x.setParam(ParamId::MpePressDepth, 0.5f);
+            x.setParam(ParamId::MpeSlide, static_cast<float>(MpeTarget::Brightness));
+            x.setParam(ParamId::MpeSlideDepth, 1.0f);
+            x.setParam(ParamId::Brightness, 0.4f);
+            if (!openOffline(x, false, 181)) return false;
+            x.setChannelPressure(3, press);
+            x.setChannelSlide(3, slide);
+            x.noteOn(57, 0.8f, 0, 3);
+            render(x, 1.0);
+            const std::vector<float> lr = render(x, 1.0);
+            db = rmsDb(lr, 0, lr.size() / 2);
+            std::vector<float> dots;
+            int per = 0;
+            centroid = 0.0;
+            double w = 0.0;
+            for (int k = 0; k < 40 && !x.partialSnapshot(dots, per); ++k) render(x, 0.01);
+            for (size_t i = 0; i + 1 < dots.size(); i += 2)
+                if (dots[i] > 20.0f) { const double pw = static_cast<double>(dots[i + 1]) * dots[i + 1]; w += pw; centroid += pw * std::log2(dots[i] / 20.0); }
+            centroid = w > 0.0 ? centroid / w : 0.0;
+            return true;
+        };
+        double dbRest = 0.0, dbPress = 0.0, dbSlide = 0.0, cRest = 0.0, cPress = 0.0, cSlide = 0.0;
+        good = good && play(0.0f, 0.5f, dbRest, cRest) && play(1.0f, 0.5f, dbPress, cPress) && play(0.0f, 1.0f, dbSlide, cSlide);
+        check(good && pitch && std::fabs(dbPress - dbRest - 3.01) < 0.5 && cSlide > cRest + 0.2,
+              "MPE: each note its own bend, pressure and slide",
+              fmt("bent %.1f ct (the other %.1f); released, its channel bent again: %.1f ct; the master -1: %.1f / %.1f ct; "
+                  "pressure %+.2f dB; slide: centroid %+.2f octaves",
+                  sizes ? cents(bent[0], before[0]) : 0.0, sizes ? cents(bent[1], before[1]) : 0.0, sizes ? cents(released[1], before[1]) : 0.0,
+                  sizes ? cents(master[0], before[0]) : 0.0, sizes ? cents(master[1], before[1]) : 0.0, dbPress - dbRest, cSlide - cRest));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }
