@@ -1278,6 +1278,7 @@ void Engine::renderBlock()
         viewDistance_[static_cast<size_t>(i)].store(v.distance, std::memory_order_relaxed);
         viewTime_[static_cast<size_t>(i)].store(cv.time, std::memory_order_relaxed);
         viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
+        viewNote_[static_cast<size_t>(i)].store(on ? v.note : -1, std::memory_order_relaxed);
     }
     for (size_t gi = 0; gi < ghosts_.size(); ++gi) {   // the ghosts after the voices, as source 3
         const size_t i = voices_.size() + gi;
@@ -1289,6 +1290,7 @@ void Engine::renderBlock()
         viewDistance_[i].store(cv.distance, std::memory_order_relaxed);
         viewTime_[i].store(cv.time, std::memory_order_relaxed);
         viewSource_[i].store(3, std::memory_order_relaxed);
+        viewNote_[i].store(-1, std::memory_order_relaxed);
     }
 
     // 4. The modal hall's settings: it runs on the GPU in the same graph, hearing the voices' block

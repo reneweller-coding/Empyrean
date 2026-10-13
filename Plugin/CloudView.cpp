@@ -20,6 +20,68 @@ float CloudView::xOf(float hz, juce::Rectangle<float> area)
     return area.getX() + juce::jlimit(0.0f, 1.0f, u) * area.getWidth();
 }
 
+void CloudView::paintKeys(juce::Graphics& g, juce::Rectangle<float> keys, juce::Rectangle<float> spec)
+{
+    const frame::Skin& skin = additivui::skin();
+    const juce::Colour bySource[3] = { skin.accent, additivui::colour::violet, skin.family(frame::Family::Space) };   // played, conductor, Brain 2
+    // Each sounding key once: its loudest voice, near and loud brightest.
+    float level[128] = {};
+    int source[128] = {};
+    for (const additiv::VoiceView& v : views_) {
+        if (v.note < 0 || v.note > 127 || v.hz <= 0.0f || v.gain <= 0.0f || v.source > 2) continue;
+        const float l = juce::jlimit(0.0f, 1.0f, std::sqrt(v.gain) * (1.0f - 0.6f * juce::jlimit(0.0f, 1.0f, v.distance)));
+        if (l > level[v.note]) { level[v.note] = std::max(l, 0.05f); source[v.note] = juce::jlimit(0, 2, v.source); }
+    }
+    constexpr int kFirst = 21, kLast = 108;   // A0 .. C8
+    auto edge = [&](float n) { return xOf(440.0f * std::exp2((n - 69.0f) / 12.0f), spec); };
+    // As a keyboard: the white keys one strip, a line where two white keys meet (B-C, E-F), the
+    // black keys short and dark over it; a sounding key lit in its part.
+    const float left = edge(static_cast<float>(kFirst) - 0.5f), right = edge(static_cast<float>(kLast) + 0.5f);
+    const float blackH = std::round(keys.getHeight() * 0.62f);
+    g.setColour(skin.dim.interpolatedWith(skin.faint, 0.45f));
+    g.fillRect(left, keys.getY(), right - left, keys.getHeight());
+    for (int n = kFirst; n <= kLast; ++n) {
+        const float x0 = edge(static_cast<float>(n) - 0.5f), x1 = edge(static_cast<float>(n) + 0.5f);
+        const bool black = juce::MidiMessage::isMidiNoteBlack(n);
+        if (black) {
+            g.setColour(level[n] > 0.0f ? skin.bg.interpolatedWith(bySource[source[n]], 0.55f + 0.45f * level[n]) : skin.bg);
+            g.fillRect(x0, keys.getY(), x1 - x0, blackH);
+            continue;
+        }
+        if (level[n] > 0.0f) {
+            // A white key reaches under its black neighbours' halves; lit, it is its own semitone.
+            g.setColour(skin.faint.interpolatedWith(bySource[source[n]], 0.55f + 0.45f * level[n]));
+            g.fillRect(x0, keys.getY(), x1 - x0, keys.getHeight());
+        }
+        if (n > kFirst && !juce::MidiMessage::isMidiNoteBlack(n - 1)) {   // B|C, E|F
+            g.setColour(skin.bg.withAlpha(0.9f));
+            g.fillRect(x0 - 0.5f, keys.getY(), 1.0f, keys.getHeight());
+        }
+    }
+    // The conductor's root, while it conducts.
+    const int root = proc_.engine().brainRoot();
+    if (proc_.value(static_cast<int>(ParamId::BrainOn)) >= 0.5f && root >= kFirst && root <= kLast) {
+        const float x = 0.5f * (edge(static_cast<float>(root) - 0.5f) + edge(static_cast<float>(root) + 0.5f));
+        juce::Path tri;
+        tri.addTriangle(x - 3.5f, keys.getY() - 1.0f, x + 3.5f, keys.getY() - 1.0f, x, keys.getY() + 4.0f);
+        g.setColour(additivui::colour::root);
+        g.fillPath(tri);
+    }
+    // The names, low to high, each in its colour.
+    const juce::Font font(juce::FontOptions(11.0f));
+    g.setFont(font);
+    float x = spec.getX() + 4.0f;
+    for (int n = 0; n < 128; ++n) {
+        if (level[n] <= 0.0f) continue;
+        const juce::String name = juce::MidiMessage::getMidiNoteName(n, true, true, 4);
+        const float w = juce::GlyphArrangement::getStringWidth(font, name) + 8.0f;
+        if (x + w > spec.getRight()) break;
+        g.setColour(bySource[source[n]].withAlpha(0.45f + 0.55f * level[n]));
+        g.drawText(name, juce::Rectangle<float>(x, spec.getY() + 2.0f, w, 14.0f), juce::Justification::centredLeft);
+        x += w;
+    }
+}
+
 void CloudView::refreshLandscape()
 {
     int choice = juce::jlimit(0, additiv::kNumLandscapeChoices - 1, juce::roundToInt(proc_.value(static_cast<int>(ParamId::Landscape))));
@@ -135,7 +197,9 @@ void CloudView::paint(juce::Graphics& g)
     auto inner = all.reduced(10.0f);
     const auto landArea = inner.removeFromRight(inner.getWidth() * 0.28f).withTrimmedLeft(10.0f);
     landArea_ = landArea;
-    const auto spec = inner.withTrimmedBottom(14.0f);
+    constexpr float kKeyH = 10.0f;   // the keys' strip under the spectrum
+    const auto spec = inner.withTrimmedBottom(14.0f + kKeyH + 3.0f);
+    const juce::Rectangle<float> keys(spec.getX(), spec.getBottom() + 2.0f, spec.getWidth(), kKeyH);
 
     // The axis: 100 Hz, 1 kHz, 10 kHz.
     g.setFont(juce::FontOptions(11.0f));
@@ -144,9 +208,10 @@ void CloudView::paint(juce::Graphics& g)
         g.setColour(skin.faint.withAlpha(0.5f));
         g.drawVerticalLine(juce::roundToInt(x), spec.getY(), spec.getBottom());
         g.setColour(skin.dim);
-        g.drawText(f >= 1000.0f ? juce::String(f / 1000.0f, 0) + "k" : juce::String(f, 0), juce::Rectangle<float>(x - 20.0f, spec.getBottom(), 40.0f, 14.0f),
+        g.drawText(f >= 1000.0f ? juce::String(f / 1000.0f, 0) + "k" : juce::String(f, 0), juce::Rectangle<float>(x - 20.0f, keys.getBottom(), 40.0f, 14.0f),
                    juce::Justification::centred);
     }
+    paintKeys(g, keys, spec);
 
     // The partials themselves: every eighth one a point with its trail (plotDots, from the GPU's snapshot).
     dotsArea_ = spec.toNearestInt();

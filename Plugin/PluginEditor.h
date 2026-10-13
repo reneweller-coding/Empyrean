@@ -40,6 +40,8 @@ public:
     void resized() override;
     /** @brief The family's keys. @param key the key @return true when it was one */
     bool keyPressed(const juce::KeyPress& key) override;
+    /** @brief In the standalone, the window gets a maximise button beside the other two (Noctuary's, Totality's). */
+    void parentHierarchyChanged() override;
 
 private:
     /** @brief The status line, the play button and the picture, fifteen times a second. */

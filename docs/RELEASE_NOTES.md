@@ -27,6 +27,9 @@ Corrections after listening: the preset menu, the jumps in a morph with modulati
   stretch the blend widens with the distances. The blend's weights are continuous everywhere: a
   preset enters and leaves the blend at nothing.
 - The Map page: the map from the top, as large as the window shows; the knobs and the routes beside it.
+- **The keys** under the picture of the partials, each at its pitch on the same axis: the notes that sound lit in their
+  colours (yours, the conductor's, the second conductor's), the conductor's root marked, their names in the corner.
+- **A maximise button** on the standalone's window, as Noctuary and Totality have.
 
 ## 0.13.0 (13.10.2026, not released)
 

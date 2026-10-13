@@ -21,6 +21,7 @@ const juce::Colour faint  { 0xff3c4559 };   ///< tracks, axes, the off state
 const juce::Colour accent { 0xff7fe0c4 };   ///< the aurora's green: the title, the tab in front
 const juce::Colour violet { 0xffb69cf0 };   ///< its violet edge: the conductor's notes
 const juce::Colour onset  { 0xffd7799b };   ///< a playhead, a mute
+const juce::Colour root   { 0xffe8b56a };   ///< the conductor's root on the keys
 const juce::Colour good   { 0xff7fd49a };   ///< a meter in range
 const juce::Colour bad    { 0xffe06a5f };   ///< a meter over
 } // namespace colour

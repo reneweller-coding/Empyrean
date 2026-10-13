@@ -65,6 +65,7 @@ struct VoiceView {
     float distance = 0.0f;   ///< where it stands, 0 at the ear .. 1 far
     float time = 0.0f;       ///< seconds since it began (the motions' clock)
     int source = 0;          ///< 0 played, 1 the conductor, 2 the second conductor, 3 a ghost of the memory
+    int note = -1;           ///< the key it sounds (MIDI), -1 for a ghost or when silent
 };
 
 constexpr int kMaxViewVoices = 32;   ///< voices a picture can be given
@@ -299,6 +300,7 @@ public:
         v.distance = viewDistance_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.time = viewTime_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.source = viewSource_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.note = viewNote_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         return v;
     }
 
@@ -692,6 +694,7 @@ private:
     std::array<std::atomic<float>, kMaxViewVoices> viewDistance_{};  ///< its distance
     std::array<std::atomic<float>, kMaxViewVoices> viewTime_{};      ///< its time since the note began
     std::array<std::atomic<int>, kMaxViewVoices> viewSource_{};      ///< whose note it plays
+    std::array<std::atomic<int>, kMaxViewVoices> viewNote_{};        ///< the key it sounds, -1 none
 };
 
 } // namespace additiv

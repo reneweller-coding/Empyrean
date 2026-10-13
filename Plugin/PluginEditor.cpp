@@ -416,6 +416,18 @@ bool AdditivEditor::keyPressed(const juce::KeyPress& key)
     return frame::handleKey(key, k);
 }
 
+void AdditivEditor::parentHierarchyChanged()
+{
+    // On the next turn of the message loop: the standalone's window is still putting its content in
+    // when this is called. In a host the plug-in lives in the host's window and this finds nothing.
+    juce::MessageManager::callAsync([safe = juce::Component::SafePointer<AdditivEditor>(this)] {
+        if (safe == nullptr) return;
+        if (auto* window = safe->findParentComponentOfClass<juce::DocumentWindow>())
+            window->setTitleBarButtonsRequired(juce::DocumentWindow::minimiseButton | juce::DocumentWindow::maximiseButton
+                                                   | juce::DocumentWindow::closeButton, false);
+    });
+}
+
 void AdditivEditor::toggleFullScreen()
 {
     if (!standalone()) return;

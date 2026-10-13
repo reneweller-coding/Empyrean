@@ -3,8 +3,9 @@
  * @brief The picture above the pages: the partials themselves, as the GPU has them -- every
  *        eighth partial of every voice a point, its frequency across (log), its loudness up, coloured
  *        by whose note it is (played, the conductor, the second conductor, a ghost of the memory),
- *        leaving a trail that fades -- and beside it the landscape the Aurora motion reads, with
- *        where in its loop the voices are.
+ *        leaving a trail that fades; under it the keys, each at its frequency, the notes that sound
+ *        lit in the same colours and their names in the corner -- and beside it the landscape the
+ *        Aurora motion reads, with where in its loop the voices are.
  */
 #pragma once
 
@@ -31,6 +32,16 @@ private:
     void plotDots(int w, int h);
     /** @brief A frequency's place on the axis. @param hz the frequency @param area the axis' area @return x */
     static float xOf(float hz, juce::Rectangle<float> area);
+    /**
+     * @brief The keys under the spectrum, A0 to C8, each where its pitch lies on the axis: the notes
+     *        that sound lit by whose they are (the partials' colours), dimmer the further they stand and
+     *        the softer they are; the conductor's root marked; the sounding notes' names in the
+     *        spectrum's corner, low to high.
+     * @param g     where
+     * @param keys  the strip
+     * @param spec  the spectrum's area (the axis, and the corner for the names)
+     */
+    void paintKeys(juce::Graphics& g, juce::Rectangle<float> keys, juce::Rectangle<float> spec);
 
     AdditivProcessor& proc_;                                            ///< whose voices
     std::array<additiv::VoiceView, additiv::kMaxViewVoices> views_{};  ///< the voices as the last block left them
