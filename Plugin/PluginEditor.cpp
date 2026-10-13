@@ -450,7 +450,7 @@ void AdditivEditor::showHelp(bool on)
 void AdditivEditor::loadPreset(int index)
 {
     history_.begin("Preset", values(), {}, true);
-    proc_.applyPreset(index);
+    proc_.choosePreset(index);
     history_.end(values(), {});
 }
 

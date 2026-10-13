@@ -98,7 +98,7 @@ void AdditivProcessor::pollHeadset()
     if (e.hold) setValue(static_cast<int>(ParamId::Brain2On), value(static_cast<int>(ParamId::Brain2On)) >= 0.5f ? 0.0f : 1.0f);
     if (e.filterMoved) setValue(static_cast<int>(ParamId::Macro2), 0.5f * (e.filter + 1.0f));
     if (e.throwMoved) setValue(static_cast<int>(ParamId::Macro1), e.throwAmount);
-    if (e.next) applyPreset((currentPreset() + 1) % additiv::numPresets());
+    if (e.next) choosePreset((currentPreset() + 1) % additiv::numPresets());
 }
 
 AdditivProcessor::~AdditivProcessor() { engine_.release(); }
@@ -193,6 +193,23 @@ void AdditivProcessor::applyPreset(int index, double glide)
     engine_.setModText(mod);
     if (g <= 0.0) engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way); a glide keeps the chord
     current_.store(index, std::memory_order_relaxed);
+}
+
+void AdditivProcessor::choosePreset(int index)
+{
+    if (index < 0 || index >= additiv::numPresets()) return;
+    journeyPlayer_.stop();
+    setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+    if (value(static_cast<int>(ParamId::MapActive)) >= 0.5f) {
+        leaveMap(false);   // the route stops with it; the engine glides from the map's blend (Map Glide)
+        float x = 0.0f, y = 0.0f;
+        additiv::presetMapPosition(index, x, y);
+        setValue(static_cast<int>(ParamId::MapX), x);
+        setValue(static_cast<int>(ParamId::MapY), y);
+    } else {
+        route_.stop();
+    }
+    applyPreset(index);
 }
 
 void AdditivProcessor::setSlotFromSound(int slot)
@@ -480,7 +497,7 @@ bool AdditivProcessor::saveJourneyDraft(const juce::File& file)
 void AdditivProcessor::handleAsyncUpdate()
 {
     const int index = pendingProgram_.exchange(-1, std::memory_order_relaxed);
-    if (index >= 0) applyPreset(index);
+    if (index >= 0) choosePreset(index);
 }
 
 void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)

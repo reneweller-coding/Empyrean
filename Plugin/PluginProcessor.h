@@ -60,7 +60,7 @@ public:
     /** @brief The preset last applied. @return its index (0 when none was) */
     int getCurrentProgram() override { return std::max(current_.load(std::memory_order_relaxed), 0); }
     /** @brief Applies a factory preset (message thread). @param index the preset */
-    void setCurrentProgram(int index) override { applyPreset(index); }
+    void setCurrentProgram(int index) override { choosePreset(index); }
     /** @brief A preset's name with its group. @param index the preset @return "Group: Name" */
     const juce::String getProgramName(int index) override;
     /** @brief Nothing to rename. @param index ignored @param name ignored */
@@ -107,6 +107,16 @@ public:
      * @param glide  seconds; below 0 the Glide knob's; 0 at once (and the conductor fills its chord)
      */
     void applyPreset(int index, double glide);
+    /**
+     * @brief The player -- or the host, or a hand on the headset -- chooses a preset: that preset is
+     *        what is heard. Whatever was choosing the sound lets go (a journey, a route, the A/B morph,
+     *        the map, whose cursor goes to the preset's point so the map shows where the sound is),
+     *        and the sound glides into the preset as applyPreset does. Under the A/B morph or the map
+     *        a preset changed only the knobs, which they do not play: the menu seemed broken.
+     *        Message thread.
+     * @param index  the preset
+     */
+    void choosePreset(int index);
 
     /** @name The A/B morph's slots (Morph.h) @{ */
     /** @brief A slot takes the sound as it plays now: every knob and the matrix. @param slot 0 (A) or 1 (B) */
