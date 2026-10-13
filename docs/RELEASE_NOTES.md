@@ -1,5 +1,33 @@
 # Release notes
 
+## 0.13.1 (13.10.2026, not released)
+
+Corrections after listening: the preset menu, the jumps in a morph with modulation, the map.
+
+- **A preset you choose is the one you hear.** Under the A/B morph a preset from the list only moved
+  the knobs, which the morph does not play; with the map on it only moved the cursor, and there a
+  blend of six presets played. Now the list, the arrows, a program change and the headset play the
+  preset: Morph switches off, a journey or a route stops, the map lets go (its cursor goes to the
+  preset's point), and the sound glides in.
+- **Morphing with modulation has no steps.** Each sound brings its own LFOs and envelopes: on the way
+  the rows of the sound being left keep running on its modulators while they fade (before, LFO 1
+  changed its shape at the middle, and a slow breath on the brightness quickened into the next
+  sound's flutter). A motion, a living landscape or a field passes through nothing where its kind
+  changes with whatever the matrix adds to its depth (before, 0.30 of a depth stood there), and a
+  picture does so where its landscape changes. Following the map's cursor, a kind fades out before
+  it changes, and whole numbers glide (before, a far jump moved the partials by 91 % of their range
+  in one block).
+- **The map as the presets sound.** Every preset was measured (its spectrum's centre, how much it
+  changes over a quarter of a second, a second and three seconds): across darker to brighter, up
+  still to moving, half rank and half value as in Noctuary. The first map ranked guesses from the
+  parameters and filled the square evenly; its axes agreed with the measured ones by a correlation
+  of 0.24 and 0.16. Now the bank's darker, gently moving middle is crowded and its edges thin.
+- **Radius in the spacing of the presets** round the cursor (0.1 .. 4, default 0.4): on a preset's
+  own point that preset plays (0.98 of the blend), half way to a neighbour the two share; in an empty
+  stretch the blend widens with the distances. The blend's weights are continuous everywhere: a
+  preset enters and leaves the blend at nothing.
+- The Map page: the map from the top, as large as the window shows; the knobs and the routes beside it.
+
 ## 0.13.0 (13.10.2026, not released)
 
 Spectral means, moving pictures, the preset map, and 1024 more presets.

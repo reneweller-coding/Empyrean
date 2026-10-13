@@ -76,8 +76,8 @@ offline renderer and the manual, and a portable zip.
   them), Shift (a frequency shifter), a spectral comb whose notches travel without end, your own picture or recording
   as a landscape, and animated pictures after the Kaleidoscope visualizer -- kaleidoscope, tunnel, endless spiral,
   flow, feedback, rain, starfield, moire -- read by every partial.
-- **The preset map:** every preset on a square (darker to brighter, still to moving); the cursor blends the presets
-  round it, routes walk it with a travel and a hold time for each waypoint.
+- **The preset map:** every preset on a square by how it sounds, measured (darker to brighter, still to moving); the
+  cursor blends the presets round it, routes walk it with a travel and a hold time for each waypoint.
 - **4096 presets** in 64 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
   visions), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, the filter

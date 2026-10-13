@@ -526,6 +526,33 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 15: Korrekturen nach dem Anhören (gebaut, 13.10.2026, 0.13.1)
+
+Der Nutzer: "das Laden der Presets über das Menü kaputt", "sind die Presets wirklich so regelmäßig
+verteilt?", "beim Morphen mit den Modulationen ... Unstetigkeiten".
+- **Menü:** `choosePreset` (Menü, Pfeile, Programmwechsel, Headset): Journey und Pfad halten, Morph aus,
+  die Karte lässt los (Cursor auf den Punkt), dann `applyPreset`. Ursache: unter A/B nur die Regler,
+  bei Karte nur der Cursor, und Radius 0,05 war das Dreifache des Punktabstands (sechs Presets gemischt);
+  Selbsttest 51 prüfte "auf dem Punkt" nur mit 0,004.
+- **Modulatoren je Klang:** `ModSetup` (LFO- und Hüllkurven-Formen und -Raten) in `MorphState::setups`,
+  `ModRow::setup`; die Engine lässt je Setup eine `OwnModulators`-Einheit laufen (eine Einheit, die
+  keiner mehr liest, übernimmt ein neues Setup und läuft weiter; eine neue startet als Kopie der
+  stärksten). **Gates** (`MorphState::gate`) für Bewegung, Leben, Feld: der Matrix-Anteil der Menge
+  wird damit multipliziert, durch null am Wechsel. **approachMorph:** eine andere Art blendet erst aus
+  (doppeltes Tempo), Begleiter bleiben, Wechsel unter 0,005; ganze Zahlen gleiten ungerundet (die
+  Engine rundet). **Landschaft:** wechselt nur, wo alle Leser (Aurora, Bilder) bei null sind.
+- **Karte gemessen:** `additiv_presets --describe` (Schwerpunkt in Oktaven über 40 Hz; Bewegung =
+  Betragsänderung von 36 Bändern über 0,25/1/3 s relativ; Breite; Flachheit), 4096 Presets in 111 min
+  → `work/presets/descriptors.json`; `make_map.py`: halb Rang, halb Wert (Perzentile 1/99 auf 0,05/0,95,
+  tanh-Ränder), leichte Abstoßung. Korrelation der alten Achsen mit den gemessenen: 0,24 / 0,16.
+- **Radius relativ:** σ = Radius × Abstand zum zweitnächsten Preset (0,1 .. 4, Standard 0,4: auf dem
+  Punkt 0,977 des Gewichts); Gewicht des siebten Nachbarn und 2 % werden abgezogen (stetig). Pfade
+  in derselben Einheit (0,5 .. 1,5).
+
+**Gemessen [M]:** Selbsttest 52 vorher/nachher: Helligkeit je Block 0,0041 → 0,0017 (As LFO selbst
+0,0020); Bewegungstiefe am Wechsel 0,30 → 0,000; Kartensprung Partials 0,91 → 0,004 ihres Bereichs je
+Block, Menge am Artwechsel 1,0 → 0,005; Bildtiefe am Landschaftswechsel 0,004.
+
 ## Phase 14: die Preset-Karte und ihre Pfade (gebaut, 13.10.2026)
 
 Der Nutzer: "eine Preset-Karte wie in Noctuary ... Pfade definieren ... Zeiten für die Dauer der Morphs".
