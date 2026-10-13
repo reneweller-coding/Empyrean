@@ -23,6 +23,13 @@
  * Each sound brings its own LFOs and envelopes (ModSetup): a blend keeps the setups of the sounds
  * in it, and every row the setup it came with, so the engine runs one set of modulators per setup
  * and a row fades out on the modulators it was made for.
+ *
+ * The voice filter is a weighted list, one entry a model (Off among them): filters of the same
+ * model blend their cutoff and resonance as numbers -- a sweep stays a sweep -- and different ones
+ * stand side by side with their weights. The card moves one into the other by transport (Cloud.h,
+ * CloudVoice::filterCount): the filters' power curves over the octaves are read as masses, and the
+ * blend is their Wasserstein barycentre, the average of their quantile functions -- a formant
+ * travels to where the other filter's pass band is rather than fading out while that one fades in.
  */
 #pragma once
 
@@ -34,6 +41,15 @@ namespace additiv {
 constexpr int kMorphRows = 64;     ///< weighted matrix rows a sound can hold (a blend of blends merges and, past this, drops the weakest)
 constexpr int kMorphSetups = 16;   ///< sounds' own modulators a blend can hold (a seventh sound's rows share the first's)
 constexpr int kMorphGates = 3;     ///< the choices with an amount that have a gate: the motion, the living landscape, the field
+constexpr int kMorphFilters = 9;   ///< the voice filters a sound can hold: one a model, Off included
+
+/** @brief One of a sound's voice filters, and its weight in the sound. */
+struct MorphFilter {
+    int model = 0;            ///< FilterModel
+    float cutoff = 1000.0f;   ///< Hz: of the blended ones of this model, the weighted mean in the knob's domain
+    float resonance = 0.0f;   ///< 0 .. 1, likewise
+    float weight = 0.0f;      ///< 0 .. 1: its share of the sound (the shares add up to 1)
+};
 
 /** @brief The amounts the gates multiply, in gate order (the filter's is filterMix). */
 constexpr ParamId kGatedAmounts[kMorphGates] = { ParamId::MotionDepth, ParamId::LifeDepth, ParamId::FieldStrength };
@@ -41,7 +57,9 @@ constexpr ParamId kGatedAmounts[kMorphGates] = { ParamId::MotionDepth, ParamId::
 /** @brief A sound as the engine plays it before the matrix: every parameter, the filter's share and the weighted rows. */
 struct MorphState {
     float values[kNumParams] = {};   ///< every parameter, in its own units
-    float filterMix = 1.0f;          ///< 0 .. 1: the voice filter's gain is raised to this (0: no filter)
+    float filterMix = 1.0f;          ///< 0 .. 1: the share of the filters that are not Off (for the panel)
+    int filterCount = 0;             ///< voice filters in the list
+    MorphFilter filters[kMorphFilters];   ///< the voice filters with their weights (the knobs show the heaviest that is not Off)
     float gate[kMorphGates] = { 1.0f, 1.0f, 1.0f };   ///< 0 .. 1: each gated amount, the matrix's push included, is multiplied by this (0 where its kind changes)
     int setupCount = 0;              ///< setups in use
     ModSetup setups[kMorphSetups];   ///< the LFOs and envelopes of the sounds in it

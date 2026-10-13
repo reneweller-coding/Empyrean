@@ -2026,6 +2026,75 @@ int main()
                   rise, loud.db, plain.db, softRise, settled.back - plain.centroid));
     }
 
+    // 56. The filter morphs by transport (Phase 16d): a glide from a low pass at 300 Hz into a high
+    //     pass at 3 kHz. Half way the filter is neither faded out nor both at half: its mass has
+    //     travelled into the middle -- the partials between 600 Hz and 1.5 kHz pass more than four
+    //     times as strongly as those under 100 Hz and over 8 kHz (a fade would leave them alike).
+    //     The filter's gain at a partial: its amplitude against the same voice without a filter.
+    {
+        // Every watched partial's (Hz, amplitude) at the start, half way and at the end of the glide.
+        auto take = [&](bool filtered, std::vector<float>& start, std::vector<float>& middle, std::vector<float>& end) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.05f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::KeyTrack, 0.0f);
+            e.setParam(ParamId::FilterEnv, 0.0f);
+            e.setParam(ParamId::FilterDrift, 0.0f);
+            e.setParam(ParamId::FilterModel, filtered ? 3.0f : 0.0f);   // LP 24
+            e.setParam(ParamId::Cutoff, 300.0f);
+            e.setParam(ParamId::Resonance, 0.2f);
+            if (!openOffline(e, false, 177)) return false;
+            e.noteOn(31, 0.8f, 0);
+            std::vector<float> L(128), R(128), dots;
+            int per = 0;
+            for (int k = 0; k < 375 * 2; ++k) {
+                e.process(L.data(), R.data(), 128);
+                if (e.partialSnapshot(dots, per)) start = dots;
+            }
+            e.beginMorph(6.0);
+            e.setParam(ParamId::FilterModel, filtered ? 4.0f : 0.0f);   // HP 12
+            e.setParam(ParamId::Cutoff, 3000.0f);
+            bool half = false;
+            for (int k = 0; k < 375 * 8; ++k) {
+                e.process(L.data(), R.data(), 128);
+                if (!e.partialSnapshot(dots, per)) continue;
+                if (!half && e.morphProgress() >= 0.5f) { middle = dots; half = true; }
+                end = dots;
+            }
+            return half && !start.empty();
+        };
+        std::vector<float> s0, m0, e0, s1, m1, e1;
+        const bool ran = take(false, s0, m0, e0) && take(true, s1, m1, e1);
+        // The filter's gain in a band, the power mean of the partials in it.
+        auto band = [](const std::vector<float>& plain, const std::vector<float>& filtered, double lo, double hi) {
+            double sum = 0.0;
+            int n = 0;
+            for (size_t i = 0; i + 1 < plain.size() && i + 1 < filtered.size(); i += 2)
+                if (plain[i] >= lo && plain[i] < hi && plain[i + 1] > 1.0e-9f) {
+                    const double g = filtered[i + 1] / plain[i + 1];
+                    sum += g * g;
+                    ++n;
+                }
+            return n > 0 ? std::sqrt(sum / n) : 0.0;
+        };
+        double lo[3] = {}, mid[3] = {}, hi[3] = {};
+        const std::vector<float>* plain[3] = { &s0, &m0, &e0 };
+        const std::vector<float>* filt[3] = { &s1, &m1, &e1 };
+        for (int k = 0; ran && k < 3; ++k) {
+            lo[k] = band(*plain[k], *filt[k], 40.0, 100.0);
+            mid[k] = band(*plain[k], *filt[k], 600.0, 1500.0);
+            hi[k] = band(*plain[k], *filt[k], 8000.0, 16000.0);
+        }
+        auto db = [](double g) { return 20.0 * std::log10(std::max(g, 1.0e-9)); };
+        check(ran && lo[0] > 4.0 * hi[0] && mid[1] > 4.0 * lo[1] && mid[1] > 4.0 * hi[1] && hi[2] > 4.0 * lo[2],
+              "filter: a morph moves the pass band through the middle",
+              fmt("low / middle / high, dB: start %.1f / %.1f / %.1f, half way %.1f / %.1f / %.1f, end %.1f / %.1f / %.1f",
+                  db(lo[0]), db(mid[0]), db(hi[0]), db(lo[1]), db(mid[1]), db(hi[1]), db(lo[2]), db(mid[2]), db(hi[2])));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

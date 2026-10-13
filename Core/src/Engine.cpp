@@ -664,6 +664,8 @@ void Engine::readParams()
         }
         // A gated amount is heard by its gate, the matrix's push too: nothing where its kind changes.
         for (int g = 0; g < kMorphGates; ++g) offset[static_cast<int>(kGatedAmounts[g])] *= sound_.gate[g];
+        cutoffPush_ = offset[static_cast<int>(ParamId::Cutoff)];
+        resonancePush_ = offset[static_cast<int>(ParamId::Resonance)];
         for (int i = 0; i < kNumParams; ++i) {
             const ParamDesc& d = paramTable()[static_cast<size_t>(i)];
             const float base = this->base(d.id);
@@ -684,6 +686,7 @@ void Engine::readParams()
     // octave of cutoff and 40 % of brightness (at 0.5, nothing).
     {
         const float e = std::clamp(jamEnergy_.load(std::memory_order_relaxed), 0.0f, 1.0f);
+        jamCutoff_ = e != 0.5f ? std::exp2(2.0f * (e - 0.5f)) : 1.0f;
         if (e != 0.5f) {
             cur_[static_cast<size_t>(ParamId::Brightness)] = std::clamp(cur_[static_cast<size_t>(ParamId::Brightness)] * (0.6f + 0.8f * e), 0.0f, 1.0f);
             cur_[static_cast<size_t>(ParamId::Cutoff)] = std::clamp(cur_[static_cast<size_t>(ParamId::Cutoff)] * std::exp2(2.0f * (e - 0.5f)), 40.0f, 18000.0f);
@@ -1206,10 +1209,41 @@ void Engine::renderBlock()
         cv.presenceDb = blk_.presence;
         cv.lowCut = blk_.padLowCut;
         cv.filterModel = static_cast<int>(model);
-        cv.filterMix = sound_.filterMix;
+        cv.filterMix = sound_.filterMix;   // for the panel; the card reads the filter list below
         cv.cutoff = fc;
         cv.filterQ = q;
         cv.vowel = 4.0f * std::clamp(std::log(fc / 40.0f) / std::log(18000.0f / 40.0f), 0.0f, 1.0f);
+        // During a morph between different filters (Morph.h): the heaviest four of the sound's, each
+        // with this voice's key tracking, envelope and drift and the matrix's push, transported into
+        // each other on the card. One filter alone is the filter above.
+        cv.filterCount = 0;
+        if (sound_.filterCount > 1) {
+            int order[kMorphFilters];
+            const int n = sound_.filterCount;
+            for (int k = 0; k < n; ++k) order[k] = k;
+            std::stable_sort(order, order + n, [this](int a, int b) { return sound_.filters[a].weight > sound_.filters[b].weight; });
+            const int count = std::min(n, kVoiceFilters);
+            float sum = 0.0f;
+            for (int k = 0; k < count; ++k) sum += sound_.filters[order[k]].weight;
+            const ParamDesc& cd = paramDesc(ParamId::Cutoff);
+            const ParamDesc& rd = paramDesc(ParamId::Resonance);
+            for (int k = 0; k < count; ++k) {
+                const MorphFilter& mf = sound_.filters[order[k]];
+                const FilterModel m = static_cast<FilterModel>(std::clamp(mf.model, 0, kNumFilterModels - 1));
+                const float base = fromNorm(cd, std::clamp(toNorm(cd, mf.cutoff) + cutoffPush_, 0.0f, 1.0f)) * jamCutoff_;
+                const float fck = std::clamp(base * std::exp2(oct), 20.0f, 20000.0f);
+                const float res = fromNorm(rd, std::clamp(toNorm(rd, mf.resonance) + resonancePush_, 0.0f, 1.0f));
+                float qk = 0.707f + res * res * 11.3f;
+                if (m == FilterModel::Peak) qk = 1.0f + 3.0f * res;
+                if (m == FilterModel::Formant) qk = 4.0f + 16.0f * res;
+                cv.filterWeight[k] = mf.weight / std::max(sum, 1.0e-9f);
+                cv.filterModels[k] = static_cast<float>(m);
+                cv.filterCutoffs[k] = fck;
+                cv.filterQs[k] = qk;
+                cv.filterVowels[k] = 4.0f * std::clamp(std::log(fck / 40.0f) / std::log(18000.0f / 40.0f), 0.0f, 1.0f);
+            }
+            cv.filterCount = count;
+        }
         cv.air = blk_.air;
         cv.airCenter = blk_.airCenter;
         cv.airWidth = blk_.airWidth;

@@ -611,6 +611,9 @@ private:
     double islandDrift_ = 0.0;                         ///< the Islands' drift across, cells of their grid
     float turbDrive_ = 0.0f;                           ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float turbAfter_ = 0.0f;                           ///< s the cascade keeps settling after Turbulence went to nothing
+    float cutoffPush_ = 0.0f;                          ///< the matrix's push on the cutoff this block, normalised (each of the morph's filters takes it)
+    float resonancePush_ = 0.0f;                       ///< and on the resonance
+    float jamCutoff_ = 1.0f;                           ///< the family jam's factor on the cutoff this block
     float lifeQuiet_ = 0.0f;                           ///< seconds since it was last seeded (it is not seeded again sooner than 2 s)
     float lifeMakeup_ = 1.0f;                          ///< the make-up as it glides (half a second), so a seeding does not jump
     /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */

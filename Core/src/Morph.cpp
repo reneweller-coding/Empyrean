@@ -17,6 +17,12 @@ void MorphState::set(const float* v, const ModRow* r, int count)
     std::copy(v, v + kNumParams, values);
     filterMix = 1.0f;
     for (float& g : gate) g = 1.0f;
+    filterCount = 1;
+    filters[0].model = static_cast<int>(std::lround(v[static_cast<size_t>(ParamId::FilterModel)]));
+    filters[0].cutoff = v[static_cast<size_t>(ParamId::Cutoff)];
+    filters[0].resonance = v[static_cast<size_t>(ParamId::Resonance)];
+    filters[0].weight = 1.0f;
+    filterMix = filters[0].model == 0 ? 0.0f : 1.0f;
     setupCount = 1;
     setups[0] = modSetupFrom(v);
     rowCount = 0;
@@ -93,7 +99,6 @@ const Pair kPairs[] = {
     { ParamId::Motion, ParamId::MotionDepth, 0, { ParamId::Motion, ParamId::Motion }, 0 },
     { ParamId::LifeMode, ParamId::LifeDepth, 1, { ParamId::LifeMode, ParamId::LifeMode }, 0 },
     { ParamId::FieldMode, ParamId::FieldStrength, 2, { ParamId::FieldMode, ParamId::FieldMode }, 0 },
-    { ParamId::FilterModel, ParamId::Count, -1, { ParamId::Cutoff, ParamId::Resonance }, 2 },
 };
 
 /** @brief Whether a pair's kind reads the landscape (Aurora, the animated pictures). @param p the pair @param kind its choice @return true then */
@@ -206,6 +211,67 @@ void compactSetups(MorphState& s)
     s.setupCount = n;
 }
 
+/**
+ * @brief Adds a sound's filter with its weight scaled: merged with the entry of its model (cutoff
+ *        and resonance as the weighted mean, the cutoff in its knob's domain), or appended.
+ * @param out  the sound being made
+ * @param f    the filter
+ * @param k    its weight's scale
+ */
+void addFilter(MorphState& out, const MorphFilter& f, float k)
+{
+    const float w = f.weight * k;
+    if (w <= 0.0f) return;
+    for (int i = 0; i < out.filterCount; ++i) {
+        MorphFilter& e = out.filters[i];
+        if (e.model != f.model) continue;
+        const float sum = e.weight + w;
+        const ParamDesc& cd = paramDesc(ParamId::Cutoff);
+        e.cutoff = fromNorm(cd, (e.weight * toNorm(cd, e.cutoff) + w * toNorm(cd, f.cutoff)) / sum);
+        e.resonance = (e.weight * e.resonance + w * f.resonance) / sum;
+        e.weight = sum;
+        return;
+    }
+    if (out.filterCount < kMorphFilters) {
+        out.filters[out.filterCount] = f;
+        out.filters[out.filterCount].weight = w;
+        ++out.filterCount;
+    }
+}
+
+/**
+ * @brief The filter list made whole: the faint ones dropped, the weights brought to 1, the share
+ *        that is not Off, and the knobs on the heaviest that is not Off (Off when there is none).
+ * @param s  the sound
+ */
+void finishFilters(MorphState& s)
+{
+    int keep = 0;
+    float sum = 0.0f;
+    for (int i = 0; i < s.filterCount; ++i)
+        if (s.filters[i].weight > 1.0e-5f) { s.filters[keep++] = s.filters[i]; sum += s.filters[i].weight; }
+    s.filterCount = keep;
+    if (keep == 0) {
+        s.filterCount = 1;
+        s.filters[0] = MorphFilter{};
+        s.filters[0].weight = 1.0f;
+        sum = 1.0f;
+    }
+    int heaviest = -1;
+    s.filterMix = 0.0f;
+    for (int i = 0; i < s.filterCount; ++i) {
+        s.filters[i].weight /= sum;
+        if (s.filters[i].model == 0) continue;
+        s.filterMix += s.filters[i].weight;
+        if (heaviest < 0 || s.filters[i].weight > s.filters[heaviest].weight) heaviest = i;
+    }
+    s.values[static_cast<size_t>(ParamId::FilterModel)] = heaviest >= 0 ? static_cast<float>(s.filters[heaviest].model) : 0.0f;
+    if (heaviest >= 0) {
+        s.values[static_cast<size_t>(ParamId::Cutoff)] = s.filters[heaviest].cutoff;
+        s.values[static_cast<size_t>(ParamId::Resonance)] = s.filters[heaviest].resonance;
+    }
+}
+
 /** @brief A number a share of the way, unrounded, arriving exactly when close. @param d the parameter @param a from @param b to @param k the share @return the value */
 float follow(const ParamDesc& d, float a, float b, float k)
 {
@@ -224,8 +290,12 @@ void approachMorph(const MorphState& cur, const MorphState& target, float coef, 
         const size_t i = static_cast<size_t>(d.id);
         out.values[i] = d.kind == ParamKind::Float || d.kind == ParamKind::Int ? follow(d, cur.values[i], target.values[i], coef) : target.values[i];
     }
-    out.filterMix = cur.filterMix + (target.filterMix - cur.filterMix) * coef;
     for (int g = 0; g < kMorphGates; ++g) out.gate[g] = cur.gate[g] + (target.gate[g] - cur.gate[g]) * coef;
+    // The filters: both lists, weighted (the card transports one into the other).
+    out.filterCount = 0;
+    for (int i = 0; i < cur.filterCount; ++i) addFilter(out, cur.filters[i], 1.0f - coef);
+    for (int i = 0; i < target.filterCount; ++i) addFilter(out, target.filters[i], coef);
+    finishFilters(out);
     // A kind that differs: its amount and gate fade out (twice the pace), its companions stay; it
     // changes when nothing of it is heard. From off it changes at once, with nothing of it yet.
     // The landscape changes when nothing that reads it is heard: until then those that read it
@@ -273,16 +343,21 @@ void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& o
         out.values[i] = d.kind == ParamKind::Float || d.kind == ParamKind::Int ? lerpParam(d, a.values[i], b.values[i], w)
                                                                                 : (w < 0.5f ? a.values[i] : b.values[i]);
     }
-    // The choices with an amount (the motion, the living landscape, the field, the voice filter with
-    // its cutoff and resonance -- an Off filter's are not heard and should not sweep): the amount
-    // and the gate by the rule, the kind from the side in use. Where the landscape changes (at the
-    // middle, a plain choice), those that read it pass through nothing there, even from or to off.
+    // The choices with an amount (the motion, the living landscape, the field): the amount and the
+    // gate by the rule, the kind from the side in use. Where the landscape changes (at the middle, a
+    // plain choice), those that read it pass through nothing there, even from or to off.
     for (const Pair& p : kPairs) {
         const Side s = side(choiceOf(a, p.choice), choiceOf(b, p.choice), amountOf(p, a), amountOf(p, b), gateOf(p, a), gateOf(p, b), 0,
                             sameKind(p, a, b), landChanges(p, a, b), w, a, b);
         setAmount(p, out, s.amount, s.gate);
         if (s.from != nullptr) takeKind(p, *s.from, out);
     }
+    // The voice filters: both lists, weighted; the same model blends its numbers, different ones
+    // stand side by side (the card transports one into the other).
+    out.filterCount = 0;
+    for (int i = 0; i < a.filterCount; ++i) addFilter(out, a.filters[i], 1.0f - w);
+    for (int i = 0; i < b.filterCount; ++i) addFilter(out, b.filters[i], w);
+    finishFilters(out);
     // The matrix: both, weighted, each row with the modulators it came with.
     out.rowCount = 0;
     out.setupCount = 0;

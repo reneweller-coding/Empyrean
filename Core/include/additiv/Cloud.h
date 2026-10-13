@@ -98,6 +98,9 @@ struct EnvLane {
     std::int32_t pad = 0;           ///< keeps the lane 64 bytes
 };
 
+constexpr int kVoiceFilters = 4;   ///< filters a voice carries during a morph between different ones (the heaviest)
+constexpr int kFilterBins = 1024;  ///< the transported filter's table: 20 Hz .. 20 kHz on the log axis
+
 /** @brief One voice as the host describes it; the engine fills the derived fields at launch(). */
 struct CloudVoice {
     float hz = 110.0f;            ///< fundamental, Hz
@@ -154,6 +157,17 @@ struct CloudVoice {
     float stretch = 1.0f;         ///< harmonic h at h^stretch (partialRatio)
     float shift = 0.0f;           ///< Hz added to every partial (below 20 Hz they fade out)
     float turbulence = 0.0f;      ///< the energy cascade's drive for this note, per second (0: none; Turbulence)
+    // The voice filters during a morph between different ones (Morph.h): with two or more, the
+    // filter above is not read; the card transports them into each other (filterTransportKernel).
+    int   filterCount = 0;        ///< filters in the lists below (0 or 1: the filter above alone)
+    float filterWeight[kVoiceFilters] = {};   ///< each one's share
+    float filterModels[kVoiceFilters] = {};   ///< its model (FilterModel, as a number)
+    float filterCutoffs[kVoiceFilters] = {};  ///< its cutoff, Hz
+    float filterQs[kVoiceFilters] = {};       ///< its Q
+    float filterVowels[kVoiceFilters] = {};   ///< its vowel (Formant)
+    float fpad0 = 0.0f;           ///< keeps the struct a multiple of 16 bytes
+    float fpad1 = 0.0f;           ///< likewise
+    float fpad2 = 0.0f;           ///< likewise
     float pad2 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
     float pad3 = 0.0f;            ///< likewise
 };
