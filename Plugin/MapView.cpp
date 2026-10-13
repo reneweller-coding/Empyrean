@@ -136,7 +136,7 @@ void MapView::paint(juce::Graphics& g)
             const float rad = 3.0f + 5.0f * b.weight[k];
             g.drawEllipse(s.x - rad, s.y - rad, 2.0f * rad, 2.0f * rad, 1.2f);
         }
-        const float rr = cr * p.getWidth();
+        const float rr = std::max(b.sigma * p.getWidth(), 6.0f);   // the blend's width there (the radius in the local spacing)
         g.setColour(additivui::colour::accent.withAlpha(0.12f));
         g.fillEllipse(c.x - rr, c.y - rr, 2.0f * rr, 2.0f * rr);
         g.setColour(additivui::colour::accent);
@@ -276,7 +276,7 @@ void RouteView::rebuild()
         row->radius.setText(juce::String(w.radius, 3), false);
         row->travel.setTooltip("How long the sound takes to glide here from the point before (m:ss)");
         row->hold.setTooltip("How long it stays here (m:ss)");
-        row->radius.setTooltip("How wide the blend is here (0.01 .. 0.3)");
+        row->radius.setTooltip("How far the blend reaches here, in the spacing of the presets round it (0.1 .. 4; under 0.5 a preset's own point plays it alone)");
         for (juce::TextEditor* t : { &row->travel, &row->hold, &row->radius }) {
             t->setJustification(juce::Justification::centred);
             t->onReturnKey = [this, i] { commit(i); };
@@ -302,7 +302,7 @@ void RouteView::commit(int i)
     double t = 0.0;
     if (additiv::Journey::parseTime(row.travel.getText().trim().toStdString(), t)) w.travel = static_cast<float>(std::max(0.0, t));
     if (additiv::Journey::parseTime(row.hold.getText().trim().toStdString(), t)) w.hold = static_cast<float>(std::max(0.0, t));
-    w.radius = juce::jlimit(0.01f, 0.3f, row.radius.getText().getFloatValue() > 0.0f ? row.radius.getText().getFloatValue() : w.radius);
+    w.radius = juce::jlimit(0.1f, 4.0f, row.radius.getText().getFloatValue() > 0.0f ? row.radius.getText().getFloatValue() : w.radius);
     proc_.setWaypoint(i, w);
 }
 
@@ -448,7 +448,7 @@ juce::String MapPage::describe() const
 {
     return params_.describe() + route_.describe()
          + "\nThe map lays every preset on a square: across from darker to brighter, up from still to moving. With Map on, the "
-           "sound is the blend of the presets round the cursor (Radius: how wide), and it follows the cursor over Map Glide. Click "
+           "sound is the blend of the presets round the cursor (Radius: how far, in the spacing of the presets there), and it follows the cursor over Map Glide. Click "
            "a preset to go there, drag to wander; Shift-click adds a waypoint. A route walks the cursor from waypoint to waypoint: "
            "each reached over its travel time -- the time the sound takes to turn into the next -- and held for its hold time, "
            "Route Speed faster or slower, round and round with Loop.\n";

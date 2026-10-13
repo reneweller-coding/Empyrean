@@ -22,7 +22,7 @@ namespace additiv {
 struct Waypoint {
     float x = 0.5f,         ///< @brief map position, 0 .. 1
           y = 0.5f,         ///< @brief map position, 0 .. 1
-          radius = 0.05f;   ///< blend radius (0.01 .. 0.3) at this point
+          radius = 0.4f;    ///< blend radius (0.1 .. 4, in the spacing of the presets there) at this point
     float travel = 60.0f;   ///< seconds to glide here from the previous point (or from where the cursor was)
     float hold = 60.0f;     ///< seconds to stay
     int   preset = -1;      ///< resolved preset index when the point was given by name, else -1
@@ -151,7 +151,7 @@ private:
           elapsed_ = 0.0f;   ///< seconds spent in the current travel or hold
     float fromX_ = 0.5f,    ///< @brief x where the current travel started (the previous point, or the cursor at start())
           fromY_ = 0.5f,    ///< @brief y where the current travel started
-          fromR_ = 0.08f;   ///< radius where the current travel started
+          fromR_ = 0.4f;    ///< radius where the current travel started
     float curX_ = 0.5f,    ///< @brief the cursor's x now, as update() last wrote it
           curY_ = 0.5f,    ///< @brief the cursor's y now
           curR_ = 0.08f;   ///< the blend radius now

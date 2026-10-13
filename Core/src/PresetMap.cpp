@@ -47,12 +47,11 @@ MapNeighbours mapNeighbours(float x, float y, float radius)
     b.count = std::min(count, MapNeighbours::kMax);
     for (int k = 0; k < b.count; ++k) b.index[k] = index[k];
     if (b.count == 0) return b;
-    // In a gap (the nearest further than the radius) the width grows towards the third neighbour,
-    // smoothly over one more radius; on a preset's own point it is that preset alone.
-    const float sigma = std::max(radius, 1.0e-3f);
-    const float d0 = std::sqrt(dist[0]), d3 = std::sqrt(dist[b.count >= 3 ? 2 : 0]);
-    const float g = std::clamp((d0 - sigma) / sigma, 0.0f, 1.0f);
-    const float sig = sigma + g * g * (3.0f - 2.0f * g) * std::max(0.0f, 0.7f * d3 - sigma);
+    // The width: the radius in the spacing there, the distance to the second nearest (on a
+    // preset's own point its neighbour's; between two, half their distance; in a gap, the gap's).
+    const float spacing = std::sqrt(dist[count >= 2 ? 1 : 0]);
+    const float sig = std::max(std::max(radius, 0.01f) * spacing, 1.0e-4f);
+    b.sigma = sig;
     // Relative to the nearest (no underflow in a gap), less what the seventh would weigh.
     const float floor = count > MapNeighbours::kMax ? std::exp(-(dist[MapNeighbours::kMax] - dist[0]) / (2.0f * sig * sig)) : 0.0f;
     float sum = 0.0f;

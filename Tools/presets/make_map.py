@@ -1,16 +1,26 @@
 """make_map.py: the preset map and the routes over it -- into Core/src/PresetMap.inc and Core/src/Routes.inc.
 
-The map (after Noctuary's Tools/preset_map.py, but from the presets' own parameters: there is no
-measured library here) lays every preset of the bank on a square with two axes one can read:
+The map (after Noctuary's Tools/preset_map.py) lays every preset of the bank on a square by what it
+sounds like, measured (additiv_presets --describe, into work/presets/descriptors.json: each preset
+plays a chord for 14 s, its last eight are described):
 
-  across  dark -> bright   the brightness, the tilt (falling), the filter's opening, the air, the presence
-  up      still -> moving  the motion's depth and rate, the shimmer, the ripple, the sync, the living
-                           landscape, a quick attack, a quick conductor, a travelling comb
+  across  dark -> bright   the spectral centroid, in octaves
+  up      still -> moving  how much the spectrum changes over a quarter of a second, a second and
+                           three seconds, as a share of itself (on a log scale: the stillest presets
+                           differ by little in it, and that little is what is heard)
 
-Across is taken by rank, up by rank within strips of like brightness (so the presets fill the
-square evenly: up means more moving than its neighbours in brightness), then a short repulsion
-pass moves points that sit on top of each other apart. Near on the map is set alike -- the promise of
-a smooth blend, not of a good one.
+Where many presets sound alike they crowd, where none sounds like that the map is empty. (The
+first map, 13.10.2026, ranked guesses from the parameters and filled the square evenly; measured,
+its axes had a correlation of 0.24 and 0.16 with these.) As Noctuary does, each axis is half its
+rank and half its value -- the value brought to the square by its 1st and 99th percentile, the
+tails beyond drawn in softly (tanh) rather than piled on the edge: half of the bank sounds within
+a tenth of the brightness range, and on the values alone that half would crowd into a twentieth of
+the square. The clusters and the gaps keep their shape; a light repulsion only parts points that
+would sit on top of each other.
+
+The routes' radii are in the spacing of the presets round a waypoint (PresetMap.h).
+
+Without descriptors.json the old axes from the parameters are used (and said so).
 
 The routes are walks over the map (Route.h): waypoints by preset name, so they follow the
 presets if the map is laid out again, each with a travel time (the glide to it), a hold time and
@@ -52,6 +62,33 @@ def axes(table, p):
     return bright, moving
 
 
+DESCRIPTORS = ROOT / "work" / "presets" / "descriptors.json"
+
+
+def measured(names):
+    """(bright, moving) per preset from descriptors.json, or None when it lacks any of them."""
+    import json
+    if not DESCRIPTORS.exists():
+        return None
+    d = json.loads(DESCRIPTORS.read_text(encoding="utf-8"))
+    if any(n not in d for n in names):
+        missing = [n for n in names if n not in d]
+        print(f"descriptors.json lacks {len(missing)} presets (first: {missing[0]}): the parameters' axes instead")
+        return None
+    return [(d[n][0], math.log(max(d[n][1], 1e-4))) for n in names]
+
+
+def to_square(values, lo_q=1.0, hi_q=99.0):
+    """Values onto 0.03 .. 0.97: half their rank, half themselves by their 1st and 99th percentile
+    (at 0.05 and 0.95, the tails beyond drawn in by a tanh, so nothing piles on the edge)."""
+    v = np.array(values, dtype=np.float64)
+    lo, hi = np.percentile(v, lo_q), np.percentile(v, hi_q)
+    mid, half = 0.5 * (lo + hi), max(0.5 * (hi - lo), 1e-9)
+    raw = 0.5 + 0.5 * np.tanh(1.47 * (v - mid) / half)   # the percentiles at 0.05 and 0.95, the tails beyond softly towards the edge
+    rank = np.argsort(np.argsort(v)) / max(len(v) - 1, 1)
+    return list(0.03 + 0.94 * (0.5 * rank + 0.5 * raw))
+
+
 def rank01(values, rng):
     """Values to their ranks, spread evenly over 0.03 .. 0.97 (ties broken by a die)."""
     order = sorted(range(len(values)), key=lambda i: (values[i], rng.random()))
@@ -61,10 +98,10 @@ def rank01(values, rng):
     return out
 
 
-def repel(xy, steps=40):
+def repel(xy, steps=40, share=0.7):
     """Pushes points closer than a share of the mean spacing apart, a little each step."""
     n = len(xy)
-    d0 = 0.7 / math.sqrt(n)
+    d0 = share / math.sqrt(n)
     p = np.array(xy, dtype=np.float64)
     for _ in range(steps):
         diff = p[:, None, :] - p[None, :, :]
@@ -89,7 +126,7 @@ def nearest(points, names, x, y, avoid=()):
     return best
 
 
-def route_text(points, names, places, rng, travel=(60, 180), hold=(30, 120), radius=(0.03, 0.06)):
+def route_text(points, names, places, rng, travel=(60, 180), hold=(30, 120), radius=(0.5, 1.5)):
     """A route through the presets nearest to places, with times drawn from the ranges."""
     taken, items = [], []
     for k, (x, y) in enumerate(places):
@@ -104,23 +141,30 @@ def main():
     table = param_table()
     bank = make_presets.build()
     rng = random.Random(4096)
-    raw = []
-    for name, g, params, _ in bank:
-        p = dict(kv.split("=", 1) for kv in params.split())
-        raw.append(axes(table, p))
-    # Across by rank; up by rank within each of 32 strips of like brightness -- brightness and motion
-    # go together (the sleep concerts are dark and still), so ranked each on its own they would
-    # leave whole corners empty, and an empty place on the map has nothing to blend.
-    xs = rank01([a for a, _ in raw], rng)
-    ys = [0.0] * len(raw)
-    order = sorted(range(len(raw)), key=lambda i: xs[i])
-    strips = 32
-    for s in range(strips):
-        idx = order[s * len(order) // strips:(s + 1) * len(order) // strips]
-        ranked = rank01([raw[i][1] for i in idx], rng)
-        for i, y in zip(idx, ranked):
-            ys[i] = y
-    xy = repel(list(zip(xs, ys)))
+    names = [name for name, *_ in bank]
+    heard = measured(names)
+    if heard is not None:
+        # As they sound: half rank, half value, a light repulsion against overlaps only.
+        xs = to_square([a for a, _ in heard])
+        ys = to_square([m for _, m in heard])
+        xy = repel(list(zip(xs, ys)), steps=30, share=0.2)
+        print(f"the map from {DESCRIPTORS}")
+    else:
+        raw = []
+        for name, g, params, _ in bank:
+            p = dict(kv.split("=", 1) for kv in params.split())
+            raw.append(axes(table, p))
+        # Across by rank; up by rank within each of 32 strips of like brightness.
+        xs = rank01([a for a, _ in raw], rng)
+        ys = [0.0] * len(raw)
+        order = sorted(range(len(raw)), key=lambda i: xs[i])
+        strips = 32
+        for s in range(strips):
+            idx = order[s * len(order) // strips:(s + 1) * len(order) // strips]
+            ranked = rank01([raw[i][1] for i in idx], rng)
+            for i, y in zip(idx, ranked):
+                ys[i] = y
+        xy = repel(list(zip(xs, ys)))
     lines = ["// Generated by Tools/presets/make_map.py -- do not edit; edit the script and run it again.",
              "/// Every factory preset's place on the map, in the bank's order: across dark to bright, up still to moving.",
              "const float kPresetMap[][2] = {"]
@@ -130,7 +174,6 @@ def main():
     OUT_MAP.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
 
     # The routes.
-    names = [name for name, *_ in bank]
     points = {name: tuple(xy[i]) for i, name in enumerate(names)}
     section = {name: g // 16 for name, g, *_ in bank}
     by = lambda s: [n for n in names if section[n] == s]   # noqa: E731

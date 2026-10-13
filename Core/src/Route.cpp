@@ -68,7 +68,7 @@ bool Route::parse(const char* text)
         }
         w.travel = std::max(0.0f, std::strtof(fields[1], nullptr));
         w.hold   = std::max(0.0f, std::strtof(fields[2], nullptr));
-        if (nf >= 4) w.radius = std::clamp(std::strtof(fields[3], nullptr), 0.01f, 0.3f);
+        if (nf >= 4) w.radius = std::clamp(std::strtof(fields[3], nullptr), 0.1f, 4.0f);
         if (n >= kMaxPoints) return false;
         pts[n++] = w;
         s = (*e == ';' || *e == '\n') ? e + 1 : e;

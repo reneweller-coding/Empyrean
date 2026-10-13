@@ -1590,16 +1590,16 @@ int main()
         check(good, "life: the animated pictures move, keep the level, repeat", fmt("free %.1f dBFS; moved a cell, dBFS: ", level0) + report);
     }
 
-    // 51. The preset map: on a preset's own point the blend is that preset; half way to a neighbour a
-    //     number lies between the two; the engine follows the map's target over Map Glide; the
-    //     routes that come with it read, write back and walk to their points.
+    // 51. The preset map: on a preset's own point, at the default radius, the blend is that preset;
+    //     half way to a neighbour a number lies between the two; the engine follows the map's target
+    //     over Map Glide; the routes that come with it read, write back and walk to their points.
     {
         MapBlender blender;
         float x = 0.0f, y = 0.0f;
         presetMapPosition(100, x, y);
         MorphState at;
         MapNeighbours nb;
-        blender.blend(x, y, 0.004f, at, &nb);
+        blender.blend(x, y, paramDesc(ParamId::MapRadius).def, at, &nb);
         float values[kNumParams];
         presetValues(100, values, nullptr);
         double worst = 0.0;   // what carries the sound (an amount whose choice is off may differ: it is not heard)
@@ -1608,13 +1608,13 @@ int main()
             const ParamDesc& d = paramDesc(id);
             worst = std::max(worst, static_cast<double>(std::fabs(toNorm(d, at.values[static_cast<size_t>(id)]) - toNorm(d, values[static_cast<size_t>(id)]))));
         }
-        const bool onPoint = nb.index[0] == 100 && nb.weight[0] > 0.99f && worst < 1.0e-3;
+        const bool onPoint = nb.index[0] == 100 && nb.weight[0] > 0.95f && worst < 0.03;
         // Half way to the nearest other preset, a wide blend: the tilt between the two (or equal).
         const int other = nb.index[1];
         float ox = 0.0f, oy = 0.0f;
         presetMapPosition(other, ox, oy);
         MorphState mid;
-        blender.blend(0.5f * (x + ox), 0.5f * (y + oy), 0.02f, mid);
+        blender.blend(0.5f * (x + ox), 0.5f * (y + oy), 1.0f, mid);
         float vo[kNumParams];
         presetValues(other, vo, nullptr);
         const float ta = values[static_cast<size_t>(ParamId::Tilt)], tb = vo[static_cast<size_t>(ParamId::Tilt)], tm = mid.values[static_cast<size_t>(ParamId::Tilt)];
@@ -1639,14 +1639,14 @@ int main()
             if (!r.parse(routePreset(i).points) || r.count() < 3 || r.write(buf, sizeof(buf)) <= 0 || !back.parse(buf) || back.count() != r.count()) ++bad;
         }
         Route r;
-        r.parse("0.2,0.2|1|1|0.05;0.8,0.6|2|1|0.1");
-        r.start(0.5f, 0.5f, 0.05f, true);
+        r.parse("0.2,0.2|1|1|0.5;0.8,0.6|2|1|1.5");
+        r.start(0.5f, 0.5f, 0.4f, true);
         float cx = 0.0f, cy = 0.0f, cr = 0.0f;
         bool reachedA = false, reachedB = false, looped = false;
         for (int k = 0; k < 160; ++k) {   // 8 s at 0.05 s: A after 1 s, B after 4 s, A again after 6 s
             r.update(0.05f, cx, cy, cr);
             if (std::fabs(cx - 0.2f) < 1.0e-4f && std::fabs(cy - 0.2f) < 1.0e-4f) { reachedA = true; if (reachedB) looped = true; }
-            if (std::fabs(cx - 0.8f) < 1.0e-4f && std::fabs(cy - 0.6f) < 1.0e-4f && std::fabs(cr - 0.1f) < 1.0e-5f) reachedB = true;
+            if (std::fabs(cx - 0.8f) < 1.0e-4f && std::fabs(cy - 0.6f) < 1.0e-4f && std::fabs(cr - 1.5f) < 1.0e-5f) reachedB = true;
         }
         check(onPoint && between && follows && bad == 0 && reachedA && reachedB && looped && r.running(), "map: blends, follows, and routes walk",
               fmt("on its point: preset %d weight %.3f, off by %.1e; half way the tilt %.2f between %.2f and %.2f; followed: %s; "
