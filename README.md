@@ -78,11 +78,15 @@ offline renderer and the manual, and a portable zip.
   flow, feedback, rain, starfield, moire -- read by every partial.
 - **The preset map:** every preset on a square by how it sounds, measured (darker to brighter, still to moving); the
   cursor blends the presets round it, routes walk it with a travel and a hold time for each waypoint.
-- **4096 presets** in 64 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
-  visions), levelled by their loudest second.
-- **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, the filter
-  fades from one into the other; a morph knob between two slots; and journeys, presets in a row glided into each
-  other for a whole night (135 come with it, seven of them whole nights).
+- **Swarms, fluids and turbulence:** the partials' oscillators as chimeras (an ordered core in a disordered cloud) or
+  as swarmalators (phase waves circling through pitch and field); a real fluid (lattice Boltzmann) the notes blow ink
+  into, and an oil-and-water separation that gathers into islands, as living landscapes; the energy cascade of a gong.
+- **MPE:** every note its own bend, pressure and slide (Push 3, Osmose, Linnstrument, Seaboard), each moving a target.
+- **5120 presets** in 80 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions, swarms and currents), levelled by their loudest second.
+- **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
+  modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
+  journeys, presets in a row glided into each other for a whole night (168 come with it, eight of them whole nights).
 
 ## Build
 

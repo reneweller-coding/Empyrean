@@ -526,6 +526,28 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 16: Schwärme, Strömungen, Turbulenz, Transport, MPE (gebaut, 14.10.2026, 0.14.0)
+
+Ein Text über Forschung zu GPU-Audio, DDSP, physikalischer Modellierung und Schwarmdynamik; meine Einschätzung:
+gebaut wurde, was zum Instrument passt (Tensor-Kerne, Reibung, Raytracing je Partial und Verdeckungs-Culling nicht).
+- **16a Sync-Modi:** Chimera (Kopplung an die Nachbarn rund um den Ring der Wolke, 1 + 0,995 cos, Verzug 1,25 .. 1,55,
+  Start nach Abrams/Strogatz) und Swarm (Swarmalators auf dem Ring nach O'Keeffe et al.: Platz x auf einem Kreis in
+  Tonhöhe Reach·cos x und Seite ½·sin x; drei mittlere Zeiger je Wolke). Zustände simuliert (Python): Phasenwelle bei
+  K = 0, J > 0 oder K ≈ 1, J < 0; zwei Gruppen bei K, J > 0; zersplittert an den Grenzen; verstreut bei J < 0.
+- **16b Fluid und Islands:** Lattice-Boltzmann D2Q9 (BGK) auf dem Torus des Felds, Düsen der acht lautesten Noten an
+  Frequenz und Oktave, Tinte semi-Lagrange; Cahn-Hilliard mit Oono-Puri auf 64×32 in einem Block (Shared Memory).
+- **16c Turbulence:** Leistung je Harmonischer auf der GPU, Fluss drive·p² (7/10 nach h+1, 3/10 nach 2h), Rückkehr über
+  Settle/(1 + h/8); Antrieb kubisch in Notenstärke und Lautheit.
+- **16d Filter-Transport:** MorphState hält gewichtete Filter (einer je Modell); `filterTransportKernel` bildet das
+  Wasserstein-Baryzentrum der Leistungskurven (1024 Bänder, Mittel der Quantilfunktionen); ein Filter: direkt.
+- **16e MPE:** Kanäle 2..16 je eine Note (Biegung, Druck, CC 74), Kanal 1 Master; RPN 0/6; Press/Slide-Ziele.
+- **16f Presets:** 1024 in 16 Gruppen; 324 der 4096 bekamen die neuen Mittel (nach allem anderen gezogen).
+  `additiv_presets --describe` führt die Beschreibungen jetzt zusammen; gemessen wurden die 1348 neuen und geänderten.
+
+**Gemessen [M]:** Selbsttest 57/57: 53 Chimäre 0,49 der Nachbarn im Gleichschritt, Schwarm gleich weit (0,3 ct) bzw.
+verstreut (11,9 ct); 54 Tinte 0,79 an den Noten gegen 0,28, Inseln 578 → 370 Grenzen; 55 Schwerpunkt laut +1,23,
+leise +0,52 Oktaven; 56 halbwegs tief −27,6 / Mitte +1,9 / hoch −27,2 dB; 57 Biegung 200 ct, Druck +3,00 dB.
+
 ## Phase 15: Korrekturen nach dem Anhören (gebaut, 13.10.2026, 0.13.1)
 
 Der Nutzer: "das Laden der Presets über das Menü kaputt", "sind die Presets wirklich so regelmäßig

@@ -1,5 +1,30 @@
 # Release notes
 
+## 0.14.0 (14.10.2026, not released)
+
+Swarms and chimeras, two living landscapes that answer the playing, turbulence, the filter morphing by transport,
+MPE, and 1024 more presets.
+
+- **Partial Sync's modes:** Chimera (each partial coupled to its neighbours round its cloud with a lag: an ordered,
+  pulsing core beside a flickering mist, its border wandering) and Swarm (swarmalators: every partial also has a place
+  on a circle in pitch and field, and place and phase pull each other -- a phase wave circling through the cloud at the
+  rate, two groups pulsing against each other, broken waves, or each for itself), with Swarm, Reach and Lag.
+- **Two living landscapes:** Fluid (a lattice Boltzmann fluid the notes blow ink and momentum into at their
+  frequencies: plumes, eddies, vortex streets) and Islands (Cahn-Hilliard separation: a fine field gathers into a few
+  large islands drifting across the spectrum).
+- **Turbulence** (Cloud page): the energy cascade of a struck gong -- a loud harmonic hands its energy upwards, the
+  louder the more, and the spectrum settles back over Settle. Brighter, not louder: a soft chord stays pure.
+- **The filter morphs by transport:** in a glide, an A/B morph or on the map, different filters move into each other
+  -- their power curves read as masses, the blend their Wasserstein barycentre -- so a pass band or a formant wanders
+  to its new place instead of fading out while the other fades in.
+- **MPE:** the lower zone, every note on channels 2 .. 16 with its own bend (48 semitones), pressure and slide
+  (controller 74); channel 1 the master. Press and Slide each move a target: level, filter, brightness, width,
+  nearness, shimmer or motion. RPN 0 sets the bend range, a host's MPE configuration switches it on or off.
+- **5120 presets:** sixteen new groups of swarms and currents (Swarms, Splinters, Chimeras, Twin Swarms, Currents,
+  Vortex Streets, Ink Plumes, Islands, Labyrinths, Archipelagos, Gong Blooms, Bronze Swells, Shimmer Cascades,
+  Pressure Pads, Expressive Voices, Living Storms); 324 of the presets before took the new means where they fit (every
+  value they had stays). 168 journeys, thirteen routes; the map measured anew.
+
 ## 0.13.1 (13.10.2026, not released)
 
 Corrections after listening: the preset menu, the jumps in a morph with modulation, the map.

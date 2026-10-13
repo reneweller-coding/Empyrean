@@ -117,7 +117,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     for (auto* b : { &prevPreset_, &presetName_, &nextPreset_ }) addAndMakeVisible(b);
     prevPreset_.setTooltip("The preset before");
     nextPreset_.setTooltip("The preset after");
-    presetName_.setTooltip("The preset playing: click for the bank (64 groups of 64: the sounds, the living systems, the sleep concerts, the visions)");
+    presetName_.setTooltip("The preset playing: click for the bank (80 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents)");
     prevPreset_.onClick = [this] { loadPreset((std::max(proc_.currentPreset(), 0) + additiv::numPresets() - 1) % additiv::numPresets()); };
     nextPreset_.onClick = [this] { loadPreset((proc_.currentPreset() + 1) % additiv::numPresets()); };
     presetName_.onClick = [this] { showPresets(); };
@@ -484,6 +484,7 @@ void AdditivEditor::showPresets()
         if (g == additiv::kNumSoundGroups) bank.addSectionHeader("Living Systems");
         if (g == additiv::kFirstSleepGroup) bank.addSectionHeader("Sleep Concerts");
         if (g == additiv::kFirstVisionGroup) bank.addSectionHeader("Visions");
+        if (g == additiv::kFirstSwarmGroup) bank.addSectionHeader("Swarms & Currents");
         juce::PopupMenu group;
         for (int i = 0; i < 64; ++i) {
             const int index = additiv::presetAt(g, i);

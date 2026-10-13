@@ -13,7 +13,7 @@ using additiv::ParamId;
 
 namespace {
 
-/** @brief A section's colour: the sounds, the living systems, the sleep concerts, the visions. @param group the preset's group @return the colour */
+/** @brief A section's colour: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents. @param group the preset's group @return the colour */
 juce::Colour sectionColour(int group)
 {
     const frame::Skin& skin = additivui::skin();
@@ -21,7 +21,8 @@ juce::Colour sectionColour(int group)
     case 0: return skin.family(frame::Family::Source);
     case 1: return additivui::colour::violet;
     case 2: return skin.family(frame::Family::Space);
-    default: return skin.family(frame::Family::Envelope);
+    case 3: return skin.family(frame::Family::Envelope);
+    default: return skin.family(frame::Family::Filter);
     }
 }
 

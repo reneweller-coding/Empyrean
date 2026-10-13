@@ -304,8 +304,21 @@ int main(int argc, char** argv)
     for (size_t i = 0; i < levels.size(); ++i)
         f << "  \"" << levels[i].first << "\": " << levels[i].second << (i + 1 < levels.size() ? ",\n" : "\n");
     f << "}\n";
-    if (!describeFile.empty()) {   // name: [brightness, motion, width, noise, level]
+    if (!describeFile.empty()) {   // name: [brightness, motion, width, noise, level], merged into what the file holds
         const fs::path dp(describeFile);
+        std::vector<std::string> kept;
+        {
+            std::ifstream in(dp);
+            std::string line;
+            while (std::getline(in, line)) {
+                const size_t a = line.find('"'), b = line.find('"', a + 1), open = line.find('[', b == std::string::npos ? 0 : b);
+                if (a == std::string::npos || b == std::string::npos || open == std::string::npos) continue;
+                const std::string name = line.substr(a + 1, b - a - 1);
+                if (std::any_of(descriptions.begin(), descriptions.end(), [&](const auto& d) { return d.first == name; })) continue;
+                const size_t close = line.find(']', open);
+                if (close != std::string::npos) kept.push_back(line.substr(0, close + 1));
+            }
+        }
         if (dp.has_parent_path()) fs::create_directories(dp.parent_path());
         std::ofstream df(dp);
         df << "{\n";
@@ -313,9 +326,10 @@ int main(int argc, char** argv)
             const Description& d = descriptions[i].second;
             char line[256];
             std::snprintf(line, sizeof line, "  \"%s\": [%.5f, %.5f, %.5f, %.5f, %.2f]%s\n", descriptions[i].first.c_str(), d.brightness, d.motion, d.width,
-                          d.noise, levels[i].second, i + 1 < descriptions.size() ? "," : "");
+                          d.noise, levels[i].second, i + 1 < descriptions.size() || !kept.empty() ? "," : "");
             df << line;
         }
+        for (size_t i = 0; i < kept.size(); ++i) df << kept[i] << (i + 1 < kept.size() ? ",\n" : "\n");
         df << "}\n";
     }
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();

@@ -17,7 +17,7 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And seven whole nights across groups (two from the sleep concerts, one from the visions): twenty-four presets, the stillest few of every group in a
+And eight whole nights across groups (two from the sleep concerts, one from the visions, one from the swarms and currents): twenty-four presets, the stillest few of every group in a
 family of groups, chained,
 twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
@@ -59,6 +59,8 @@ WHOLE_NIGHTS = [
                                   "Hypnagogia"]),
     ("Whole Night - Visions", ["Kaleidoscopes", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
                                "Painted Light"]),
+    ("Whole Night - Currents & Swarms", ["Currents", "Archipelagos", "Islands", "Chimeras", "Swarms", "Bronze Swells", "Ink Plumes",
+                                         "Twin Swarms"]),
 ]
 
 

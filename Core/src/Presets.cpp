@@ -20,6 +20,8 @@ const char* const kPresetGroupNames[kNumPresetGroups] = {
     "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow",
     "Kaleidoscopes", "Tunnels", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
     "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines",
+    "Swarms", "Splinters", "Chimeras", "Twin Swarms", "Currents", "Vortex Streets", "Ink Plumes", "Islands",
+    "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms",
 };
 
 namespace {

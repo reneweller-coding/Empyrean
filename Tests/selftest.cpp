@@ -532,7 +532,7 @@ int main()
         const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
         bool full = true;
         for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
-        check(numPresets() == 4096 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
+        check(numPresets() == 5120 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
               fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
                   bad, outOfRange, rowsLost));
     }

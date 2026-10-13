@@ -52,7 +52,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain", "Ocean Sleep", "Cradle",
           "Starfield", "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall", "Forest Night", "Slow Tides", "Afterglow",
           "Kaleidoscopes", "Tunnels", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
-          "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines"]
+          "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines",
+          "Swarms", "Splinters", "Chimeras", "Twin Swarms", "Currents", "Vortex Streets", "Ink Plumes", "Islands",
+          "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -183,6 +185,39 @@ NAMES = {
                       ["Harmony", "Chord", "Choir", "Hymn", "Anthem", "Consonance", "Concord", "Song"]),
     "Dream Machines": (["Dreaming", "Clockwork", "Humming", "Whirring", "Lucid", "Mechanical", "Electric", "Somnambulant"],
                        ["Machine", "Engine", "Automaton", "Device", "Contraption", "Apparatus", "Loom", "Orrery"]),
+    # Phase 16
+    "Swarms": (["Gyrating", "Rotating", "Wheeling", "Spiralling", "Pirouetting", "Careering", "Looping", "Coursing"],
+               ["Swarm", "Gyre", "Carousel", "Maelstrom", "Roundel", "Whirligig", "Merry-Go-Round", "Starling Ring"]),
+    "Splinters": (["Splintered", "Shattered", "Sundered", "Cleft", "Parted", "Riven", "Severed", "Fissured"],
+                  ["Phases", "Shoals", "Circles", "Arcs", "Fragments", "Facets", "Splinters", "Shards of Light"]),
+    "Chimeras": (["Half-Lit", "Twofold", "Janus", "Uneven", "Partial", "Ambivalent", "Two-Faced", "Patchwork"],
+                 ["Chimera", "Hybrid", "Kernel", "Mirage", "Sphinx", "Griffin", "Centaur", "Mosaic"]),
+    "Twin Swarms": (["Twin", "Paired", "Antiphonal", "Alternating", "Answering", "Doubled", "Opposed", "Reciprocal"],
+                    ["Beacons", "Signals", "Pendants", "Lamps", "Calls", "Lanterns", "Torches", "Semaphores"]),
+    "Currents": (["Viscous", "Honeyed", "Syrupy", "Languid", "Slow-Moving", "Treacly", "Unhurried", "Oozing"],
+                 ["Current", "Stream", "Seep", "Eddy", "Ooze", "Rivulet", "Runnel", "Trickle"]),
+    "Vortex Streets": (["Churning", "Roiling", "Seething", "Boiling", "Racing", "Restless", "Tumbling", "Swirling"],
+                       ["Vortices", "Street", "Torrent", "Rapids", "Whirlpool", "Race", "Wash", "Overfall"]),
+    "Ink Plumes": (["Inked", "Plumed", "Indigo", "Smoky", "Billowing", "Trailing", "Inky", "Wafting"],
+                   ["Plume", "Cloudlet", "Wisp", "Tendril", "Inkdrop", "Sepia Cloud", "Smoke Ring", "Pall"]),
+    "Islands": (["Gathering", "Merging", "Coalescing", "Settling", "Joining", "Pooling", "Floating", "Ripening"],
+                ["Islands", "Isles", "Atolls", "Reefs", "Continents", "Skerries", "Holms", "Sandbanks"]),
+    "Labyrinths": (["Winding", "Mazy", "Serpentine", "Tangled", "Meandering", "Coiled", "Intricate", "Veined"],
+                   ["Labyrinth", "Maze", "Channels", "Pathways", "Corridors", "Fretwork", "Tracery", "Warren"]),
+    "Archipelagos": (["Becalmed", "Misted", "Tranquil", "Hazy", "Slumbering", "Shrouded", "Dim", "Lulled"],
+                     ["Archipelago", "Lagoon", "Haven", "Cove", "Inlet", "Shallows", "Estuary", "Mooring"]),
+    "Gong Blooms": (["Blooming", "Flaring", "Swelling", "Kindled", "Thundering", "Shivering", "Resounding", "Bursting"],
+                    ["Gong", "Tam-Tam", "Plate", "Disc", "Shield", "Cymbal", "Sheet", "Tympan"]),
+    "Bronze Swells": (["Gilded", "Brazen", "Burnished", "Tawny", "Coppery", "Auric", "Rusted", "Patinated"],
+                      ["Swell", "Surge", "Crescendo", "Billow", "Upwelling", "Heave", "Groundswell", "Tidewater"]),
+    "Shimmer Cascades": (["Sparkling", "Glittering", "Showering", "Sifting", "Twinkling", "Spilling", "Raining", "Dripping"],
+                         ["Cascade", "Fountain", "Spray", "Spangles", "Glitter", "Motes", "Droplets", "Sequins"]),
+    "Pressure Pads": (["Pressed", "Caressed", "Held", "Leaning", "Pushing", "Weighted", "Tender", "Firm"],
+                      ["Pad", "Cushion", "Felt", "Palm", "Fingertips", "Hands", "Contact", "Pressure"]),
+    "Expressive Voices": (["Singing", "Sighing", "Calling", "Yearning", "Pleading", "Warbling", "Keening", "Crooning"],
+                          ["Voice", "Song", "Lament", "Cantus", "Solo", "Plea", "Lilt", "Cantilena"]),
+    "Living Storms": (["Storming", "Tempestuous", "Gusting", "Squalling", "Thunderous", "Charged", "Wind-Torn", "Brooding"],
+                      ["Storm", "Tempest", "Gale", "Cyclone", "Front", "Monsoon", "Cloudburst", "Thunderhead"]),
 }
 
 
@@ -1549,6 +1584,275 @@ RECIPES = RECIPES + [v_kaleido, v_tunnel, v_spiral, v_flow, v_feedback, v_rain, 
                      v_stretched, v_metals, v_comb, v_barber, v_painted, v_prism, v_alien, v_machine]
 
 
+# ---- Phase 16 (14.10.2026): swarms and chimeras, the Fluid and the Islands, turbulence, MPE.
+
+LIFE_FLUID, LIFE_ISLANDS = 11, 12
+MPE_T = {"Off": 0, "Level": 1, "Filter": 2, "Brightness": 3, "Width": 4, "Nearer": 5, "Shimmer": 6, "Motion": 7}
+
+
+def set_swarm(r, state, depth=(0.3, 0.7), rate=(0.1, 1.2), reach=(10, 50)):
+    """The partials as swarmalators. Where their states lie (simulated, 14.10.2026): a phase wave
+    circling through pitch and field without coupling and with attraction, or with strong coupling
+    and repulsion; two groups pulsing against each other with both; broken waves at the borders
+    between; each for itself with repulsion and little coupling."""
+    r.set("sync_mode", 2)
+    r.set("sync_depth", f(r.u(*depth), 2))
+    r.set("sync_rate", f(r.lg(*rate), 3))
+    r.set("sync_reach", f(r.u(*reach), 1))
+    if state == "wave":
+        coupling, swarm = (0.0, r.u(0.4, 1.0)) if r.rng.random() < 0.5 else (r.u(0.85, 1.0), r.u(-0.8, -0.3))
+        spread = r.u(0.03, 0.2)
+    elif state == "twin":
+        coupling, swarm, spread = r.u(0.3, 1.0), r.u(0.3, 1.0), r.u(0.03, 0.3)
+    elif state == "splinter":
+        if r.rng.random() < 0.5:
+            coupling, swarm, spread = r.u(0.5, 0.7), r.u(-0.6, -0.4), r.u(0.03, 0.15)
+        else:
+            coupling, swarm, spread = 0.0, r.u(0.25, 0.4), r.u(0.2, 0.35)
+    else:
+        coupling, swarm, spread = r.u(0.0, 0.3), r.u(-1.0, -0.3), r.u(0.1, 0.4)
+    r.set("sync_coupling", f(coupling, 2))
+    r.set("sync_swarm", f(swarm, 2))
+    r.set("sync_spread", f(spread, 2))
+
+
+def set_chimera(r, depth=(0.3, 0.7), rate=(0.1, 1.0)):
+    """A chimera: the partials coupled to their neighbours with a lag, alike in their rates."""
+    r.set("sync_mode", 1)
+    r.set("sync_depth", f(r.u(*depth), 2))
+    r.set("sync_coupling", f(r.u(0.6, 1.0), 2))
+    r.set("sync_rate", f(r.lg(*rate), 3))
+    r.set("sync_spread", f(r.u(0.0, 0.04), 3))
+    r.set("sync_lag", f(r.u(0.3, 0.65), 2))
+
+
+def set_turb(r, amount=(0.4, 1.0), settle=(2, 20)):
+    """The energy cascade."""
+    r.set("turbulence", f(r.u(*amount), 2))
+    r.set("turbulence_time", f(r.lg(*settle), 2))
+
+
+def set_mpe(r, presses, press_depth, slides, slide_depth):
+    """What a played note's pressure and slide move (MPE)."""
+    r.set("mpe_press", MPE_T[r.pick(*presses)])
+    r.set("mpe_press_depth", f(r.u(*press_depth), 2))
+    r.set("mpe_slide", MPE_T[r.pick(*slides)])
+    r.set("mpe_slide_depth", f(r.u(*slide_depth), 2))
+    if MPE_T["Filter"] in (r.p.get("mpe_press"), r.p.get("mpe_slide")) and int(num(r, "filter_model", 0)) == 0:
+        r.set("filter_model", FILTER["LP 12"])   # a filter for the hand to move
+        r.set("cutoff", f(r.lg(600, 3000), 0))
+        r.set("resonance", f(r.u(0.1, 0.4), 2))
+
+
+P16_POOLS = {
+    "swarm": [("lfo2", "sync_reach", (0.08, 0.2)), ("kura1", "sync_swarm", (0.1, 0.25)), ("lorenz_x", "sync_depth", (0.08, 0.18))],
+    "life": [("lfo3", "life_rate", (0.08, 0.2)), ("kura2", "life_depth", (0.08, 0.18))],
+    "turb": [("loudness", "turbulence", (0.1, 0.25)), ("lfo3", "turbulence", (0.08, 0.2)), ("rossler_x", "turbulence", (0.08, 0.2))],
+}
+
+
+def p16_rows(r, kinds, count, via_p=0.25):
+    """Rows onto the new means' knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P16_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        elif src.startswith("kura"):
+            setup(r, "kura")
+        elif src.startswith(("lorenz", "rossler")):
+            setup(r, "chaos")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def q_swarms(r):
+    based(r, "Choirs", "Strings", "Organs", "Sleep Concert", "Shimmer", "Glass")
+    set_swarm(r, "wave")
+    p16_rows(r, ["swarm"], 1)
+    rows_from(r, ["kura"], 1)
+
+
+def q_splinters(r):
+    based(r, "Glass", "Shimmer", "Bells", "Strings", "Air & Noise", "Keys")
+    set_swarm(r, "splinter", rate=(0.3, 2.5))
+    p16_rows(r, ["swarm"], 1)
+    rows_from(r, ["chaos"], 1)
+
+
+def q_chimeras(r):
+    based(r, "Choirs", "Organs", "Strings", "Sleep Concert", "Deep Space", "Pendulums")
+    set_chimera(r)
+    rows_from(r, ["kura", "lenia"], 2)
+
+
+def q_twins(r):
+    based(r, "Pendulums", "Bells", "Glass", "Organs", "Keys", "Waves")
+    set_swarm(r, "twin", rate=(0.1, 0.8), reach=(20, 60))
+    p16_rows(r, ["swarm"], 1)
+
+
+def q_currents(r):
+    based(r, "Sleep Concert", "Choirs", "Strings", "Deep Space", "Air & Noise", "Waves")
+    set_life(r, LIFE_FLUID, (0.4, 0.75), (0.05, 0.4), (0.0, 0.4), (0.6, 1.0))
+    p16_rows(r, ["life"], 1)
+
+
+def q_vortex(r):
+    based(r, "Air & Noise", "Glass", "Shimmer", "Waves", "Glissandi", "Dark Drones")
+    set_life(r, LIFE_FLUID, (0.5, 0.85), (0.4, 1.0), (0.6, 1.0), (0.6, 1.0))
+    rows_from(r, ["heard"], 1)
+
+
+def q_plumes(r):
+    based(r, "Bells", "Keys", "Glass", "Pendulums", "Strings")
+    set_life(r, LIFE_FLUID, (0.5, 0.9), (0.2, 0.7), (0.3, 0.8), (0.7, 1.0))
+    p16_rows(r, ["life"], 1)
+
+
+def q_islands(r):
+    based(r, "Choirs", "Organs", "Strings", "Shimmer", "Deep Space", "Sleep Concert")
+    set_life(r, LIFE_ISLANDS, (0.4, 0.8), (0.2, 0.8), (0.6, 1.0), (0.6, 1.0))
+    p16_rows(r, ["life"], 1)
+
+
+def q_labyrinths(r):
+    based(r, "Glass", "Air & Noise", "Shimmer", "Organs", "Microtonal")
+    set_life(r, LIFE_ISLANDS, (0.4, 0.8), (0.3, 0.9), (0.0, 0.4), (0.5, 1.0))
+    rows_from(r, ["kura"], 1)
+
+
+def q_archipelagos(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_life(r, LIFE_ISLANDS, (0.3, 0.6), (0.1, 0.4), (0.5, 1.0), (0.6, 1.0))
+    sleep_rows(r, ["breath", "tide", "night"], 2)
+
+
+def q_gongs(r):
+    based(r, "Bells", "Dark Drones", "Deep Space", "Organs")
+    set_turb(r, (0.6, 1.0), (2, 12))
+    if r.rng.random() < 0.4:
+        r.set("stretch", f(r.u(1180, 1240), 1))
+    p16_rows(r, ["turb"], 1)
+
+
+def q_bronze(r):
+    based(r, "Organs", "Strings", "Choirs", "Sleep Concert", "Shepard & Tides")
+    set_turb(r, (0.4, 0.8), (6, 30))
+    p16_rows(r, ["turb"], 1)
+    rows_from(r, ["kura"], 1)
+
+
+def q_cascades(r):
+    based(r, "Glass", "Shimmer", "Bells", "Keys", "Air & Noise")
+    set_turb(r, (0.5, 1.0), (1, 8))
+    p16_rows(r, ["turb"], 1)
+
+
+def q_pressure(r):
+    based(r, "Keys", "Strings", "Organs", "Choirs", "Glass", "Bells")
+    if r.rng.random() < 0.7:
+        r.set("brain_on", 0)   # an instrument for the hands
+    set_mpe(r, ["Level", "Filter", "Nearer", "Width"], (0.4, 0.9), ["Brightness", "Filter", "Shimmer", "Motion"], (0.4, 0.9))
+
+
+def q_voices(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Organs")
+    if r.rng.random() < 0.6:
+        r.set("brain_on", 0)
+    r.set("filter_model", FILTER["Formant"])   # the slide moves the vowel
+    r.set("cutoff", f(r.lg(300, 2500), 0))
+    r.set("resonance", f(r.u(0.2, 0.6), 2))
+    set_mpe(r, ["Level", "Nearer"], (0.4, 0.8), ["Filter"], (0.3, 0.7))
+
+
+def q_storms(r):
+    based(r, *ALL)
+    if r.rng.random() < 0.5:
+        set_life(r, LIFE_FLUID, (0.4, 0.8), (0.3, 0.9), (0.4, 1.0), (0.6, 1.0))
+    else:
+        set_life(r, LIFE_ISLANDS, (0.4, 0.8), (0.3, 0.9), (0.2, 1.0), (0.6, 1.0))
+    if r.rng.random() < 0.5:
+        set_swarm(r, r.pick("wave", "splinter", "twin"))
+    else:
+        set_chimera(r)
+    set_turb(r, (0.3, 0.8), (2, 15))
+    p16_rows(r, ["swarm", "life", "turb"], 2)
+
+
+RECIPES = RECIPES + [q_swarms, q_splinters, q_chimeras, q_twins, q_currents, q_vortex, q_plumes, q_islands,
+                     q_labyrinths, q_archipelagos, q_gongs, q_bronze, q_cascades, q_pressure, q_voices, q_storms]
+
+
+# The new means in the groups before, where they fit, drawn after everything else (what a preset had
+# stays): turb = (p, amount, settle); fluid / islands = (p, depth, rate, character), only where no
+# living landscape lives yet; swarm = (p, states), making a sync it has a swarm or a chimera (or
+# giving one); mpe = (p, presses, slides).
+SLOW = ((0.3, 0.55), (0.05, 0.3))
+P16_FX = {
+    "Glass":             dict(turb=(0.25, (0.3, 0.7), (1, 8))),
+    "Bells":             dict(turb=(0.35, (0.4, 0.8), (2, 10))),
+    "Strings":           dict(mpe=(0.4, ["Level"], ["Width", "Brightness"])),
+    "Organs":            dict(turb=(0.2, (0.2, 0.5), (6, 20))),
+    "Air & Noise":       dict(fluid=(0.2, (0.4, 0.7), (0.2, 0.6), (0.3, 0.9))),
+    "Deep Space":        dict(fluid=(0.15, (0.3, 0.6), (0.05, 0.3), (0.0, 0.5))),
+    "Waves":             dict(fluid=(0.2, (0.4, 0.7), (0.1, 0.5), (0.2, 0.7))),
+    "Dark Drones":       dict(turb=(0.2, (0.3, 0.6), (6, 20))),
+    "Keys":              dict(mpe=(0.5, ["Level", "Filter"], ["Brightness", "Filter"])),
+    "Synchrony":         dict(swarm=(0.4, ["wave", "twin", "splinter", "chimera"])),
+    "Flocks":            dict(swarm=(0.2, ["wave", "splinter"])),
+    "Ripples":           dict(fluid=(0.2, (0.4, 0.7), (0.2, 0.6), (0.3, 0.8))),
+    "Spectral Cascades": dict(turb=(0.4, (0.4, 0.8), (1, 8))),
+    "Resonant Halls":    dict(turb=(0.3, (0.3, 0.7), (3, 15))),
+    "Night Gardens":     dict(islands=(0.15,) + SLOW + ((0.5, 1.0),)),
+    "Deep Sleep":        dict(islands=(0.2,) + SLOW + ((0.6, 1.0),)),
+    "Dream Drift":       dict(islands=(0.2,) + SLOW + ((0.4, 1.0),)),
+    "Ocean Sleep":       dict(fluid=(0.2,) + SLOW + ((0.0, 0.3),)),
+    "Hypnagogia":        dict(islands=(0.2,) + SLOW + ((0.3, 0.9),)),
+    "Slow Tides":        dict(fluid=(0.15,) + SLOW + ((0.0, 0.3),)),
+    "Afterglow":         dict(islands=(0.2,) + SLOW + ((0.6, 1.0),)),
+    "Stretched Worlds":  dict(turb=(0.25, (0.3, 0.7), (2, 12))),
+    "Shifted Metals":    dict(turb=(0.3, (0.4, 0.8), (2, 10))),
+    "Dream Machines":    dict(swarm=(0.2, ["wave", "twin", "splinter"])),
+}
+
+
+def p16_effects(r, group):
+    """Phase 16 in one of the first sixty-four groups, drawn after everything else."""
+    fx = P16_FX.get(group, {})
+    if "turb" in fx:
+        p, amount, settle = fx["turb"]
+        if r.rng.random() < p:
+            set_turb(r, amount, settle)
+    for kind, mode in (("fluid", LIFE_FLUID), ("islands", LIFE_ISLANDS)):
+        if kind in fx:
+            p, depth, rate, character = fx[kind]
+            if r.rng.random() < p and num(r, "life_mode", 0) == 0:   # a living landscape that grows stays
+                set_life(r, mode, depth, rate, character, (0.6, 1.0))
+    if "swarm" in fx:
+        p, states = fx["swarm"]
+        if r.rng.random() < p:
+            depth = num(r, "sync_depth", 0.0)
+            keep = (max(0.25, depth - 0.05), max(0.3, depth + 0.05)) if depth > 0.0 else (0.3, 0.6)
+            state = r.pick(*states)
+            if state == "chimera":
+                set_chimera(r, depth=keep)
+            else:
+                set_swarm(r, state, depth=keep)
+    if "mpe" in fx:
+        p, presses, slides = fx["mpe"]
+        if r.rng.random() < p:
+            set_mpe(r, presses, (0.4, 0.8), slides, (0.4, 0.8))
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -1567,6 +1871,8 @@ def build():
                 p10_effects(r, group)
             if g < 48:   # phase 13 drawn last: what the preset had stays as it was
                 p13_effects(r, group)
+            if g < 64:   # and phase 16 after it
+                p16_effects(r, group)
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
@@ -1581,7 +1887,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 64 groups of 64 (Presets.h).",
+             "/// The factory presets: 80 groups of 64 (Presets.h).",
              "const Preset kPresets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

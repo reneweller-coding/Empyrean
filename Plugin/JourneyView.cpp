@@ -100,6 +100,7 @@ void JourneyView::choosePreset(int slot)
         if (g == additiv::kNumSoundGroups) bank.addSectionHeader("Living Systems");
         if (g == additiv::kFirstSleepGroup) bank.addSectionHeader("Sleep Concerts");
         if (g == additiv::kFirstVisionGroup) bank.addSectionHeader("Visions");
+        if (g == additiv::kFirstSwarmGroup) bank.addSectionHeader("Swarms & Currents");
         juce::PopupMenu group;
         for (int i = 0; i < 64; ++i) {
             const int index = additiv::presetAt(g, i);
