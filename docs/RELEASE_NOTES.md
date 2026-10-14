@@ -1,5 +1,36 @@
 # Release notes
 
+## 0.15.0 (14.10.2026, not released)
+
+A hall that grows into the music played in it, each partial's own time, a ripple that lingers, orbits, and 1024 more
+presets.
+
+- **The growing hall** (new Hall page): with Grow the modal hall remembers what it hears, band by band over the
+  octaves, over Memory (a minute to four hours), and rings longer where it heard much (growth) or shorter (erosion).
+  The memory stays through presets, is kept with the session, and can be saved, loaded or begun anew
+  (Documents/Empyrean/Halls); the page draws it.
+- **Time Bend** (Motion > Time): each partial's clock -- its drift, shimmer and sync -- slower where the spectrum is
+  dense, or, below nothing, faster.
+- **Ripple Bend:** the ripple's wave slower where the notes sound, so it lingers and piles up there.
+- **Orbit** (a field mode): the scale's pitches as wells in pitch and place, a magnetic field bending every move into
+  circles -- fast small ones riding a slow one. Pull, Radius, Spring and Wander set wells, size, damping and field.
+- **6144 presets:** sixteen new groups of halls and orbits (Growing Halls, Eroded Halls, Cathedral Years, Worn Stone,
+  Slow Clocks, Quickened Air, Gravity Lenses, Lingering Waves, Orbits, Cyclotrons, Planetaria, Magnetic Choirs,
+  Event Horizons, Memory Palaces, Celestial Mechanics, Living Architecture); 307 of the presets before took the new
+  means where they fit (every value they had stays). A whole night of halls and orbits, a route over them.
+- **The picture takes the hand:** it shows what the page in front edits, where it acts -- the filter's curve and the
+  comb's notches, the air's band and the brightness' edge, the conductor's register over the keys, the ripple's
+  string, the hall's memory and its lowest mode -- and the curve's point, the band, the edges and the bracket can be
+  dragged.
+- **Canvas:** the picture alone, the whole window, the landscape behind the partials and the four macros under them;
+  a click in the spectrum plays the key under it.
+- **Modulation at the knob:** every matrix row on a knob is an arc round it in its source's colour (its span, and a
+  dot where it moves the knob now); a knob's right-click menu lists its rows with their depths and offers every
+  source to modulate it with.
+- **The groups:** a group's main controls are marked, and a group whose main controls stand at nothing rests, dimmed.
+- **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;
+  Depth and Keys Depth as rings to drag.
+
 ## 0.14.0 (14.10.2026, not released)
 
 Swarms and chimeras, two living landscapes that answer the playing, turbulence, the filter morphing by transport,

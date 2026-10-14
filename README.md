@@ -58,7 +58,8 @@ offline renderer and the manual, and a portable zip.
 - **The modal hall:** a reverb made the way the instrument is made, sixty-five thousand resonances that die away, on
   the GPU. Tuned, a share of them stands on the pitches of the scale and the hall rings in key, like sympathetic
   strings; Decay up to a minute, Damping, Spread, Drift, Width, Lowest, Breath (its colour moves), Paint (heard
-  through the landscape), Freeze.
+  through the landscape), Freeze. It **grows**: it remembers what it heard, band by band, over minutes to hours, and
+  rings longer there (or erodes); the memory stays with the session and can be saved and loaded.
 - **The spectral echo:** five hundred bands, each with a delay line of its own on the GPU: tilted, scattered, fed back.
 - **Memory:** every note let go leaves a ghost that blooms after it, fades over minutes, blurs and recedes.
 - **Binaural** (headphones): every partial of the near plane at a point of its own round the head -- head shadow,
@@ -78,12 +79,18 @@ offline renderer and the manual, and a portable zip.
   flow, feedback, rain, starfield, moire -- read by every partial.
 - **The preset map:** every preset on a square by how it sounds, measured (darker to brighter, still to moving); the
   cursor blends the presets round it, routes walk it with a travel and a hold time for each waypoint.
+- **A panel that takes the hand:** the picture shows what the page in front edits and lets it be dragged (the filter's
+  curve, the air's band, the register, the hall's lowest mode); a Canvas mode for listening; every modulation as an
+  arc round its knob, made and changed from the knob's menu; the space seen from above.
 - **Swarms, fluids and turbulence:** the partials' oscillators as chimeras (an ordered core in a disordered cloud) or
   as swarmalators (phase waves circling through pitch and field); a real fluid (lattice Boltzmann) the notes blow ink
   into, and an oil-and-water separation that gathers into islands, as living landscapes; the energy cascade of a gong.
 - **MPE:** every note its own bend, pressure and slide (Push 3, Osmose, Linnstrument, Seaboard), each moving a target.
-- **5120 presets** in 80 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
-  visions, swarms and currents), levelled by their loudest second.
+- **The partials' own time and orbits:** each partial's clock slower (or faster) where the spectrum is dense; the
+  ripple lingering at the notes; the Orbit field, the scale's pitches as wells and a magnetic field bending every
+  partial into circles of pitch and place.
+- **6144 presets** in 96 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions, swarms and currents, halls and orbits), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
   journeys, presets in a row glided into each other for a whole night (168 come with it, eight of them whole nights).

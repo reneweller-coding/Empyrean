@@ -1314,6 +1314,7 @@ void ControlActions::showMenu(juce::Component& target, int id) const
     if (learn) m.addItem(cc >= 0 ? "MIDI learn (now CC " + juce::String(cc) + ") ..." : juce::String("MIDI learn ..."), [f = learn, id] { f(id); });
     if (forget && cc >= 0) m.addItem("Forget CC " + juce::String(cc), [f = forget, id] { f(id); });
     if (reset) m.addItem("Default value", [f = reset, id] { f(id); });
+    if (more) more(m, id);
     m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&target));
 }
 

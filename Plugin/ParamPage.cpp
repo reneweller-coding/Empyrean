@@ -4,7 +4,10 @@
  */
 #include "ParamPage.h"
 
+#include "KnobMod.h"
 #include "Theme.h"
+
+#include <algorithm>
 
 namespace {
 
@@ -39,6 +42,12 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
             addAndMakeVisible(label);
             Cell cell;
             cell.label = label;
+            cell.id = id;
+            cell.gate = std::find(g.gate.begin(), g.gate.end(), pid) != g.gate.end();
+            if (cell.gate) {   // a main control: its name in the group's colour
+                label->setColour(juce::Label::textColourId, box.colour);
+                label->setFont(juce::FontOptions(12.5f, juce::Font::bold));
+            }
             if (d.kind == additiv::ParamKind::Choice) {
                 auto* c = new frame::Choice(&actions, id);
                 for (int i = 0; i < d.numChoices; ++i) c->addItem(d.choices[i], i + 1);
@@ -73,6 +82,54 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
         for (const Cell& c : box.cells) box.width += c.width;
         boxes_.push_back(std::move(box));
     }
+    startTimerHz(15);
+}
+
+void ParamPage::timerCallback()
+{
+    if (!isShowing()) return;
+    for (Box& b : boxes_) {
+        // Awake while a gate is up, or a matrix row moves one (it lifts it from nothing).
+        bool any = false, awake = false;
+        for (const Cell& c : b.cells)
+            if (c.gate) {
+                any = true;
+                awake = awake || std::abs(proc_.value(c.id)) > 1.0e-6f;
+                for (int i = 0; i < additiv::kModRows && !awake; ++i) {
+                    const additiv::ModRow r = proc_.engine().modRow(i);
+                    awake = r.source != additiv::ModSource::Off && r.target == c.id && r.depth != 0.0f;
+                }
+            }
+        const bool resting = any && !awake;
+        if (resting != b.resting) {
+            b.resting = resting;
+            for (Cell& c : b.cells)
+                if (!c.gate) {
+                    c.control->setAlpha(resting ? 0.4f : 1.0f);
+                    c.label->setAlpha(resting ? 0.5f : 1.0f);
+                }
+            repaint(b.bounds);
+        }
+        // The knobs the matrix moves (and those it moved a moment ago, to clear their arcs).
+        for (Cell& c : b.cells) {
+            auto* k = dynamic_cast<juce::Slider*>(c.control);
+            if (k == nullptr) continue;
+            bool on = false;
+            for (int i = 0; i < additiv::kModRows && !on; ++i) {
+                const additiv::ModRow r = proc_.engine().modRow(i);
+                on = r.source != additiv::ModSource::Off && r.target == c.id;
+            }
+            if (on || c.moved) repaint(k->getBounds().expanded(12));
+            c.moved = on;
+        }
+    }
+}
+
+void ParamPage::paintOverChildren(juce::Graphics& g)
+{
+    for (const Box& b : boxes_)
+        for (const Cell& c : b.cells)
+            if (auto* k = dynamic_cast<juce::Slider*>(c.control)) knobmod::paintArcs(g, proc_, *k, c.id);
 }
 
 std::vector<juce::Rectangle<int>> ParamPage::flow(int width) const
@@ -122,10 +179,22 @@ void ParamPage::paint(juce::Graphics& g)
         g.fillRoundedRectangle(r, skin.radius);
         g.setColour(skin.edge);
         g.drawRoundedRectangle(r.reduced(0.5f), skin.radius, 1.0f);
-        g.setColour(b.colour);
+        g.setColour(b.colour.withAlpha(b.resting ? 0.5f : 1.0f));
         g.fillRoundedRectangle(r.getX() + kPad, r.getY() + 9.0f, 3.0f, 10.0f, 1.5f);
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-        g.drawText(b.title, b.bounds.withHeight(kTitle).withTrimmedLeft(kPad + 9), juce::Justification::centredLeft);
+        g.drawText(b.resting ? b.title + juce::String("  -  off") : b.title, b.bounds.withHeight(kTitle).withTrimmedLeft(kPad + 9),
+                   juce::Justification::centredLeft);
+        // The main controls: a soft halo of the group's colour behind them.
+        for (const Cell& c : b.cells) {
+            if (!c.gate || c.control == nullptr) continue;
+            const bool knob = dynamic_cast<juce::Slider*>(c.control) != nullptr;
+            const auto cb = c.control->getBounds().toFloat();
+            const float d = std::min(cb.getWidth(), cb.getHeight() - (knob ? 16.0f : 0.0f));
+            const auto centre = knob ? juce::Point<float>(cb.getCentreX(), cb.getY() + d * 0.5f) : cb.getCentre();
+            g.setGradientFill(juce::ColourGradient(b.colour.withAlpha(0.16f), centre.x, centre.y, b.colour.withAlpha(0.0f), centre.x + d * 0.62f,
+                                                   centre.y, true));
+            g.fillEllipse(centre.x - d * 0.62f, centre.y - d * 0.62f, d * 1.24f, d * 1.24f);
+        }
     }
 }
 

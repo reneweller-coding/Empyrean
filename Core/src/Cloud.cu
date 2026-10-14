@@ -278,29 +278,9 @@ __device__ float laneValue(const EnvLane& L, const LaneContext& c, std::uint32_t
     return shapeValue(c.shapes[idx], tau, tauOff, phase);
 }
 
-/** @brief The formants of u, o, a, e, i (Hz), three each. */
-__constant__ float kFormants[5][3] = {
-    { 350.0f, 600.0f, 2400.0f },
-    { 450.0f, 800.0f, 2830.0f },
-    { 800.0f, 1150.0f, 2900.0f },
-    { 400.0f, 2000.0f, 2550.0f },
-    { 270.0f, 2140.0f, 2950.0f },
-};
-
 /**
- * @brief A two-pole band pass's magnitude, unity at its centre.
- * @param r  frequency over centre
- * @param q  Q
- * @return   the gain
- */
-__device__ inline float bandPass(float r, float q)
-{
-    const float a = 1.0f - r * r, b = r / q;
-    return b * rsqrtf(a * a + b * b + 1.0e-12f);
-}
-
-/**
- * @brief The voice filter's response at one partial: the analogue prototype's magnitude.
+ * @brief The voice filter's response at one partial: the analogue prototype's magnitude (Spectrum.h's
+ *        filterResponse, the same the picture draws).
  * @param model   FilterModel
  * @param f       the partial, Hz
  * @param cutoff  Hz
@@ -310,34 +290,7 @@ __device__ inline float bandPass(float r, float q)
  */
 __device__ float filterGain(int model, float f, float cutoff, float q, float vowel)
 {
-    if (model <= 0) return 1.0f;
-    const float r = f / fmaxf(cutoff, 1.0f);
-    const float a = 1.0f - r * r, b = r / fmaxf(q, 0.1f);
-    const float den2 = a * a + b * b + 1.0e-12f;
-    switch (static_cast<FilterModel>(model)) {
-    case FilterModel::LP6:   return rsqrtf(1.0f + r * r);
-    case FilterModel::LP12:  return rsqrtf(den2);
-    case FilterModel::LP24:  return 1.0f / den2;
-    case FilterModel::HP12:  return r * r * rsqrtf(den2);
-    case FilterModel::BP12:  return b * rsqrtf(den2);
-    case FilterModel::Notch: return fabsf(a) * rsqrtf(den2);
-    case FilterModel::Peak:  return 1.0f + (fmaxf(q, 1.0f) - 1.0f) * bandPass(r, 2.0f);
-    case FilterModel::Formant: {
-        const float v = fminf(fmaxf(vowel, 0.0f), 4.0f);
-        const int i0 = min(static_cast<int>(v), 3);
-        const float fr = v - static_cast<float>(i0);
-        float g = 0.02f;
-        const float w[3] = { 1.0f, 0.5f, 0.25f };
-        for (int k = 0; k < 3; ++k) {
-            const float fk = kFormants[i0][k] * exp2f(fr * log2f(kFormants[i0 + 1][k] / kFormants[i0][k]));
-            g += w[k] * bandPass(f / fk, q);
-        }
-        // Three band passes at unity pass little between them: measured over the factory chord the
-        // formant presets sat 18 dB under the rest of the bank. Made up here, not in every preset.
-        return 3.0f * g;
-    }
-    default: return 1.0f;
-    }
+    return filterResponse(model, f, cutoff, q, vowel);
 }
 
 /**

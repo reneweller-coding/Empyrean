@@ -584,6 +584,8 @@ struct ControlActions {
     std::function<void(int)> forget;              ///< unbinds it
     std::function<void(int)> reset;               ///< back to its default
     std::function<juce::String(int)> describe;    ///< a line on it (the menu's header)
+    /** @brief More items for id @p id, added after the others (an instrument's own: Empyrean's modulation at the knob). */
+    std::function<void(juce::PopupMenu&, int)> more;
     /** @brief Shows the menu for id @p id at @p target. */
     void showMenu(juce::Component& target, int id) const;
 };

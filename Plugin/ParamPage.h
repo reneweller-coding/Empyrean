@@ -14,13 +14,18 @@
 #include <vector>
 
 /** @brief One page of parameter groups. */
-class ParamPage final : public juce::Component {
+class ParamPage final : public juce::Component, private juce::Timer {
 public:
-    /** @brief A group: its title, its family (the colour) and its parameters in order. */
+    /**
+     * @brief A group: its title, its family (the colour), its parameters in order, and what wakes it --
+     *        the parameters that, all at nothing, leave the group resting (its other controls dimmed,
+     *        "off" by its title); they are drawn as its main controls.
+     */
     struct Group {
         juce::String title;                      ///< the box's title
         frame::Family family;                    ///< its colour
         std::vector<additiv::ParamId> ids;       ///< its parameters
+        std::vector<additiv::ParamId> gate = {}; ///< what wakes it (none: always awake)
     };
 
     /**
@@ -34,19 +39,27 @@ public:
 
     /** @brief Flows the boxes and lays out their cells. */
     void resized() override;
-    /** @brief Draws the boxes and their titles. */
+    /** @brief Draws the boxes and their titles, and a soft halo behind each group's main controls. */
     void paint(juce::Graphics& g) override;
+    /** @brief The matrix rows on the knobs, as arcs round them (KnobMod.h). */
+    void paintOverChildren(juce::Graphics& g) override;
     /** @brief The page's parameters in words, for the help: name, range, unit, key. @return the text */
     juce::String describe() const;
     /** @brief The height the page needs at a width. @param width pixels @return pixels */
     int heightFor(int width) const;
 
 private:
+    /** @brief Wakes or rests the groups as their gates say; repaints the knobs the matrix moves. */
+    void timerCallback() override;
+
     /** @brief One control in a box. */
     struct Cell {
         juce::Component* control = nullptr;   ///< the knob, chooser or switch
         juce::Label* label = nullptr;         ///< its name
         int width = 0;                        ///< its cell's width
+        int id = -1;                          ///< its parameter
+        bool gate = false;                    ///< one of what wakes its group (a main control)
+        bool moved = false;                   ///< a matrix row was on it at the last look
     };
     /** @brief One group box. */
     struct Box {
@@ -55,6 +68,7 @@ private:
         std::vector<Cell> cells;              ///< its controls
         juce::Rectangle<int> bounds;          ///< where it was laid out
         int width = 0;                        ///< the width it needs
+        bool resting = false;                 ///< every gate at nothing: its other controls dimmed
     };
     /**
      * @brief Where every box goes at a width.

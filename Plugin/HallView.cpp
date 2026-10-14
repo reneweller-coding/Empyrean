@@ -171,8 +171,8 @@ HallPage::HallPage(AdditivProcessor& proc, const frame::ControlActions& actions,
     : params_(proc, actions,
               { { "Modal Hall", frame::Family::Motion, { ParamId::ModalLevel, ParamId::ModalDecay, ParamId::ModalDamp, ParamId::ModalTune, ParamId::ModalSpread,
                                                          ParamId::ModalDrift, ParamId::ModalWidth, ParamId::ModalLow, ParamId::ModalBreath,
-                                                         ParamId::ModalPaint, ParamId::ModalFreeze } },
-                { "Growth", frame::Family::Envelope, { ParamId::HallGrow, ParamId::HallMemory } } },
+                                                         ParamId::ModalPaint, ParamId::ModalFreeze }, { ParamId::ModalLevel } },
+                { "Growth", frame::Family::Envelope, { ParamId::HallGrow, ParamId::HallMemory }, { ParamId::HallGrow } } },
               live),
       view_(proc)
 {

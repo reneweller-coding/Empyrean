@@ -63,6 +63,8 @@ private:
     bool standalone() const { return proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone; }
     /** @brief The standalone's full screen on or off. */
     void toggleFullScreen();
+    /** @brief The canvas on or off: the picture takes the whole window, the pages step aside. @param on canvas */
+    void setCanvas(bool on);
     /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
     void bindChoice(frame::Choice& box, additiv::ParamId id);
 
@@ -97,6 +99,8 @@ private:
     frame::IconButton help_{ frame::IconButton::Icon::Help, "Help (F1)" };              ///< the help
     frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
     CloudView cloud_{ proc_ };                                 ///< the picture
+    juce::TextButton canvasButton_{ "Canvas" };                ///< the picture alone, the whole window (and back)
+    bool canvas_ = false;                                      ///< the canvas is shown
     frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play
     juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages
     std::vector<std::function<juce::String()>> describe_;     ///< per page its parameters in words, for the help

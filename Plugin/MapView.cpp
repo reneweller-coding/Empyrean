@@ -407,7 +407,7 @@ juce::String RouteView::describe() const
 
 MapPage::MapPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live)
     : params_(proc, actions,
-              { { "Map", frame::Family::Motion, { ParamId::MapActive, ParamId::MapRadius, ParamId::MapGlide } },
+              { { "Map", frame::Family::Motion, { ParamId::MapActive, ParamId::MapRadius, ParamId::MapGlide }, { ParamId::MapActive } },
                 { "Route", frame::Family::Space, { ParamId::RouteSpeed } } },
               live),
       map_(proc), route_(proc)

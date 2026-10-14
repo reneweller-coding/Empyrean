@@ -7,8 +7,10 @@
 #include "AdditivData.h"
 #include "JourneyView.h"
 #include "HallView.h"
+#include "KnobMod.h"
 #include "MapView.h"
 #include "SourcesView.h"
+#include "SpaceView.h"
 
 #include "additiv/Landscape.h"
 #include "additiv/Presets.h"
@@ -103,6 +105,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         proc_.resetToDefault(id);
         history_.end(values(), {});
     };
+    actions_.more = [this](juce::PopupMenu& m, int id) { knobmod::addMenuItems(proc_, m, id); };
     actions_.describe = [](int id) {
         const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamId>(id));
         return juce::String(d.name) + "  (" + d.key + ")";
@@ -142,6 +145,10 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     help_.onClick = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
     settings_.onClick = [this] { showSettings(); };
     addAndMakeVisible(cloud_);
+    addAndMakeVisible(canvasButton_);
+    canvasButton_.setTooltip("Canvas: the partials and the landscape alone, the whole window, the four macros under them; a click in the spectrum plays (double-click the picture, or Esc, to come back)");
+    canvasButton_.onClick = [this] { setCanvas(!canvas_); };
+    cloud_.onDoubleClick = [this] { setCanvas(!canvas_); };
 
     // The pages: what belongs together sits in one box, coloured by its family. The tabs join the
     // editor first, so every page's controls are made under the frame's look and feel.
@@ -156,50 +163,49 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                          ParamId::Stretch, ParamId::Shift } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
                                                ParamId::ShimmerRate, ParamId::Stereo } },
-                    { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter } },
-                    { "Turbulence", F::Source, Ids{ ParamId::Turbulence, ParamId::TurbulenceTime } } });
-    page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape } },
+                    { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter }, Ids{ ParamId::Air } },
+                    { "Turbulence", F::Source, Ids{ ParamId::Turbulence, ParamId::TurbulenceTime }, Ids{ ParamId::Turbulence } } });
+    page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape }, Ids{ ParamId::Motion } },
                      { "Field", F::Motion, Ids{ ParamId::FieldMode, ParamId::FieldStrength, ParamId::FieldRadius, ParamId::FieldSpring,
-                                                ParamId::FieldRate, ParamId::FieldCount } },
-                     { "Time", F::Envelope, Ids{ ParamId::Dispersion, ParamId::TimeBend } },
+                                                ParamId::FieldRate, ParamId::FieldCount }, Ids{ ParamId::FieldMode } },
+                     { "Time", F::Envelope, Ids{ ParamId::Dispersion, ParamId::TimeBend }, Ids{ ParamId::Dispersion, ParamId::TimeBend } },
                      { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
-                                                           ParamId::LifeZoom, ParamId::LifeSides, ParamId::LifeTurn } },
+                                                           ParamId::LifeZoom, ParamId::LifeSides, ParamId::LifeTurn }, Ids{ ParamId::LifeMode } },
                      { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncMode, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread,
-                                                         ParamId::SyncSwarm, ParamId::SyncReach, ParamId::SyncLag } },
-                     { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay, ParamId::RippleBend } } });
+                                                         ParamId::SyncSwarm, ParamId::SyncReach, ParamId::SyncLag }, Ids{ ParamId::SyncDepth } },
+                     { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay, ParamId::RippleBend }, Ids{ ParamId::RippleDepth } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
-                                                 ParamId::FilterDrift } },
-                     { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo } },
+                                                 ParamId::FilterDrift }, Ids{ ParamId::FilterModel } },
+                     { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo }, Ids{ ParamId::CombDepth } },
                      { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
     page("Tuning", { { "Tuning", F::Motion, Ids{ ParamId::Scale, ParamId::RootNote, ParamId::KeyMap, ParamId::RefPitch, ParamId::Purity } },
-                     { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod } },
-                     { "Self-Tune", F::Motion, Ids{ ParamId::TuneGravity, ParamId::TuneReach, ParamId::TuneAnchor } } });
+                     { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod }, Ids{ ParamId::Tide } },
+                     { "Self-Tune", F::Motion, Ids{ ParamId::TuneGravity, ParamId::TuneReach, ParamId::TuneAnchor }, Ids{ ParamId::TuneGravity } } });
     page("Conductor", { { "Conductor", F::Motion, Ids{ ParamId::BrainOn, ParamId::AutoMode, ParamId::BrainRate, ParamId::AutoRate, ParamId::BrainDensity,
-                                                       ParamId::BrainHoldMin, ParamId::BrainHoldMax } },
+                                                       ParamId::BrainHoldMin, ParamId::BrainHoldMax }, Ids{ ParamId::BrainOn } },
                         { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh } },
                         { "Harmony", F::Motion, Ids{ ParamId::BrainConsonance, ParamId::BrainWander, ParamId::AutoLead, ParamId::AutoTension,
                                                      ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::AutoStep } },
                         { "Brain 2", F::Envelope, Ids{ ParamId::Brain2On, ParamId::Brain2Interval, ParamId::Brain2Density, ParamId::Brain2Rate,
-                                                       ParamId::Brain2Depth } },
+                                                       ParamId::Brain2Depth }, Ids{ ParamId::Brain2On } },
                         { "MPE", F::Filter, Ids{ ParamId::MpeOn, ParamId::MpeBend, ParamId::MpePress, ParamId::MpePressDepth, ParamId::MpeSlide,
-                                                 ParamId::MpeSlideDepth } } });
-    page("Space", { { "Planes", F::Space, Ids{ ParamId::Depth, ParamId::KeysDepth, ParamId::Breath, ParamId::BreathRate, ParamId::Doppler } },
-                    { "Near", F::Space, Ids{ ParamId::Presence, ParamId::PadLowCut } },
-                    { "Far Reverb", F::Space, Ids{ ParamId::FarLevel, ParamId::FarSize, ParamId::FarDecay, ParamId::FarDamp, ParamId::FarDiffuse,
-                                                   ParamId::FarPreDelay, ParamId::FarUnmask, ParamId::FarMode, ParamId::FarFreeze } },
-                    { "Master", F::Space, Ids{ ParamId::MasterGain, ParamId::BassMono, ParamId::StereoWidth } },
-                    { "Binaural", F::Space, Ids{ ParamId::Binaural, ParamId::BinauralSpan, ParamId::BinauralHeight, ParamId::BinauralOrbit } } });
+                                                 ParamId::MpeSlideDepth }, Ids{ ParamId::MpeOn } } });
+    {
+        auto* s = new SpacePage(proc_, actions_, &live_);
+        describe_.push_back([s] { return s->describe(); });
+        tabs_.addTab("Space", additivui::skin().panel, new ScrollPage(s, [s](int w) { return s->heightFor(w); }), true);
+    }
     page("Effects", { { "Echo", F::Space, Ids{ ParamId::DelayMix, ParamId::DelayTimeL, ParamId::DelayTimeR, ParamId::DelayFeedback, ParamId::DelayCross,
-                                               ParamId::DelayDamp, ParamId::DelayAbsorb, ParamId::DelayDuck, ParamId::DelayToFar } },
+                                               ParamId::DelayDamp, ParamId::DelayAbsorb, ParamId::DelayDuck, ParamId::DelayToFar }, Ids{ ParamId::DelayMix } },
                       { "Echo 2", F::Space, Ids{ ParamId::Delay2Mix, ParamId::Delay2TimeL, ParamId::Delay2TimeR, ParamId::Delay2Feedback,
-                                                 ParamId::Delay2Damp, ParamId::Delay2ToFar } },
+                                                 ParamId::Delay2Damp, ParamId::Delay2ToFar }, Ids{ ParamId::Delay2Mix } },
                       { "Room", F::Envelope, Ids{ ParamId::EarlyLevel, ParamId::EarlySize, ParamId::EarlyAbsorb, ParamId::NearMix, ParamId::NearDecay,
-                                                  ParamId::NearDamp } },
+                                                  ParamId::NearDamp }, Ids{ ParamId::EarlyLevel, ParamId::NearMix } },
                       { "Spectral Echo", F::Space, Ids{ ParamId::SpecMix, ParamId::SpecTime, ParamId::SpecTilt, ParamId::SpecScatter,
-                                                        ParamId::SpecFeedback, ParamId::SpecDamp, ParamId::SpecToFar } },
-                      { "Melt", F::Motion, Ids{ ParamId::MeltMix, ParamId::MeltTime, ParamId::MeltSpread, ParamId::MeltToFar } },
+                                                        ParamId::SpecFeedback, ParamId::SpecDamp, ParamId::SpecToFar }, Ids{ ParamId::SpecMix } },
+                      { "Melt", F::Motion, Ids{ ParamId::MeltMix, ParamId::MeltTime, ParamId::MeltSpread, ParamId::MeltToFar }, Ids{ ParamId::MeltMix } },
                       { "Memory", F::Envelope, Ids{ ParamId::MemoryLevel, ParamId::MemoryTime, ParamId::MemoryBloom, ParamId::MemoryBlur,
-                                                    ParamId::MemorySink } } });
+                                                    ParamId::MemorySink }, Ids{ ParamId::MemoryLevel } } });
     {
         auto* h = new HallPage(proc_, actions_, &live_);
         describe_.push_back([h] { return h->describe(); });
@@ -307,6 +313,7 @@ void AdditivEditor::timerCallback()
         else if (e.morphProgress() < 1.0f) s << "      gliding " << juce::roundToInt(100.0f * e.morphProgress()) << " %";
     }
     status_.setText(s, juce::dontSendNotification);
+    cloud_.setPage(canvas_ ? juce::String() : tabs_.getCurrentTabName());   // the picture shows what the page in front edits
     cloud_.refresh();
     shootStep();
     // ADDITIV_LOG: a line a second on the real-time path (the slowest block, the emptiest ring, the
@@ -366,10 +373,15 @@ void AdditivEditor::shootStep()
     const int t = (shotTick_ - start) / 3;
     if (t > 0) {
         const juce::Image img = createComponentSnapshot(getLocalBounds());
-        const juce::File f(shotPrefix_ + "-" + juce::String(t - 1) + "-" + tabs_.getCurrentTabName() + ".png");
+        const juce::File f(shotPrefix_ + "-" + juce::String(t - 1) + "-" + (canvas_ ? juce::String("Canvas") : tabs_.getCurrentTabName()) + ".png");
         f.deleteFile();
         juce::FileOutputStream out(f);
         if (out.openedOk()) juce::PNGImageFormat().writeImageToStream(img, out);
+    }
+    if (t == tabs_.getNumTabs() && !canvas_ && juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_CANVAS", {}).isNotEmpty()) {
+        setCanvas(true);   // ADDITIV_SHOT_CANVAS: the canvas last, photographed on the next round
+        shotTick_ -= 3;
+        return;
     }
     if (t < tabs_.getNumTabs()) {
         tabs_.setCurrentTabIndex(t);
@@ -405,7 +417,13 @@ void AdditivEditor::resized()
     h.tools = { &undo_, &redo_, nullptr, &help_, &settings_ };
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
+    if (canvas_) {   // the picture is the window
+        cloud_.setBounds(area);
+        canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
+        return;
+    }
     cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, area.getHeight() / 4)));
+    canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
     area.removeFromTop(8);
     tabs_.setBounds(area);
     if (helpView_ != nullptr) helpView_->setBounds(area);
@@ -422,7 +440,8 @@ bool AdditivEditor::keyPressed(const juce::KeyPress& key)
     k.redo = [this] { apply(history_.redo(), true); };
     k.help = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
     k.escape = [this] {
-        if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+        if (canvas_) setCanvas(false);
+        else if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
         else if (juce::Desktop::getInstance().getKioskModeComponent() != nullptr) toggleFullScreen();
     };
     return frame::handleKey(key, k);
@@ -438,6 +457,16 @@ void AdditivEditor::parentHierarchyChanged()
             window->setTitleBarButtonsRequired(juce::DocumentWindow::minimiseButton | juce::DocumentWindow::maximiseButton
                                                    | juce::DocumentWindow::closeButton, false);
     });
+}
+
+void AdditivEditor::setCanvas(bool on)
+{
+    canvas_ = on;
+    if (on && helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+    tabs_.setVisible(!on);
+    canvasButton_.setButtonText(on ? "Back" : "Canvas");
+    cloud_.setCanvas(on);
+    resized();
 }
 
 void AdditivEditor::toggleFullScreen()

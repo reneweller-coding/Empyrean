@@ -963,6 +963,12 @@ void Engine::lifeSnapshot(std::vector<float>& cells)
     cells = snapLife_;
 }
 
+void Engine::rippleSnapshot(std::vector<float>& cells)
+{
+    const std::lock_guard<std::mutex> lock(snapLock_);
+    cells = snapRipple_;
+}
+
 bool Engine::partialSnapshot(std::vector<float>& dots, int& perVoice)
 {
     const std::lock_guard<std::mutex> lock(snapLock_);
@@ -1292,9 +1298,7 @@ void Engine::renderBlock()
                         + blk_.filterDrift * v.cutoffDrift.update(dtf, 0.05f, side_) + 3.0f * expr(MpeTarget::Filter);
         const float fc = std::clamp(blk_.cutoff * std::exp2(oct), 20.0f, 20000.0f);
         const FilterModel model = static_cast<FilterModel>(std::clamp(blk_.filterModel, 0, kNumFilterModels - 1));
-        float q = 0.707f + blk_.resonance * blk_.resonance * 11.3f;   // up to Q 12
-        if (model == FilterModel::Peak) q = 1.0f + 3.0f * blk_.resonance;   // the bell's gain, up to +12 dB
-        if (model == FilterModel::Formant) q = 4.0f + 16.0f * blk_.resonance;
+        const float q = filterQ(static_cast<int>(model), blk_.resonance);   // Spectrum.h: the picture's curve reads the same
 
         float level = kVoiceLevel * (v.source != 0 ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
         cv.hz = static_cast<float>(v.hz * doppler * std::exp2(static_cast<double>(mpeBend) / 12.0));
@@ -1339,9 +1343,7 @@ void Engine::renderBlock()
                 const float base = fromNorm(cd, std::clamp(toNorm(cd, mf.cutoff) + cutoffPush_, 0.0f, 1.0f)) * jamCutoff_;
                 const float fck = std::clamp(base * std::exp2(oct), 20.0f, 20000.0f);
                 const float res = fromNorm(rd, std::clamp(toNorm(rd, mf.resonance) + resonancePush_, 0.0f, 1.0f));
-                float qk = 0.707f + res * res * 11.3f;
-                if (m == FilterModel::Peak) qk = 1.0f + 3.0f * res;
-                if (m == FilterModel::Formant) qk = 4.0f + 16.0f * res;
+                const float qk = filterQ(static_cast<int>(m), res);
                 cv.filterWeight[k] = mf.weight / std::max(sum, 1.0e-9f);
                 cv.filterModels[k] = static_cast<float>(m);
                 cv.filterCutoffs[k] = fck;
@@ -1680,6 +1682,7 @@ void Engine::renderBlock()
         combPhase_ += static_cast<double>(cur(ParamId::CombSweep)) * dt;
         combPhase_ -= std::floor(combPhase_);
         K.phase = static_cast<float>(combPhase_);
+        combPhaseView_.store(K.phase, std::memory_order_relaxed);
         const float d = K.depth;
         K.makeup = 1.0f / std::sqrt(std::max((1.0f - 0.5f * d) * (1.0f - 0.5f * d) + 0.125f * d * d, 1.0e-6f));
     }
@@ -1801,6 +1804,12 @@ void Engine::renderBlock()
                 snapPer_ = per;
                 if (const float* cells = cloud_.lifePicture()) snapLife_.assign(cells, cells + kLifeW * kLifeH);
                 else snapLife_.clear();
+                if (cloud_.ripple().depth > 0.0f) {   // the ripple's string (once sized: no allocation after)
+                    snapRipple_.resize(static_cast<size_t>(kRippleCells));
+                    std::copy(std::begin(rippleNow_), std::end(rippleNow_), snapRipple_.begin());
+                } else {
+                    snapRipple_.clear();
+                }
                 if (cloud_.hallMemory(snapHall_.data())) {   // and the hall's memory
                     snapHallValid_ = true;
                     snapHallAge_ = hallAge_;

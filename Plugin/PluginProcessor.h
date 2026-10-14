@@ -235,6 +235,17 @@ public:
     juce::String engineError() const { const std::lock_guard<std::mutex> lock(errorLock_); return juce::String(engineError_); }
     /** @brief The hands arriving from a Quest app in bridge mode. @return the headset */
     frame::Headset& headset() { return headset_; }
+    /**
+     * @brief A key played from the panel (the canvas's spectrum), as if from a keyboard on channel 1.
+     *        Message thread.
+     * @param note      MIDI note
+     * @param velocity  0 .. 1; 0 lets it go
+     */
+    void tapNote(int note, float velocity)
+    {
+        if (velocity > 0.0f) taps_.noteOn(1, note, velocity);
+        else taps_.noteOff(1, note, 0.0f);
+    }
     static constexpr const char* kApp = "Empyrean";   ///< the settings' and the jam's name
 
 private:
@@ -293,6 +304,7 @@ private:
     std::atomic<int> pendingProgram_{ -1 };                ///< a MIDI program change waiting for the message thread
     int bankGroup_ = 0;                                    ///< the group bank select (CC 0) chose
     bool sustain_ = false;                                 ///< the hold pedal (CC 64) is down
+    juce::MidiKeyboardState taps_;                         ///< keys the picture plays (the canvas), merged into the block's MIDI
     std::bitset<128> held_;                                ///< notes let go while the pedal was down, released with it
     float masterBend_ = 2.0f;                              ///< MPE: the master channel's bend range, semitones (its RPN 0)
     int rpn_[16] = { 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF,

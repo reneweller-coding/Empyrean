@@ -345,6 +345,14 @@ public:
      */
     void setHallMemory(const std::vector<float>& in, double age);
     /**
+     * @brief The ripple's string as the last snapshot left it, for the picture (kRippleCells cells, low to
+     *        high; empty while the ripple rests). Any thread but the worker's.
+     * @param cells  receives the cells
+     */
+    void rippleSnapshot(std::vector<float>& cells);
+    /** @brief Where the spectral comb's notches stand, in notches (SpectralComb::phase), for the picture. Any thread. @return 0 .. 1 */
+    float combPhase() const { return combPhaseView_.load(std::memory_order_relaxed); }
+    /**
      * @brief The ripple's string as it stands after the last block, low to high (tests, diagnostics).
      *        The worker's thread, or offline.
      * @param out  receives kRippleCells values
@@ -614,6 +622,8 @@ private:
     std::array<float, kHallBins> hallPending_{};       ///< a memory to send up with the next block (under snapLock_)
     double hallPendingAge_ = 0.0;                      ///< and its age
     bool hallPendingSet_ = false;                      ///< hallPending_ waits for the next block
+    std::vector<float> snapRipple_;                    ///< the ripple's string at the last snapshot (under snapLock_), empty while it rests
+    std::atomic<float> combPhaseView_{ 0.0f };         ///< the comb's phase after the last block, for the picture
     /**
      * @brief One block of the ripple's string: struck at the harmonics of every note that started this
      *        block (rippleStrikes_, gathered by the voice loop, which clears the restart flags), then the damped wave equation stepped (leapfrog, reflecting ends, as many substeps

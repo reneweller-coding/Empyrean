@@ -574,6 +574,7 @@ bool AdditivProcessor::mpeController(int ch, int cc, int value)
 void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi)
 {
     juce::ScopedNoDenormals noDenormals;
+    taps_.processNextMidiBuffer(midi, 0, buffer.getNumSamples(), true);   // the keys the panel plays
     // MPE (the lower zone): with it on, a note on channels 2 .. 16 has that channel's bend, pressure
     // and slide (CC 74) for its own; channel 1 is the master, its bend moves every played note.
     const bool mpe = value(static_cast<int>(ParamId::MpeOn)) >= 0.5f;

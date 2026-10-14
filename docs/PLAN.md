@@ -526,6 +526,47 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 18: Die Oberfläche nimmt die Hand (gebaut, 14.10.2026, 0.15.0)
+
+Eine Kritik der Oberfläche nach HCI-Maßstäben (Hierarchie, direkte Manipulation, Modulation am Regler, 2D-Raum,
+Zen-Modus); umgesetzt, verbunden mit eigenen Ideen. `Frame.h` bekam einen optionalen Haken (`ControlActions::more`) für
+eigene Menüeinträge, sonst bleibt der Rahmen der Familie unberührt.
+- **18a Modulation am Knob** (`KnobMod`): je Zeile ein Bogen in der Farbe ihrer Quelle (Spanne, Punkt für jetzt) über
+  `ParamPage::paintOverChildren`; das Rechtsklickmenü listet die Zeilen (Tiefe ziehen, entfernen) und „Modulate with“
+  legt eine Zeile in der ersten freien an. Gruppen haben ein `gate`: stehen alle auf null (und keine Zeile bewegt sie),
+  ruht die Gruppe gedimmt; die Gate-Regler sind betont (Name in Gruppenfarbe, Halo).
+- **18b Das Bild zeigt die Seite vorn** und lässt sich greifen: Filterkurve (die Formel jetzt einmal in `Spectrum.h`,
+  GPU und Bild rechnen dasselbe), Kamm-Kerben (Phase aus der Engine), Air-Band und Helligkeitsgrenze, Register-
+  Klammer, Ripple-Saite (Snapshot), Hallgedächtnis und Lowest. **Canvas:** das Bild allein, Landschaft dahinter, Makros,
+  Tasten spielen per Klick (`MidiKeyboardState` in den MIDI-Puffer).
+- **18c Space von oben** (`SpaceView`): Stimmen auf ihrer Ebene und Tonhöhe mit Spuren; Depth und Keys Depth als Ringe.
+
+## Phase 17: Die wachsende Halle, Eigenzeit, verweilender Ripple, Orbit (gebaut, 14.10.2026, 0.15.0)
+
+Ein zweiter Ideentext (spektraler Magnetismus, spektrale Chemie, Zeitdilatation und Linsen, vorausschauender Dirigent,
+Morphogenese der Halle); gebaut, was sich messbar und hörbar umsetzen lässt. Offen und mit dem Nutzer zu klären:
+Kristallisation als Experiment, ein Dirigent, der hellen Stellen der Landschaft folgt.
+- **17a Halle:** `updateKernel` sammelt die Amplitude jedes Partials ganzzahlig (`atomicAdd`, uint64, 1e-12) in 1024
+  log-Bändern 20 Hz .. 20 kHz; `hallKernel` (ein Block, feste Reihenfolge) macht daraus die relative Dichte (Mittel 1,
+  über drei Bänder geglättet), folgt ihr über 0,3 s und schreibt das Gedächtnis M mit 1 − exp(−dt/Memory), solange
+  etwas klingt. `modalKernel`: T ·= 2^(Grow · clamp(log2(1 + M) − 1, −0,5, 1,5)). Amplituden statt Leistungen: mit
+  Leistung zählten nur die lautesten Bänder, die Obertöne eines Akkords lagen unter dem Mittel und wuchsen nicht.
+  Gedächtnis im Plugin-Zustand (base64), .hall-Dateien, bleibt über `prepare()` hinweg.
+- **17b Eigenzeit:** τ je Partial, Rate 1/(1 + D·s) bzw. 1 + |D|·s mit s = clamp(log2(1 + ρ) − 1, 0, 4); Drift,
+  Schimmern und Sync laufen auf τ. **Ripple Bend:** Dichte der klingenden Stimmen (16 Harmonische, σ = 4 Zellen),
+  c_i = c/(1 + 4·Bend·s); konservative Form (c²u_x)_x -- in c²u_xx verließen Wellen die langsame Zone lauter
+  (gemessen: Energie 164 % statt 35 %).
+- **17c Orbit:** Zustand (Versatz, Seite, zwei Geschwindigkeiten) je Partial, Ping-Pong; Mulde am nächsten Skalenton,
+  Drehung der Geschwindigkeit um ω_c·dt exakt, Rauschen σ = ½R·√(2γk·dt) (mittleres Quadrat ½R nach dem
+  Gleichverteilungssatz, in Python geprüft). Fehler gefunden: der Header kappte `count` außer bei Scale auf 8.
+- **17d Presets:** 1024 in 16 Gruppen (Abschnitt „Halls & Orbits“), 307 bestehende ergänzt (nach allem anderen
+  gezogen); gemessen wurden die 1331 neuen und geänderten.
+
+**Gemessen [M]:** Selbsttest 61/61: 58 Gedächtnis 15,8 am Grundton, Ausklang 11,2 dB/s neu, 4,9 gewachsen,
+16,1 erodiert, 3,3 nach dem Laden in eine neue Engine; 59 Drift 0,94 → 0,45 (langsam) / 2,58 (schnell) ct je Bild;
+60 Grundton kreist 6,9 ct um seinen Ton, 11 Nulldurchgänge in 10 s, Pegel ±0,1 dB; 61 Ripple nach 0,6 s 23 % ohne,
+70 % mit Bend am Grundton.
+
 ## Phase 16: Schwärme, Strömungen, Turbulenz, Transport, MPE (gebaut, 14.10.2026, 0.14.0)
 
 Ein Text über Forschung zu GPU-Audio, DDSP, physikalischer Modellierung und Schwarmdynamik; meine Einschätzung:

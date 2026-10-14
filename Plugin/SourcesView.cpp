@@ -4,24 +4,11 @@
  */
 #include "SourcesView.h"
 
+#include "KnobMod.h"
 #include "Theme.h"
 
 using additiv::ModSource;
-
-namespace {
-
-/** @brief A source's colour: by its kind, as the matrix's menu sections them. @param s the source @return the colour */
-juce::Colour sourceColour(ModSource s)
-{
-    const frame::Skin& skin = additivui::skin();
-    if (s >= ModSource::Reservoir1) return additivui::colour::violet;
-    if (s >= ModSource::Loudness) return skin.family(frame::Family::Space);
-    if (s >= ModSource::Beat) return skin.family(frame::Family::Envelope);
-    if (s >= ModSource::Lenia1) return skin.family(frame::Family::Motion);
-    return skin.family(frame::Family::Source);
-}
-
-} // namespace
+using knobmod::sourceColour;
 
 SourcesView::SourcesView(AdditivProcessor& proc) : proc_(proc)
 {
