@@ -19,6 +19,7 @@ namespace {
 constexpr int kTitle = 26;      ///< a box's title row
 constexpr int kGap = 10;        ///< between the boxes
 constexpr int kNudgeH = 92;     ///< the nudges' box
+constexpr int kSnapH = 104;     ///< the snapshots' box
 constexpr int kVaryH = 176;     ///< the variations' box
 constexpr int kTeachH = 214;    ///< the teaching's box: four columns of a name, a large knob, three buttons, a status
 constexpr int kFindH = 132;     ///< the search's box
@@ -56,9 +57,65 @@ void VariationTile::mouseUp(const juce::MouseEvent&)
     repaint();
 }
 
-FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, Undoable undoable)
-    : proc_(proc), actions_(actions), live_(live), undoable_(std::move(undoable))
+/** @brief A snapshot's tile (see FocusPage). */
+class FocusPage::SnapshotTile final : public juce::Component {
+public:
+    /** @brief Tile @p k of @p page. @param page the page @param k 0 .. 7 */
+    SnapshotTile(FocusPage& page, int k) : page_(page), k_(k) {}
+    /** @brief Its picture and number, or an empty frame. */
+    void paint(juce::Graphics& g) override
+    {
+        const frame::Skin& skin = additivui::skin();
+        const auto r = getLocalBounds().toFloat().reduced(1.0f);
+        const auto& shots = page_.proc_.snapshots();
+        const bool has = k_ < static_cast<int>(shots.size());
+        g.setColour(skin.raised);
+        g.fillRoundedRectangle(r, skin.radius);
+        if (has && shots[static_cast<size_t>(k_)].picture.isValid())
+            g.drawImage(shots[static_cast<size_t>(k_)].picture, r.reduced(3.0f), juce::RectanglePlacement::stretchToFit);
+        g.setColour(has ? skin.accent : skin.faint);
+        g.drawRoundedRectangle(r, skin.radius, has ? 1.2f : 1.0f);
+        g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
+        g.drawText(juce::String(k_ + 1), r.reduced(6.0f, 3.0f), juce::Justification::topLeft);
+    }
+    /** @brief A click recalls it; a right-click offers the morph's slots and forgetting. @param e the click */
+    void mouseUp(const juce::MouseEvent& e) override
+    {
+        if (k_ >= static_cast<int>(page_.proc_.snapshots().size())) return;
+        if (e.mods.isPopupMenu()) {
+            juce::PopupMenu m;
+            m.addItem("Into the morph's slot A", [this] { page_.proc_.snapshotToSlot(k_, 0); });
+            m.addItem("Into the morph's slot B", [this] { page_.proc_.snapshotToSlot(k_, 1); });
+            m.addSeparator();
+            m.addItem("Forget it", [this] {
+                page_.proc_.forgetSnapshot(k_);
+                for (auto& t : page_.snapTiles_) t->repaint();
+            });
+            m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this));
+            return;
+        }
+        page_.undoable_("Snapshot " + juce::String(k_ + 1), [this] { page_.proc_.recallSnapshot(k_); });
+    }
+
+private:
+    FocusPage& page_;   ///< whose
+    int k_;             ///< which
+};
+
+FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, Undoable undoable,
+                     std::function<juce::Image()> picture)
+    : proc_(proc), actions_(actions), live_(live), undoable_(std::move(undoable)), picture_(std::move(picture))
 {
+    snap_.setTooltip("Keeps the sound now -- every knob and the matrix, with its picture: click a tile to come back, right-click for the morph's slots");
+    snap_.onClick = [this] {
+        proc_.takeSnapshot(picture_ ? picture_() : juce::Image());
+        for (auto& t : snapTiles_) t->repaint();
+    };
+    addAndMakeVisible(snap_);
+    for (int k = 0; k < 8; ++k) {
+        snapTiles_.push_back(std::make_unique<SnapshotTile>(*this, k));
+        addAndMakeVisible(*snapTiles_.back());
+    }
     const frame::Skin& skin = additivui::skin();
     for (int a = 0; a < additiv::kNudgeAxes; ++a) {
         juce::TextButton& lo = lower_[static_cast<size_t>(a)];
@@ -257,24 +314,26 @@ void FocusPage::filesDropped(const juce::StringArray& files, int, int)
     if (files.size() == 1) find(juce::File(files[0]));
 }
 
-std::array<juce::Rectangle<int>, 5> FocusPage::boxes(int w) const
+std::array<juce::Rectangle<int>, 6> FocusPage::boxes(int w) const
 {
-    std::array<juce::Rectangle<int>, 5> r;
+    std::array<juce::Rectangle<int>, 6> r;
     int y = kGap;
     r[0] = { kGap, y, w - 2 * kGap, kNudgeH };
-    y += kNudgeH;
+    y += kNudgeH + kGap;
+    r[1] = { kGap, y, w - 2 * kGap, kSnapH };
+    y += kSnapH;
     const int focusH = focus_ != nullptr ? focus_->heightFor(w) : 0;
-    r[1] = { 0, y, w, focusH };
+    r[2] = { 0, y, w, focusH };
     y += focusH;
-    r[2] = { kGap, y, w - 2 * kGap, kVaryH };
+    r[3] = { kGap, y, w - 2 * kGap, kVaryH };
     y += kVaryH + kGap;
-    r[3] = { kGap, y, w - 2 * kGap, kTeachH };
+    r[4] = { kGap, y, w - 2 * kGap, kTeachH };
     y += kTeachH + kGap;
-    r[4] = { kGap, y, w - 2 * kGap, kFindH };
+    r[5] = { kGap, y, w - 2 * kGap, kFindH };
     return r;
 }
 
-int FocusPage::heightFor(int w) const { return boxes(w)[4].getBottom() + kGap; }
+int FocusPage::heightFor(int w) const { return boxes(w)[5].getBottom() + kGap; }
 
 void FocusPage::resized()
 {
@@ -289,9 +348,16 @@ void FocusPage::resized()
         }
         nudgeStatus_.setBounds(r[0].getX() + 12, r[0].getY() + kTitle + 34, r[0].getWidth() - 24, 20);
     }
-    if (focus_ != nullptr) focus_->setBounds(r[1]);
+    {   // the snapshots: the button, then eight tiles
+        auto area = r[1].reduced(12, 0).withTrimmedTop(kTitle).withHeight(66);
+        snap_.setBounds(area.removeFromLeft(100).withSizeKeepingCentre(96, 28));
+        area.removeFromLeft(8);
+        const int w = area.getWidth() / 8;
+        for (int k = 0; k < 8; ++k) snapTiles_[static_cast<size_t>(k)]->setBounds(area.withX(area.getX() + k * w).withWidth(w).reduced(3, 0));
+    }
+    if (focus_ != nullptr) focus_->setBounds(r[2]);
     {   // the variations
-        auto area = r[2].reduced(12, 0).withTrimmedTop(kTitle);
+        auto area = r[3].reduced(12, 0).withTrimmedTop(kTitle);
         auto top = area.removeFromTop(28);
         make_.setBounds(top.removeFromLeft(110).reduced(2));
         back_.setBounds(top.removeFromLeft(80).reduced(2));
@@ -307,7 +373,7 @@ void FocusPage::resized()
         }
     }
     {   // the teaching: four columns, each a name, a large knob, Teach / Here / Forget, its status
-        auto area = r[3].reduced(12, 0).withTrimmedTop(kTitle);
+        auto area = r[4].reduced(12, 0).withTrimmedTop(kTitle);
         const int w = area.getWidth() / 4;
         for (int m = 0; m < 4; ++m) {
             const size_t i = static_cast<size_t>(m);
@@ -323,7 +389,7 @@ void FocusPage::resized()
         }
     }
     {   // the search
-        auto area = r[4].reduced(12, 0).withTrimmedTop(kTitle);
+        auto area = r[5].reduced(12, 0).withTrimmedTop(kTitle);
         auto top = area.removeFromTop(28);
         open_.setBounds(top.removeFromLeft(170).reduced(2));
         top.removeFromLeft(8);
@@ -339,10 +405,12 @@ void FocusPage::paint(juce::Graphics& g)
 {
     const frame::Skin& skin = additivui::skin();
     const auto r = boxes(getWidth());
-    const char* const titles[5] = { "Nudge: a little more of one thing, the level held", nullptr,
-                                    "Variations: hold a tile to listen, Keep to take it", "Teach the macros by example: Teach, move the knobs, set the macro, Here",
+    const char* const titles[6] = { "Nudge: a little more of one thing, the level held", "Snapshots: keep the sound now, come back with a click (right-click: the morph's slots)",
+                                    nullptr, "Variations: hold a tile to listen, Keep to take it",
+                                    "Teach the macros by example: Teach, move the knobs, set the macro, Here",
                                     "Find by example: the presets that sound like a recording" };
-    const frame::Family families[5] = { frame::Family::Source, frame::Family::Source, frame::Family::Motion, frame::Family::Envelope, frame::Family::Space };
+    const frame::Family families[6] = { frame::Family::Source, frame::Family::Filter, frame::Family::Source, frame::Family::Motion, frame::Family::Envelope,
+                                        frame::Family::Space };
     for (size_t i = 0; i < r.size(); ++i) {
         if (titles[i] == nullptr) continue;
         const auto b = r[i].toFloat();

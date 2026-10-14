@@ -49,8 +49,10 @@ public:
      * @param actions   the knobs' right-click menu
      * @param live      the live rings
      * @param undoable  wraps a change into one undo step (the editor's history)
+     * @param picture   the partials as the picture shows them now, small (a snapshot's)
      */
-    FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, Undoable undoable);
+    FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, Undoable undoable,
+              std::function<juce::Image()> picture);
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
     int heightFor(int w) const;
     /** @brief The boxes from the top. */
@@ -73,13 +75,18 @@ private:
     void find(const juce::File& f);
     /** @brief The search's results into their buttons. */
     void showFound();
-    /** @brief The boxes' rectangles at a width. @param w pixels @return nudge, focus, variations, teach, find */
-    std::array<juce::Rectangle<int>, 5> boxes(int w) const;
+    /** @brief The boxes' rectangles at a width. @param w pixels @return nudge, snapshots, focus, variations, teach, find */
+    std::array<juce::Rectangle<int>, 6> boxes(int w) const;
+    /** @brief A snapshot's tile: its picture; a click recalls it, a right-click offers A, B, forget. */
+    class SnapshotTile;
 
     AdditivProcessor& proc_;                       ///< the processor
     const frame::ControlActions& actions_;         ///< the knobs' menu
     frame::LiveRings* live_;                       ///< the live rings
     Undoable undoable_;                            ///< one undo step
+    std::function<juce::Image()> picture_;         ///< the partials now, small
+    juce::TextButton snap_{ "Snapshot" };          ///< keeps the sound now
+    std::vector<std::unique_ptr<SnapshotTile>> snapTiles_;   ///< eight tiles
     std::array<juce::TextButton, 4> lower_;        ///< darker, calmer, narrower, purer
     std::array<juce::TextButton, 4> higher_;       ///< brighter, livelier, wider, airier
     juce::Label nudgeStatus_;                      ///< what the last nudge did

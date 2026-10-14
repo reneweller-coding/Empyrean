@@ -37,6 +37,8 @@ public:
     void setPage(const juce::String& page) { page_ = page; }
     /** @brief The whole window, or the strip above the pages. @param on canvas */
     void setCanvas(bool on);
+    /** @brief The partials as the picture shows them now, small (a snapshot's picture). @param w width @param h height @return the image */
+    juce::Image thumbnail(int w, int h) const;
     /** @brief Whether it is the canvas. @return true then */
     bool canvas() const { return canvas_; }
     /** @brief Called on a double click in the spectrum (the editor switches the canvas). */

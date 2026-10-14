@@ -1539,6 +1539,9 @@ void Engine::renderBlock()
         viewTime_[static_cast<size_t>(i)].store(cv.time, std::memory_order_relaxed);
         viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
         viewNote_[static_cast<size_t>(i)].store(on ? v.note : -1, std::memory_order_relaxed);
+        viewPress_[static_cast<size_t>(i)].store(v.press, std::memory_order_relaxed);
+        viewSlide_[static_cast<size_t>(i)].store(v.slide, std::memory_order_relaxed);
+        viewBend_[static_cast<size_t>(i)].store(v.bend, std::memory_order_relaxed);
     }
     for (size_t gi = 0; gi < ghosts_.size(); ++gi) {   // the ghosts after the voices, as source 3
         const size_t i = voices_.size() + gi;

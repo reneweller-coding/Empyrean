@@ -178,6 +178,25 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     };
     info_ = std::make_unique<InfoLine>(proc_, *this);
     addAndMakeVisible(*info_);
+    addAndMakeVisible(nightButton_);
+    nightButton_.setTooltip("The night mode: the window dim and warm for a dark room, the picture calmer; a canvas left alone fades further");
+    nightButton_.setClickingTogglesState(false);
+    nightButton_.onClick = [this] { setNight(!night_); };
+    activity_.last = &lastActivity_;
+    lastActivity_ = juce::Time::getMillisecondCounterHiRes();
+    addMouseListener(&activity_, true);
+    night_ = proc_.userSettings().getBoolValue("night", false);
+    nightButton_.setToggleState(night_, juce::dontSendNotification);
+    addChildComponent(tour_);
+    veil_.setInterceptsMouseClicks(false, false);
+    addChildComponent(veil_);   // over the window, then the overlays over it
+    palette_.toFront(false);
+    browser_.toFront(false);
+    tour_.toFront(false);
+    tour_.onDone = [this] {
+        proc_.userSettings().setValue("tourDone", true);
+        proc_.userSettings().saveIfNeeded();
+    };
     canvasButton_.setTooltip("Canvas: the partials and the landscape alone, the whole window, the four macros under them; a click in the spectrum plays (double-click the picture, or Esc, to come back)");
     canvasButton_.onClick = [this] { setCanvas(!canvas_); };
     cloud_.onDoubleClick = [this] { setCanvas(!canvas_); };
@@ -196,7 +215,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
             history_.begin(name, values(), {}, true);
             change();
             history_.end(values(), {});
-        });
+        }, [this] { return cloud_.thumbnail(160, 60); });
         describe_.push_back([f] { return f->describe(); });
         tabs_.addTab("Focus", additivui::skin().panel, new ScrollPage(f, [f](int w) { return f->heightFor(w); }), true);
     }
@@ -284,6 +303,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
 
 AdditivEditor::~AdditivEditor()
 {
+    removeMouseListener(&activity_);
     for (auto* p : proc_.getParameters()) p->removeListener(this);
     stopTimer();
     setLookAndFeel(nullptr);
@@ -357,7 +377,25 @@ void AdditivEditor::timerCallback()
     }
     status_.setText(s, juce::dontSendNotification);
     cloud_.setPage(canvas_ ? juce::String() : tabs_.getCurrentTabName());   // the picture shows what the page in front edits
-    cloud_.refresh();
+    // The night: the picture calmer (half as often), the veil -- deeper in a canvas left alone for a minute and a half.
+    if (!night_ || (++refreshTick_ & 1) == 0) cloud_.refresh();
+    float veil = 0.0f;
+    if (night_) {
+        veil = 0.5f;
+        const double idle = (juce::Time::getMillisecondCounterHiRes() - lastActivity_) * 0.001;
+        if (canvas_ && idle > 90.0) veil = static_cast<float>(std::min(0.9, 0.5 + (idle - 90.0) / 20.0 * 0.4));
+    }
+    if (std::abs(veil - veil_.alpha) > 0.004f) {
+        veil_.alpha = veil;
+        veil_.setVisible(veil > 0.0f);
+        veil_.repaint();
+    }
+    // The first steps, once, on the first start (not in the shot mode).
+    if (!tourAsked_ && shotPrefix_.isEmpty()) {
+        tourAsked_ = true;
+        if (!proc_.userSettings().getBoolValue("tourDone", false))
+            juce::Timer::callAfterDelay(1200, [safe = juce::Component::SafePointer<AdditivEditor>(this)] { if (safe != nullptr) safe->startTour(); });
+    }
     shootStep();
     // ADDITIV_LOG: a line a second on the real-time path (the slowest block, the emptiest ring, the
     // largest callback, the underruns so far), for finding what makes it stutter; the slowest block
@@ -423,6 +461,16 @@ void AdditivEditor::shootStep()
             const int id = static_cast<int>(shown->id);
             juce::Timer::callAfterDelay(3000, [safe = juce::Component::SafePointer<AdditivEditor>(this), id] { if (safe != nullptr) safe->revealParam(id); });
         }
+        // ADDITIV_SHOT_NIGHT: the night mode, for this run only; ADDITIV_SHOT_SNAP: two snapshots a few seconds in;
+        // ADDITIV_SHOT_TOUR: the tour's first step.
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_NIGHT", {}).isNotEmpty()) night_ = true;
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_SNAP", {}).isNotEmpty())
+            for (int ms : { 2000, 2600 })
+                juce::Timer::callAfterDelay(ms, [safe = juce::Component::SafePointer<AdditivEditor>(this)] {
+                    if (safe != nullptr) safe->proc_.takeSnapshot(safe->cloud_.thumbnail(160, 60));
+                });
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_TOUR", {}).isNotEmpty())
+            juce::Timer::callAfterDelay(1500, [safe = juce::Component::SafePointer<AdditivEditor>(this)] { if (safe != nullptr) safe->startTour(); });
         // ADDITIV_SHOT_BROWSER: the preset browser open.
         if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_BROWSER", {}).isNotEmpty())
             juce::MessageManager::callAsync([this] { browser_.open(); });
@@ -462,6 +510,30 @@ void AdditivEditor::shootStep()
     }
 }
 
+void AdditivEditor::setNight(bool on)
+{
+    night_ = on;
+    nightButton_.setToggleState(on, juce::dontSendNotification);
+    proc_.userSettings().setValue("night", on);
+    proc_.userSettings().saveIfNeeded();
+    lastActivity_ = juce::Time::getMillisecondCounterHiRes();
+}
+
+void AdditivEditor::startTour()
+{
+    if (canvas_) setCanvas(false);
+    tabs_.setCurrentTabIndex(0);
+    std::vector<Tour::Step> s;
+    s.push_back({ &play_, "Play", "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." });
+    s.push_back({ &presetName_, "6144 presets", "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." });
+    s.push_back({ &cloud_, "The partials themselves", "Twenty thousand sines a voice, as the graphics card has them. The page in front draws what it edits here -- the filter's curve, the register, the air -- and you can drag it. Double-click: the canvas." });
+    s.push_back({ &tabs_, "Focus", "The simple ways in: nudge the sound brighter, calmer, wider or airier; the few knobs that matter for it; snapshots; variations to evolve it by ear; macros taught by example; presets found by a recording." });
+    s.push_back({ &searchButton_, "Search (Ctrl+K)", "Type a few letters to find any knob (its page opens, it lights up; \"cutoff 800\" sets it), any preset or action." });
+    if (info_ != nullptr) s.push_back({ info_.get(), "The info line", "Point at any control: what it does, its value and what moves it are told here." });
+    s.push_back({ &save_, "Your own presets", "Save the sound as your own (Ctrl+S); a star by the name tells that it has moved from its preset, a notch on a knob where the preset had it." });
+    tour_.start(std::move(s));
+}
+
 void AdditivEditor::paint(juce::Graphics& g)
 {
     backdrop_.paint(g, getLocalBounds(), headerBottom_, additivui::skin(), frame::Settings::of(kApp).backdrop());
@@ -489,16 +561,21 @@ void AdditivEditor::resized()
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
     palette_.setBounds(getLocalBounds());
+    veil_.setBounds(getLocalBounds());
     browser_.setBounds(getLocalBounds());
     if (canvas_) {   // the picture is the window
         cloud_.setBounds(area);
         canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
         searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
+        nightButton_.setBounds(searchButton_.getX() - 64, cloud_.getY() + 6, 58, 20);
+        tour_.setBounds(getLocalBounds());
         return;
     }
     cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, area.getHeight() / 4)));
     canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
     searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
+    nightButton_.setBounds(searchButton_.getX() - 64, cloud_.getY() + 6, 58, 20);
+    tour_.setBounds(getLocalBounds());
     area.removeFromTop(8);
     tabs_.setBounds(area);
     if (helpView_ != nullptr) helpView_->setBounds(area);
@@ -605,6 +682,9 @@ std::vector<CommandPalette::Command> AdditivEditor::paletteCommands()
         tabs_.setCurrentTabIndex(0);
     });
     action("Help", "the manual (F1)", [this] { showHelp(true); });
+    action("Night mode", "the window dim and warm for a dark room", [this] { setNight(!night_); });
+    action("Tour", "the first steps again", [this] { startTour(); });
+    action("Snapshot", "keep the sound now (Focus page)", [this] { proc_.takeSnapshot(cloud_.thumbnail(160, 60)); });
     action("Browse presets", "by name, group, star, recent, and how they sound", [this] { browser_.open(); });
     action("Presets menu", "the bank's groups as a menu", [this] { showPresets(); });
     for (int t = 0; t < tabs_.getNumTabs(); ++t)
@@ -784,6 +864,10 @@ void AdditivEditor::showSettings()
     };
     m.headsetStatus = [this] { return proc_.headset().statusText(); };
     m.jamStatus = [this] { return proc_.jamStatus(); };   // the family jam: Off, Lead, Follow
+    m.moreItems = [this](juce::PopupMenu& menu) {
+        menu.addItem("Night mode", true, night_, [this] { setNight(!night_); });
+        menu.addItem("The first steps (tour)", [this] { startTour(); });
+    };
     m.about = [this] {
         return juce::String("The additive ambient synth: 20,000 partials per voice on the GPU, after Noctuary.\n")
              + (proc_.engine().prepared() ? proc_.engine().deviceName() : juce::String("GPU engine not running"));

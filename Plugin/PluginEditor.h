@@ -12,6 +12,7 @@
 #include "CloudView.h"
 #include "InfoLine.h"
 #include "Palette.h"
+#include "Tour.h"
 #include "Frame.h"
 #include "MatrixView.h"
 #include "ParamPage.h"
@@ -70,6 +71,10 @@ private:
     void setCanvas(bool on);
     /** @brief Opens the command palette (Ctrl+K). */
     void openPalette();
+    /** @brief The night mode on or off (kept in the player's settings). @param on night */
+    void setNight(bool on);
+    /** @brief The first steps' tour, from its first step. */
+    void startTour();
     /** @brief Everything the palette can do: the actions, every knob, every preset. @return the commands */
     std::vector<CommandPalette::Command> paletteCommands();
     /**
@@ -126,6 +131,30 @@ private:
     CommandPalette palette_;                                   ///< the command palette, over everything while open
     PresetBrowser browser_{ proc_ };                           ///< the preset browser, over everything while open
     std::unique_ptr<InfoLine> info_;                           ///< the info line at the bottom: what the control under the mouse does
+    juce::TextButton nightButton_{ "Night" };                  ///< the night mode
+    bool night_ = false;                                       ///< the night mode is on: the window dim and warm
+    bool tourAsked_ = false;                                   ///< the first start's tour was considered
+    double lastActivity_ = 0.0;                                ///< when the mouse or a key last moved (ms)
+    int refreshTick_ = 0;                                      ///< timer ticks (the night refreshes the picture half as often)
+    /** @brief Notes every move of the mouse in the window (the night's canvas fades when left alone). */
+    struct Activity final : public juce::MouseListener {
+        double* last = nullptr;   ///< where the time goes
+        /** @brief A move. @param e ignored */
+        void mouseMove(const juce::MouseEvent&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+        /** @brief A press. @param e ignored */
+        void mouseDown(const juce::MouseEvent&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+        /** @brief A wheel. @param e ignored @param w ignored */
+        void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+    };
+    Activity activity_;                                        ///< the mouse's moves
+    /** @brief The night's veil: over the window, under the palette, the browser and the tour; the mouse goes through it. */
+    struct Veil final : public juce::Component {
+        float alpha = 0.0f;   ///< how dark
+        /** @brief Dark and warm: little blue for eyes used to the dark. @param g where */
+        void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xff0c0703).withAlpha(alpha)); }
+    };
+    Veil veil_;                                                ///< the night's veil
+    Tour tour_;                                                ///< the first steps
     bool canvas_ = false;                                      ///< the canvas is shown
     frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play
     juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages

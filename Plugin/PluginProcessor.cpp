@@ -295,6 +295,39 @@ void AdditivProcessor::chooseUserPreset(int i)
     applyUserPreset(i, -1.0);
 }
 
+void AdditivProcessor::takeSnapshot(const juce::Image& picture)
+{
+    Snapshot s;
+    s.values = knobValues();
+    s.mod = engine_.modText();
+    s.picture = picture;
+    snapshots_.push_back(std::move(s));
+    if (snapshots_.size() > 8) snapshots_.erase(snapshots_.begin());
+}
+
+void AdditivProcessor::recallSnapshot(int i)
+{
+    if (i < 0 || i >= static_cast<int>(snapshots_.size())) return;
+    stepOutOfBlends();
+    applyValues(snapshots_[static_cast<size_t>(i)].values, 1.0);
+    engine_.setModText(snapshots_[static_cast<size_t>(i)].mod);
+}
+
+void AdditivProcessor::forgetSnapshot(int i)
+{
+    if (i >= 0 && i < static_cast<int>(snapshots_.size())) snapshots_.erase(snapshots_.begin() + i);
+}
+
+void AdditivProcessor::snapshotToSlot(int i, int slot)
+{
+    if (i < 0 || i >= static_cast<int>(snapshots_.size())) return;
+    slot &= 1;
+    slotValues_[slot] = snapshots_[static_cast<size_t>(i)].values;
+    slotMods_[slot] = snapshots_[static_cast<size_t>(i)].mod;
+    engine_.setMorphSlot(slot, slotValues_[slot].data(), slotMods_[slot]);
+    slotNames_[slot] = "snapshot " + juce::String(i + 1);
+}
+
 juce::PropertiesFile& AdditivProcessor::userSettings()
 {
     if (userSettings_ == nullptr) {
@@ -1130,6 +1163,13 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
         s->setAttribute("rows", juce::String(slotMods_[k]));
         for (const ParamDesc& d : additiv::paramTable()) s->setAttribute(juce::String("p_") + d.key, static_cast<double>(slotValues_[k][static_cast<size_t>(d.id)]));
     }
+    for (const Snapshot& s : snapshots_) {   // the snapshots: their knobs and matrices (not their pictures)
+        juce::String knobs;
+        for (const ParamDesc& d : additiv::paramTable()) knobs << d.key << "=" << juce::String(s.values[static_cast<size_t>(d.id)], 6) << " ";
+        auto* e = xml.createNewChildElement("Snapshot");
+        e->setAttribute("values", knobs.trim());
+        e->setAttribute("mod", juce::String(s.mod));
+    }
     for (int m = 0; m < 4; ++m) {   // the macros taught by example: per place its value and the knobs it moves
         const additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
         if (l.count < 2) continue;
@@ -1207,6 +1247,17 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         slotMods_[k] = s->getStringAttribute("rows").toStdString();
         slotNames_[k] = s->getStringAttribute("name");
         engine_.setMorphSlot(k, slotValues_[k].data(), slotMods_[k]);
+    }
+    snapshots_.clear();   // the snapshots as the state kept them
+    for (auto* e : xml->getChildWithTagNameIterator("Snapshot")) {
+        Snapshot s;
+        s.values.resize(static_cast<size_t>(additiv::kNumParams));
+        for (const ParamDesc& d : additiv::paramTable()) s.values[static_cast<size_t>(d.id)] = value(static_cast<int>(d.id));
+        for (const juce::String& kv : juce::StringArray::fromTokens(e->getStringAttribute("values"), " ", ""))
+            if (const ParamDesc* d = additiv::findParam(kv.upToFirstOccurrenceOf("=", false, false).toRawUTF8()))
+                s.values[static_cast<size_t>(d->id)] = std::clamp(kv.fromFirstOccurrenceOf("=", false, false).getFloatValue(), d->min, d->max);
+        s.mod = e->getStringAttribute("mod").toStdString();
+        if (snapshots_.size() < 8) snapshots_.push_back(std::move(s));
     }
     for (int m = 0; m < 4; ++m) {   // the taught macros as the state kept them; none named: none
         lessons_[static_cast<size_t>(m)] = additiv::MacroLesson{};

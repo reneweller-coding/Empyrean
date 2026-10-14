@@ -67,6 +67,9 @@ struct VoiceView {
     float time = 0.0f;       ///< seconds since it began (the motions' clock)
     int source = 0;          ///< 0 played, 1 the conductor, 2 the second conductor, 3 a ghost of the memory
     int note = -1;           ///< the key it sounds (MIDI), -1 for a ghost or when silent
+    float press = 0.0f;      ///< MPE: its pressure, 0 .. 1
+    float slide = 0.5f;      ///< MPE: its slide, 0 .. 1 (0.5 at rest)
+    float bend = 0.0f;       ///< MPE: its own bend, semitones
 };
 
 constexpr int kMaxViewVoices = 32;   ///< voices a picture can be given
@@ -313,6 +316,9 @@ public:
         v.time = viewTime_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.source = viewSource_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.note = viewNote_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.press = viewPress_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.slide = viewSlide_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.bend = viewBend_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         return v;
     }
 
@@ -793,6 +799,9 @@ private:
     std::array<std::atomic<float>, kMaxViewVoices> viewTime_{};      ///< its time since the note began
     std::array<std::atomic<int>, kMaxViewVoices> viewSource_{};      ///< whose note it plays
     std::array<std::atomic<int>, kMaxViewVoices> viewNote_{};        ///< the key it sounds, -1 none
+    std::array<std::atomic<float>, kMaxViewVoices> viewPress_{};     ///< its MPE pressure
+    std::array<std::atomic<float>, kMaxViewVoices> viewSlide_{};     ///< its MPE slide
+    std::array<std::atomic<float>, kMaxViewVoices> viewBend_{};      ///< its MPE bend, semitones
 };
 
 } // namespace additiv

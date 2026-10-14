@@ -202,6 +202,25 @@ public:
     void revertKnob(int id);
     /** @} */
 
+    /** @name Snapshots (the Focus page) @{ */
+    /** @brief A moment of the sound kept: its knobs, its matrix, its picture. */
+    struct Snapshot {
+        std::vector<float> values;    ///< the knobs, kNumParams values
+        std::string mod;              ///< the matrix
+        juce::Image picture;          ///< the partials as they looked (none after a session was reloaded)
+    };
+    /** @brief The snapshots, the oldest first (at most eight). @return them */
+    const std::vector<Snapshot>& snapshots() const { return snapshots_; }
+    /** @brief Keeps the sound now (the oldest gives way to a ninth). @param picture what the partials look like */
+    void takeSnapshot(const juce::Image& picture);
+    /** @brief Back to a snapshot, gliding over a second. @param i which */
+    void recallSnapshot(int i);
+    /** @brief Forgets a snapshot. @param i which */
+    void forgetSnapshot(int i);
+    /** @brief A snapshot into the A/B morph's slot. @param i which @param slot 0 (A) or 1 (B) */
+    void snapshotToSlot(int i, int slot);
+    /** @} */
+
     /** @name Browsing (the preset browser) @{ */
     /** @brief Listens to a factory preset: the sound glides there, until endPreview() (or it is chosen). @param index the preset */
     void previewPreset(int index);
@@ -432,6 +451,7 @@ private:
     std::array<additiv::MacroLesson, 4> lessons_{};        ///< what each macro was taught
     std::array<std::vector<float>, 4> teachBase_{};        ///< per macro the knobs when its teaching began (empty: not teaching)
     std::vector<UserPreset> userPresets_;                  ///< the player's presets (refreshUserPresets)
+    std::vector<Snapshot> snapshots_;                      ///< the snapshots, the oldest first
     std::unique_ptr<juce::PropertiesFile> userSettings_;   ///< favourites, recent, night mode, the tour (userSettings)
     std::vector<float> browseFrom_;                        ///< the knobs before a preset was listened to
     std::string browseFromMod_;                            ///< and the matrix

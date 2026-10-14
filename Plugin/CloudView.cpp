@@ -67,6 +67,15 @@ int CloudView::keyAt(float x) const
     return juce::jlimit(21, 108, juce::roundToInt(69.0f + 12.0f * std::log2(hz / 440.0f)));
 }
 
+juce::Image CloudView::thumbnail(int w, int h) const
+{
+    juce::Image img(juce::Image::RGB, std::max(w, 1), std::max(h, 1), true);
+    juce::Graphics g(img);
+    g.fillAll(additivui::skin().bg);
+    if (dots_.isValid()) g.drawImage(dots_, img.getBounds().toFloat(), juce::RectanglePlacement::stretchToFit);
+    return img;
+}
+
 void CloudView::setCanvas(bool on)
 {
     canvas_ = on;
@@ -126,6 +135,28 @@ void CloudView::paintKeys(juce::Graphics& g, juce::Rectangle<float> keys, juce::
         if (n > kFirst && !juce::MidiMessage::isMidiNoteBlack(n - 1)) {   // B|C, E|F
             g.setColour(skin.bg.withAlpha(0.9f));
             g.fillRect(x0 - 0.5f, keys.getY(), 1.0f, keys.getHeight());
+        }
+    }
+    // MPE at the keys: a played note's pressure as a bar above its key, its slide as a dot in it, its bend
+    // as a line from the key to where it sounds.
+    for (const additiv::VoiceView& v : views_) {
+        if (v.source != 0 || v.note < kFirst || v.note > kLast || v.hz <= 0.0f) continue;
+        const float x0 = edge(static_cast<float>(v.note) - 0.5f), x1 = edge(static_cast<float>(v.note) + 0.5f), xc = 0.5f * (x0 + x1);
+        const float top = keys.getY() - 2.0f;
+        if (v.press > 0.01f) {
+            const float h = 16.0f * juce::jlimit(0.0f, 1.0f, v.press);
+            g.setColour(skin.accent.withAlpha(0.75f));
+            g.fillRect(juce::Rectangle<float>::leftTopRightBottom(x0, top - h, std::max(x1, x0 + 3.0f), top));
+        }
+        if (std::abs(v.slide - 0.5f) > 0.02f) {
+            g.setColour(additivui::colour::root);
+            g.fillEllipse(xc - 2.5f, top - 2.0f - 16.0f * juce::jlimit(0.0f, 1.0f, v.slide) - 2.5f, 5.0f, 5.0f);
+        }
+        if (std::abs(v.bend) > 0.05f) {
+            const float xb = edge(static_cast<float>(v.note) + v.bend);
+            g.setColour(skin.accent);
+            g.drawLine(xc, top + 1.0f, xb, top + 1.0f, 1.5f);
+            g.fillEllipse(xb - 2.0f, top - 1.0f, 4.0f, 4.0f);
         }
     }
     // The conductor's root, while it conducts.
