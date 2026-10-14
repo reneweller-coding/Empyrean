@@ -61,6 +61,8 @@ WHOLE_NIGHTS = [
                                "Painted Light"]),
     ("Whole Night - Currents & Swarms", ["Currents", "Archipelagos", "Islands", "Chimeras", "Swarms", "Bronze Swells", "Ink Plumes",
                                          "Twin Swarms"]),
+    ("Whole Night - Halls & Orbits", ["Cathedral Years", "Planetaria", "Worn Stone", "Growing Halls", "Slow Clocks", "Event Horizons",
+                                      "Memory Palaces", "Orbits"]),
 ]
 
 

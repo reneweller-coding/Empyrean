@@ -2057,6 +2057,8 @@ def o_magnetic(r):
 
 def x_horizons(r):
     based(r, "Deep Space", "Dark Drones", "Sleep Concert", "Shepard & Tides", "Organs")
+    if int(num(r, "filter_model", 0)) in (FILTER["LP 12"], FILTER["LP 24"]) and num(r, "cutoff", 2500.0) < 300.0:
+        r.set("cutoff", f(num(r, "cutoff", 2500.0) * 2.5, 0))   # a drone's low pass this deep left one 3.6 dB under the bank's level at +12 dB
     set_bend(r, (0.7, 1.0), drift=(5, 15))
     r.set("dispersion", f(r.u(0.4, 1.2), 2))
     set_hall(r, level=(0.25, 0.45), decay=(25, 60))
