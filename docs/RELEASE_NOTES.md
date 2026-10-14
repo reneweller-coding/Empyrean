@@ -35,6 +35,14 @@ presets.
   the most for this sound), **Variations** (six near the sound, hold to listen, Keep to evolve it), **Teach** (a macro
   learns a gesture by example) and **Find** (the presets that sound like a recording, ringed on the map). Built on a
   measure of what every shaping knob does around 48 presets.
+- **Your own presets:** save (Ctrl+S), save as, back to the preset; a star when the sound has moved from its preset, a
+  notch on each knob where the preset had it; journeys play them by name.
+- **The preset browser:** by name, section, group, stars, recent and the measured traits (darker/brighter,
+  stiller/more moving, narrower/wider, purer/airier), and by who plays; hold to listen.
+- **The command palette** (Ctrl+K): any knob (its page opens, it lights up; "cutoff 800" sets it), preset or action.
+- **The info line:** what the control under the mouse does, its value and what moves it -- a sentence for all 210.
+- **Macros as large knobs**, named by what they move; **snapshots** with pictures; **MPE seen at the keys**;
+  a **night mode** for dark rooms; **first steps** on the first start.
 - **The whole bank levelled anew:** 3530 presets from before 0.14.0 measured again with today's engine (some had
   drifted by several dB); the map and the search read the new measures.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;

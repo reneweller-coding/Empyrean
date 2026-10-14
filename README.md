@@ -82,6 +82,8 @@ offline renderer and the manual, and a portable zip.
 - **Simple ways in (the Focus page):** nudges (brighter, calmer, wider, airier) built on a measure of what every knob
   does, the few knobs that matter for this sound, variations to evolve a sound by ear, macros taught by example, and
   presets found by a recording.
+- **A panel to find one's way in:** your own presets, a preset browser by how they sound, a command palette (Ctrl+K),
+  an info line that explains every control, snapshots, macros as named knobs, a night mode and first steps.
 - **A panel that takes the hand:** the picture shows what the page in front edits and lets it be dragged (the filter's
   curve, the air's band, the register, the hall's lowest mode); a Canvas mode for listening; every modulation as an
   arc round its knob, made and changed from the knob's menu; the space seen from above.

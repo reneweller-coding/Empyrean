@@ -526,6 +526,21 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 21: Eine Oberfläche zum Wiederfinden (gebaut, 14.10.2026, 0.15.0)
+
+Meine Vorschläge, vom Nutzer alle gewünscht (vorerst nur in Empyrean, dann Entscheidung über die Familie):
+- **21a Eigene Presets** (es gab keine!): `Documents/Empyrean/Presets/*.empyrean` (XML: Werte, Matrix), Speichern
+  Strg+S, Speichern unter (Werks-Namen abgelehnt: Reisen finden beim Namen), Referenz je Preset → Stern im Namen,
+  Kerbe am Knob, Zurück für Knob und Ganzes. Matrixvergleich über packModRow (wie die Engine schreibt).
+- **21b Makros** als große Drehknöpfe (Literatur: kein Befund für kleine Slider; Fitts, Hardware-Encoder), benannt
+  nach dem stärksten Ziel (Lektion oder Zeile), gleichnamige Parameter mit Bereich (Motion Depth, Space Depth).
+- **21c Befehlspalette** Strg+K: Regler (Seite, Aufleuchten, Wert), Presets, Aktionen; verstreute Buchstaben.
+- **21d Info-Zeile** (Ableton Info View): 210 Sätze in `ParamInfo.cpp`, Wert, Matrix-Quellen; sonst Tooltip.
+- **21e Preset-Browser**: Kategorien, Suche, Eigenschaftsbereiche (aus `Find.inc`), „wer spielt“, Sterne und
+  Verlauf (`player.settings`), Vorhören per gehaltenem ▶.
+- **21f–i**: Nachtmodus (eigener Schleier unter den Überlagerungen), Schnappschüsse (Bild aus der CloudView),
+  MPE an den Tasten (VoiceView: press, slide, bend), erste Schritte (Tour, sieben Hinweise).
+
 ## Phase 20: Einfache Wege hinein -- die Fokus-Seite (gebaut, 14.10.2026, 0.15.0)
 
 Ideen aus der Forschung, vom Nutzer gewählt (ohne CLAP-Textsuche): semantische Stupser (Social-EQ, SAFE), Fokus
