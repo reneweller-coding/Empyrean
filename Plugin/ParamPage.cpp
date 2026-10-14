@@ -90,6 +90,10 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
 void ParamPage::timerCallback()
 {
     if (!isShowing()) return;
+    if (flashId_ >= 0) {   // the found control's ring fades
+        if (juce::Component* c = controlFor(flashId_)) repaint(c->getBounds().expanded(8));
+        if (juce::Time::getMillisecondCounterHiRes() > flashUntil_) flashId_ = -1;
+    }
     for (Box& b : boxes_) {
         // Awake while a gate is up, or a matrix row moves one (it lifts it from nothing).
         bool any = false, awake = false;
@@ -131,8 +135,41 @@ void ParamPage::timerCallback()
     }
 }
 
+juce::Component* ParamPage::controlFor(int id) const
+{
+    for (const Box& b : boxes_)
+        for (const Cell& c : b.cells)
+            if (c.id == id) return c.control;
+    return nullptr;
+}
+
+juce::String ParamPage::groupOf(int id) const
+{
+    for (const Box& b : boxes_)
+        for (const Cell& c : b.cells)
+            if (c.id == id) return b.title;
+    return {};
+}
+
+void ParamPage::flash(int id)
+{
+    flashId_ = id;
+    flashUntil_ = juce::Time::getMillisecondCounterHiRes() + 1800.0;
+    repaint();
+}
+
 void ParamPage::paintOverChildren(juce::Graphics& g)
 {
+    // A control the palette found: a ring that fades over two seconds.
+    if (flashId_ >= 0)
+        if (juce::Component* c = controlFor(flashId_)) {
+            const double left = flashUntil_ - juce::Time::getMillisecondCounterHiRes();
+            if (left > 0.0) {
+                const float a = static_cast<float>(std::min(1.0, left / 900.0));
+                g.setColour(additivui::skin().accent.withAlpha(a));
+                g.drawRoundedRectangle(c->getBounds().toFloat().expanded(4.0f), 8.0f, 2.5f);
+            }
+        }
     const auto& ref = proc_.reference();
     const bool marks = ref.size() == static_cast<size_t>(additiv::kNumParams);
     for (const Box& b : boxes_)

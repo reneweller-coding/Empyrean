@@ -9,6 +9,7 @@
 #pragma once
 
 #include "CloudView.h"
+#include "Palette.h"
 #include "Frame.h"
 #include "MatrixView.h"
 #include "ParamPage.h"
@@ -65,6 +66,16 @@ private:
     void toggleFullScreen();
     /** @brief The canvas on or off: the picture takes the whole window, the pages step aside. @param on canvas */
     void setCanvas(bool on);
+    /** @brief Opens the command palette (Ctrl+K). */
+    void openPalette();
+    /** @brief Everything the palette can do: the actions, every knob, every preset. @return the commands */
+    std::vector<CommandPalette::Command> paletteCommands();
+    /**
+     * @brief Shows a parameter's control: its page in front, scrolled to it, lighting up.
+     * @param id  the parameter
+     * @return    false when no page shows it
+     */
+    bool revealParam(int id);
     /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
     void bindChoice(frame::Choice& box, additiv::ParamId id);
 
@@ -109,6 +120,8 @@ private:
     frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
     CloudView cloud_{ proc_ };                                 ///< the picture
     juce::TextButton canvasButton_{ "Canvas" };                ///< the picture alone, the whole window (and back)
+    juce::TextButton searchButton_{ "Search" };                ///< the command palette (Ctrl+K)
+    CommandPalette palette_;                                   ///< the command palette, over everything while open
     bool canvas_ = false;                                      ///< the canvas is shown
     frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play
     juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages

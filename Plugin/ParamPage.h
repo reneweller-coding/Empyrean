@@ -47,6 +47,12 @@ public:
     juce::String describe() const;
     /** @brief The height the page needs at a width. @param width pixels @return pixels */
     int heightFor(int width) const;
+    /** @brief A parameter's control on this page. @param id the parameter @return it, null when it is not here */
+    juce::Component* controlFor(int id) const;
+    /** @brief The title of the box a parameter is in. @param id the parameter @return it, "" when it is not here */
+    juce::String groupOf(int id) const;
+    /** @brief Lets a parameter's control light up for a moment (the palette found it). @param id the parameter */
+    void flash(int id);
 
 private:
     /** @brief Wakes or rests the groups as their gates say; repaints the knobs the matrix moves. */
@@ -80,6 +86,8 @@ private:
 
     AdditivProcessor& proc_;                                                      ///< whose parameters
     std::vector<Box> boxes_;                                                      ///< the boxes
+    int flashId_ = -1;                                                            ///< the control lighting up, -1 none
+    double flashUntil_ = 0.0;                                                     ///< until when (ms)
     std::vector<additiv::ParamId> ids_;                                           ///< every parameter on the page
     juce::OwnedArray<juce::Component> controls_;                                  ///< the controls
     juce::OwnedArray<juce::Label> labels_;                                        ///< their names

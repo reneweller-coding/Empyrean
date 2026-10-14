@@ -163,6 +163,10 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     settings_.onClick = [this] { showSettings(); };
     addAndMakeVisible(cloud_);
     addAndMakeVisible(canvasButton_);
+    addAndMakeVisible(searchButton_);
+    searchButton_.setTooltip("Find any knob, preset or action by typing a few letters (Ctrl+K)");
+    searchButton_.onClick = [this] { openPalette(); };
+    addChildComponent(palette_);
     canvasButton_.setTooltip("Canvas: the partials and the landscape alone, the whole window, the four macros under them; a click in the spectrum plays (double-click the picture, or Esc, to come back)");
     canvasButton_.onClick = [this] { setCanvas(!canvas_); };
     cloud_.onDoubleClick = [this] { setCanvas(!canvas_); };
@@ -403,6 +407,12 @@ void AdditivEditor::shootStep()
             proc_.saveUserPreset(saveName, why);
             proc_.setValue(static_cast<int>(ParamId::Tilt), proc_.value(static_cast<int>(ParamId::Tilt)) + 0.4f);
         }
+        // ADDITIV_SHOT_PALETTE: the command palette open with that typed into it.
+        const juce::String query = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_PALETTE", {});
+        if (query.isNotEmpty()) juce::MessageManager::callAsync([this, query] {
+            openPalette();
+            palette_.type(query);
+        });
         // ADDITIV_SHOT_VARY: the Focus page's six variations made, for their picture.
         if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_VARY", {}).isNotEmpty()) proc_.makeVariations(0.3f);
     }
@@ -454,13 +464,16 @@ void AdditivEditor::resized()
     h.tools = { &undo_, &redo_, nullptr, &save_, &help_, &settings_ };
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
+    palette_.setBounds(getLocalBounds());
     if (canvas_) {   // the picture is the window
         cloud_.setBounds(area);
         canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
+        searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
         return;
     }
     cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, area.getHeight() / 4)));
     canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
+    searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
     area.removeFromTop(8);
     tabs_.setBounds(area);
     if (helpView_ != nullptr) helpView_->setBounds(area);
@@ -468,6 +481,10 @@ void AdditivEditor::resized()
 
 bool AdditivEditor::keyPressed(const juce::KeyPress& key)
 {
+    if (key == juce::KeyPress('k', juce::ModifierKeys::ctrlModifier, 0) || key == juce::KeyPress('K', juce::ModifierKeys::ctrlModifier, 0)) {
+        openPalette();
+        return true;
+    }
     frame::Keys k;
     if (standalone()) {   // in a host, Space and F11 are the host's
         k.playStop = [this] { play_.triggerClick(); };
@@ -505,6 +522,104 @@ void AdditivEditor::setCanvas(bool on)
     canvasButton_.setButtonText(on ? "Back" : "Canvas");
     cloud_.setCanvas(on);
     resized();
+}
+
+/** @brief Every ParamPage under a component, depth first. @param c the component @param out receives them */
+static void findParamPages(juce::Component* c, std::vector<ParamPage*>& out)
+{
+    if (c == nullptr) return;
+    if (auto* p = dynamic_cast<ParamPage*>(c)) out.push_back(p);
+    for (juce::Component* child : c->getChildren()) findParamPages(child, out);
+}
+
+bool AdditivEditor::revealParam(int id)
+{
+    if (canvas_) setCanvas(false);
+    for (int t = 0; t < tabs_.getNumTabs(); ++t) {
+        auto* view = dynamic_cast<juce::Viewport*>(tabs_.getTabContentComponent(t));
+        if (view == nullptr) continue;
+        std::vector<ParamPage*> pages;
+        findParamPages(view->getViewedComponent(), pages);
+        for (ParamPage* page : pages)
+            if (juce::Component* control = page->controlFor(id)) {
+                tabs_.setCurrentTabIndex(t);
+                const auto at = view->getViewedComponent()->getLocalPoint(control, juce::Point<int>(0, 0));
+                view->setViewPosition(0, std::max(0, at.y - 80));
+                page->flash(id);
+                return true;
+            }
+    }
+    return false;
+}
+
+void AdditivEditor::openPalette()
+{
+    if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+    palette_.open(paletteCommands());
+}
+
+std::vector<CommandPalette::Command> AdditivEditor::paletteCommands()
+{
+    std::vector<CommandPalette::Command> c;
+    auto action = [&c](const juce::String& title, const juce::String& detail, std::function<void()> f) {
+        c.push_back({ title, detail, "Action", false, [f](const juce::String&) { f(); } });
+    };
+    action("Canvas", "the picture alone, the whole window", [this] { setCanvas(!canvas_); });
+    action("Play / Stop", "the conductor", [this] { play_.triggerClick(); });
+    action("Step", "exchange one voice of the chord now", [this] { proc_.engine().autoplayStep(); });
+    action("Save", "your own preset (Ctrl+S)", [this] { quickSave(); });
+    action("Save as ...", "your own preset under a new name", [this] { saveAs(); });
+    action("Back to the preset", "every knob where the preset had it", [this] {
+        history_.begin("Back to the preset", values(), {}, true);
+        proc_.revert();
+        history_.end(values(), {});
+    });
+    action("Variations", "six near the sound (Focus page)", [this] {
+        proc_.makeVariations(0.3f);
+        tabs_.setCurrentTabIndex(0);
+    });
+    action("Help", "the manual (F1)", [this] { showHelp(true); });
+    action("Presets", "the bank's menu", [this] { showPresets(); });
+    for (int t = 0; t < tabs_.getNumTabs(); ++t)
+        action("Page: " + tabs_.getTabNames()[t], "show it", [this, t] {
+            if (canvas_) setCanvas(false);
+            tabs_.setCurrentTabIndex(t);
+        });
+    // Every knob, where it is: its page and its group.
+    std::vector<juce::String> where(static_cast<size_t>(additiv::kNumParams));
+    for (int t = tabs_.getNumTabs() - 1; t >= 0; --t) {   // the first page that shows it wins
+        auto* view = dynamic_cast<juce::Viewport*>(tabs_.getTabContentComponent(t));
+        if (view == nullptr) continue;
+        std::vector<ParamPage*> pages;
+        findParamPages(view->getViewedComponent(), pages);
+        for (ParamPage* page : pages)
+            for (int id = 0; id < additiv::kNumParams; ++id)
+                if (page->controlFor(id) != nullptr) where[static_cast<size_t>(id)] = tabs_.getTabNames()[t] + " / " + page->groupOf(id);
+    }
+    for (int id = 0; id < additiv::kNumParams; ++id) {
+        if (where[static_cast<size_t>(id)].isEmpty()) continue;
+        const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamId>(id));
+        const bool number = d.kind == additiv::ParamKind::Float || d.kind == additiv::ParamKind::Int;
+        c.push_back({ juce::String(d.name), where[static_cast<size_t>(id)], "Knob", number, [this, id](const juce::String& value) {
+                         if (value.isNotEmpty()) {
+                             history_.begin(additiv::paramDesc(static_cast<ParamId>(id)).name, values(), {}, true);
+                             proc_.setValue(id, value.getFloatValue());
+                             history_.end(values(), {});
+                         }
+                         revealParam(id);
+                     } });
+    }
+    // The player's presets, then the bank's.
+    for (size_t i = 0; i < proc_.userPresets().size(); ++i)
+        c.push_back({ proc_.userPresets()[i].name, "your preset", "Yours", false, [this, i](const juce::String&) {
+                         history_.begin("Preset", values(), {}, true);
+                         proc_.chooseUserPreset(static_cast<int>(i));
+                         history_.end(values(), {});
+                     } });
+    for (int i = 0; i < additiv::numPresets(); ++i)
+        c.push_back({ juce::String(additiv::preset(i).name), juce::String(additiv::kPresetGroupNames[additiv::preset(i).group]), "Preset", false,
+                      [this, i](const juce::String&) { loadPreset(i); } });
+    return c;
 }
 
 void AdditivEditor::toggleFullScreen()
