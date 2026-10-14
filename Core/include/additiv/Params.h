@@ -254,6 +254,7 @@ enum class ParamId : int {
     RippleBend,     ///< 0 .. 1: the ripple's speed falls where the spectrum is loud: its waves linger at the notes
     // Phase 19 (14.10.2026)
     BrainLight,     ///< 0 .. 1: the conductors prefer notes whose harmonics fall where the landscape (or the living field) is bright
+    BrainFoundation,///< 0 .. 1: a voice on the conductor's root in the octave from C2 (or Lowest, when lower), held while the root stands (its level; 0 none)
     Count           ///< number of parameters
 };
 

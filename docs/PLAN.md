@@ -526,6 +526,28 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 22: Ein Fundament unter dem Dirigenten (gebaut, 14.10.2026, 0.15.0)
+
+Nutzer: „Der Conductor scheint immer relativ hohe Noten zu spielen, aber selten ein solides Bassfundament.“
+Befund: Empyrean reicht dem ClusterBrain keine Registerrollen durch (Layers, Bass Hold ... stehen auf aus), und im
+Chords-Modus (fast alle Presets) bewertet `chooseNote` nur Konsonanz und Stimmführung; der Grundton wird sogar
+halbiert. Gemessen mit `additiv_presets --register` (je Gruppe ein Preset, 3 min; work/register/).
+- **Foundation** (`brain_foundation`, 0..1, Conductor > Register): die Engine (nicht das geteilte ClusterBrain) hält
+  eine Stimme auf dem Grundton in der Oktave ab C2 (ab Lowest, wenn tiefer; Quelle 4, als Dirigent gezeigt, wird beim
+  Stimmenklau verschont, kommt wieder, wenn sie doch genommen wurde); der Akkord wird ab einer Quinte darüber gezogen
+  (mindestens eine Oktave Raum). Pegel (0,6 + 0,4 x Foundation) x halbe Summenleistung der Akkordstimmen (als Amplitude,
+  über 4 s geglättet), nah (Tiefe x 0,15). Erst stand es nah und lauter: unter einem noch einziehenden Akkord
+  (Lunar Hall: 24 s Attack, eine Note alle 163 s) war es +9 dB und 81 % der Leistung unter 150 Hz.
+- Messwerkzeuge laden Presets jetzt wie das Panel mit `requestFill()` (sonst misst man den langsamen Einstieg:
+  im Mittel 1,1 Noten); empy_render `--fill`.
+- Presets: `foundation(r)` zuletzt gezogen, 85 % bekommen 0,45..0,85 (keins mit Lowest >= 55): 4956 von 6144.
+- Selbsttest 67: tiefste Note = Grundton unter C3 in 100 % der Blicke (ohne: 47 %), kein Akkordton näher als eine Quinte.
+- Gemessen an 48 Presets (je jede zweite Gruppe, 150 s, Akkord sofort voll): tiefste Note = Grundton 22 % -> 82 % der
+  Zeit, auf H2 oder tiefer 66 % -> 90 %, Leistung unter 150 Hz im Median gleich (14,2 -> 14,4 %): der Bass war oft da,
+  aber nicht der Grundton und nicht stehend. Pegel: Median -0,1 dB (-2,1 .. +4,1). Zehn Presets bleiben fast ohne
+  Bass: drei ohne Fundament (Lowest >= 55), die übrigen formen ihre Teiltöne nach einer unten dunklen Landschaft.
+  Hörbeispiele: work/renders/foundation (Lunar Hall, Starry Milky Way, je vorher/nachher).
+
 ## Phase 21k: Mehr Platz, Seiten mit Status, Modulationsleiste (gebaut, 14.10.2026, 0.15.0)
 
 Nach einer zweiten HCI-Kritik (blinde Tabs, Tab-Wechsel, Modulation nur auf eigener Seite; Vital/Pigments als

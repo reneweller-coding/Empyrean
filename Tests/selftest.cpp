@@ -2573,6 +2573,53 @@ int main()
                   n > 0 ? preset(found[0]).name : "-"));
     }
 
+    // 67. Foundation: with it the lowest sounding note is the root's, in the lowest octave of the
+    //     register, nearly all the time, and every chord note stands a fifth above it or higher;
+    //     without it the conductor's lowest note is only by chance the root.
+    {
+        double rootShare[2] = { 0.0, 0.0 };
+        int looks[2] = { 0, 0 }, under = 0;
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::AutoMode, 1.0f);   // Chords, as nearly every preset plays
+            e.setParam(ParamId::AutoRate, 4.0f);
+            e.setParam(ParamId::AutoRootMove, 0.6f);
+            e.setParam(ParamId::BrainDensity, 5.0f);
+            e.setParam(ParamId::BrainLow, 36.0f);
+            e.setParam(ParamId::BrainHigh, 79.0f);
+            e.setParam(ParamId::BrainFoundation, k == 0 ? 0.0f : 0.7f);
+            if (!openOffline(e, true, 67)) return 1;
+            std::vector<float> L(256), R(256);
+            int rootLowest = 0;
+            for (int b = 0; b < 187 * 150; ++b) {   // two and a half minutes, a look every second
+                e.process(L.data(), R.data(), 256);
+                if (b % 187 != 0 || b < 187 * 15) continue;
+                int lowest = 128, notes = 0;
+                std::vector<int> all;
+                for (int i = 0; i < kMaxViewVoices; ++i) {
+                    const VoiceView v = e.voiceView(i);
+                    if (v.source != 1 || v.hz <= 0.0f || v.gain < 0.3f || v.note < 0) continue;
+                    lowest = std::min(lowest, v.note);
+                    all.push_back(v.note);
+                    ++notes;
+                }
+                if (notes == 0) continue;
+                ++looks[k];
+                const int root = e.brainRoot();
+                if (((lowest - root) % 12 + 12) % 12 == 0 && lowest < 48) ++rootLowest;
+                if (k == 1)
+                    for (int n : all)
+                        if (n != lowest && n < lowest + 7) ++under;   // a chord note crowding the foundation
+            }
+            rootShare[k] = looks[k] > 0 ? static_cast<double>(rootLowest) / looks[k] : 0.0;
+        }
+        check(looks[0] > 100 && looks[1] > 100 && rootShare[1] > 0.9 && rootShare[1] > rootShare[0] + 0.3 && under < looks[1] / 10,
+              "conductor: Foundation holds the root at the bottom of the register",
+              fmt("the lowest note the root, under C3: %.0f %% without, %.0f %% with it; chord notes less than a fifth over it: %d of %d looks",
+                  100.0 * rootShare[0], 100.0 * rootShare[1], under, looks[1]));
+    }
+
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);
     return g_failures == 0 ? 0 : 1;
 }

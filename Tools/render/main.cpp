@@ -6,7 +6,7 @@
  *
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
- *                    [--route NAME|FILE] [--route-speed X]
+ *                    [--route NAME|FILE] [--route-speed X] [--fill]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -15,7 +15,8 @@
  * comes with the instrument by its name ("Whole Night - Deep Space"), or a .journey file; each step
  * glides into its preset as the instrument does. --route walks a route over the preset map (Route.h):
  * one that comes with the instrument by its name ("Dawn") or a .route file, the sound the blend of
- * the presets round the cursor, followed over Map Glide. The WAV is written as it is rendered; beyond an hour
+ * the presets round the cursor, followed over Map Glide. --fill lets the conductor's chord arrive within
+ * seconds, as a preset chosen on the panel does, instead of entering one voice at a time. The WAV is written as it is rendered; beyond an hour
  * it is cut into files of an hour (render-01.wav, render-02.wav, ...).
  */
 #include "additiv/Engine.h"
@@ -226,7 +227,7 @@ int main(int argc, char** argv)
     std::string presetName, journeyName, routeName;
     double routeSpeed = 1.0;
     std::uint64_t journeySeed = 1;
-    bool brain = true;
+    bool brain = true, fill = false;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         const bool has = i + 1 < argc;
@@ -237,6 +238,7 @@ int main(int argc, char** argv)
         else if (a == "--mod" && has) modRows = argv[++i];   // matrix rows in the text form, after the preset's (Modulation.h)
         else if (a == "--hold" && has) hold = std::atof(argv[++i]);
         else if (a == "--no-brain") brain = false;
+        else if (a == "--fill") fill = true;
         else if (a == "--preset" && has) presetName = argv[++i];
         else if (a == "--journey" && has) journeyName = argv[++i];
         else if (a == "--journey-seed" && has) journeySeed = std::strtoull(argv[++i], nullptr, 10);
@@ -312,6 +314,7 @@ int main(int argc, char** argv)
     c.seed = seed;
     std::string error;
     if (!e.prepare(c, &error)) { std::fprintf(stderr, "empy_render: %s\n", error.c_str()); return 1; }
+    if (fill) e.requestFill();
     std::printf("%s, latency %d samples, scale %s, motion %s, autoplay %s, %.0f s\n", e.deviceName().c_str(), e.latencySamples(),
                 kScaleNames[static_cast<int>(e.param(ParamId::Scale))], kMotionNames[static_cast<int>(e.param(ParamId::Motion))],
                 e.param(ParamId::BrainOn) >= 0.5f ? kBrainModeNames[static_cast<int>(e.param(ParamId::AutoMode))] : "off", seconds);

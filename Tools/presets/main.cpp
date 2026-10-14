@@ -4,7 +4,15 @@
  *        bank to one level (Noctuary's level matching, done once for the bank).
  *
  *     additiv_presets [--from N] [--to M] [--names FILE] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
- *                     [--describe FILE] [--sensitivity FILE]
+ *                     [--describe FILE] [--sensitivity FILE] [--register FILE [--step K] [--set "key=value;..."]]
+ *
+ * --register lets every K-th preset (or the named ones) play as its conductor plays it, alone, for
+ * the seconds asked (240 by default) -- the chord arriving within seconds, as a preset chosen on the
+ * panel does -- and writes per preset where the conductor's notes stand: the
+ * lowest note's median, the share of the time it is at B2 or below, the share it is the root, how
+ * many notes sound, the share of the power below 150 Hz -- whether the music has a floor -- and the
+ * level (dBFS RMS).
+ * --set changes knobs after the preset's (to hear a change against the bank as it is).
  *
  * --names measures only the presets a file names, one a line (those a change of the bank touched);
  * what levels.json held for the others stays.
@@ -207,6 +215,107 @@ int nudgeCheck(const std::vector<int>& which, double seconds)
     return 0;
 }
 
+/**
+ * @brief The register mode (see the file comment): one JSON line per preset.
+ * @param which      the presets
+ * @param seconds    how long each plays
+ * @param out        the file
+ * @param overrides  knobs set after the preset's
+ * @return           0 on success
+ */
+int registerMode(const std::vector<int>& which, double seconds, const fs::path& out, const std::vector<std::pair<ParamId, float>>& overrides)
+{
+    std::ofstream f(out);
+    const auto t0 = std::chrono::steady_clock::now();
+    double sumLowBass = 0.0, sumRoot = 0.0, sumBand = 0.0;
+    std::vector<int> medians;
+    for (size_t k = 0; k < which.size(); ++k) {
+        const int index = which[k];
+        Engine e;
+        e.setRealtime(false);
+        float values[kNumParams];
+        std::string mod, error;
+        presetValues(index, values, &mod);
+        for (const auto& [id, v] : overrides) values[static_cast<int>(id)] = v;
+        for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+        e.setModText(mod);
+        e.setParam(ParamId::BrainOn, 1.0f);
+        e.setParam(ParamId::MasterGain, 0.0f);
+        EngineConfig c;
+        c.maxHostBlock = 2048;
+        c.realtimeGpuClass = false;
+        if (!e.prepare(c, &error)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
+        e.requestFill();   // as a preset chosen on the panel: the chord within seconds
+        const int n = 2048, blocks = static_cast<int>(seconds * c.sampleRate / n), warm = static_cast<int>(20.0 * c.sampleRate / n);
+        std::vector<float> L(n), R(n);
+        // The power below 150 Hz: a second-order low pass on each side (RBJ, Q 0.707).
+        const double w0 = 2.0 * 3.14159265358979 * 150.0 / c.sampleRate, alpha = std::sin(w0) / (2.0 * 0.7071), cw = std::cos(w0);
+        const double a0 = 1.0 + alpha, b0 = (1.0 - cw) / 2.0 / a0, b1 = (1.0 - cw) / a0, b2 = b0, a1 = -2.0 * cw / a0, a2 = (1.0 - alpha) / a0;
+        double zl[2] = { 0.0, 0.0 }, zr[2] = { 0.0, 0.0 };
+        double low = 0.0, all = 0.0;
+        std::vector<int> lowest;
+        int bassTicks = 0, rootTicks = 0, ticks = 0, notesSum = 0;
+        for (int b = 0; b < blocks; ++b) {
+            e.process(L.data(), R.data(), n);
+            for (int i = 0; i < n; ++i) {
+                const double xl = L[static_cast<size_t>(i)], xr = R[static_cast<size_t>(i)];
+                const double yl = b0 * xl + zl[0];
+                zl[0] = b1 * xl - a1 * yl + zl[1];
+                zl[1] = b2 * xl - a2 * yl;
+                const double yr = b0 * xr + zr[0];
+                zr[0] = b1 * xr - a1 * yr + zr[1];
+                zr[1] = b2 * xr - a2 * yr;
+                if (b >= warm) {
+                    low += yl * yl + yr * yr;
+                    all += xl * xl + xr * xr;
+                }
+            }
+            if (b < warm) continue;
+            // The conductors' notes that sound (a block is 43 ms: every sixth one, a quarter second).
+            if (b % 6 != 0) continue;
+            int lo = 128, count = 0;
+            for (int v = 0; v < kMaxViewVoices; ++v) {
+                const VoiceView vv = e.voiceView(v);
+                if (vv.hz <= 0.0f || vv.gain < 0.25f || (vv.source != 1 && vv.source != 2) || vv.note < 0) continue;
+                lo = std::min(lo, vv.note);
+                ++count;
+            }
+            if (count == 0) continue;
+            ++ticks;
+            notesSum += count;
+            lowest.push_back(lo);
+            if (lo <= 47) ++bassTicks;
+            if (((lo - e.brainRoot()) % 12 + 12) % 12 == 0) ++rootTicks;
+        }
+        std::sort(lowest.begin(), lowest.end());
+        const int median = lowest.empty() ? -1 : lowest[lowest.size() / 2];
+        const double bass = ticks > 0 ? static_cast<double>(bassTicks) / ticks : 0.0, root = ticks > 0 ? static_cast<double>(rootTicks) / ticks : 0.0;
+        const double band = all > 0.0 ? low / all : 0.0;
+        sumLowBass += bass;
+        sumRoot += root;
+        sumBand += band;
+        medians.push_back(median);
+        char line[512];
+        std::snprintf(line, sizeof line,
+                      "{\"preset\": \"%s\", \"group\": %d, \"low\": %d, \"high\": %d, \"median_lowest\": %d, \"bass_share\": %.3f, \"root_share\": %.3f, "
+                      "\"notes\": %.2f, \"below150\": %.4f, \"level\": %.2f}\n",
+                      preset(index).name, preset(index).group, static_cast<int>(values[static_cast<int>(ParamId::BrainLow)]),
+                      static_cast<int>(values[static_cast<int>(ParamId::BrainHigh)]), median, bass, root, ticks > 0 ? static_cast<double>(notesSum) / ticks : 0.0, band,
+                      10.0 * std::log10(std::max(all / (2.0 * std::max(1.0, static_cast<double>(blocks - warm)) * n), 1e-20)));
+        f << line;
+        f.flush();
+        const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        std::printf("  %3zu / %zu  %-24s lowest %3d  bass %4.0f %%  root %4.0f %%  below 150 Hz %5.1f %%   %5.0f s\n", k + 1, which.size(), preset(index).name,
+                    median, 100.0 * bass, 100.0 * root, 100.0 * band, s);
+        std::fflush(stdout);
+    }
+    std::sort(medians.begin(), medians.end());
+    const double m = static_cast<double>(which.size());
+    std::printf("%zu presets: lowest note's median %d, at B2 or below %.0f %% of the time, the root %.0f %%, below 150 Hz %.1f %% of the power\n",
+                which.size(), medians.empty() ? -1 : medians[medians.size() / 2], 100.0 * sumLowBass / m, 100.0 * sumRoot / m, 100.0 * sumBand / m);
+    return 0;
+}
+
 } // namespace
 
 /**
@@ -218,9 +327,10 @@ int nudgeCheck(const std::vector<int>& which, double seconds)
 int main(int argc, char** argv)
 {
     int from = 0, to = numPresets() - 1;
-    std::string namesFile, describeFile, sensitivityFile;
+    std::string namesFile, describeFile, sensitivityFile, registerFile, setText;
     bool checkNudges = false;
-    double seconds = 14.0;
+    int step = 1;
+    double seconds = -1.0;
     fs::path out = repoRoot() / "work" / "presets" / "levels.json";
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
@@ -233,8 +343,16 @@ int main(int argc, char** argv)
         else if (a == "--describe" && has) describeFile = argv[++i];
         else if (a == "--sensitivity" && has) sensitivityFile = argv[++i];
         else if (a == "--nudgecheck") checkNudges = true;
-        else { std::fprintf(stderr, "additiv_presets [--from N] [--to M] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE]\n"); return 1; }
+        else if (a == "--register" && has) registerFile = argv[++i];
+        else if (a == "--step" && has) step = std::max(1, std::atoi(argv[++i]));
+        else if (a == "--set" && has) setText = argv[++i];
+        else {
+            std::fprintf(stderr, "additiv_presets [--from N] [--to M] [--step K] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE] "
+                                 "[--register FILE [--set \"key=value;...\"]]\n");
+            return 1;
+        }
     }
+    if (seconds <= 0.0) seconds = registerFile.empty() ? 14.0 : 240.0;
     from = std::clamp(from, 0, numPresets() - 1);
     to = std::clamp(to, from, numPresets() - 1);
     std::vector<int> which;
@@ -249,7 +367,20 @@ int main(int argc, char** argv)
             which.push_back(index);
         }
     } else {
-        for (int i = from; i <= to; ++i) which.push_back(i);
+        for (int i = from; i <= to; i += step) which.push_back(i);
+    }
+    if (!registerFile.empty()) {
+        std::vector<std::pair<ParamId, float>> overrides;
+        size_t at = 0;
+        while (at < setText.size()) {   // "key=value;key=value"
+            const size_t end = std::min(setText.find(';', at), setText.size());
+            const std::string item = setText.substr(at, end - at);
+            const size_t eq = item.find('=');
+            if (eq != std::string::npos)
+                if (const ParamDesc* d = findParam(item.substr(0, eq).c_str())) overrides.emplace_back(d->id, static_cast<float>(std::atof(item.c_str() + eq + 1)));
+            at = end + 1;
+        }
+        return registerMode(which, seconds, registerFile, overrides);
     }
     if (!sensitivityFile.empty()) return sensitivity(which, seconds, sensitivityFile);
     if (checkNudges) return nudgeCheck(which, seconds);

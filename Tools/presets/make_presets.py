@@ -2169,6 +2169,14 @@ def p17_effects(r, group):
                 set_orbit(r)
 
 
+def foundation(r):
+    """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
+    a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was."""
+    if int(num(r, "brain_low", 36)) >= 55 or r.rng.random() < 0.15:
+        return
+    r.set("brain_foundation", f(r.u(0.45, 0.85), 2))
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -2191,6 +2199,7 @@ def build():
                 p16_effects(r, group)
             if g < 80:   # and phase 17 after that
                 p17_effects(r, group)
+            foundation(r)   # and the conductor's floor after everything
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]

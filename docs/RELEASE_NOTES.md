@@ -43,6 +43,11 @@ presets.
 - **The info line:** what the control under the mouse does, its value and what moves it -- a sentence for all 210.
 - **Macros as large knobs**, named by what they move; **snapshots** with pictures; **MPE seen at the keys**;
   a **night mode** for dark rooms; **first steps** on the first start.
+- **A floor under the conductor (Foundation, Conductor > Register):** one voice holds the root in the octave from C2 up
+  (from Lowest, when lower) while the root stands and moves with it; the chord is drawn from a fifth above. The conductor's notes
+  had no bass of their own -- in Chords mode a candidate was scored by consonance and voice leading only, the root even
+  halved. 4956 of the 6144 presets have a foundation now (drawn last: everything else they had stays); measured over 48
+  of them, the lowest note is the root 82 % of the time instead of 22 %. Its level follows the chord.
 - **Every page fits the window** (1280 x 860 and more, still at 800 high) without scrolling: the boxes fill the rows
   as tightly as they can, Focus stands in two columns, the matrix has a page of its own with every source live beside
   its rows, the space's and the hall's pictures take what is left, and the picture at the top gives way where a page

@@ -526,6 +526,23 @@ private:
     int userLandSeen_ = 0;                             ///< the version on the GPU
     float landRms_ = 1.0f;                             ///< its RMS, for the level of voices that read it
     bool stepWas_ = false;                             ///< the Step switch's last value (it fires on the rising edge)
+    // The foundation (Foundation): one voice on the conductor's root in the octave from C2 up (from
+    // Lowest when the register begins lower), held while the root stands; the chord is drawn from a
+    // fifth above it.
+    static constexpr int kFoundationSource = 4;        ///< a voice's source for the foundation (shown as the conductor's)
+    float foundation_ = 0.0f;                          ///< its level, 0 none
+    int foundationLow_ = 36;                           ///< the bottom of the foundation's octave: C2, or Lowest when lower
+    int foundationNote_ = -1;                          ///< the note it holds, -1 none
+    float foundationMatch_ = 0.0f;                     ///< half the chord voices' summed power (as an amplitude) over the foundation's sustain, followed over seconds: its level
+    /**
+     * @brief The foundation's note for a root: the root's pitch class in the octave from @p low up.
+     * @param root  the conductor's root (MIDI)
+     * @param low   the bottom of the register
+     * @return      the note
+     */
+    static int foundationNote(int root, int low) { return low + (((root - low) % 12) + 12) % 12; }
+    /** @brief The foundation follows the root, comes and goes with the conductor and Foundation, and comes back when its voice was taken. */
+    void updateFoundation();
     Modulators mods_;                                  ///< the modulation sources
     /** @brief One setup of sound_'s own LFOs and envelopes, running (Morph.h: each row reads the modulators of the sound it came from). */
     struct OwnUnit {

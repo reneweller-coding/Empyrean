@@ -63,6 +63,7 @@ const Info kInfo[] = {
     { "brain_hold_max", "The longest a note is held." },
     { "brain_low", "The conductor's lowest note (drag the bracket over the keys on this page)." },
     { "brain_high", "The conductor's highest note." },
+    { "brain_foundation", "A voice on the conductor's root in the octave from C2 up, held while the root stands, the chord over it; its level (0: none)." },
     { "brain_consonance", "How consonant the conductor's choices are: 0 anything goes, 1 strictly sweet." },
     { "brain_wander", "How far the conductor's register wanders." },
     { "auto_lead", "How far, in semitones, a voice may move when it is exchanged." },

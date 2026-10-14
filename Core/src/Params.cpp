@@ -353,6 +353,7 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::TimeBend,        "time_bend",        "Time Bend",  "Time", -1.f,  1.f,   0.f,   1.f,  ""),
     F(ParamId::RippleBend,      "ripple_bend",      "Bend",       "Ripple", 0.f, 1.f,   0.f,   1.f,  ""),
     F(ParamId::BrainLight,      "brain_light",      "Follow Light", "Conductor", 0.f, 1.f, 0.f,  1.f,  ""),
+    F(ParamId::BrainFoundation, "brain_foundation", "Foundation", "Conductor", 0.f, 1.f,  0.f,   1.f,  ""),
 } };
 
 } // namespace

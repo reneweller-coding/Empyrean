@@ -292,7 +292,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                      { "Self-Tune", F::Motion, Ids{ ParamId::TuneGravity, ParamId::TuneReach, ParamId::TuneAnchor }, Ids{ ParamId::TuneGravity } } });
     page("Conductor", { { "Conductor", F::Motion, Ids{ ParamId::BrainOn, ParamId::AutoMode, ParamId::BrainRate, ParamId::AutoRate, ParamId::BrainDensity,
                                                        ParamId::BrainHoldMin, ParamId::BrainHoldMax }, Ids{ ParamId::BrainOn } },
-                        { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh } },
+                        { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh, ParamId::BrainFoundation } },
                         { "Harmony", F::Motion, Ids{ ParamId::BrainConsonance, ParamId::BrainWander, ParamId::AutoLead, ParamId::AutoTension,
                                                      ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::BrainLight, ParamId::AutoStep } },
                         { "Brain 2", F::Envelope, Ids{ ParamId::Brain2On, ParamId::Brain2Interval, ParamId::Brain2Density, ParamId::Brain2Rate,

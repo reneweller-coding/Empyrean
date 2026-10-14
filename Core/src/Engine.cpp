@@ -191,6 +191,7 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     if (cfg_.realtimeGpuClass) raiseGpuClass();
 
     voices_.assign(static_cast<size_t>(cfg_.voices), Voice{});
+    foundationNote_ = -1;
     for (Voice& v : voices_) v.env.setSampleRate(cfg_.sampleRate / G);   // stepped once per GPU block
     rng_.seed(cfg_.seed);
     side_.seed(cfg_.seed ^ 0xA5A5A5A55A5A5A5Aull);
@@ -793,6 +794,38 @@ void Engine::readParams()
     bp2_.holdMax = 2.0f * bp_.holdMax;
     bp2_.low = std::clamp(bp_.low + blk_.brain2Interval, 12, 115);
     bp2_.high = std::clamp(bp_.high + blk_.brain2Interval, bp2_.low, 120);
+
+    // The foundation: a voice on the root in the octave from C2 up (from Lowest when the register
+    // begins lower); the chord is drawn from a fifth above it (an octave of room at the least), so
+    // nothing crowds or doubles it there.
+    foundation_ = std::clamp(g(ParamId::BrainFoundation), 0.0f, 1.0f);
+    foundationLow_ = std::min({ bp_.low, bp_.high, 36 });
+    if (foundation_ > 0.0f && bp_.on) {
+        const int hi = std::max(bp_.low, bp_.high);
+        const int f = foundationNote(brain_.root(), foundationLow_);
+        bp_.low = std::max(std::min(bp_.low, hi), std::min(f + 7, hi - 12));
+        bp_.high = hi;
+    }
+}
+
+void Engine::updateFoundation()
+{
+    const int want = bp_.on && foundation_ > 0.0f ? foundationNote(brain_.root(), foundationLow_) : -1;
+    if (foundationNote_ >= 0 && want == foundationNote_) {
+        // Still sounding? Its voice may have been taken when every voice was busy.
+        bool held = false;
+        for (const Voice& v : voices_)
+            if (v.source == kFoundationSource && v.note == foundationNote_ && !v.released) held = true;
+        if (held) return;
+        for (const Voice& v : voices_)
+            if (v.stealing && v.nextSource == kFoundationSource && v.next.note == foundationNote_) held = true;
+        if (held) return;
+        foundationNote_ = -1;
+    }
+    if (want == foundationNote_) return;
+    if (foundationNote_ >= 0) stopNote(foundationNote_, kFoundationSource);
+    if (want >= 0) startNote(want, foundation_, blk_.depth * 0.15f, kFoundationSource, 0);   // close, as the conductor's near notes: the floor is under you
+    foundationNote_ = want;
 }
 
 void Engine::refreshSpectrum()
@@ -1022,6 +1055,13 @@ void Engine::startNote(int note, float velocity, float distance, int source, int
     for (int i = 0; i < count; ++i) {
         const Voice& v = voices_[static_cast<size_t>(i)];
         if (!v.stealing && v.released && v.env.level() < bestLevel) { bestLevel = v.env.level(); best = i; }
+    }
+    if (best < 0) {   // the oldest -- not the foundation, which is the oldest by design
+        double oldest = -1.0;
+        for (int i = 0; i < count; ++i) {
+            const Voice& v = voices_[static_cast<size_t>(i)];
+            if (!v.stealing && v.source != kFoundationSource && v.age > oldest) { oldest = v.age; best = i; }
+        }
     }
     if (best < 0) {
         double oldest = -1.0;
@@ -1286,6 +1326,7 @@ void Engine::renderBlock()
             if ((((r + d) % 12) + 12) % 12 == jr && std::abs(d) < bestDist) { bestDist = std::abs(d); best = r + d; }
         brain_.setRoot(std::clamp(best, 0, 127));
     }
+    updateFoundation();
     brain2_.setRoot(std::clamp(brain_.root() + blk_.brain2Interval, 0, 127));
     brain2_.update(dt, bp2_, -1, freqOf, [this](const BrainEvent& e) {
         if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, blk_.brain2Depth * (0.85f + 0.15f * rng_.uniform()), 2, 0);
@@ -1350,6 +1391,8 @@ void Engine::renderBlock()
     float landMakeup = 1.0f;
     if (motionUsesLandscape(motion)) landMakeup = 1.0f / std::max(0.125f, 1.0f - blk_.motionDepth + blk_.motionDepth * landRms_);
     int sounding = 0;
+    float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
+    int chordVoices = 0;
     int by[3] = { 0, 0, 0 };
     float srcW = 0.0f, srcD = 0.0f;   // the near room's source: the voices' distance, weighted by loudness
     for (int i = 0; i < static_cast<int>(voices_.size()); ++i) {
@@ -1365,6 +1408,7 @@ void Engine::renderBlock()
         v.env.setTimes(blk_.attack, blk_.decay, blk_.sustain, blk_.release);
         const float gain = v.env.process();
         v.lastGain = gain;
+        if (v.source == 1 && !v.released) { chordGain += gain * gain; ++chordVoices; }   // the foundation matches these
         if (!v.env.isActive()) {
             // With dispersion the late partials sound on after the envelope: the voice stays until
             // the latest of them has heard the end of it.
@@ -1410,7 +1454,11 @@ void Engine::renderBlock()
         const FilterModel model = static_cast<FilterModel>(std::clamp(blk_.filterModel, 0, kNumFilterModels - 1));
         const float q = filterQ(static_cast<int>(model), blk_.resonance);   // Spectrum.h: the picture's curve reads the same
 
-        float level = kVoiceLevel * (v.source != 0 ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
+        // The foundation: as loud as the chord is (foundationMatch_) -- a held voice beside voices that
+        // spend half their lives fading in, or under a chord still arriving, would stand far over it --
+        // and its knob on top.
+        float level = kVoiceLevel * (v.source == kFoundationSource ? (0.6f + 0.4f * foundation_) * foundationMatch_
+                                     : v.source != 0 ? 0.6f + 0.4f * v.velocity : 0.4f + 0.6f * v.velocity);
         cv.hz = static_cast<float>(v.hz * doppler * std::exp2(static_cast<double>(mpeBend) / 12.0));
         cv.level = level * landMakeup * std::exp2(expr(MpeTarget::Level));   // up to 6 dB
         cv.gain = gain;
@@ -1492,9 +1540,15 @@ void Engine::renderBlock()
         v.onset = 0;
         v.age += dt;
         ++sounding;
-        ++by[std::clamp(v.source, 0, 2)];
+        ++by[v.source == kFoundationSource ? 1 : std::clamp(v.source, 0, 2)];   // the foundation is the conductor's
     }
     sounding_.store(sounding, std::memory_order_relaxed);
+    {   // the chord's mean envelope, followed over a few seconds (the foundation's own sustain divided out)
+        // As loud as half the chord's voices together (their power), seen over the foundation's own
+        // sustain: half a voice under a lone note, a little over one voice under five.
+        const float target = chordVoices > 0 ? 0.5f * std::sqrt(chordGain) / std::max(blk_.sustain, 0.2f) : 0.0f;
+        foundationMatch_ += (std::min(target, 1.5f) - foundationMatch_) * (1.0f - std::exp(-dtf / 4.0f));
+    }
     if (srcW > 1.0e-6f) srcDistance_ = srcD / srcW;
     if (prevSounding_ == 0 && sounding > 0) phraseStart_ = true;   // a note into silence: the envelopes' phrase begins
     prevSounding_ = sounding;
@@ -1537,7 +1591,7 @@ void Engine::renderBlock()
         viewGain_[static_cast<size_t>(i)].store(on ? cv.gain : 0.0f, std::memory_order_relaxed);
         viewDistance_[static_cast<size_t>(i)].store(v.distance, std::memory_order_relaxed);
         viewTime_[static_cast<size_t>(i)].store(cv.time, std::memory_order_relaxed);
-        viewSource_[static_cast<size_t>(i)].store(v.source, std::memory_order_relaxed);
+        viewSource_[static_cast<size_t>(i)].store(v.source == kFoundationSource ? 1 : v.source, std::memory_order_relaxed);
         viewNote_[static_cast<size_t>(i)].store(on ? v.note : -1, std::memory_order_relaxed);
         viewPress_[static_cast<size_t>(i)].store(v.press, std::memory_order_relaxed);
         viewSlide_[static_cast<size_t>(i)].store(v.slide, std::memory_order_relaxed);
