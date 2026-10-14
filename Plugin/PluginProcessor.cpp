@@ -59,6 +59,7 @@ std::unique_ptr<juce::RangedAudioParameter> makeParameter(const ParamDesc& d)
 AdditivProcessor::AdditivProcessor()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true))
 {
+    refreshUserPresets();   // the player's own presets, for the bank and the journeys
     // The table's sections become the hosts' groups, in the order they first appear.
     params_.assign(static_cast<size_t>(additiv::kNumParams), nullptr);
     std::vector<std::unique_ptr<juce::AudioProcessorParameterGroup>> groups;
@@ -195,6 +196,130 @@ void AdditivProcessor::applyPreset(int index, double glide)
     engine_.setModText(mod);
     if (g <= 0.0) engine_.requestFill();   // the arriving preset's chord within seconds (Noctuary's way); a glide keeps the chord
     current_.store(index, std::memory_order_relaxed);
+    currentUser_.clear();
+    setReference();
+}
+
+// ---- the player's own presets
+
+/**
+ * @brief A matrix's text as the engine would write it back: each row through its packing (what the
+ *        audio side holds), so that "changed" compares like with like.
+ * @param text  the text form
+ * @return      the engine's spelling of it
+ */
+static std::string modTextAsEngine(const std::string& text)
+{
+    additiv::ModRow rows[additiv::kModRows];
+    additiv::modRowsFromText(text, rows, additiv::kModRows);
+    for (auto& r : rows) r = additiv::unpackModRow(additiv::packModRow(r));
+    return additiv::modRowsToText(rows, additiv::kModRows);
+}
+
+juce::File AdditivProcessor::presetFolder()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Presets");
+}
+
+void AdditivProcessor::refreshUserPresets()
+{
+    userPresets_.clear();
+    for (const juce::File& f : presetFolder().findChildFiles(juce::File::findFiles, false, "*.empyrean")) {
+        const std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(f);
+        if (!xml || !xml->hasTagName("EmpyreanPreset")) continue;
+        UserPreset u;
+        u.name = f.getFileNameWithoutExtension();
+        u.file = f;
+        u.values.resize(static_cast<size_t>(additiv::kNumParams));
+        for (const ParamDesc& d : additiv::paramTable()) u.values[static_cast<size_t>(d.id)] = d.def;
+        for (const juce::String& kv : juce::StringArray::fromTokens(xml->getStringAttribute("values"), " ", ""))
+            if (const ParamDesc* d = additiv::findParam(kv.upToFirstOccurrenceOf("=", false, false).toRawUTF8()))
+                u.values[static_cast<size_t>(d->id)] = std::clamp(kv.fromFirstOccurrenceOf("=", false, false).getFloatValue(), d->min, d->max);
+        u.mod = xml->getStringAttribute("mod").toStdString();
+        userPresets_.push_back(std::move(u));
+    }
+    std::sort(userPresets_.begin(), userPresets_.end(), [](const UserPreset& a, const UserPreset& b) { return a.name.compareNatural(b.name) < 0; });
+}
+
+int AdditivProcessor::findUserPreset(const juce::String& name) const
+{
+    for (size_t i = 0; i < userPresets_.size(); ++i)
+        if (userPresets_[i].name == name) return static_cast<int>(i);
+    return -1;
+}
+
+bool AdditivProcessor::saveUserPreset(const juce::String& name, juce::String& why)
+{
+    const juce::String legal = juce::File::createLegalFileName(name.trim());
+    if (legal.isEmpty()) { why = "a preset needs a name"; return false; }
+    if (additiv::findPreset(legal.toRawUTF8()) >= 0) { why = "a factory preset has that name (journeys find presets by name)"; return false; }
+    juce::String values;
+    for (const ParamDesc& d : additiv::paramTable())
+        if (!additiv::keptByPresets(d.id)) values << d.key << "=" << juce::String(value(static_cast<int>(d.id)), 6) << " ";
+    juce::XmlElement xml("EmpyreanPreset");
+    xml.setAttribute("version", ADDITIV_VERSION);
+    xml.setAttribute("values", values.trim());
+    xml.setAttribute("mod", juce::String(engine_.modText()));
+    presetFolder().createDirectory();
+    if (!xml.writeTo(presetFolder().getChildFile(legal + ".empyrean"))) { why = "it could not be written into " + presetFolder().getFullPathName(); return false; }
+    refreshUserPresets();
+    current_.store(-1, std::memory_order_relaxed);
+    currentUser_ = legal;
+    setReference();
+    return true;
+}
+
+void AdditivProcessor::applyUserPreset(int i, double glide)
+{
+    if (i < 0 || i >= static_cast<int>(userPresets_.size())) return;
+    const UserPreset& u = userPresets_[static_cast<size_t>(i)];
+    const double g = glide >= 0.0 ? glide : static_cast<double>(value(static_cast<int>(ParamId::PresetGlide)));
+    if (g > 0.0) engine_.beginMorph(g);
+    for (int k = 0; k < additiv::kNumParams; ++k)
+        if (!additiv::keptByPresets(static_cast<ParamId>(k))) setValue(k, u.values[static_cast<size_t>(k)]);
+    engine_.setModText(u.mod);
+    if (g <= 0.0) engine_.requestFill();
+    current_.store(-1, std::memory_order_relaxed);
+    currentUser_ = u.name;
+    setReference();
+}
+
+void AdditivProcessor::chooseUserPreset(int i)
+{
+    journeyPlayer_.stop();
+    setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+    leaveMap(false);
+    applyUserPreset(i, -1.0);
+}
+
+void AdditivProcessor::setReference()
+{
+    reference_ = knobValues();
+    referenceMod_ = engine_.modText();
+}
+
+bool AdditivProcessor::modified() const
+{
+    if (reference_.size() != static_cast<size_t>(additiv::kNumParams)) return false;
+    for (const ParamDesc& d : additiv::paramTable()) {
+        if (additiv::keptByPresets(d.id)) continue;
+        if (std::fabs(value(static_cast<int>(d.id)) - reference_[static_cast<size_t>(d.id)]) > 1.0e-5f * std::max(1.0f, d.max - d.min)) return true;
+    }
+    return engine_.modText() != referenceMod_;
+}
+
+void AdditivProcessor::revert()
+{
+    if (reference_.size() != static_cast<size_t>(additiv::kNumParams)) return;
+    engine_.beginMorph(1.0);
+    for (int k = 0; k < additiv::kNumParams; ++k)
+        if (!additiv::keptByPresets(static_cast<ParamId>(k))) setValue(k, reference_[static_cast<size_t>(k)]);
+    engine_.setModText(referenceMod_);
+}
+
+void AdditivProcessor::revertKnob(int id)
+{
+    if (id >= 0 && id < additiv::kNumParams && reference_.size() == static_cast<size_t>(additiv::kNumParams)) setValue(id, reference_[static_cast<size_t>(id)]);
 }
 
 void AdditivProcessor::choosePreset(int index)
@@ -474,6 +599,36 @@ void AdditivProcessor::teachForget(int m)
     engine_.setMacroLesson(m, lessons_[static_cast<size_t>(m)]);
 }
 
+juce::String AdditivProcessor::macroName(int m) const
+{
+    if (m < 0 || m >= 4) return {};
+    std::vector<std::pair<float, int>> moved;   // per knob how far the macro moves it, the larger first
+    const additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+    if (l.count >= 2)
+        for (int p = 0; p < additiv::kNumParams; ++p) {
+            float most = 0.0f;
+            for (int i = 0; i < l.count; ++i) most = std::max(most, std::fabs(l.delta[i][static_cast<size_t>(p)]));
+            if (most > 0.0f) moved.emplace_back(most, p);
+        }
+    const auto source = static_cast<additiv::ModSource>(static_cast<int>(additiv::ModSource::Macro1) + m);
+    for (int i = 0; i < additiv::kModRows; ++i) {
+        const additiv::ModRow r = engine_.modRow(i);
+        if (r.source == source && r.target >= 0 && r.target < additiv::kNumParams && r.depth != 0.0f) moved.emplace_back(std::fabs(r.depth), r.target);
+    }
+    if (moved.empty()) return "Macro " + juce::String(m + 1);
+    std::sort(moved.begin(), moved.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    std::vector<int> knobs;
+    for (const auto& x : moved)
+        if (std::find(knobs.begin(), knobs.end(), x.second) == knobs.end()) knobs.push_back(x.second);
+    // A name two knobs share ("Depth": the motion's and the space's) carries its section.
+    const ParamDesc& first = additiv::paramTable()[static_cast<size_t>(knobs[0])];
+    bool shared = false;
+    for (const ParamDesc& d : additiv::paramTable()) shared = shared || (d.id != first.id && juce::String(d.name) == first.name);
+    juce::String s = shared ? juce::String(first.section) + " " + first.name : juce::String(first.name);
+    if (knobs.size() > 1) s << " & " << static_cast<int>(knobs.size() - 1) << " more";
+    return s;
+}
+
 juce::String AdditivProcessor::teachStatus(int m) const
 {
     if (m < 0 || m >= 4) return {};
@@ -659,7 +814,8 @@ bool AdditivProcessor::startJourney(const JourneyEntry& entry)
     const bool read = entry.builtin >= 0 ? j.parse(additiv::builtinJourneyText(entry.builtin)) : j.load(entry.file.getFullPathName().toRawUTF8());
     if (!read || j.steps.empty()) return false;
     bool known = false;
-    for (const additiv::JourneyStep& st : j.steps) known = known || additiv::findPreset(st.preset.c_str()) >= 0;
+    for (const additiv::JourneyStep& st : j.steps)
+        known = known || additiv::findPreset(st.preset.c_str()) >= 0 || findUserPreset(juce::String(st.preset)) >= 0;
     if (!known) return false;
     if (j.name.empty()) j.name = entry.name.toStdString();
     journey_ = j;
@@ -685,10 +841,12 @@ void AdditivProcessor::journeyTick()
     double glide = 60.0;
     if (!journeyPlayer_.advance(dt, st, glide)) return;
     const int index = additiv::findPreset(st.preset.c_str());
+    const int own = index < 0 ? findUserPreset(juce::String(st.preset)) : -1;   // one of the player's presets by that name
     if (index >= 0) applyPreset(index, std::max(glide, 0.5));   // a name the bank no longer has: nothing changes until the next step
+    else if (own >= 0) applyUserPreset(own, std::max(glide, 0.5));
     // A journey is listened to, not played: the conductor plays on through a preset made for the
     // hands (it would stop for the whole of that step).
-    if (index >= 0) setValue(static_cast<int>(ParamId::BrainOn), 1.0f);
+    if (index >= 0 || own >= 0) setValue(static_cast<int>(ParamId::BrainOn), 1.0f);
 }
 
 juce::String AdditivProcessor::journeyStatus() const
@@ -707,9 +865,9 @@ juce::String AdditivProcessor::journeyStatus() const
 void AdditivProcessor::journeyAddCurrent()
 {
     const int cp = currentPreset();
-    if (cp < 0) return;
+    if (cp < 0 && currentUser_.isEmpty()) return;
     additiv::JourneyStep st;
-    st.preset = additiv::preset(cp).name;
+    st.preset = cp >= 0 ? std::string(additiv::preset(cp).name) : currentUser_.toStdString();
     st.dwellLo = 480.0; st.dwellHi = 900.0; st.fadeLo = 90.0; st.fadeHi = 180.0;
     draft_.steps.push_back(st);
 }
@@ -863,6 +1021,7 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
     }
     xml.createNewChildElement("Mod")->setAttribute("rows", juce::String(engine_.modText()));
     xml.setAttribute("preset", current_.load(std::memory_order_relaxed));
+    if (currentUser_.isNotEmpty()) xml.setAttribute("userPreset", currentUser_);
     if (userLandFile_ != juce::File()) xml.setAttribute("landscapeFile", userLandFile_.getFullPathName());
     if (route_.count() > 0) {   // the route being played or written (not whether it runs)
         std::vector<char> buf(static_cast<size_t>(route_.count()) * 200 + 64);
@@ -928,6 +1087,7 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         p->setValueNotifyingHost(p->convertTo0to1(std::clamp(v, d.min, d.max)));
     }
     current_.store(xml->getIntAttribute("preset", -1), std::memory_order_relaxed);
+    currentUser_ = xml->getStringAttribute("userPreset");
     {   // the player's own landscape, read again from its file (a moved file: Aurora plays instead)
         const juce::File f(xml->getStringAttribute("landscapeFile"));
         const float choice = value(static_cast<int>(ParamId::Landscape));
@@ -991,6 +1151,23 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         const int cc = e->getIntAttribute("cc", -1);
         const ParamDesc* d = additiv::findParam(e->getStringAttribute("key").toRawUTF8());
         if (cc >= 0 && cc < 128 && d != nullptr) ccMap_[static_cast<size_t>(cc)].store(static_cast<int>(d->id), std::memory_order_relaxed);
+    }
+    // What "changed" is measured against: the preset the state's sound came from, when it is known.
+    setReference();
+    const int cp = current_.load(std::memory_order_relaxed);
+    if (cp >= 0 && cp < additiv::numPresets()) {
+        float values[additiv::kNumParams];
+        std::string rows;
+        additiv::presetValues(cp, values, &rows);
+        reference_.assign(values, values + additiv::kNumParams);
+        for (int k = 0; k < additiv::kNumParams; ++k)   // the listener's own are as the state has them
+            if (additiv::keptByPresets(static_cast<ParamId>(k))) reference_[static_cast<size_t>(k)] = value(k);
+        referenceMod_ = modTextAsEngine(rows);
+    } else if (const int own = findUserPreset(currentUser_); own >= 0) {
+        reference_ = userPresets_[static_cast<size_t>(own)].values;
+        for (int k = 0; k < additiv::kNumParams; ++k)
+            if (additiv::keptByPresets(static_cast<ParamId>(k))) reference_[static_cast<size_t>(k)] = value(k);
+        referenceMod_ = modTextAsEngine(userPresets_[static_cast<size_t>(own)].mod);
     }
 }
 

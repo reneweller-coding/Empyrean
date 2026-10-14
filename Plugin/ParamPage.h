@@ -60,6 +60,7 @@ private:
         int id = -1;                          ///< its parameter
         bool gate = false;                    ///< one of what wakes its group (a main control)
         bool moved = false;                   ///< a matrix row was on it at the last look
+        bool away = false;                    ///< it stood away from its preset at the last look
     };
     /** @brief One group box. */
     struct Box {

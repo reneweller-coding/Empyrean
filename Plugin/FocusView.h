@@ -91,7 +91,7 @@ private:
     juce::Label farName_;                          ///< its name
     std::vector<std::unique_ptr<VariationTile>> tiles_;   ///< six tiles
     std::array<juce::TextButton, 6> keep_;         ///< keep that one
-    std::array<juce::Slider, 4> macro_;            ///< the macros
+    std::vector<std::unique_ptr<frame::Knob>> macro_;   ///< the macros, large knobs
     std::vector<std::unique_ptr<juce::SliderParameterAttachment>> macroLinks_;   ///< to their parameters
     std::array<juce::Label, 4> macroName_;         ///< their names
     std::array<juce::TextButton, 4> teach_;        ///< begin teaching

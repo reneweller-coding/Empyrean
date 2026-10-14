@@ -82,6 +82,12 @@ private:
     juce::TextButton nextPreset_{ ">" };                       ///< the preset after
     /** @brief The bank as a menu of its groups. */
     void showPresets();
+    /** @brief The Save menu: save, save as, back to the preset, the folder. */
+    void showSaveMenu();
+    /** @brief Saves the sound under its own name when it is one of the player's presets, else asks for one. */
+    void quickSave();
+    /** @brief Asks for a name and saves the sound as one of the player's presets. */
+    void saveAs();
     /**
      * @brief Applies a preset as one undo step.
      * @param index  the preset
@@ -97,6 +103,9 @@ private:
     frame::IconButton undo_{ frame::IconButton::Icon::Undo, "Undo (Ctrl+Z)" };          ///< undo
     frame::IconButton redo_{ frame::IconButton::Icon::Redo, "Redo (Ctrl+Y)" };          ///< redo
     frame::IconButton help_{ frame::IconButton::Icon::Help, "Help (F1)" };              ///< the help
+    /** @brief Save the sound as one's own preset (Ctrl+S), back to the preset, the presets' folder. */
+    frame::IconButton save_{ frame::IconButton::Icon::Save, "Your presets: save the sound (Ctrl+S), save it as ..., back to the preset" };
+    std::unique_ptr<juce::AlertWindow> askName_;               ///< the name dialog while it is open
     frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
     CloudView cloud_{ proc_ };                                 ///< the picture
     juce::TextButton canvasButton_{ "Canvas" };                ///< the picture alone, the whole window (and back)

@@ -123,7 +123,7 @@ private:
     std::vector<float> ripple_;                                         ///< the ripple's string at the last snapshot
     std::vector<float> hall_;                                           ///< the hall's memory as last fetched
     double hallAge_ = 0.0;                                              ///< its seconds learnt
-    std::array<juce::Slider, 4> macros_;                                ///< the four macros, in the canvas
+    std::array<juce::Slider, 4> macros_;                                ///< the four macros as knobs, in the canvas
     std::array<juce::Label, 4> macroNames_;                             ///< their names
     std::vector<std::unique_ptr<juce::SliderParameterAttachment>> macroLinks_;   ///< the faders to the parameters
 };

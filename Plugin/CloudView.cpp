@@ -28,16 +28,17 @@ CloudView::CloudView(AdditivProcessor& proc) : proc_(proc)
     static const char* const kMacroNames[4] = { "Macro 1", "Macro 2", "Macro 3", "Macro 4" };
     for (int i = 0; i < 4; ++i) {
         juce::Slider& s = macros_[static_cast<size_t>(i)];
-        s.setSliderStyle(juce::Slider::LinearHorizontal);
+        s.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
         s.setTextBoxStyle(juce::Slider::NoTextBox, true, 0, 0);
-        s.setColour(juce::Slider::trackColourId, additivui::skin().accent.withAlpha(0.7f));
+        s.setColour(juce::Slider::rotarySliderFillColourId, additivui::skin().family(frame::Family::Envelope));
         s.setTooltip(juce::String(kMacroNames[i]) + ": whatever the matrix lets it move");
         const int id = static_cast<int>(ParamId::Macro1) + i;
         if (auto* p = proc_.parameter(id)) macroLinks_.push_back(std::make_unique<juce::SliderParameterAttachment>(*p, s));
         juce::Label& l = macroNames_[static_cast<size_t>(i)];
         l.setText(kMacroNames[i], juce::dontSendNotification);
         l.setColour(juce::Label::textColourId, additivui::skin().dim);
-        l.setFont(juce::FontOptions(11.0f));
+        l.setFont(juce::FontOptions(12.0f));
+        l.setJustificationType(juce::Justification::centredLeft);
         addChildComponent(s);
         addChildComponent(l);
     }
@@ -81,11 +82,11 @@ void CloudView::setCanvas(bool on)
 
 void CloudView::resized()
 {
-    // The macros under the keys, in the canvas: four short faders side by side on the left.
-    const int y = getHeight() - 40, w = 150;
+    // The macros under the keys, in the canvas: four knobs side by side on the left, each with its name beside it.
+    const int size = 54, y = getHeight() - size - 8, w = 190;
     for (int i = 0; i < 4; ++i) {
-        macroNames_[static_cast<size_t>(i)].setBounds(20 + i * (w + 16), y - 2, w, 14);
-        macros_[static_cast<size_t>(i)].setBounds(20 + i * (w + 16), y + 12, w, 20);
+        macros_[static_cast<size_t>(i)].setBounds(20 + i * w, y, size, size);
+        macroNames_[static_cast<size_t>(i)].setBounds(20 + i * w + size + 4, y + size / 2 - 9, w - size - 10, 18);
     }
 }
 
@@ -318,6 +319,11 @@ void CloudView::refresh()
         if (page_ == "Motion") proc_.engine().rippleSnapshot(ripple_);
     }
     if (page_ == "Hall") proc_.engine().hallMemory(hall_, hallAge_);
+    if (canvas_)   // the macros' names follow what they move
+        for (int i = 0; i < 4; ++i) {
+            const juce::String name = proc_.macroName(i);
+            if (macroNames_[static_cast<size_t>(i)].getText() != name) macroNames_[static_cast<size_t>(i)].setText(name, juce::dontSendNotification);
+        }
     if (!dotsArea_.isEmpty()) plotDots(dotsArea_.getWidth(), dotsArea_.getHeight());
     repaint();
 }
@@ -553,7 +559,7 @@ void CloudView::paint(juce::Graphics& g)
     }
 
     auto inner = all.reduced(canvas_ ? 20.0f : 10.0f);
-    if (canvas_) inner.removeFromBottom(48.0f);   // the macros
+    if (canvas_) inner.removeFromBottom(62.0f);   // the macros
     const auto landArea = canvas_ ? inner : inner.removeFromRight(inner.getWidth() * 0.28f).withTrimmedLeft(10.0f);
     landArea_ = canvas_ ? juce::Rectangle<float>() : landArea;
     const float keyH = canvas_ ? 14.0f : 10.0f;   // the keys' strip under the spectrum

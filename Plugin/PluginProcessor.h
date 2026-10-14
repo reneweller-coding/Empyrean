@@ -164,6 +164,44 @@ public:
     };
     /** @brief Where the player's routes live: Documents/Empyrean/Routes. @return the folder */
     static juce::File routeFolder();
+    /** @name The player's own presets (Documents/Empyrean/Presets) @{ */
+    /** @brief One of the player's presets. */
+    struct UserPreset {
+        juce::String name;            ///< its name (its file's)
+        std::vector<float> values;    ///< its knobs, kNumParams values (those it does not name at their defaults)
+        std::string mod;              ///< its matrix
+        juce::File file;              ///< its file
+    };
+    /** @brief Where the player's presets live: Documents/Empyrean/Presets. @return the folder */
+    static juce::File presetFolder();
+    /** @brief The player's presets as last read from the folder, by name. @return them */
+    const std::vector<UserPreset>& userPresets() const { return userPresets_; }
+    /** @brief Reads the folder again. */
+    void refreshUserPresets();
+    /**
+     * @brief Saves the sound now (every knob a preset sets, and the matrix) as one of the player's
+     *        presets; it becomes the preset playing.
+     * @param name  its name (a factory preset's name is refused: journeys find presets by name)
+     * @param why   receives the reason when it cannot
+     * @return      true when written
+     */
+    bool saveUserPreset(const juce::String& name, juce::String& why);
+    /** @brief The player chooses one of their presets (a journey and the A/B morph let go). @param i its index in userPresets() */
+    void chooseUserPreset(int i);
+    /** @brief One of the player's presets by name. @param name its name @return its index, -1 none */
+    int findUserPreset(const juce::String& name) const;
+    /** @brief The player's preset playing, by name ("" when a factory one is, or none). @return it */
+    juce::String currentUserPreset() const { return currentUser_; }
+    /** @brief The knobs of the preset the sound came from (what "changed" is measured against). @return kNumParams values, empty before any */
+    const std::vector<float>& reference() const { return reference_; }
+    /** @brief Whether the sound has moved from its preset: a knob a preset sets, or the matrix. @return true then */
+    bool modified() const;
+    /** @brief Back to the preset the sound came from, gliding over a second. */
+    void revert();
+    /** @brief One knob back to its preset's value. @param id the knob */
+    void revertKnob(int id);
+    /** @} */
+
     /** @name The Focus page (Focus.h, Find.h) @{ */
     /** @brief The knobs as they stand. @return kNumParams values */
     std::vector<float> knobValues() const;
@@ -208,6 +246,14 @@ public:
     void teachForget(int m);
     /** @brief Whether a macro is being taught. @param m 0 .. 3 @return true then */
     bool teaching(int m) const { return m >= 0 && m < 4 && !teachBase_[static_cast<size_t>(m)].empty(); }
+    /**
+     * @brief A macro's name: what it moves most -- the knob its lesson moves furthest, or the target of
+     *        its strongest matrix row ("Motion Depth"), "and n more" when it moves several; "Macro n" when
+     *        it moves nothing.
+     * @param m  0 .. 3
+     * @return   the name
+     */
+    juce::String macroName(int m) const;
     /** @brief What a macro was taught, in words. @param m 0 .. 3 @return the text */
     juce::String teachStatus(int m) const;
     /**
@@ -366,6 +412,14 @@ private:
     std::uint64_t varSeed_ = 1;                            ///< their dice
     std::array<additiv::MacroLesson, 4> lessons_{};        ///< what each macro was taught
     std::array<std::vector<float>, 4> teachBase_{};        ///< per macro the knobs when its teaching began (empty: not teaching)
+    std::vector<UserPreset> userPresets_;                  ///< the player's presets (refreshUserPresets)
+    juce::String currentUser_;                             ///< the player's preset playing, "" none
+    std::vector<float> reference_;                         ///< the knobs of the preset the sound came from
+    std::string referenceMod_;                             ///< and its matrix, as the engine writes it
+    /** @brief The sound now is what "changed" is measured against (after a preset arrives or is saved). */
+    void setReference();
+    /** @brief One of the player's presets applied (no journey or morph let go). @param i its index @param glide seconds, -1: Preset Glide */
+    void applyUserPreset(int i, double glide);
     std::vector<int> found_;                               ///< the last search's presets
     std::vector<float> foundDistance_;                     ///< and their distances
     juce::File userLandFile_;                              ///< where it came from

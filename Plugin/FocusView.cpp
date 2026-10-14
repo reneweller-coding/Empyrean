@@ -20,7 +20,7 @@ constexpr int kTitle = 26;      ///< a box's title row
 constexpr int kGap = 10;        ///< between the boxes
 constexpr int kNudgeH = 92;     ///< the nudges' box
 constexpr int kVaryH = 176;     ///< the variations' box
-constexpr int kTeachH = 160;    ///< the teaching's box
+constexpr int kTeachH = 214;    ///< the teaching's box: four columns of a name, a large knob, three buttons, a status
 constexpr int kFindH = 132;     ///< the search's box
 const char* const kAxis[additiv::kNudgeAxes] = { "brightness", "motion", "width", "air" };   ///< what each pair moves
 
@@ -127,12 +127,20 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
 
     for (int m = 0; m < 4; ++m) {
         const size_t i = static_cast<size_t>(m);
-        macroName_[i].setText("Macro " + juce::String(m + 1), juce::dontSendNotification);
-        macroName_[i].setColour(juce::Label::textColourId, skin.ink);
-        macroName_[i].setFont(juce::FontOptions(13.0f, juce::Font::bold));
-        macro_[i].setSliderStyle(juce::Slider::LinearHorizontal);
-        macro_[i].setTextBoxStyle(juce::Slider::TextBoxRight, false, 44, 18);
-        if (auto* p = proc_.parameter(static_cast<int>(ParamId::Macro1) + m)) macroLinks_.push_back(std::make_unique<juce::SliderParameterAttachment>(*p, macro_[i]));
+        macroName_[i].setText(proc_.macroName(m), juce::dontSendNotification);
+        macroName_[i].setColour(juce::Label::textColourId, skin.family(frame::Family::Envelope));
+        macroName_[i].setFont(juce::FontOptions(14.0f, juce::Font::bold));
+        macroName_[i].setJustificationType(juce::Justification::centred);
+        macroName_[i].setMinimumHorizontalScale(0.7f);
+        const int id = static_cast<int>(ParamId::Macro1) + m;
+        auto knob = std::make_unique<frame::Knob>(juce::Slider::RotaryHorizontalVerticalDrag, juce::Slider::TextBoxBelow, &actions_, id);
+        knob->setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 16);
+        knob->setColour(juce::Slider::rotarySliderFillColourId, skin.family(frame::Family::Envelope));
+        knob->setTooltip("Macro " + juce::String(m + 1) + ": what the matrix and its lesson let it move");
+        if (auto* p = proc_.parameter(id)) macroLinks_.push_back(std::make_unique<juce::SliderParameterAttachment>(*p, *knob));
+        if (live_ != nullptr) live_->add(*knob, id);
+        macro_.push_back(std::move(knob));
+        juce::Component* macroKnob = macro_.back().get();
         teach_[i].setButtonText("Teach");
         teach_[i].setTooltip("Begin: the sound now is this macro's place at its value now. Then move the knobs, set the macro, and press Here");
         teach_[i].onClick = [this, m] { proc_.teachBegin(m); };
@@ -144,7 +152,9 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
         forget_[i].onClick = [this, m] { proc_.teachForget(m); };
         teachStatus_[i].setColour(juce::Label::textColourId, skin.dim);
         teachStatus_[i].setFont(juce::FontOptions(12.0f));
-        for (juce::Component* c : { static_cast<juce::Component*>(&macroName_[i]), static_cast<juce::Component*>(&macro_[i]), static_cast<juce::Component*>(&teach_[i]),
+        teachStatus_[i].setJustificationType(juce::Justification::centredTop);
+        teachStatus_[i].setFont(juce::FontOptions(11.0f));
+        for (juce::Component* c : { static_cast<juce::Component*>(&macroName_[i]), macroKnob, static_cast<juce::Component*>(&teach_[i]),
                                     static_cast<juce::Component*>(&here_[i]), static_cast<juce::Component*>(&forget_[i]), static_cast<juce::Component*>(&teachStatus_[i]) })
             addAndMakeVisible(c);
     }
@@ -205,8 +215,9 @@ void FocusPage::timerCallback()
     back_.setEnabled(true);
     for (size_t k = 0; k < keep_.size(); ++k) keep_[k].setEnabled(static_cast<int>(k) < proc_.variationCount());
     for (int m = 0; m < 4; ++m) {
-        const juce::String s = proc_.teachStatus(m);
+        const juce::String s = proc_.teachStatus(m), name = proc_.macroName(m);
         if (teachStatus_[static_cast<size_t>(m)].getText() != s) teachStatus_[static_cast<size_t>(m)].setText(s, juce::dontSendNotification);
+        if (macroName_[static_cast<size_t>(m)].getText() != name) macroName_[static_cast<size_t>(m)].setText(name, juce::dontSendNotification);
         here_[static_cast<size_t>(m)].setEnabled(proc_.teaching(m));
     }
 }
@@ -295,19 +306,20 @@ void FocusPage::resized()
             keep_[static_cast<size_t>(k)].setBounds(cell.withTrimmedTop(80).withHeight(24));
         }
     }
-    {   // the teaching
+    {   // the teaching: four columns, each a name, a large knob, Teach / Here / Forget, its status
         auto area = r[3].reduced(12, 0).withTrimmedTop(kTitle);
+        const int w = area.getWidth() / 4;
         for (int m = 0; m < 4; ++m) {
             const size_t i = static_cast<size_t>(m);
-            auto row = area.removeFromTop(30);
-            macroName_[i].setBounds(row.removeFromLeft(80));
-            macro_[i].setBounds(row.removeFromLeft(220).reduced(0, 4));
-            row.removeFromLeft(8);
-            teach_[i].setBounds(row.removeFromLeft(70).reduced(2));
-            here_[i].setBounds(row.removeFromLeft(70).reduced(2));
-            forget_[i].setBounds(row.removeFromLeft(70).reduced(2));
-            row.removeFromLeft(8);
-            teachStatus_[i].setBounds(row);
+            auto col = area.withX(area.getX() + m * w).withWidth(w).reduced(6, 0);
+            macroName_[i].setBounds(col.removeFromTop(18));
+            macro_[i]->setBounds(col.removeFromTop(96).withSizeKeepingCentre(96, 96));
+            auto buttons = col.removeFromTop(26).withSizeKeepingCentre(std::min(col.getWidth(), 222), 26);
+            const int bw = buttons.getWidth() / 3;
+            teach_[i].setBounds(buttons.removeFromLeft(bw).reduced(2, 0));
+            here_[i].setBounds(buttons.removeFromLeft(bw).reduced(2, 0));
+            forget_[i].setBounds(buttons.reduced(2, 0));
+            teachStatus_[i].setBounds(col.withHeight(34));
         }
     }
     {   // the search

@@ -7,6 +7,8 @@
 #include "KnobMod.h"
 #include "Theme.h"
 
+#include "additiv/Presets.h"
+
 #include <algorithm>
 
 namespace {
@@ -110,7 +112,8 @@ void ParamPage::timerCallback()
                 }
             repaint(b.bounds);
         }
-        // The knobs the matrix moves (and those it moved a moment ago, to clear their arcs).
+        // The knobs the matrix moves (and those it moved a moment ago, to clear their arcs); the
+        // preset's marks with them (the timer repaints every knob that has moved from its preset).
         for (Cell& c : b.cells) {
             auto* k = dynamic_cast<juce::Slider*>(c.control);
             if (k == nullptr) continue;
@@ -119,17 +122,36 @@ void ParamPage::timerCallback()
                 const additiv::ModRow r = proc_.engine().modRow(i);
                 on = r.source != additiv::ModSource::Off && r.target == c.id;
             }
-            if (on || c.moved) repaint(k->getBounds().expanded(12));
+            const auto& ref = proc_.reference();
+            const bool away = ref.size() == static_cast<size_t>(additiv::kNumParams) && ref[static_cast<size_t>(c.id)] != static_cast<float>(k->getValue());
+            if (on || c.moved || away != c.away) repaint(k->getBounds().expanded(12));
             c.moved = on;
+            c.away = away;
         }
     }
 }
 
 void ParamPage::paintOverChildren(juce::Graphics& g)
 {
+    const auto& ref = proc_.reference();
+    const bool marks = ref.size() == static_cast<size_t>(additiv::kNumParams);
     for (const Box& b : boxes_)
         for (const Cell& c : b.cells)
-            if (auto* k = dynamic_cast<juce::Slider*>(c.control)) knobmod::paintArcs(g, proc_, *k, c.id);
+            if (auto* k = dynamic_cast<juce::Slider*>(c.control)) {
+                knobmod::paintArcs(g, proc_, *k, c.id);
+                // Where the preset had it, when it has moved: a small notch outside the ring.
+                if (!marks || additiv::keptByPresets(static_cast<additiv::ParamId>(c.id))) continue;
+                const float was = ref[static_cast<size_t>(c.id)];
+                if (std::fabs(was - static_cast<float>(k->getValue())) <= 1.0e-5f * static_cast<float>(std::max(1.0, k->getMaximum() - k->getMinimum()))) continue;
+                const auto area = k->getLookAndFeel().getSliderLayout(*k).sliderBounds.toFloat() + k->getPosition().toFloat();
+                const float size = std::min(area.getWidth(), area.getHeight()), ring = size * 0.5f - 3.0f;
+                const auto rp = k->getRotaryParameters();
+                const float a = rp.startAngleRadians + static_cast<float>(k->valueToProportionOfLength(was)) * (rp.endAngleRadians - rp.startAngleRadians);
+                const auto c0 = area.getCentre();
+                const float r0 = ring + 1.0f, r1 = ring + 6.0f;
+                g.setColour(additivui::skin().ink.withAlpha(0.75f));
+                g.drawLine(c0.x + std::sin(a) * r0, c0.y - std::cos(a) * r0, c0.x + std::sin(a) * r1, c0.y - std::cos(a) * r1, 1.6f);
+            }
 }
 
 std::vector<juce::Rectangle<int>> ParamPage::flow(int width) const

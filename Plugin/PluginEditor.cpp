@@ -106,7 +106,21 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         proc_.resetToDefault(id);
         history_.end(values(), {});
     };
-    actions_.more = [this](juce::PopupMenu& m, int id) { knobmod::addMenuItems(proc_, m, id); };
+    actions_.more = [this](juce::PopupMenu& m, int id) {
+        // Back to where the preset had it, when it has moved.
+        const auto& ref = proc_.reference();
+        if (id >= 0 && id < additiv::kNumParams && ref.size() == static_cast<size_t>(additiv::kNumParams) && !additiv::keptByPresets(static_cast<ParamId>(id))
+            && proc_.value(id) != ref[static_cast<size_t>(id)]) {
+            const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamId>(id));
+            m.addItem("Back to the preset's value (" + juce::String(ref[static_cast<size_t>(id)], 3) + (d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String()) + ")",
+                      [this, id] {
+                          history_.begin("Back to the preset", values(), {}, true);
+                          proc_.revertKnob(id);
+                          history_.end(values(), {});
+                      });
+        }
+        knobmod::addMenuItems(proc_, m, id);
+    };
     actions_.describe = [](int id) {
         const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamId>(id));
         return juce::String(d.name) + "  (" + d.key + ")";
@@ -141,6 +155,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     status_.setFont(juce::FontOptions(12.0f));
     addAndMakeVisible(status_);
     for (auto* b : { &undo_, &redo_, &help_, &settings_ }) addAndMakeVisible(b);
+    addAndMakeVisible(save_);
+    save_.onClick = [this] { showSaveMenu(); };
     undo_.onClick = [this] { apply(history_.undo(), false); };
     redo_.onClick = [this] { apply(history_.redo(), true); };
     help_.onClick = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
@@ -300,7 +316,9 @@ void AdditivEditor::timerCallback()
     const bool on = proc_.value(static_cast<int>(ParamId::BrainOn)) >= 0.5f;
     play_.show(on ? frame::IconButton::Icon::Stop : frame::IconButton::Icon::Play, on ? "Autoplay: stop the conductor" : "Autoplay: start the conductor");
     const int cp = proc_.currentPreset();
-    const juce::String name = cp >= 0 ? juce::String(additiv::kPresetGroupNames[additiv::preset(cp).group]) + ": " + additiv::preset(cp).name : juce::String("Presets ...");
+    juce::String name = cp >= 0 ? juce::String(additiv::kPresetGroupNames[additiv::preset(cp).group]) + ": " + additiv::preset(cp).name
+                      : proc_.currentUserPreset().isNotEmpty() ? "Yours: " + proc_.currentUserPreset() : juce::String("Presets ...");
+    if ((cp >= 0 || proc_.currentUserPreset().isNotEmpty()) && proc_.modified()) name << " *";   // moved from its preset
     if (presetName_.getButtonText() != name) presetName_.setButtonText(name);
     undo_.setEnabled(history_.canUndo());
     redo_.setEnabled(history_.canRedo());
@@ -378,6 +396,13 @@ void AdditivEditor::shootStep()
                     if (val == d->choices[c]) v = static_cast<float>(c);
                 proc_.setValue(static_cast<int>(d->id), v);
             }
+        // ADDITIV_SHOT_SAVE: the sound saved as the player's preset of that name, then Tilt moved (the star, the marks).
+        const juce::String saveName = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_SAVE", {});
+        if (saveName.isNotEmpty()) {
+            juce::String why;
+            proc_.saveUserPreset(saveName, why);
+            proc_.setValue(static_cast<int>(ParamId::Tilt), proc_.value(static_cast<int>(ParamId::Tilt)) + 0.4f);
+        }
         // ADDITIV_SHOT_VARY: the Focus page's six variations made, for their picture.
         if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_VARY", {}).isNotEmpty()) proc_.makeVariations(0.3f);
     }
@@ -426,7 +451,7 @@ void AdditivEditor::resized()
     h.actions = { { &step_, 64 } };
     h.play = &play_;
     h.status = &status_;
-    h.tools = { &undo_, &redo_, nullptr, &help_, &settings_ };
+    h.tools = { &undo_, &redo_, nullptr, &save_, &help_, &settings_ };
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
     if (canvas_) {   // the picture is the window
@@ -448,6 +473,7 @@ bool AdditivEditor::keyPressed(const juce::KeyPress& key)
         k.playStop = [this] { play_.triggerClick(); };
         k.fullScreen = [this] { toggleFullScreen(); };
     }
+    k.save = [this] { quickSave(); };
     k.undo = [this] { apply(history_.undo(), false); };
     k.redo = [this] { apply(history_.redo(), true); };
     k.help = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
@@ -519,10 +545,64 @@ void AdditivEditor::loadPreset(int index)
     history_.end(values(), {});
 }
 
+void AdditivEditor::showSaveMenu()
+{
+    juce::PopupMenu m;
+    const juce::String own = proc_.currentUserPreset();
+    m.addItem(own.isNotEmpty() ? "Save \"" + own + "\"  (Ctrl+S)" : juce::String("Save  (Ctrl+S)"), [this] { quickSave(); });
+    m.addItem("Save as ...", [this] { saveAs(); });
+    m.addSeparator();
+    m.addItem("Back to the preset", proc_.modified(), false, [this] {
+        history_.begin("Back to the preset", values(), {}, true);
+        proc_.revert();
+        history_.end(values(), {});
+    });
+    m.addItem("Open your presets' folder", [] {
+        AdditivProcessor::presetFolder().createDirectory();
+        AdditivProcessor::presetFolder().startAsProcess();
+    });
+    m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&save_));
+}
+
+void AdditivEditor::quickSave()
+{
+    const juce::String own = proc_.currentUserPreset();
+    if (own.isEmpty()) { saveAs(); return; }
+    juce::String why;
+    if (!proc_.saveUserPreset(own, why)) juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Save", "Not saved: " + why);
+}
+
+void AdditivEditor::saveAs()
+{
+    const int cp = proc_.currentPreset();
+    const juce::String suggestion = proc_.currentUserPreset().isNotEmpty() ? proc_.currentUserPreset() + " 2"
+                                    : cp >= 0 ? juce::String("My ") + additiv::preset(cp).name : juce::String("My Sound");
+    askName_ = std::make_unique<juce::AlertWindow>("Save as your own preset", "Its name (in Documents/Empyrean/Presets; journeys find it by it):",
+                                                   juce::MessageBoxIconType::NoIcon, this);
+    askName_->addTextEditor("name", suggestion);
+    askName_->addButton("Save", 1, juce::KeyPress(juce::KeyPress::returnKey));
+    askName_->addButton("Cancel", 0, juce::KeyPress(juce::KeyPress::escapeKey));
+    askName_->enterModalState(true, juce::ModalCallbackFunction::create([this](int result) {
+        const juce::String name = askName_ != nullptr ? askName_->getTextEditorContents("name") : juce::String();
+        askName_.reset();
+        if (result != 1) return;
+        juce::String why;
+        if (!proc_.saveUserPreset(name, why)) juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::WarningIcon, "Save", "Not saved: " + why);
+    }), false);
+}
+
 void AdditivEditor::showPresets()
 {
     juce::PopupMenu bank;
     const int current = proc_.currentPreset();
+    proc_.refreshUserPresets();
+    if (!proc_.userPresets().empty()) {   // the player's own first
+        bank.addSectionHeader("Yours");
+        juce::PopupMenu yours;
+        for (size_t i = 0; i < proc_.userPresets().size(); ++i)
+            yours.addItem(100000 + static_cast<int>(i) + 1, proc_.userPresets()[i].name, true, proc_.userPresets()[i].name == proc_.currentUserPreset());
+        bank.addSubMenu("Your presets", yours, true, nullptr, proc_.currentUserPreset().isNotEmpty());
+    }
     for (int g = 0; g < additiv::kNumPresetGroups; ++g) {
         if (g == 0) bank.addSectionHeader("Sounds");
         if (g == additiv::kNumSoundGroups) bank.addSectionHeader("Living Systems");
@@ -539,7 +619,13 @@ void AdditivEditor::showPresets()
         bank.addSubMenu(additiv::kPresetGroupNames[g], group, true, nullptr, current >= 0 && additiv::preset(current).group == g);
     }
     bank.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(&presetName_), [this](int id) {
-        if (id > 0) loadPreset(id - 1);
+        if (id > 100000) {
+            history_.begin("Preset", values(), {}, true);
+            proc_.chooseUserPreset(id - 100001);
+            history_.end(values(), {});
+        } else if (id > 0) {
+            loadPreset(id - 1);
+        }
     });
 }
 
