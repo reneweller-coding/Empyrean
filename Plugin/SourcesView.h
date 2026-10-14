@@ -11,6 +11,7 @@
 #include "additiv/Modulation.h"
 
 #include <array>
+#include <functional>
 #include <utility>
 #include <vector>
 
@@ -27,6 +28,16 @@ public:
     ~SourcesView() override;
     /** @brief The traces in a grid. */
     void paint(juce::Graphics& g) override;
+    /** @brief A click on a trace chooses its source. @param e the click */
+    void mouseDown(const juce::MouseEvent& e) override;
+    /** @brief A source clicked. */
+    std::function<void(additiv::ModSource)> onChoose;
+    /** @brief The source marked (the inspector's). @param s the source */
+    void setChosen(additiv::ModSource s)
+    {
+        chosen_ = s;
+        repaint();
+    }
     /**
      * @brief The least height the grid needs at a width: as many columns as fit, the cells at their lowest. Given more,
      *        the cells grow.
@@ -65,4 +76,5 @@ private:
     std::array<std::array<float, kHistory>, additiv::kNumModSources> history_{};       ///< per source its last values, a ring
     int head_ = 0;                                                                      ///< where the next sample goes
     std::vector<additiv::ModSource> shown_;                                             ///< the sources drawn, in order
+    additiv::ModSource chosen_ = additiv::ModSource::Off;                               ///< the source marked
 };

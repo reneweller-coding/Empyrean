@@ -24,6 +24,12 @@ public:
     static int idealHeight() { return 2 * 34 + 30 + 2 * 34 + 30 + 20; }
     /** @brief What it shows, in words, for the help. @return the text */
     juce::String describe() const;
+    /** @brief The journey chosen in the box, read (the timeline's preview). @param out receives it @return false when none is chosen */
+    bool chosen(additiv::Journey& out) const
+    {
+        const int id = journeys_.getSelectedId();
+        return id > 0 && id <= static_cast<int>(entries_.size()) && AdditivProcessor::readJourney(entries_[static_cast<size_t>(id - 1)], out);
+    }
 
 private:
     /** @brief One slot's row. */
@@ -62,7 +68,27 @@ private:
     int tick_ = 0;                                              ///< timer ticks, for the slower refreshes
 };
 
-/** @brief The Journey page: its knobs (the glide, the morph) above, the slots and journeys below. */
+/**
+ * @brief The journey's timeline: its steps as a band over time, each as wide as it lasts (its glide a ramp into it),
+ *        the preset's name on it; the step under way lit and filling as its time runs. Before a journey runs, the
+ *        one chosen in the box, faint.
+ */
+class JourneyTimeline final : public juce::Component, private juce::Timer {
+public:
+    /** @brief The timeline of @p proc's journeys. @param proc the processor @param view the box it previews */
+    JourneyTimeline(AdditivProcessor& proc, const JourneyView& view);
+    /** @brief The band, the steps, where the journey is. @param g where */
+    void paint(juce::Graphics& g) override;
+
+private:
+    /** @brief Twice a second while it is seen. */
+    void timerCallback() override;
+
+    AdditivProcessor& proc_;    ///< whose journeys
+    const JourneyView& view_;   ///< the box
+};
+
+/** @brief The Journey page: its knobs (the glide, the morph) above, the slots and journeys below, the timeline under them. */
 class JourneyPage final : public juce::Component {
 public:
     /**
@@ -73,13 +99,15 @@ public:
      */
     JourneyPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
-    int heightFor(int w) const { return params_.heightFor(w) + JourneyView::idealHeight() + 10; }
+    int heightFor(int w) const { return params_.heightFor(w) + JourneyView::idealHeight() + 10 + kTimelineMin + 10; }
     /** @brief The knobs above, the rest below. */
     void resized() override;
     /** @brief The page in words. @return the text */
     juce::String describe() const { return params_.describe() + view_.describe(); }
 
 private:
-    ParamPage params_;    ///< the glide and the morph's knobs
-    JourneyView view_;    ///< the slots and the journeys
+    static constexpr int kTimelineMin = 110;   ///< the timeline's least height
+    ParamPage params_;          ///< the glide and the morph's knobs
+    JourneyView view_;          ///< the slots and the journeys
+    JourneyTimeline timeline_;  ///< the journey over time
 };

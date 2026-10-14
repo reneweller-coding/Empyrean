@@ -1326,7 +1326,25 @@ Knob::Knob(SliderStyle style, TextEntryBoxPosition box, const ControlActions* ac
 void Knob::mouseDown(const juce::MouseEvent& e)
 {
     if (e.mods.isPopupMenu() && actions_ != nullptr) { actions_->showMenu(*this, id_); return; }
+    altDragging_ = e.mods.isAltDown() && actions_ != nullptr && actions_->altDrag && actions_->altDrag(id_, e, 0);
+    if (altDragging_) return;
     juce::Slider::mouseDown(e);
+}
+
+void Knob::mouseDrag(const juce::MouseEvent& e)
+{
+    if (altDragging_) { actions_->altDrag(id_, e, 1); return; }
+    juce::Slider::mouseDrag(e);
+}
+
+void Knob::mouseUp(const juce::MouseEvent& e)
+{
+    if (altDragging_) {
+        altDragging_ = false;
+        actions_->altDrag(id_, e, 2);
+        return;
+    }
+    juce::Slider::mouseUp(e);
 }
 
 void Choice::mouseDown(const juce::MouseEvent& e)

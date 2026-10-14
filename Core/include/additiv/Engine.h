@@ -70,6 +70,7 @@ struct VoiceView {
     float press = 0.0f;      ///< MPE: its pressure, 0 .. 1
     float slide = 0.5f;      ///< MPE: its slide, 0 .. 1 (0.5 at rest)
     float bend = 0.0f;       ///< MPE: its own bend, semitones
+    float tune = 0.0f;       ///< Self-Tune's pull on it, cents
 };
 
 constexpr int kMaxViewVoices = 32;   ///< voices a picture can be given
@@ -293,6 +294,27 @@ public:
 
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return brainRoot_.load(std::memory_order_relaxed); }
+    /** @brief Seconds until the conductor's next decision, for the panel. Any thread. @return seconds */
+    float conductorNext() const { return conductorNext_.load(std::memory_order_relaxed); }
+    /** @brief The seconds that wait began with (the countdown's whole). Any thread. @return seconds */
+    float conductorSpan() const { return conductorSpan_.load(std::memory_order_relaxed); }
+    /** @brief The note the foundation holds, -1 none, for the picture. Any thread. @return MIDI */
+    int foundationNow() const { return foundationView_.load(std::memory_order_relaxed); }
+    /**
+     * @brief The scale's pitches folded into one octave over the root, in cents above the root's equal-tempered
+     *        pitch, for the panel (the scale itself, before Purity blends it with equal temperament). Any thread.
+     * @param out  receives them, ascending
+     * @param max  room in out
+     * @return     how many
+     */
+    int scaleCents(float* out, int max) const
+    {
+        const int n = std::min(max, viewScaleCount_.load(std::memory_order_relaxed));
+        for (int i = 0; i < n; ++i) out[i] = viewScale_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        return n;
+    }
+    /** @brief The root's equal-tempered pitch, the panel's zero for cents. Any thread. @return hertz */
+    float rootHz() const { return viewRootHz_.load(std::memory_order_relaxed); }
 
     /** @brief Callbacks that found the ring short (real time only). @return count since prepare() */
     std::uint64_t underruns() const { return underruns_.load(std::memory_order_relaxed); }
@@ -319,6 +341,7 @@ public:
         v.press = viewPress_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.slide = viewSlide_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         v.bend = viewBend_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
+        v.tune = viewTune_[static_cast<size_t>(i)].load(std::memory_order_relaxed);
         return v;
     }
 
@@ -801,6 +824,10 @@ private:
     std::atomic<int> sounding_{ 0 };                   ///< voices sounding, for status
     std::atomic<int> soundingBy_[3] = {};               ///< voices sounding per source, for status
     std::atomic<int> brainRoot_{ 0 };                  ///< the conductor's root, for status
+    std::atomic<float> conductorNext_{ 0.0f };         ///< conductorNext()
+    std::atomic<float> conductorSpan_{ 1.0f };         ///< conductorSpan()
+    std::atomic<int> foundationView_{ -1 };            ///< foundationNow()
+    double conductorWas_ = 0.0;                        ///< the countdown at the block before (a jump up begins a new wait)
     std::atomic<std::uint64_t> underruns_{ 0 };        ///< callbacks short of samples
     std::atomic<std::uint64_t> late_{ 0 };             ///< notes applied after their stamp
     std::atomic<float> gpuMs_{ 0.0f };                 ///< GPU time of the last block
@@ -819,6 +846,10 @@ private:
     std::array<std::atomic<float>, kMaxViewVoices> viewPress_{};     ///< its MPE pressure
     std::array<std::atomic<float>, kMaxViewVoices> viewSlide_{};     ///< its MPE slide
     std::array<std::atomic<float>, kMaxViewVoices> viewBend_{};      ///< its MPE bend, semitones
+    std::array<std::atomic<float>, kMaxViewVoices> viewTune_{};      ///< Self-Tune's pull on it, cents
+    std::array<std::atomic<float>, 48> viewScale_{};                 ///< the scale folded into an octave, cents over the root (scaleCents)
+    std::atomic<int> viewScaleCount_{ 0 };                           ///< how many
+    std::atomic<float> viewRootHz_{ 261.63f };                       ///< the root's equal-tempered pitch (rootHz)
 };
 
 } // namespace additiv

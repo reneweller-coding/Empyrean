@@ -43,6 +43,21 @@ presets.
 - **The info line:** what the control under the mouse does, its value and what moves it -- a sentence for all 210.
 - **Macros as large knobs**, named by what they move; **snapshots** with pictures; **MPE seen at the keys**;
   a **night mode** for dark rooms; **first steps** on the first start.
+- **ASIO** in the standalone's audio dialog (Windows), with Steinberg's ASIO SDK under its GPLv3 option.
+- **The header tidied:** search, canvas, night and the MIDI marks as glyphs beside undo and help; a meter of the output
+  with a clip mark; A | B held lets you hear the preset as it was; a line under Step runs down to the conductor's next
+  exchange; the status tells what sounds (the GPU and the device in its tooltip, the GPU only when it is tight).
+- **Focus, quieter:** the variations are there on their own (made anew whenever the sound moves), Keep once a tile was
+  heard; a "+" in the first free snapshot; teaching in steps (Teach, then Set here or Cancel, a small x to forget).
+- **One Modulation page:** the matrix and every source live; a click on a source opens it in the inspector, where the
+  modulators' knobs live now. **Alt-drag** any knob: the inspector's source modulates it by the drag. **Undo** takes back
+  every change to the matrix -- and a preset's matrix with the preset, which it did not before.
+- **Spans and links:** Lowest - Highest and Hold Min - Max as one bar with two ends; a chain links an echo's Time L and R.
+- **Tuning shows the tuning:** the octave over the root with the scale's pitches in cents off the steps, and the voices
+  where they sound, Self-Tune's pull as a tail. **Journeys** get a timeline of their steps.
+- **Words in the palette:** "dark calm wide" (or dunkel, ruhig, breit ...) finds the presets measured so.
+- **Zoom** (100 - 150 %) in the settings, beside the window's size; the last page comes back; the foundation's key is
+  underlined in the picture.
 - **A floor under the conductor (Foundation, Conductor > Register):** one voice holds the root in the octave from C2 up
   (from Lowest, when lower) while the root stands and moves with it; the chord is drawn from a fifth above. The conductor's notes
   had no bass of their own -- in Chords mode a candidate was scored by consonance and voice leading only, the root even

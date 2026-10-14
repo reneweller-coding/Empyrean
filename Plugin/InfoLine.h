@@ -23,6 +23,13 @@ public:
     void paint(juce::Graphics& g) override;
     /** @brief Tells about a parameter without the mouse on it (the palette found it). @param id the parameter */
     void showParam(int id);
+    /** @brief Shows a line of its own (an Alt-drag's depth). @param text the line */
+    void showText(const juce::String& text)
+    {
+        name_.clear();
+        text_ = text;
+        repaint();
+    }
 
 private:
     /** @brief Follows the mouse over every component of the window (a listener of its own: the line is no parent of them). */

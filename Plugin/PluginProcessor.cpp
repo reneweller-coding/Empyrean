@@ -614,8 +614,30 @@ float AdditivProcessor::nudgeSound(int axis, float sign)
     return got;
 }
 
+bool AdditivProcessor::variationsFree() const
+{
+    return value(static_cast<int>(ParamId::MapActive)) < 0.5f && value(static_cast<int>(ParamId::MorphActive)) < 0.5f && !browsing_ && !comparing_
+           && previewing_ < 0;
+}
+
+void AdditivProcessor::compareWithPreset(bool on)
+{
+    if (on == comparing_ || reference_.size() != static_cast<size_t>(additiv::kNumParams)) return;
+    comparing_ = on;
+    if (on) {
+        compareFrom_ = knobValues();
+        compareFromMod_ = engine_.modText();
+        applyValues(reference_, 0.3);
+        engine_.setModText(referenceMod_);
+    } else {
+        applyValues(compareFrom_, 0.3);
+        engine_.setModText(compareFromMod_);
+    }
+}
+
 void AdditivProcessor::makeVariations(float far)
 {
+    ++variationGeneration_;
     stepOutOfBlends();
     varFar_ = std::clamp(far, 0.05f, 1.0f);
     parent_ = knobValues();
@@ -712,6 +734,19 @@ bool AdditivProcessor::teachHere(int m)
     for (int i = 0; i < additiv::kNumParams; ++i)
         if (additiv::teachable(static_cast<ParamId>(i)) && value(i) != from[static_cast<size_t>(i)]) setValue(i, from[static_cast<size_t>(i)]);
     return true;
+}
+
+void AdditivProcessor::teachCancel(int m)
+{
+    if (!teaching(m)) return;
+    const std::vector<float> from = teachBase_[static_cast<size_t>(m)];
+    teachBase_[static_cast<size_t>(m)].clear();
+    if (lessons_[static_cast<size_t>(m)].count < 2) {   // a new lesson had only its first place: none
+        lessons_[static_cast<size_t>(m)] = additiv::MacroLesson{};
+        engine_.setMacroLesson(m, lessons_[static_cast<size_t>(m)]);
+    }
+    for (int i = 0; i < additiv::kNumParams; ++i)
+        if (additiv::teachable(static_cast<ParamId>(i)) && value(i) != from[static_cast<size_t>(i)]) setValue(i, from[static_cast<size_t>(i)]);
 }
 
 void AdditivProcessor::teachForget(int m)
@@ -1128,6 +1163,15 @@ void AdditivProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::Midi
         R = spare_.getWritePointer(0);
     }
     engine_.process(L, R, n);
+    {   // the meter's peaks, the larger kept until the panel reads them
+        float pl = 0.0f, pr = 0.0f;
+        for (int i = 0; i < n; ++i) {
+            pl = std::max(pl, std::fabs(L[i]));
+            pr = std::max(pr, std::fabs(R[i]));
+        }
+        if (pl > peak_[0].load(std::memory_order_relaxed)) peak_[0].store(pl, std::memory_order_relaxed);
+        if (pr > peak_[1].load(std::memory_order_relaxed)) peak_[1].store(pr, std::memory_order_relaxed);
+    }
     for (int c = 2; c < buffer.getNumChannels(); ++c) buffer.clear(c, 0, n);
     if (muted_) buffer.clear();   // ADDITIV_MUTE: the engine runs and is seen, nothing is heard (the manual's pictures)
 }

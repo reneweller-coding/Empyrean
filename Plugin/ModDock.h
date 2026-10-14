@@ -119,6 +119,10 @@ public:
     std::function<void(int)> onReveal;
     /** @brief The Matrix button: the matrix page. */
     std::function<void()> onMatrix;
+    /** @brief A source's own parameters (an LFO's shape and rate, a macro, the attractors' period ...). @param s the source @return them */
+    static std::vector<additiv::ParamId> ownParams(additiv::ModSource s);
+    /** @brief The source whose own knob a parameter is (the first, for knobs shared by a family). @param id the parameter @return it, Off none */
+    static additiv::ModSource sourceOf(int id);
 
     /** @brief The box, the name, the trace. @param g where */
     void paint(juce::Graphics& g) override;
@@ -132,8 +136,6 @@ private:
     void rebuildRows();
     /** @brief The source's own knobs anew. */
     void rebuildControls();
-    /** @brief A source's own parameters (an LFO's shape and rate, a macro, the attractors' period ...). @param s the source @return them */
-    static std::vector<additiv::ParamId> ownParams(additiv::ModSource s);
     /** @brief The rows on the source, as a key: changes when one is added, removed or retargeted. @return the key */
     juce::String rowsKey() const;
     /** @brief Where the trace is drawn. @return pixels */

@@ -30,6 +30,8 @@ public:
      * @param commands  what it can do
      */
     void open(std::vector<Command> commands);
+    /** @brief Commands made from the words typed (presets by how they sound), shown first; empty when the words ask for none. */
+    std::function<std::vector<Command>(const juce::StringArray&)> fromWords;
     /** @brief Closes it. */
     void close();
     /** @brief Types into the search (the shot mode's way of showing it). @param text what */
@@ -66,6 +68,7 @@ private:
     bool keyPressed(const juce::KeyPress& key, juce::Component* origin) override;
 
     std::vector<Command> all_;          ///< what it can do
+    size_t fixed_ = 0;                  ///< how many of them were given to open() (the rest came from the words)
     std::vector<int> shown_;            ///< what matches, best first
     juce::String number_;               ///< a number typed after the words
     juce::TextEditor search_;           ///< the search

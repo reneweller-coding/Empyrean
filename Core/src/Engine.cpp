@@ -1285,6 +1285,28 @@ void Engine::renderBlock()
     refreshSpectrum();
     refreshScale();
     refreshLandscape();
+    {   // the scale for the panel: four octaves of keys folded into one over the root, the same pitch once
+        const double ref = blk_.refPitch;
+        const int rootNote = 60 + rootPc_;
+        const double f0 = ref * std::pow(2.0, (rootNote - 69) / 12.0);
+        float cents[48];
+        int n = 0;
+        for (int k = 0; k < 48 && f0 > 0.0; ++k) {
+            const double hz = scaleFrequency(scale_, rootNote - 12 + k, rootNote, ref, snapKeys_);
+            if (!(hz > 0.0) || !std::isfinite(hz)) continue;   // a scale that has no pitch there: nothing to draw (and no NaN for the sort)
+            double c = std::fmod(1200.0 * std::log2(hz / f0), 1200.0);
+            if (!std::isfinite(c)) continue;
+            if (c < 0.0) c += 1200.0;
+            if (c > 1199.5) c = 0.0;
+            bool seen = false;
+            for (int j = 0; j < n && !seen; ++j) seen = std::fabs(cents[j] - c) < 1.0;
+            if (!seen) cents[n++] = static_cast<float>(c);
+        }
+        std::sort(cents, cents + n);
+        for (int i = 0; i < n; ++i) viewScale_[static_cast<size_t>(i)].store(cents[i], std::memory_order_relaxed);
+        viewScaleCount_.store(n, std::memory_order_relaxed);
+        viewRootHz_.store(static_cast<float>(f0), std::memory_order_relaxed);
+    }
 
     // 1. The played notes that are due, in the order they came, each on its own sample.
     drainEvents();
@@ -1333,6 +1355,13 @@ void Engine::renderBlock()
         else stopNote(e.note, 2);
     });
     brainRoot_.store(brain_.root(), std::memory_order_relaxed);
+    {   // the conductor's countdown and the foundation, for the panel
+        const double next = brain_.untilNext();
+        if (next > conductorWas_ + 0.5) conductorSpan_.store(static_cast<float>(next), std::memory_order_relaxed);
+        conductorWas_ = next;
+        conductorNext_.store(static_cast<float>(next), std::memory_order_relaxed);
+        foundationView_.store(foundationNote_, std::memory_order_relaxed);
+    }
 
     // 3. The voices: envelope, place, frequency, colour, filter, air, motion.
     // While the sound glides, the tuning follows slowly: a new scale is reached by the partials
@@ -1596,6 +1625,7 @@ void Engine::renderBlock()
         viewPress_[static_cast<size_t>(i)].store(v.press, std::memory_order_relaxed);
         viewSlide_[static_cast<size_t>(i)].store(v.slide, std::memory_order_relaxed);
         viewBend_[static_cast<size_t>(i)].store(v.bend, std::memory_order_relaxed);
+        viewTune_[static_cast<size_t>(i)].store(v.tuneCents, std::memory_order_relaxed);
     }
     for (size_t gi = 0; gi < ghosts_.size(); ++gi) {   // the ghosts after the voices, as source 3
         const size_t i = voices_.size() + gi;

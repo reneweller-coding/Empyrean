@@ -59,6 +59,8 @@ void VariationTile::paint(juce::Graphics& g)
 
 void VariationTile::mouseDown(const juce::MouseEvent&)
 {
+    if (k_ >= proc_.variationCount()) return;
+    if (onHeard) onHeard(k_);
     proc_.previewVariation(k_);
     repaint();
 }
@@ -77,26 +79,63 @@ public:
     {
         setTooltip("A snapshot: click to come back to it (the sound glides there); right-click: into the morph's slot A or B, or forget it");
     }
+    /** @brief What the tile does now: keep the sound (the +), come back to one, or nothing yet. @return the text */
+    juce::String getTooltip() override
+    {
+        const int count = static_cast<int>(page_.proc_.snapshots().size());
+        if (k_ == count) return "Keep the sound now -- every knob and the matrix, with its picture";
+        return k_ < count ? juce::SettableTooltipClient::getTooltip() : juce::String();
+    }
+    /** @brief The + lights up under the mouse. @param e ignored */
+    void mouseEnter(const juce::MouseEvent&) override { repaint(); }
+    /** @brief And goes dim again. @param e ignored */
+    void mouseExit(const juce::MouseEvent&) override { repaint(); }
     /** @brief Its picture and number, or an empty frame. */
     void paint(juce::Graphics& g) override
     {
         const frame::Skin& skin = additivui::skin();
         const auto r = getLocalBounds().toFloat().reduced(1.0f);
         const auto& shots = page_.proc_.snapshots();
-        const bool has = k_ < static_cast<int>(shots.size());
+        const int count = static_cast<int>(shots.size());
+        const bool has = k_ < count;
+        if (k_ == count) {   // the first free one: a + that keeps the sound
+            g.setColour(skin.accent.withAlpha(isMouseOver() ? 0.16f : 0.07f));
+            g.fillRoundedRectangle(r, skin.radius);
+            g.setColour(skin.accent.withAlpha(0.7f));
+            const float dash[2] = { 4.0f, 3.0f };
+            juce::Path outline;
+            outline.addRoundedRectangle(r, skin.radius);
+            juce::Path dashed;
+            juce::PathStrokeType(1.0f).createDashedStroke(dashed, outline, dash, 2);
+            g.fillPath(dashed);
+            g.setFont(juce::FontOptions(r.getHeight() < 40.0f ? 12.0f : 14.0f, juce::Font::bold));
+            g.drawText(r.getWidth() > 90.0f ? "+ Snapshot" : "+", r, juce::Justification::centred);
+            return;
+        }
+        if (!has) {   // further free ones: barely there until they are filled
+            g.setColour(skin.faint.withAlpha(0.35f));
+            g.drawRoundedRectangle(r, skin.radius, 1.0f);
+            return;
+        }
         g.setColour(skin.raised);
         g.fillRoundedRectangle(r, skin.radius);
-        if (has && shots[static_cast<size_t>(k_)].picture.isValid())
+        if (shots[static_cast<size_t>(k_)].picture.isValid())
             g.drawImage(shots[static_cast<size_t>(k_)].picture, r.reduced(3.0f), juce::RectanglePlacement::stretchToFit);
-        g.setColour(has ? skin.accent : skin.faint);
-        g.drawRoundedRectangle(r, skin.radius, has ? 1.2f : 1.0f);
+        g.setColour(skin.accent);
+        g.drawRoundedRectangle(r, skin.radius, 1.2f);
         g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
         g.drawText(juce::String(k_ + 1), r.reduced(6.0f, 3.0f), juce::Justification::topLeft);
     }
     /** @brief A click recalls it; a right-click offers the morph's slots and forgetting. @param e the click */
     void mouseUp(const juce::MouseEvent& e) override
     {
-        if (k_ >= static_cast<int>(page_.proc_.snapshots().size())) return;
+        const int count = static_cast<int>(page_.proc_.snapshots().size());
+        if (k_ == count && !e.mods.isPopupMenu()) {   // the +
+            page_.proc_.takeSnapshot(page_.picture_ ? page_.picture_() : juce::Image());
+            for (auto& t : page_.snapTiles_) t->repaint();
+            return;
+        }
+        if (k_ >= count) return;
         if (e.mods.isPopupMenu()) {
             juce::PopupMenu m;
             m.addItem("Into the morph's slot A", [this] { page_.proc_.snapshotToSlot(k_, 0); });
@@ -121,12 +160,6 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
                      std::function<juce::Image()> picture)
     : proc_(proc), actions_(actions), live_(live), undoable_(std::move(undoable)), picture_(std::move(picture))
 {
-    snap_.setTooltip("Keeps the sound now -- every knob and the matrix, with its picture: click a tile to come back, right-click for the morph's slots");
-    snap_.onClick = [this] {
-        proc_.takeSnapshot(picture_ ? picture_() : juce::Image());
-        for (auto& t : snapTiles_) t->repaint();
-    };
-    addAndMakeVisible(snap_);
     for (int k = 0; k < 8; ++k) {
         snapTiles_.push_back(std::make_unique<SnapshotTile>(*this, k));
         addAndMakeVisible(*snapTiles_.back());
@@ -163,7 +196,8 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
     nudgeStatus_.setText("Each press moves the sound a little; undo takes it back.", juce::dontSendNotification);
     addAndMakeVisible(nudgeStatus_);
 
-    make_.setTooltip("Six variations near the sound now: hold a tile to listen, Keep to take it (the next six are then made around it)");
+    make_.setButtonText("New six");
+    make_.setTooltip("Six other variations near the sound now (they are made on their own whenever the sound moves): hold a tile to listen, Keep to take it");
     make_.onClick = [this] {
         proc_.makeVariations(static_cast<float>(far_.getValue()));
         for (auto& t : tiles_) t->repaint();
@@ -186,6 +220,10 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
         addAndMakeVisible(c);
     for (int k = 0; k < 6; ++k) {
         tiles_.push_back(std::make_unique<VariationTile>(proc_, k));
+        tiles_.back()->onHeard = [this](int which) {
+            heard_[static_cast<size_t>(which)] = true;
+            keep_[static_cast<size_t>(which)].setVisible(true);
+        };
         addAndMakeVisible(*tiles_.back());
         juce::TextButton& keep = keep_[static_cast<size_t>(k)];
         keep.setButtonText("Keep");
@@ -194,7 +232,7 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
             undoable_("Variation " + juce::String(k + 1), [this, k] { proc_.takeVariation(k); });
             for (auto& t : tiles_) t->repaint();
         };
-        addAndMakeVisible(keep);
+        addChildComponent(keep);   // shown once its tile was heard
     }
 
     for (int m = 0; m < 4; ++m) {
@@ -214,21 +252,38 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
         macro_.push_back(std::move(knob));
         juce::Component* macroKnob = macro_.back().get();
         teach_[i].setButtonText("Teach");
-        teach_[i].setTooltip("Begin: the sound now is this macro's place at its value now. Then move the knobs, set the macro, and press Here");
-        teach_[i].onClick = [this, m] { proc_.teachBegin(m); };
-        here_[i].setButtonText("Here");
+        teach_[i].setTooltip("Begin: the sound now is this macro's place at its value now. Then move the knobs, set the macro, and press Set here");
+        teach_[i].onClick = [this, m] {
+            proc_.teachBegin(m);
+            timerCallback();
+        };
+        here_[i].setButtonText("Set here");
         here_[i].setTooltip("The sound now becomes this macro's place at its value now; the knobs go back, the macro carries it");
-        here_[i].onClick = [this, m] { proc_.teachHere(m); };
-        forget_[i].setButtonText("Forget");
+        here_[i].onClick = [this, m] {
+            proc_.teachHere(m);
+            timerCallback();
+        };
+        cancel_[i].setButtonText("Cancel");
+        cancel_[i].setTooltip("Ends the teaching: the knobs go back where it began, the macro keeps what it had");
+        cancel_[i].onClick = [this, m] {
+            proc_.teachCancel(m);
+            timerCallback();
+        };
+        forget_[i].setButtonText("x");
         forget_[i].setTooltip("Forgets what this macro was taught (its matrix rows stay)");
-        forget_[i].onClick = [this, m] { proc_.teachForget(m); };
+        forget_[i].onClick = [this, m] {
+            proc_.teachForget(m);
+            timerCallback();
+        };
         teachStatus_[i].setColour(juce::Label::textColourId, skin.dim);
         teachStatus_[i].setFont(juce::FontOptions(12.0f));
         teachStatus_[i].setJustificationType(juce::Justification::centredTop);
         teachStatus_[i].setFont(juce::FontOptions(11.0f));
         for (juce::Component* c : { static_cast<juce::Component*>(&macroName_[i]), macroKnob, static_cast<juce::Component*>(&teach_[i]),
-                                    static_cast<juce::Component*>(&here_[i]), static_cast<juce::Component*>(&forget_[i]), static_cast<juce::Component*>(&teachStatus_[i]) })
+                                    static_cast<juce::Component*>(&teachStatus_[i]) })
             addAndMakeVisible(c);
+        for (juce::Component* c : { static_cast<juce::Component*>(&here_[i]), static_cast<juce::Component*>(&cancel_[i]), static_cast<juce::Component*>(&forget_[i]) })
+            addChildComponent(c);
     }
 
     open_.setTooltip("A recording (WAV or FLAC): the presets that sound most like it -- or drop one on this page");
@@ -255,7 +310,7 @@ FocusPage::FocusPage(AdditivProcessor& proc, const frame::ControlActions& action
 
     rebuildFocus({});
     timerCallback();
-    startTimerHz(4);
+    startTimerHz(15);
 }
 
 void FocusPage::rebuildFocus(const std::vector<ParamId>& ids)
@@ -273,8 +328,9 @@ void FocusPage::rebuildFocus(const std::vector<ParamId>& ids)
 void FocusPage::timerCallback()
 {
     if (!isShowing() && focus_ != nullptr && !focusIds_.empty()) return;
+    const bool slow = tick_ % 4 == 0;   // four times a second; the teaching's pulse at fifteen
     // The focus anew when what matters changed (a preset, a gate opened or closed).
-    if (tick_++ % 4 == 0) {
+    if (tick_++ % 16 == 0) {
         const std::vector<float> v = proc_.knobValues();
         ParamId ids[8];
         const int n = additiv::focusParams(v.data(), ids, 8);
@@ -284,13 +340,46 @@ void FocusPage::timerCallback()
         std::sort(b.begin(), b.end());
         if (a != b) rebuildFocus(now);
     }
+    // The teaching's pulse.
+    bool anyTeaching = false;
+    for (int m = 0; m < 4; ++m) anyTeaching = anyTeaching || proc_.teaching(m);
+    if (anyTeaching) {
+        pulse_ += 1.0 / 15.0;
+        repaint(boxes(getWidth())[4]);
+    }
+    if (!slow) return;
+    // The variations: made on their own around the sound as it is -- when there are none, or the sound has
+    // moved since -- while nothing else plays it (no blend, nothing listened to).
+    if (isShowing() && proc_.variationsFree()) {
+        const std::vector<float> now = proc_.knobValues();
+        if (proc_.variationCount() == 0 || proc_.variationParent() != now) proc_.makeVariations(static_cast<float>(far_.getValue()));
+    }
+    if (proc_.variationGeneration() != generation_) {   // new ones: none heard yet
+        generation_ = proc_.variationGeneration();
+        heard_.fill(false);
+        for (auto& k : keep_) k.setVisible(false);
+        for (auto& t : tiles_) t->repaint();
+    }
     back_.setEnabled(true);
-    for (size_t k = 0; k < keep_.size(); ++k) keep_[k].setEnabled(static_cast<int>(k) < proc_.variationCount());
+    // Teaching in steps: Teach; while teaching, Set here and Cancel; once taught, a small x to forget.
+    bool relayout = false;
     for (int m = 0; m < 4; ++m) {
-        const juce::String s = proc_.teachStatus(m), name = proc_.macroName(m);
-        if (teachStatus_[static_cast<size_t>(m)].getText() != s) teachStatus_[static_cast<size_t>(m)].setText(s, juce::dontSendNotification);
-        if (macroName_[static_cast<size_t>(m)].getText() != name) macroName_[static_cast<size_t>(m)].setText(name, juce::dontSendNotification);
-        here_[static_cast<size_t>(m)].setEnabled(proc_.teaching(m));
+        const size_t i = static_cast<size_t>(m);
+        const bool teaching = proc_.teaching(m), taught = proc_.taught(m);
+        const juce::String s = teaching ? juce::String("move the knobs, turn the macro, then Set here") : taught ? proc_.teachStatus(m) : juce::String();
+        const juce::String name = proc_.macroName(m);
+        if (teachStatus_[i].getText() != s) teachStatus_[i].setText(s, juce::dontSendNotification);
+        if (macroName_[i].getText() != name) macroName_[i].setText(name, juce::dontSendNotification);
+        const bool showTeach = !teaching, showForget = taught && !teaching;
+        if (teach_[i].isVisible() != showTeach || here_[i].isVisible() != teaching || forget_[i].isVisible() != showForget) relayout = true;
+        teach_[i].setVisible(showTeach);
+        here_[i].setVisible(teaching);
+        cancel_[i].setVisible(teaching);
+        forget_[i].setVisible(showForget);
+    }
+    if (relayout) {
+        resized();
+        repaint();
     }
 }
 
@@ -386,8 +475,6 @@ void FocusPage::resized()
     }
     {   // the snapshots: the button, then eight tiles -- in a row, or in two rows of four where the box is narrow
         auto area = r[1].reduced(12, 0).withTrimmedTop(kTitle).withTrimmedBottom(10);
-        snap_.setBounds(area.removeFromLeft(100).withSizeKeepingCentre(96, 28));
-        area.removeFromLeft(8);
         const int across = area.getWidth() / 8 >= 90 ? 8 : 4, down = 8 / across;
         const int w = area.getWidth() / across, h = (area.getHeight() - (down - 1) * 4) / down;
         for (int k = 0; k < 8; ++k)
@@ -420,11 +507,18 @@ void FocusPage::resized()
             auto col = area.withX(area.getX() + m * w).withWidth(w).reduced(6, 0);
             macroName_[i].setBounds(col.removeFromTop(18));
             macro_[i]->setBounds(col.removeFromTop(96).withSizeKeepingCentre(96, 96));
-            auto buttons = col.removeFromTop(26).withSizeKeepingCentre(std::min(col.getWidth(), 222), 26);
-            const int bw = buttons.getWidth() / 3;
-            teach_[i].setBounds(buttons.removeFromLeft(bw).reduced(2, 0));
-            here_[i].setBounds(buttons.removeFromLeft(bw).reduced(2, 0));
-            forget_[i].setBounds(buttons.reduced(2, 0));
+            auto buttons = col.removeFromTop(26);
+            if (proc_.teaching(m)) {   // Set here | Cancel
+                auto pair = buttons.withSizeKeepingCentre(std::min(buttons.getWidth(), 176), 26);
+                here_[i].setBounds(pair.removeFromLeft(pair.getWidth() / 2).reduced(2, 0));
+                cancel_[i].setBounds(pair.reduced(2, 0));
+            } else if (proc_.taught(m)) {   // Teach  x
+                auto pair = buttons.withSizeKeepingCentre(std::min(buttons.getWidth(), 116), 26);
+                forget_[i].setBounds(pair.removeFromRight(26).reduced(1, 0));
+                teach_[i].setBounds(pair.reduced(2, 0));
+            } else {
+                teach_[i].setBounds(buttons.withSizeKeepingCentre(std::min(buttons.getWidth(), 90), 26));
+            }
             teachStatus_[i].setBounds(col.withHeight(34));
         }
     }
@@ -448,7 +542,7 @@ void FocusPage::paint(juce::Graphics& g)
     const auto r = boxes(getWidth());
     const char* const titles[6] = { "Nudge: a little more of one thing, the level held", "Snapshots: keep the sound now, come back with a click",
                                     nullptr, "Variations: hold a tile to listen, Keep to take it",
-                                    "Teach the macros by example: Teach, move the knobs, set the macro, Here",
+                                    "Teach the macros by example: Teach, move the knobs, turn the macro, Set here",
                                     "Find by example: the presets that sound like a recording" };
     const frame::Family families[6] = { frame::Family::Source, frame::Family::Filter, frame::Family::Source, frame::Family::Motion, frame::Family::Envelope,
                                         frame::Family::Space };
@@ -463,6 +557,15 @@ void FocusPage::paint(juce::Graphics& g)
         g.fillRoundedRectangle(b.getX() + 8.0f, b.getY() + 9.0f, 3.0f, 10.0f, 1.5f);
         g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
         g.drawText(titles[i], r[i].withHeight(kTitle).withTrimmedLeft(17), juce::Justification::centredLeft);
+    }
+    // A ring pulsing round each macro being taught.
+    const int w = r[4].reduced(12, 0).getWidth() / 4;
+    const float a = 0.45f + 0.35f * static_cast<float>(std::sin(pulse_ * 4.0));
+    for (int m = 0; m < 4; ++m) {
+        if (!proc_.teaching(m)) continue;
+        const auto col = juce::Rectangle<int>(r[4].getX() + 12 + m * w, r[4].getY() + kTitle - 4, w, r[4].getHeight() - kTitle).reduced(4, 0).toFloat();
+        g.setColour(skin.accent.withAlpha(a));
+        g.drawRoundedRectangle(col, 8.0f, 2.0f);
     }
 }
 

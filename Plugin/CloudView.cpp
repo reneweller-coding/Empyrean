@@ -168,6 +168,13 @@ void CloudView::paintKeys(juce::Graphics& g, juce::Rectangle<float> keys, juce::
         g.setColour(additivui::colour::root);
         g.fillPath(tri);
     }
+    // The foundation (Foundation): its key underlined in the root's colour, the floor the chord stands on.
+    const int floorNote = proc_.engine().foundationNow();
+    if (floorNote >= kFirst && floorNote <= kLast) {
+        const float x0 = edge(static_cast<float>(floorNote) - 0.5f), x1 = edge(static_cast<float>(floorNote) + 0.5f);
+        g.setColour(additivui::colour::root);
+        g.fillRoundedRectangle(x0 - 1.0f, keys.getBottom() + 1.0f, x1 - x0 + 2.0f, 2.5f, 1.0f);
+    }
     // The names, low to high, each in its colour.
     const juce::Font font(juce::FontOptions(11.0f));
     g.setFont(font);

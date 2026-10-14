@@ -1237,6 +1237,8 @@ public:
      * @return true from requestFill() until the cluster once reaches its density
      */
     bool filling() const { return filling_; }
+    /** @brief Seconds until the next decision (Empyrean's Step shows them running down). @return seconds */
+    double untilNext() const { return timer_; }
     /**
      * @name Read-outs for the panel and the tests
      *

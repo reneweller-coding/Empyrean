@@ -22,9 +22,10 @@ PRESET = "Velvet Dreaming"   # Sleep Concert: the conductor, Breathe, the far re
 SETTLE = 8                   # seconds: the preset fills its chord at speed (Engine::requestFill), the attack rises
 # The chapters' own pictures: name -> (what the screenshot mode is asked, the tab photographed).
 EXTRAS = {
-    "palette": ({"ADDITIV_SHOT_PALETTE": "cutoff"}, 0),
+    "palette": ({"ADDITIV_SHOT_PALETTE": "dark calm wide"}, 0),
     "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, 0),
     "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, 1),
+    "journey": ({"ADDITIV_SHOT_JOURNEY": "Sleep Concert - Night"}, 9),
 }
 
 

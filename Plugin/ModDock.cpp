@@ -65,7 +65,7 @@ void drawTrace(juce::Graphics& g, juce::Rectangle<float> r, const ModDock& dock,
 ModDock::ModDock(AdditivProcessor& proc) : proc_(proc)
 {
     for (auto& h : history_) h.fill(0.0f);
-    toggle_.setButtonText("Modulation");
+    toggle_.setButtonText("Inspector");
     toggle_.setTooltip("The sources' inspector: a source's trace, its knobs and where it goes");
     toggle_.onClick = [this] { if (onToggle) onToggle(); };
     addAndMakeVisible(toggle_);
@@ -310,6 +310,14 @@ std::vector<ParamId> SourceInspector::ownParams(ModSource s)
             return { ParamId::ReservoirChaos, ParamId::ReservoirMemory, ParamId::ReservoirInput };
         default: return {};
     }
+}
+
+ModSource SourceInspector::sourceOf(int id)
+{
+    for (int k = 1; k < additiv::kNumModSources; ++k)
+        for (ParamId p : ownParams(static_cast<ModSource>(k)))
+            if (static_cast<int>(p) == id) return static_cast<ModSource>(k);
+    return ModSource::Off;
 }
 
 void SourceInspector::show(ModSource s)

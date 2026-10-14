@@ -526,6 +526,23 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 23: Feinschliff nach der dritten Kritik, ASIO (gebaut, 15.10.2026, 0.15.0)
+
+Nutzer: „baue das alles ein, auch das ASIO SDK“ (die Kritikpunkte und meine Vorschläge):
+- **ASIO:** Steinbergs SDK 2.3.4 (GPLv3-Option seit 29.10.2025) in `_Sources/ASIO-SDK`, `JUCE_ASIO=1`, sonst JUCEs
+  identische Kopie; der Layout-Bericht listet die Gerätetypen (Windows Audio, ..., ASIO).
+- **Kopfzeile:** eigene Glyphen (HeaderParts.h: Mond, Lupe, Rahmen, A|B), Pegelanzeige mit Clip-Marke, A|B halten =
+  Preset hören (`compareWithPreset`), Countdown unter Step (`ClusterBrain::untilNext`), Statuszeile ruhig.
+- **Focus:** Variationen selbst gewürfelt (wenn sich der Klang bewegt hat, nicht in Blends), Keep erst nach Anhören,
+  „+ Snapshot“, Teach in Schritten (`teachCancel`, `taught`), pulsierender Ring.
+- **Modulation + Matrix** ein Tab (12 Tabs), Klick auf Quelle -> Inspektor; Palette/revealParam finden Modulator-Regler
+  über `SourceInspector::sourceOf`. **Alt-Ziehen** am Knopf (Frame.h `ControlActions::altDrag`, zweiter optionaler
+  Haken). **Undo der Matrix:** jeder Schritt trägt den Matrixtext (`extraBefore/After` war leer: Preset-Undo stellte die
+  Matrix nicht zurück); Änderungen außerhalb eines Schritts werden nach 0,7 s Ruhe ein Schritt „Modulation".
+- **Spannen und Ketten** in ParamPage (`Group::spans`, `links`); **TuningView** (Engine: `scaleCents`, `rootHz`,
+  `VoiceView::tune`); **JourneyTimeline**; **Palette-Wörter** (Merkmale aus Find.inc); **Zoom** über
+  `setScaleFactor` (Host-Skala darunter erhalten); letzte Seite gemerkt; Fundament-Taste unterstrichen; MIDI-Marken.
+
 ## Phase 22: Ein Fundament unter dem Dirigenten (gebaut, 14.10.2026, 0.15.0)
 
 Nutzer: „Der Conductor scheint immer relativ hohe Noten zu spielen, aber selten ein solides Bassfundament.“

@@ -272,6 +272,30 @@ public:
     bool variationBack();
     /** @brief What a variation changes most, in words. @param k which @return the text */
     juce::String variationSummary(int k) const;
+    /** @brief The sound the variations were made around (empty before the first). @return its values */
+    const std::vector<float>& variationParent() const { return parent_; }
+    /** @brief How often the variations were made anew (a page sees new ones by it). @return the count */
+    int variationGeneration() const { return variationGeneration_; }
+    /** @brief Whether they can be made now without leaving a blend (the map, the morph). @return true then */
+    bool variationsFree() const;
+    /**
+     * @brief Compare: while held, the preset as it was (its knobs and matrix, gliding there); let go, the sound
+     *        as it is again. No undo step: nothing changes.
+     * @param on  held
+     */
+    void compareWithPreset(bool on);
+    /** @brief Whether the preset is being compared with. @return true then */
+    bool comparing() const { return comparing_; }
+    /**
+     * @brief The output's peaks since the last look, per side (the meter in the header); they reset as they are read.
+     * @param left   receives the left side's
+     * @param right  receives the right side's
+     */
+    void takePeaks(float& left, float& right)
+    {
+        left = peak_[0].exchange(0.0f, std::memory_order_relaxed);
+        right = peak_[1].exchange(0.0f, std::memory_order_relaxed);
+    }
     /** @brief Begins to teach a macro: the sound now is its place at its value now. @param m 0 .. 3 */
     void teachBegin(int m);
     /**
@@ -283,6 +307,10 @@ public:
     bool teachHere(int m);
     /** @brief Forgets what a macro was taught. @param m 0 .. 3 */
     void teachForget(int m);
+    /** @brief Ends a teaching without a new place: the knobs back where it began, the lesson as it was. @param m 0 .. 3 */
+    void teachCancel(int m);
+    /** @brief Whether a macro has a lesson (two places at least). @param m 0 .. 3 @return true then */
+    bool taught(int m) const { return m >= 0 && m < 4 && lessons_[static_cast<size_t>(m)].count >= 2; }
     /** @brief Whether a macro is being taught. @param m 0 .. 3 @return true then */
     bool teaching(int m) const { return m >= 0 && m < 4 && !teachBase_[static_cast<size_t>(m)].empty(); }
     /**
@@ -361,6 +389,15 @@ public:
     bool startJourney(const JourneyEntry& entry);
     /** @brief Stops the journey; the preset playing stays. */
     void stopJourney() { journeyPlayer_.stop(); }
+    /** @brief The journey's clock: running, its step, the seconds left in it, the journey (the timeline). @return it */
+    const additiv::JourneyPlayer& journeyPlayer() const { return journeyPlayer_; }
+    /** @brief Reads a journey without starting it (the timeline's preview). @param entry which @param out receives it @return false when it cannot be read */
+    static bool readJourney(const JourneyEntry& entry, additiv::Journey& out)
+    {
+        const bool read = entry.builtin >= 0 ? out.parse(additiv::builtinJourneyText(entry.builtin)) : out.load(entry.file.getFullPathName().toRawUTF8());
+        if (read && out.name.empty()) out.name = entry.name.toStdString();
+        return read && !out.steps.empty();
+    }
     /** @brief The journey under way in words (name, step, preset, time left), empty when none is. @return the text */
     juce::String journeyStatus() const;
     /** @brief Appends the preset playing to the journey being written. */
@@ -457,6 +494,11 @@ private:
     std::vector<float> browseFrom_;                        ///< the knobs before a preset was listened to
     std::string browseFromMod_;                            ///< and the matrix
     bool browsing_ = false;                                ///< a preset is being listened to
+    int variationGeneration_ = 0;                          ///< variationGeneration()
+    std::vector<float> compareFrom_;                       ///< the knobs while the preset is compared with
+    std::string compareFromMod_;                           ///< and the matrix
+    bool comparing_ = false;                               ///< the preset is being compared with
+    std::array<std::atomic<float>, 2> peak_{};             ///< the output's peaks since the last look (takePeaks)
     /** @brief A preset chosen by the player goes on the recent list. @param name its name */
     void noteRecent(const juce::String& name);
     /** @brief Knobs and matrix applied for listening (no reference, no recent). @param v the knobs @param mod the matrix */

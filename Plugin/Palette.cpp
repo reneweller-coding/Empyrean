@@ -51,6 +51,7 @@ CommandPalette::CommandPalette() : list_({}, this)
 void CommandPalette::open(std::vector<Command> commands)
 {
     all_ = std::move(commands);
+    fixed_ = all_.size();
     search_.clear();
     filter();
     setVisible(true);
@@ -107,7 +108,14 @@ void CommandPalette::filter()
         words.remove(words.size() - 1);
     }
     std::vector<std::pair<float, int>> scored;
-    for (size_t i = 0; i < all_.size(); ++i) {
+    // What the words make (presets by how they sound): first, in their own order.
+    all_.resize(fixed_);
+    if (fromWords && !words.isEmpty())
+        for (Command& c : fromWords(words)) {
+            scored.emplace_back(1000.0f - static_cast<float>(scored.size()), static_cast<int>(all_.size()));
+            all_.push_back(std::move(c));
+        }
+    for (size_t i = 0; i < fixed_; ++i) {
         const Command& c = all_[i];
         if (words.isEmpty()) {   // nothing typed: the actions first, then the knobs
             if (c.kind == "Action") scored.emplace_back(1.0f, static_cast<int>(i));

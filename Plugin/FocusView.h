@@ -5,10 +5,12 @@
  *        Nudge: four pairs of buttons -- darker or brighter, calmer or livelier, narrower or wider,
  *        purer or airier -- each moving every heard knob a little the measured way, the level held.
  *        Focus: the knobs that do the most for this sound, all else left on the pages. Variations: six
- *        near the sound now, each listened to while its tile is held and kept with Keep, the next six
- *        then made around it (interactive evolution); Back returns. Teach: a macro learns a gesture by
- *        example -- Teach, move the knobs, set the macro, Here. Find: a recording, opened or dropped,
- *        and the presets that sound most like it (also ringed on the map).
+ *        near the sound now, made on their own whenever the sound has moved (not while a blend plays),
+ *        each listened to while its tile is held and kept with Keep (shown once it was heard), the next
+ *        six then made around it (interactive evolution); Back returns. Snapshots: the first free tile
+ *        is a "+" that keeps the sound. Teach: a macro learns a gesture by example -- Teach, move the
+ *        knobs, set the macro, Set here (or Cancel); a taught macro has a small x to forget it. Find: a
+ *        recording, opened or dropped, and the presets that sound most like it (also ringed on the map).
  */
 #pragma once
 
@@ -32,6 +34,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
     /** @brief Back to the sound before. @param e the release */
     void mouseUp(const juce::MouseEvent& e) override;
+    /** @brief It was listened to (its Keep is shown). */
+    std::function<void(int)> onHeard;
 
 private:
     AdditivProcessor& proc_;   ///< whose variations
@@ -103,7 +107,11 @@ private:
     std::array<juce::Label, 4> macroName_;         ///< their names
     std::array<juce::TextButton, 4> teach_;        ///< begin teaching
     std::array<juce::TextButton, 4> here_;         ///< the sound now is the macro's place here
-    std::array<juce::TextButton, 4> forget_;       ///< forget the lesson
+    std::array<juce::TextButton, 4> forget_;       ///< forget the lesson (a small x, once taught)
+    std::array<juce::TextButton, 4> cancel_;       ///< end the teaching without a new place
+    std::array<bool, 6> heard_{};                  ///< which variations were listened to (their Keep shown)
+    int generation_ = -1;                          ///< the variations' generation the tiles show
+    double pulse_ = 0.0;                           ///< the teaching's pulse, seconds
     std::array<juce::Label, 4> teachStatus_;       ///< what each was taught
     juce::TextButton open_{ "Open a recording ..." };   ///< the search's file
     juce::Label findStatus_;                       ///< what was searched

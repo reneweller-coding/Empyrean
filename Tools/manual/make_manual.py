@@ -40,7 +40,6 @@ TABS = {
     "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Memory"],
     "Hall": ["Modal", "Hall"],
     "Modulation": ["Modulation"],
-    "Matrix": [],
     "Journey": ["Morph"],
     "Map": ["Map"],
 }

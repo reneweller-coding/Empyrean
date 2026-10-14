@@ -586,6 +586,11 @@ struct ControlActions {
     std::function<juce::String(int)> describe;    ///< a line on it (the menu's header)
     /** @brief More items for id @p id, added after the others (an instrument's own: Empyrean's modulation at the knob). */
     std::function<void(juce::PopupMenu&, int)> more;
+    /**
+     * @brief An Alt-drag on knob @p id (an instrument's own: Empyrean sets a modulation's depth by it): phase 0 the
+     *        press (return false to let the knob turn as usual), 1 each drag, 2 the release.
+     */
+    std::function<bool(int, const juce::MouseEvent&, int)> altDrag;
     /** @brief Shows the menu for id @p id at @p target. */
     void showMenu(juce::Component& target, int id) const;
 };
@@ -597,14 +602,19 @@ public:
      *        id.
      */
     Knob(SliderStyle style, TextEntryBoxPosition box, const ControlActions* actions, int id);
-    /** @brief A right click shows the menu (ControlActions::showMenu); any other click turns the knob. */
+    /** @brief A right click shows the menu (ControlActions::showMenu); an Alt-drag goes to ControlActions::altDrag when it takes it; any other click turns the knob. */
     void mouseDown(const juce::MouseEvent& e) override;
+    /** @brief The drag: the knob's, or the Alt-drag's. @param e the drag */
+    void mouseDrag(const juce::MouseEvent& e) override;
+    /** @brief The release: the knob's, or the Alt-drag's end. @param e the release */
+    void mouseUp(const juce::MouseEvent& e) override;
     /** @brief The store id it edits. */
     int id() const { return id_; }
 
 private:
     const ControlActions* actions_;   ///< what its right-click menu does (null: no menu)
     int id_;   ///< the store id it edits
+    bool altDragging_ = false;   ///< an Alt-drag took this press
 };
 /** @brief A menu with the right-click menu. */
 class Choice final : public juce::ComboBox {

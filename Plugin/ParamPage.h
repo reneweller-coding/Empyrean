@@ -3,7 +3,9 @@
  * @brief A page of the panel: group boxes in their family's colour, each holding the frame's knobs,
  *        choosers and switches for a list of parameters, bound to the host's parameters. The boxes
  *        flow left to right and wrap, in as few rows as they allow; every control has the right-click
- *        menu (MIDI learn, forget, default).
+ *        menu (MIDI learn, forget, default). Two parameters that make a span (Lowest and Highest) are one
+ *        bar with two ends; two knobs that go together (an echo's Time L and R) can be linked by a small
+ *        chain between them, so that one turned turns the other in proportion.
  */
 #pragma once
 
@@ -34,6 +36,8 @@ public:
         frame::Family family;                    ///< its colour
         std::vector<additiv::ParamId> ids;       ///< its parameters
         std::vector<additiv::ParamId> gate = {}; ///< what wakes it (none: always awake)
+        std::vector<std::pair<additiv::ParamId, additiv::ParamId>> spans = {};   ///< low and high of a span, shown as one bar
+        std::vector<std::pair<additiv::ParamId, additiv::ParamId>> links = {};   ///< two knobs that may be linked
     };
 
     /**
@@ -64,8 +68,14 @@ public:
     /** @brief Every group's state now (also while the page is hidden). @return them, in order */
     std::vector<GroupState> groupStates() const;
 
-    /** @brief A source dropped on a knob made a row: the source, the parameter, the row. */
-    std::function<void(additiv::ModSource, int, int)> onModDropped;
+    /** @brief Every page shows the MIDI controller learned on each knob as a small mark (the header's MIDI button). */
+    static inline bool showMidi = false;
+    /** @brief Who hears that a source was dropped on a knob: the editor, found up the page's parents (every page, also those made later). */
+    struct DropListener {
+        virtual ~DropListener() = default;
+        /** @brief A row was made (or not: row -1). @param s the source @param id the parameter @param row the row */
+        virtual void modDropped(additiv::ModSource s, int id, int row) = 0;
+    };
     /** @brief Only a source's chip (ModDock). @param d the drag @return true for one */
     bool isInterestedInDragSource(const SourceDetails& d) override;
     /** @brief The knob under the source lights up. @param d the drag */
@@ -87,6 +97,7 @@ private:
         juce::Label* label = nullptr;         ///< its name
         int width = 0;                        ///< its cell's width
         int id = -1;                          ///< its parameter
+        int id2 = -1;                         ///< a span's high end, -1 none
         bool gate = false;                    ///< one of what wakes its group (a main control)
         bool moved = false;                   ///< a matrix row was on it at the last look
         bool away = false;                    ///< it stood away from its preset at the last look
@@ -114,6 +125,15 @@ private:
 
     AdditivProcessor& proc_;                                                      ///< whose parameters
     std::vector<Box> boxes_;                                                      ///< the boxes
+    /** @brief Two linked knobs and their chain. */
+    struct Link {
+        juce::Slider* a = nullptr;                    ///< the first knob
+        juce::Slider* b = nullptr;                    ///< the second
+        std::unique_ptr<juce::Button> chain;          ///< links and unlinks them
+        double ratio = 1.0;                           ///< b over a, taken when a drag begins
+        bool busy = false;                            ///< one is being moved by the other
+    };
+    std::vector<std::unique_ptr<Link>> links_;                                    ///< the linked pairs
     int flashId_ = -1;                                                            ///< the control lighting up, -1 none
     int dropId_ = -1;                                                             ///< the knob under a dragged source, -1 none
     additiv::ModSource dropSource_ = additiv::ModSource::Off;                     ///< the source dragged

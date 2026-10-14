@@ -11,8 +11,8 @@ namespace {
 constexpr int kHead = 12;      ///< the headings' row
 constexpr int kGapIn = 2;      ///< between the pages of a section
 constexpr int kGapOut = 22;    ///< between the sections
-constexpr int kDot = 5;        ///< a dot's size
-constexpr int kDotStep = 7;    ///< a dot's place
+constexpr int kDot = 7;        ///< a dot's size
+constexpr int kDotStep = 9;    ///< a dot's place
 
 /** @brief The pages' names' font. @return it */
 juce::Font nameFont() { return juce::Font(juce::FontOptions(14.0f)); }

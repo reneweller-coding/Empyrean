@@ -19,6 +19,7 @@
 #include "Palette.h"
 #include "Tour.h"
 #include "Frame.h"
+#include "HeaderParts.h"
 #include "MatrixView.h"
 #include "ParamPage.h"
 #include "PluginProcessor.h"
@@ -37,6 +38,7 @@ public:
 /** @brief The panel (see the file comment). */
 class AdditivEditor final : public juce::AudioProcessorEditor,
                             public juce::DragAndDropContainer,
+                            public ParamPage::DropListener,
                             private juce::Timer,
                             private juce::AudioProcessorParameter::Listener {
 public:
@@ -46,12 +48,16 @@ public:
 
     /** @brief The window's background (the frame's backdrop). @param g where */
     void paint(juce::Graphics& g) override;
+    /** @brief The conductor's countdown: a thin line under Step that runs down to the next exchange. @param g where */
+    void paintOverChildren(juce::Graphics& g) override;
     /** @brief The header, the picture, the pages, the help. */
     void resized() override;
     /** @brief The family's keys. @param key the key @return true when it was one */
     bool keyPressed(const juce::KeyPress& key) override;
     /** @brief In the standalone, the window gets a maximise button beside the other two (Noctuary's, Totality's). */
     void parentHierarchyChanged() override;
+    /** @brief The host's scale (a screen's density), the zoom on top of it. @param newScale the host's */
+    void setScaleFactor(float newScale) override;
 
 private:
     /** @brief The status line, the play button and the picture, fifteen times a second. */
@@ -149,12 +155,15 @@ private:
     std::unique_ptr<juce::AlertWindow> askName_;               ///< the name dialog while it is open
     frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
     CloudView cloud_{ proc_ };                                 ///< the picture
-    juce::TextButton canvasButton_{ "Canvas" };                ///< the picture alone, the whole window (and back)
-    juce::TextButton searchButton_{ "Search" };                ///< the command palette (Ctrl+K)
+    ViewButton canvasButton_{ ViewButton::Glyph::Canvas, "Canvas: the partials and the landscape alone, the whole window (again, or Esc: back)" };   ///< the picture alone
+    ViewButton searchButton_{ ViewButton::Glyph::Search, "Search (Ctrl+K): any knob, preset or action by a few letters" };   ///< the command palette
+    ViewButton compare_{ ViewButton::Glyph::Compare, "Hold to hear the preset as it was; let go for your sound" };   ///< hold: the preset
+    frame::IconButton midi_{ frame::IconButton::Icon::MidiLearn, "Show the MIDI controllers learned on the knobs" };   ///< MIDI marks on the knobs
+    OutputMeter meter_;                                        ///< the output
     CommandPalette palette_;                                   ///< the command palette, over everything while open
     PresetBrowser browser_{ proc_ };                           ///< the preset browser, over everything while open
     std::unique_ptr<InfoLine> info_;                           ///< the info line at the bottom: what the control under the mouse does
-    juce::TextButton nightButton_{ "Night" };                  ///< the night mode
+    ViewButton nightButton_{ ViewButton::Glyph::Night, "Night: the window dim and warm for a dark room, the picture calmer" };   ///< the night mode
     bool night_ = false;                                       ///< the night mode is on: the window dim and warm
     bool tourAsked_ = false;                                   ///< the first start's tour was considered
     double lastActivity_ = 0.0;                                ///< when the mouse or a key last moved (ms)
@@ -193,12 +202,35 @@ private:
     bool layoutChecked_ = false;                               ///< ADDITIV_LAYOUT: the pages were measured
     bool rememberSize_ = false;                                ///< the window's size is kept for the next start (not in the shot or layout modes)
     PageStrip strip_;                                          ///< the pages' strip
-    std::vector<std::vector<ParamPage*>> pagesOf_;             ///< per page its parameter pages (their groups' states)
+    /** @brief A source dropped on a knob: the inspector shows it (or all rows are taken). @param s the source @param id the parameter @param row the row, -1 none */
+    void modDropped(additiv::ModSource s, int id, int row) override;
+    /** @brief The parameter pages on a page, as they are now. @param tab the page @return them */
+    std::vector<ParamPage*> pagesOn(int tab);
     std::unique_ptr<ModDock> dock_;                            ///< the sources along the bottom
     std::unique_ptr<SourceInspector> inspector_;               ///< one source seen whole
+    juce::Component* matrixPage_ = nullptr;                    ///< the Modulation page (owned by its tab), to mark the source chosen
     bool inspectorOpen_ = true;                                ///< the docked inspector is wanted (remembered)
     bool overlayOpen_ = false;                                 ///< the inspector is open over the pages (a small window)
     bool inspectorDocked_ = false;                             ///< the window is tall enough to dock it
+    float hostScale_ = 1.0f;                                   ///< the scale the host asked for
+    float zoom_ = 1.0f;                                        ///< the player's zoom: the controls larger (player.settings "zoom")
+    /** @brief The zoom anew (kept in the player's settings). @param z 1 .. 1.5 */
+    void setZoom(float z);
+    int altRow_ = -1;                                          ///< the matrix row an Alt-drag on a knob sets, -1 none
+    float altDepth_ = 0.0f;                                    ///< its depth when the drag began
+    float stepLeft_ = -1.0f;                                   ///< the share of the conductor's wait still to come, -1 none (the line under Step)
+    juce::String lastMatrix_;                                  ///< the matrix as the undo history last knew it
+    juce::String pendingBefore_;                               ///< a matrix edit outside an undo step: the matrix before it
+    double pendingAt_ = 0.0;                                   ///< when it last moved (ms); a step once it rests
+    juce::String presetKey_;                                   ///< the preset playing, as the matrix's watch last saw it
+    /** @brief The matrix as text, the rest of an undo step's state. @return it */
+    juce::String matrixText() const { return juce::String(proc_.engine().modText()); }
+    /** @brief Closes an undo step with the matrix as it is now. */
+    void endStep();
+    /** @brief The matrix watched: an edit made outside an undo step (a dropped chip, the inspector, the matrix page, a knob's menu) becomes one once it rests. */
+    void watchMatrix();
+    /** @brief Records a matrix edit still pending, before an undo or redo. */
+    void flushMatrix();
     /** @brief One step of the screenshot mode (ADDITIV_SHOT), from the timer. */
     void shootStep();
     /**

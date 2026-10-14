@@ -46,6 +46,17 @@ std::pair<int, int> SourcesView::grid(int w, int h, int count)
     return { cols, std::clamp(cellH, kCellMinH, kCellMaxH) };
 }
 
+void SourcesView::mouseDown(const juce::MouseEvent& e)
+{
+    const auto [cols, cellH] = grid(getWidth(), getHeight(), static_cast<int>(shown_.size()));
+    const float cellW = static_cast<float>(getWidth() - 20 - (cols - 1) * kGap) / static_cast<float>(cols);
+    const float x = static_cast<float>(e.x) - 10.0f, y = static_cast<float>(e.y - kHead);
+    if (x < 0.0f || y < 0.0f) return;
+    const int col = static_cast<int>(x / (cellW + kGap)), row = y >= 0.0f ? static_cast<int>(y / static_cast<float>(cellH + kGap)) : -1;
+    const int i = row * cols + col;
+    if (col < cols && row >= 0 && i < static_cast<int>(shown_.size()) && onChoose) onChoose(shown_[static_cast<size_t>(i)]);
+}
+
 void SourcesView::timerCallback()
 {
     for (int s = 1; s < additiv::kNumModSources; ++s)
@@ -73,6 +84,10 @@ void SourcesView::paint(juce::Graphics& g)
                                           cellW, static_cast<float>(cellH));
         g.setColour(skin.raised.withAlpha(0.55f));
         g.fillRoundedRectangle(cell, 4.0f);
+        if (shown_[n] == chosen_) {
+            g.setColour(skin.accent);
+            g.drawRoundedRectangle(cell.reduced(0.5f), 4.0f, 1.4f);
+        }
         const ModSource src = static_cast<ModSource>(s);
         const bool uni = additiv::isUnipolarSource(src);
         const auto& h = history_[static_cast<size_t>(s)];

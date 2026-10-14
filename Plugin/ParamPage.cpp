@@ -21,6 +21,137 @@ constexpr int kCellHeight = 100;  ///< a cell: name, control, value
 constexpr int kGap = 10;          ///< between boxes
 constexpr int kPad = 8;           ///< inside a box
 
+/**
+ * @brief A span: two parameters, its low and its high end, as one bar with two ends to drag. Bound to the host's
+ *        parameters with gestures (an undo step each drag); a right-click offers the nearer end's menu.
+ */
+class SpanControl final : public juce::Component, public juce::SettableTooltipClient {
+public:
+    /**
+     * @brief The span of @p low and @p high.
+     * @param proc     the processor
+     * @param actions  the right-click menu
+     * @param low      the low end's parameter
+     * @param high     the high end's
+     * @param colour   its group's colour
+     */
+    SpanControl(AdditivProcessor& proc, const frame::ControlActions& actions, int low, int high, juce::Colour colour)
+        : proc_(proc), actions_(actions), id_{ low, high }, colour_(colour)
+    {
+        for (int e = 0; e < 2; ++e)
+            if (auto* p = proc_.parameter(id_[e]))
+                attach_[e] = std::make_unique<juce::ParameterAttachment>(*p, [this](float) { repaint(); });
+        for (auto& a : attach_)
+            if (a != nullptr) a->sendInitialUpdate();
+    }
+    /** @brief The track, the span lit, the two ends, their values. @param g where */
+    void paint(juce::Graphics& g) override
+    {
+        const frame::Skin& skin = additivui::skin();
+        const auto t = track();
+        g.setColour(skin.raised);
+        g.fillRoundedRectangle(t.withSizeKeepingCentre(t.getWidth(), 4.0f), 2.0f);
+        const float x0 = t.getX() + t.getWidth() * norm(0), x1 = t.getX() + t.getWidth() * norm(1);
+        g.setColour(colour_);
+        g.fillRoundedRectangle(juce::Rectangle<float>::leftTopRightBottom(std::min(x0, x1), t.getCentreY() - 2.0f, std::max(x0, x1), t.getCentreY() + 2.0f), 2.0f);
+        for (int e = 0; e < 2; ++e) {
+            const float x = e == 0 ? x0 : x1;
+            g.setColour(e == held_ ? skin.ink : colour_.brighter(0.3f));
+            g.fillEllipse(x - 6.0f, t.getCentreY() - 6.0f, 12.0f, 12.0f);
+            g.setColour(skin.bg);
+            g.fillEllipse(x - 2.5f, t.getCentreY() - 2.5f, 5.0f, 5.0f);
+        }
+        g.setColour(skin.dim);
+        g.setFont(juce::FontOptions(11.5f));
+        g.drawText(text(0) + "  -  " + text(1), getLocalBounds().removeFromBottom(18), juce::Justification::centred);
+    }
+    /** @brief The nearer end is taken (a right-click: its menu). @param e the press */
+    void mouseDown(const juce::MouseEvent& e) override
+    {
+        const auto t = track();
+        const float x0 = t.getX() + t.getWidth() * norm(0), x1 = t.getX() + t.getWidth() * norm(1);
+        const int near = std::fabs(static_cast<float>(e.x) - x0) <= std::fabs(static_cast<float>(e.x) - x1) ? 0 : 1;
+        if (e.mods.isPopupMenu()) {
+            actions_.showMenu(*this, id_[near]);
+            return;
+        }
+        held_ = near;
+        if (attach_[held_] != nullptr) attach_[held_]->beginGesture();
+        mouseDrag(e);
+    }
+    /** @brief The end held follows, never past the other. @param e the drag */
+    void mouseDrag(const juce::MouseEvent& e) override
+    {
+        if (held_ < 0 || attach_[held_] == nullptr) return;
+        const auto t = track();
+        float n = std::clamp((static_cast<float>(e.x) - t.getX()) / t.getWidth(), 0.0f, 1.0f);
+        n = held_ == 0 ? std::min(n, norm(1)) : std::max(n, norm(0));
+        auto* p = proc_.parameter(id_[held_]);
+        attach_[held_]->setValueAsPartOfGesture(p->convertFrom0to1(n));
+        repaint();
+    }
+    /** @brief Let go. @param e the release */
+    void mouseUp(const juce::MouseEvent&) override
+    {
+        if (held_ >= 0 && attach_[held_] != nullptr) attach_[held_]->endGesture();
+        held_ = -1;
+        repaint();
+    }
+    /** @brief Both ends, as the info line shows them. @return the text */
+    juce::String getTooltip() override
+    {
+        return juce::String(additiv::paramDesc(static_cast<additiv::ParamId>(id_[0])).name) + " and " + additiv::paramDesc(static_cast<additiv::ParamId>(id_[1])).name
+               + ": " + text(0) + " to " + text(1) + " -- drag either end (right-click: its menu)";
+    }
+
+private:
+    /** @brief The track's line. @return pixels */
+    juce::Rectangle<float> track() const { return getLocalBounds().toFloat().reduced(10.0f, 0.0f).withTrimmedBottom(20.0f); }
+    /** @brief An end where it stands, 0 .. 1 along the track (its parameter's own skew). @param e 0 low, 1 high @return 0 .. 1 */
+    float norm(int e) const
+    {
+        auto* p = proc_.parameter(id_[e]);
+        return p != nullptr ? p->getValue() : 0.0f;
+    }
+    /** @brief An end's value in words: a key's name for a note, else the value and its unit. @param e 0 low, 1 high @return the text */
+    juce::String text(int e) const
+    {
+        const additiv::ParamDesc& d = additiv::paramDesc(static_cast<additiv::ParamId>(id_[e]));
+        const float v = proc_.value(id_[e]);
+        if (d.id == additiv::ParamId::BrainLow || d.id == additiv::ParamId::BrainHigh) return juce::MidiMessage::getMidiNoteName(juce::roundToInt(v), true, true, 4);
+        return juce::String(v, v >= 100.0f ? 0 : 1) + (d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String());
+    }
+
+    AdditivProcessor& proc_;                                ///< whose parameters
+    const frame::ControlActions& actions_;                  ///< the right-click menu
+    int id_[2];                                             ///< low and high
+    juce::Colour colour_;                                   ///< its group's
+    std::unique_ptr<juce::ParameterAttachment> attach_[2];  ///< to the parameters
+    int held_ = -1;                                         ///< the end being dragged, -1 none
+};
+
+/** @brief A small chain between two knobs: lit, they turn together in proportion. */
+class ChainButton final : public juce::Button {
+public:
+    /** @brief A chain, the two unlinked. */
+    ChainButton() : juce::Button("link")
+    {
+        setClickingTogglesState(true);
+        setTooltip("Link the two: turning one turns the other in proportion");
+    }
+    /** @brief Two rings of a chain, lit when linked. @param g where @param over under the mouse @param down pressed */
+    void paintButton(juce::Graphics& g, bool over, bool down) override
+    {
+        (void)down;
+        const frame::Skin& skin = additivui::skin();
+        const auto r = getLocalBounds().toFloat().reduced(2.0f);
+        g.setColour(getToggleState() ? skin.accent : (over ? skin.ink : skin.faint));
+        const float w = r.getWidth() * 0.62f, h = r.getHeight() * 0.42f;
+        g.drawRoundedRectangle(r.getX(), r.getCentreY() - h * 0.5f, w, h, h * 0.5f, 1.6f);
+        g.drawRoundedRectangle(r.getRight() - w, r.getCentreY() - h * 0.5f, w, h, h * 0.5f, 1.6f);
+    }
+};
+
 } // namespace
 
 ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups, frame::LiveRings* live)
@@ -36,6 +167,26 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
             juce::RangedAudioParameter* param = proc_.parameter(id);
             if (param == nullptr) continue;
             ids_.push_back(pid);
+            if (std::any_of(g.spans.begin(), g.spans.end(), [pid](const auto& s) { return s.second == pid; })) continue;   // in its low end's bar
+            if (auto span = std::find_if(g.spans.begin(), g.spans.end(), [pid](const auto& s) { return s.first == pid; }); span != g.spans.end()) {
+                const additiv::ParamDesc& lo = additiv::paramDesc(span->first), &hi = additiv::paramDesc(span->second);
+                auto* label = labels_.add(new juce::Label({}, juce::String(lo.name) + " - " + hi.name));
+                label->setJustificationType(juce::Justification::centred);
+                label->setColour(juce::Label::textColourId, skin.dim);
+                label->setFont(juce::FontOptions(12.0f));
+                addAndMakeVisible(label);
+                auto* c = new SpanControl(proc_, actions, id, static_cast<int>(span->second), box.colour);
+                controls_.add(c);
+                addAndMakeVisible(c);
+                Cell cell;
+                cell.label = label;
+                cell.id = id;
+                cell.id2 = static_cast<int>(span->second);
+                cell.control = c;
+                cell.width = 2 * kKnobCell;
+                box.cells.push_back(cell);
+                continue;
+            }
             const additiv::ParamDesc& d = additiv::paramDesc(pid);
             auto* label = labels_.add(new juce::Label({}, d.name));
             label->setJustificationType(juce::Justification::centred);
@@ -83,6 +234,36 @@ ParamPage::ParamPage(AdditivProcessor& proc, const frame::ControlActions& action
         if (box.cells.empty()) continue;
         box.width = 2 * kPad;
         for (const Cell& c : box.cells) box.width += c.width;
+        // Linked pairs: a chain between their knobs.
+        for (const auto& [ia, ib] : g.links) {
+            juce::Slider* a = nullptr;
+            juce::Slider* b = nullptr;
+            for (const Cell& c : box.cells) {
+                if (c.id == static_cast<int>(ia)) a = dynamic_cast<juce::Slider*>(c.control);
+                if (c.id == static_cast<int>(ib)) b = dynamic_cast<juce::Slider*>(c.control);
+            }
+            if (a == nullptr || b == nullptr) continue;
+            auto link = std::make_unique<Link>();
+            link->a = a;
+            link->b = b;
+            link->chain = std::make_unique<ChainButton>();
+            addAndMakeVisible(*link->chain);
+            Link* l = link.get();
+            auto follow = [l](juce::Slider* moved, juce::Slider* other, bool forward) {
+                if (!l->chain->getToggleState() || l->busy) return;
+                l->busy = true;
+                const double v = forward ? moved->getValue() * l->ratio : moved->getValue() / std::max(l->ratio, 1.0e-6);
+                other->setValue(juce::jlimit(other->getMinimum(), other->getMaximum(), v), juce::sendNotificationSync);
+                l->busy = false;
+            };
+            auto take = [l] { l->ratio = l->a->getValue() > 1.0e-9 ? l->b->getValue() / l->a->getValue() : 1.0; };
+            a->onDragStart = take;
+            b->onDragStart = take;
+            a->onValueChange = [l, follow] { follow(l->a, l->b, true); };
+            b->onValueChange = [l, follow] { follow(l->b, l->a, false); };
+            l->chain->onClick = take;
+            links_.push_back(std::move(link));
+        }
         boxes_.push_back(std::move(box));
     }
     startTimerHz(15);
@@ -187,14 +368,14 @@ void ParamPage::itemDropped(const SourceDetails& d)
     if (id < 0) return;
     const int row = knobmod::addRow(proc_, s, id);
     if (row >= 0) flash(id);
-    if (onModDropped) onModDropped(s, id, row);
+    if (auto* listener = findParentComponentOfClass<DropListener>()) listener->modDropped(s, id, row);
 }
 
 juce::Component* ParamPage::controlFor(int id) const
 {
     for (const Box& b : boxes_)
         for (const Cell& c : b.cells)
-            if (c.id == id) return c.control;
+            if (c.id == id || c.id2 == id) return c.control;
     return nullptr;
 }
 
@@ -202,7 +383,7 @@ juce::String ParamPage::groupOf(int id) const
 {
     for (const Box& b : boxes_)
         for (const Cell& c : b.cells)
-            if (c.id == id) return b.title;
+            if (c.id == id || c.id2 == id) return b.title;
     return {};
 }
 
@@ -237,6 +418,20 @@ void ParamPage::paintOverChildren(juce::Graphics& g)
                 g.drawRoundedRectangle(c->getBounds().toFloat().expanded(4.0f), 8.0f, 2.5f);
             }
         }
+    // The MIDI controllers learned, as small marks over the controls (the header's MIDI button).
+    if (showMidi)
+        for (const Box& b : boxes_)
+            for (const Cell& c : b.cells) {
+                const int cc = proc_.controllerFor(c.id);
+                if (cc < 0 || c.control == nullptr) continue;
+                const juce::String text = "CC " + juce::String(cc);
+                const auto at = juce::Rectangle<float>(static_cast<float>(c.control->getRight()) - 34.0f, static_cast<float>(c.control->getY()) - 2.0f, 34.0f, 14.0f);
+                g.setColour(additivui::skin().accent.withAlpha(0.9f));
+                g.fillRoundedRectangle(at, 4.0f);
+                g.setColour(additivui::skin().bg);
+                g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+                g.drawText(text, at, juce::Justification::centred);
+            }
     const auto& ref = proc_.reference();
     const bool marks = ref.size() == static_cast<size_t>(additiv::kNumParams);
     for (const Box& b : boxes_)
@@ -331,11 +526,17 @@ void ParamPage::resized()
         const int top = b.bounds.getY() + kTitle;
         for (Cell& c : b.cells) {
             c.label->setBounds(x, top, c.width, 16);
-            if (dynamic_cast<juce::ComboBox*>(c.control) != nullptr) c.control->setBounds(x + 6, top + 34, c.width - 12, 26);
+            if (c.id2 >= 0) c.control->setBounds(x + 4, top + 26, c.width - 8, 46);
+            else if (dynamic_cast<juce::ComboBox*>(c.control) != nullptr) c.control->setBounds(x + 6, top + 34, c.width - 12, 26);
             else if (dynamic_cast<juce::ToggleButton*>(c.control) != nullptr) c.control->setBounds(x + 14, top + 34, c.width - 28, 26);
             else c.control->setBounds(x, top + 16, c.width, kCellHeight - 18);
             x += c.width;
         }
+    }
+    for (const auto& l : links_) {   // the chain between the two knobs, at their rings' height
+        const auto ra = l->a->getBounds(), rb = l->b->getBounds();
+        const int cx = (ra.getRight() + rb.getX()) / 2, cy = ra.getY() + (ra.getHeight() - 16) / 2;
+        l->chain->setBounds(cx - 9, cy - 7, 18, 14);
     }
 }
 
@@ -373,6 +574,14 @@ juce::String ParamPage::describe() const
     for (const Box& b : boxes_) {
         s << b.title << "\n";
         for (const Cell& c : b.cells) {
+            if (c.id2 >= 0) {   // a span: both ends
+                for (int end : { c.id, c.id2 }) {
+                    const additiv::ParamDesc& d = additiv::paramDesc(static_cast<additiv::ParamId>(end));
+                    s << "    " << d.name << " (" << d.key << "): " << juce::String(d.min) << " .. " << juce::String(d.max)
+                      << (d.unit[0] != 0 ? juce::String(" ") + d.unit : juce::String()) << ", now " << juce::String(proc_.value(end), 2) << "\n";
+                }
+                continue;
+            }
             const int id = c.control != nullptr ? (dynamic_cast<frame::Knob*>(c.control) != nullptr ? dynamic_cast<frame::Knob*>(c.control)->id()
                                                   : dynamic_cast<frame::Choice*>(c.control) != nullptr ? dynamic_cast<frame::Choice*>(c.control)->id()
                                                   : dynamic_cast<frame::Switch*>(c.control) != nullptr ? dynamic_cast<frame::Switch*>(c.control)->id() : -1) : -1;
