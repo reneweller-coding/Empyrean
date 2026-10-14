@@ -54,7 +54,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Kaleidoscopes", "Tunnels", "Spirals", "Ink & Flow", "Feedback Loops", "Raindrops", "Star Streams", "Moire Veils",
           "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines",
           "Swarms", "Splinters", "Chimeras", "Twin Swarms", "Currents", "Vortex Streets", "Ink Plumes", "Islands",
-          "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms"]
+          "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms",
+          "Growing Halls", "Eroded Halls", "Cathedral Years", "Worn Stone", "Slow Clocks", "Quickened Air", "Gravity Lenses", "Lingering Waves",
+          "Orbits", "Cyclotrons", "Planetaria", "Magnetic Choirs", "Event Horizons", "Memory Palaces", "Celestial Mechanics", "Living Architecture"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -218,6 +220,39 @@ NAMES = {
                           ["Voice", "Song", "Lament", "Cantus", "Solo", "Plea", "Lilt", "Cantilena"]),
     "Living Storms": (["Storming", "Tempestuous", "Gusting", "Squalling", "Thunderous", "Charged", "Wind-Torn", "Brooding"],
                       ["Storm", "Tempest", "Gale", "Cyclone", "Front", "Monsoon", "Cloudburst", "Thunderhead"]),
+    # Phase 17
+    "Growing Halls": (["Growing", "Ripening", "Burgeoning", "Deepening", "Widening", "Maturing", "Awakening", "Unfurling"],
+                      ["Hall", "Nave", "Rotunda", "Atrium", "Chancel", "Cloister", "Gallery", "Transept"]),
+    "Eroded Halls": (["Eroded", "Weathered", "Worn", "Crumbling", "Sandblown", "Wind-Scoured", "Wasted", "Thinned"],
+                     ["Ruin", "Colonnade", "Arcade", "Crypt", "Undercroft", "Portico", "Ambulatory", "Apse"]),
+    "Cathedral Years": (["Ancient", "Timeless", "Centuried", "Patient", "Ageless", "Venerable", "Enduring", "Abiding"],
+                        ["Cathedral", "Basilica", "Minster", "Abbey", "Sanctuary", "Chapel", "Vault", "Dome"]),
+    "Worn Stone": (["Smoothed", "Polished", "Rounded", "Softened", "Footworn", "Rainworn", "Mossed", "Lichened"],
+                   ["Stone", "Step", "Threshold", "Flagstone", "Pillar", "Lintel", "Plinth", "Cornerstone"]),
+    "Slow Clocks": (["Dilated", "Stretched", "Lagging", "Drowsing", "Lengthened", "Unhastened", "Elongated", "Tarrying"],
+                    ["Clock", "Hour", "Escapement", "Hourglass", "Dial", "Chronometer", "Metronome", "Sundial"]),
+    "Quickened Air": (["Quickened", "Hastened", "Brisk", "Fleet", "Nimble", "Darting", "Flickering", "Skittering"],
+                      ["Air", "Breeze", "Zephyr", "Draught", "Flurry", "Updraft", "Whirl", "Sough"]),
+    "Gravity Lenses": (["Lensed", "Curved", "Warped", "Bent", "Refracted", "Focused", "Magnified", "Arced"],
+                       ["Lens", "Halo", "Ring of Light", "Arc", "Mirage", "Caustic", "Corona", "Glory"]),
+    "Lingering Waves": (["Lingering", "Pooling", "Gathered", "Lulled", "Stilled", "Trapped", "Dawdling", "Loitering"],
+                        ["Wave", "Ripple", "Swell", "Undulation", "Wavelet", "Billow", "Roller", "Surge"]),
+    "Orbits": (["Orbiting", "Circling", "Revolving", "Encircling", "Rounding", "Precessing", "Satellite", "Ringed"],
+               ["Orbit", "Ellipse", "Perihelion", "Apogee", "Epicycle", "Ring", "Circuit", "Path"]),
+    "Cyclotrons": (["Magnetic", "Ionised", "Spinning", "Whirring", "Gyral", "Accelerated", "Polar", "Electrified"],
+                   ["Cyclotron", "Gyrator", "Spindle", "Coil", "Ion", "Particle", "Helix", "Dynamo"]),
+    "Planetaria": (["Celestial", "Sidereal", "Planetary", "Heavenly", "Astral", "Starlit", "Zodiacal", "Nightbound"],
+                   ["Planetarium", "Orrery", "Sphere", "Moon", "Planet", "Comet", "Equinox", "Solstice"]),
+    "Magnetic Choirs": (["Polarised", "Attracted", "Drawn", "Magnetised", "Aligned", "Tugged", "Swaying", "Lodestone"],
+                        ["Choir", "Chorale", "Chant", "Antiphon", "Psalm", "Motet", "Canticle", "Vesper"]),
+    "Event Horizons": (["Infinite", "Frozen", "Suspended", "Boundless", "Eternal", "Fathomless", "Dark-Bound", "Unending"],
+                       ["Horizon", "Singularity", "Threshold", "Edge", "Event", "Abyss", "Rim", "Brink"]),
+    "Memory Palaces": (["Remembered", "Recalled", "Haunted", "Treasured", "Storied", "Kept", "Unforgotten", "Familiar"],
+                       ["Palace", "Chamber", "Room", "Corridor", "Library", "Archive", "Gallery", "Mansion"]),
+    "Celestial Mechanics": (["Clockwork", "Precise", "Elliptic", "Periodic", "Orbital", "Harmonic", "Gravitating", "Tidal"],
+                            ["Mechanics", "Ephemeris", "Almanac", "Transit", "Conjunction", "Syzygy", "Eclipse", "Occultation"]),
+    "Living Architecture": (["Living", "Breathing", "Growing", "Shifting", "Sentient", "Evolving", "Organic", "Unfolding"],
+                            ["Architecture", "Edifice", "Structure", "Tower", "Spire", "Citadel", "Pavilion", "Bastion"]),
 }
 
 
@@ -1853,6 +1888,285 @@ def p16_effects(r, group):
             set_mpe(r, presses, (0.4, 0.8), slides, (0.4, 0.8))
 
 
+# ---- Phase 17 (14.10.2026): the hall that grows into what it hears (or erodes), the partials' own
+# time, the ripple's bend, the Orbit field.
+
+FIELD_ORBIT = 5
+
+
+def set_hall(r, level=(0.3, 0.5), decay=(10, 40), tune=(0.5, 1.0)):
+    """A modal hall, where the preset has none yet (one it has stays as it is)."""
+    if num(r, "modal_level", 0.0) > 0.0:
+        return
+    r.set("modal_level", f(r.u(*level), 3))
+    r.set("modal_decay", f(r.lg(*decay), 1))
+    r.set("modal_damp", f(r.u(0.2, 0.5), 2))
+    r.set("modal_tune", f(r.u(*tune), 2))
+    r.set("modal_spread", f(r.u(2, 10), 1))
+    r.set("modal_drift", f(r.u(1.0, 8.0), 1))
+
+
+def set_grow(r, grow, memory):
+    """The hall's memory: growth (positive) or erosion, formed over Memory seconds."""
+    r.set("hall_grow", f(r.u(*grow), 2))
+    r.set("hall_memory", f(r.lg(*memory), 0))
+
+
+def set_bend(r, bend, drift=None):
+    """The partials' own time: their drift, shimmer and sync slower (positive) or faster where the
+    spectrum is dense -- with drift enough to hear it."""
+    r.set("time_bend", f(r.u(*bend), 2))
+    if drift is not None and num(r, "drift", 3.0) < drift[0]:
+        r.set("drift", f(r.u(*drift), 1))
+
+
+def set_orbit(r, pull=(0.1, 0.5), radius=(15, 60), spring=(0.05, 0.4), wander=(0.01, 0.15)):
+    """The Orbit field: Pull the wells' depth, Radius the orbits' size, Spring the damping, Wander
+    the magnetic field (how fast they circle)."""
+    r.set("field_mode", FIELD_ORBIT)
+    r.set("field_strength", f(r.u(*pull), 2))
+    r.set("field_radius", f(r.lg(*radius), 0))
+    r.set("field_spring", f(r.u(*spring), 2))
+    r.set("field_rate", f(r.lg(*wander), 3))
+
+
+def set_linger(r, bend):
+    """The ripple's bend: its waves slower where the notes are."""
+    r.set("ripple_bend", f(r.u(*bend), 2))
+
+
+P17_POOLS = {
+    "hall": [("lfo3", "hall_grow", (0.1, 0.3)), ("rossler_x", "hall_grow", (0.1, 0.25)), ("kura2", "modal_level", (0.05, 0.12))],
+    "time": [("lfo2", "time_bend", (0.15, 0.35)), ("loudness", "time_bend", (0.15, 0.35)), ("lorenz_x", "time_bend", (0.1, 0.3))],
+    "orbit": [("lfo2", "field_radius", (0.06, 0.15)), ("kura1", "field_rate", (0.05, 0.15)), ("lorenz_z", "field_strength", (0.08, 0.2))],
+    "ripple": [("lfo3", "ripple_bend", (0.1, 0.3)), ("flux", "ripple_bend", (0.15, 0.3))],
+}
+
+
+def p17_rows(r, kinds, count, via_p=0.25):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P17_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        elif src.startswith("kura"):
+            setup(r, "kura")
+        elif src.startswith(("lorenz", "rossler")):
+            setup(r, "chaos")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def h_growing(r):
+    based(r, "Bells", "Organs", "Choirs", "Glass", "Strings", "Dark Drones")
+    set_hall(r)
+    set_grow(r, (0.5, 1.0), (300, 1800))
+    p17_rows(r, ["hall"], 1)
+    rows_from(r, ["kura"], 1)
+
+
+def h_eroded(r):
+    based(r, "Bells", "Glass", "Organs", "Microtonal", "Keys", "Air & Noise")
+    set_hall(r, decay=(15, 50))
+    set_grow(r, (-1.0, -0.5), (300, 1800))
+    p17_rows(r, ["hall"], 1)
+
+
+def h_cathedral(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_hall(r, level=(0.25, 0.45), decay=(20, 60))
+    set_grow(r, (0.4, 0.9), (3600, 14400))
+    sleep_rows(r, ["breath", "tide"], 2)
+
+
+def h_worn(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Sleep Concert", "Shepard & Tides")
+    set_hall(r, level=(0.25, 0.45), decay=(20, 60))
+    set_grow(r, (-0.9, -0.4), (1800, 7200))
+    sleep_rows(r, ["tide", "chaos"], 1)
+
+
+def t_slow(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Organs", "Shimmer", "Deep Space")
+    set_bend(r, (0.6, 1.0), drift=(6, 20))
+    if num(r, "shimmer", 0.4) < 0.3:
+        r.set("shimmer", f(r.u(0.3, 0.6), 2))
+    p17_rows(r, ["time"], 1)
+
+
+def t_quick(r):
+    based(r, "Air & Noise", "Glass", "Shimmer", "Waves", "Glissandi")
+    set_bend(r, (-1.0, -0.5), drift=(4, 15))
+    p17_rows(r, ["time"], 1)
+
+
+def t_lens(r):
+    based(r, "Bells", "Glass", "Keys", "Pendulums", "Shimmer", "Microtonal")
+    set_bend(r, (0.5, 1.0), drift=(4, 12))
+    set_ripple(r, (0.4, 0.8), (0.3, 1.5), (5, 20))
+    set_linger(r, (0.5, 1.0))
+    if r.rng.random() < 0.5:
+        r.set("dispersion", f(r.u(0.2, 0.8), 2))
+
+
+def t_linger(r):
+    based(r, "Keys", "Bells", "Glass", "Pendulums", "Waves", "Strings")
+    set_ripple(r, (0.5, 1.0), (0.5, 3.0), (4, 20))
+    set_linger(r, (0.6, 1.0))
+    if r.p.get("brain_on") != 0:   # the conductor changes notes often: every change strikes the string
+        r.set("auto_rate", f(r.lg(8, 30), 1))
+    p17_rows(r, ["ripple"], 1)
+
+
+def o_orbits(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Shimmer", "Sleep Concert")
+    set_orbit(r)
+    p17_rows(r, ["orbit"], 1)
+
+
+def o_cyclotrons(r):
+    based(r, "Glass", "Bells", "Keys", "Air & Noise", "Shimmer", "Microtonal")
+    set_orbit(r, pull=(0.4, 0.9), radius=(8, 30), spring=(0.02, 0.2), wander=(0.15, 0.6))
+    p17_rows(r, ["orbit"], 1)
+
+
+def o_planetaria(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_orbit(r, pull=(0.05, 0.25), radius=(20, 80), spring=(0.02, 0.15), wander=(0.005, 0.04))
+    sleep_rows(r, ["breath", "wander"], 2)
+
+
+def o_magnetic(r):
+    based(r, "Choirs", "Strings", "Organs", "Sleep Concert")
+    set_orbit(r, pull=(0.2, 0.6), radius=(10, 40), spring=(0.1, 0.4), wander=(0.02, 0.2))
+    if r.rng.random() < 0.5:
+        set_swarm(r, r.pick("wave", "twin"), depth=(0.2, 0.5))
+    else:
+        rows_from(r, ["kura"], 1)
+
+
+def x_horizons(r):
+    based(r, "Deep Space", "Dark Drones", "Sleep Concert", "Shepard & Tides", "Organs")
+    set_bend(r, (0.7, 1.0), drift=(5, 15))
+    r.set("dispersion", f(r.u(0.4, 1.2), 2))
+    set_hall(r, level=(0.25, 0.45), decay=(25, 60))
+    set_grow(r, (0.3, 0.8), (900, 3600))
+    p17_rows(r, ["time", "hall"], 1)
+
+
+def x_palaces(r):
+    based(r, "Sleep Concert", "Strings", "Keys", "Choirs", "Organs")
+    set_hall(r)
+    set_grow(r, (0.4, 1.0), (600, 3600))
+    r.set("memory_level", f(r.u(0.3, 0.6), 2))
+    r.set("memory_time", f(r.lg(90, 300), 0))
+    r.set("memory_bloom", f(r.lg(4, 15), 1))
+    rows_from(r, ["piece"], 1)
+
+
+def x_mechanics(r):
+    based(r, "Bells", "Glass", "Pendulums", "Organs", "Choirs", "Microtonal")
+    set_orbit(r, pull=(0.2, 0.6), radius=(10, 50), spring=(0.05, 0.3), wander=(0.02, 0.3))
+    set_bend(r, (0.3, 0.8), drift=(3, 10))
+    p17_rows(r, ["orbit", "time"], 1)
+
+
+def x_living(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = []
+        if r.rng.random() < 0.6:
+            kinds.append("hall")
+        if r.rng.random() < 0.6:
+            kinds.append("time")
+        if r.rng.random() < 0.5 and num(r, "field_mode", 0) == 0:
+            kinds.append("orbit")
+        if r.rng.random() < 0.4:
+            kinds.append("ripple")
+    if "hall" in kinds:
+        set_hall(r)
+        set_grow(r, (0.4, 1.0) if r.rng.random() < 0.6 else (-1.0, -0.4), (600, 3600))
+    if "time" in kinds:
+        set_bend(r, (0.4, 1.0) if r.rng.random() < 0.6 else (-1.0, -0.4), drift=(4, 15))
+    if "orbit" in kinds:
+        set_orbit(r)
+    if "ripple" in kinds:
+        set_ripple(r, (0.4, 0.9), (0.4, 2.5), (4, 20))
+        set_linger(r, (0.5, 1.0))
+    p17_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [h_growing, h_eroded, h_cathedral, h_worn, t_slow, t_quick, t_lens, t_linger,
+                     o_orbits, o_cyclotrons, o_planetaria, o_magnetic, x_horizons, x_palaces, x_mechanics, x_living]
+
+
+# The new means in the groups before, where they fit, drawn after everything else (what a preset had
+# stays): grow = (p, grow, memory), a quiet hall given where there is none; bend = (p, bend);
+# linger = (p, bend), only where a ripple runs; orbit = (p, gentle), a Scale field or none becoming
+# an orbit (gentle: the sleep concerts' slow wide circles).
+P17_FX = {
+    "Organs":             dict(grow=(0.15, (0.3, 0.8), (900, 3600))),
+    "Dark Drones":        dict(grow=(0.15, (-0.7, -0.3), (1800, 7200))),
+    "Shimmer":            dict(bend=(0.15, (-0.8, -0.3))),
+    "Glass":              dict(bend=(0.1, (-0.8, -0.3))),
+    "Microtonal":         dict(orbit=(0.15, False)),
+    "Keys":               dict(linger=(0.4, (0.4, 0.9))),
+    "Bells":              dict(linger=(0.3, (0.4, 0.9))),
+    "Synchrony":          dict(bend=(0.25, (0.3, 0.8))),
+    "Ripples":            dict(linger=(0.45, (0.4, 1.0))),
+    "Resonant Halls":     dict(grow=(0.35, (0.3, 0.9), (600, 3600))),
+    "Ghosts & Memory":    dict(grow=(0.25, (0.3, 0.8), (600, 3600))),
+    "Gravity Wells":      dict(orbit=(0.35, False)),
+    "Smear & Dispersion": dict(bend=(0.4, (0.4, 1.0))),
+    "Deep Sleep":         dict(grow=(0.15, (0.2, 0.6), (3600, 14400))),
+    "Dream Drift":        dict(bend=(0.2, (0.3, 0.8))),
+    "Starfield":          dict(orbit=(0.2, True)),
+    "Hypnagogia":         dict(bend=(0.2, (0.3, 0.8))),
+    "Twilight Choirs":    dict(grow=(0.2, (0.2, 0.6), (1800, 7200))),
+    "Warm Drones":        dict(grow=(0.2, (0.2, 0.6), (1800, 7200))),
+    "Afterglow":          dict(grow=(0.15, (-0.6, -0.2), (1800, 7200))),
+    "Star Streams":       dict(orbit=(0.2, True)),
+    "Swarms":             dict(bend=(0.2, (0.3, 0.8))),
+    "Chimeras":           dict(bend=(0.2, (0.3, 0.8))),
+}
+
+
+def p17_effects(r, group):
+    """Phase 17 in one of the first eighty groups, drawn after everything else."""
+    fx = P17_FX.get(group, {})
+    if "grow" in fx:
+        p, grow, memory = fx["grow"]
+        if r.rng.random() < p:
+            set_hall(r, level=(0.15, 0.3), decay=(15, 45))
+            set_grow(r, grow, memory)
+    if "bend" in fx:
+        p, bend = fx["bend"]
+        if r.rng.random() < p:
+            set_bend(r, bend)
+    if "linger" in fx:
+        p, bend = fx["linger"]
+        if r.rng.random() < p and num(r, "ripple_depth", 0.0) > 0.0:
+            set_linger(r, bend)
+    if "orbit" in fx:
+        p, gentle = fx["orbit"]
+        if r.rng.random() < p and int(num(r, "field_mode", 0)) in (0, 1):
+            if gentle:
+                set_orbit(r, pull=(0.05, 0.25), radius=(20, 80), spring=(0.02, 0.15), wander=(0.005, 0.04))
+            else:
+                set_orbit(r)
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -1873,6 +2187,8 @@ def build():
                 p13_effects(r, group)
             if g < 64:   # and phase 16 after it
                 p16_effects(r, group)
+            if g < 80:   # and phase 17 after that
+                p17_effects(r, group)
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
@@ -1887,7 +2203,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 80 groups of 64 (Presets.h).",
+             "/// The factory presets: 96 groups of 64 (Presets.h).",
              "const Preset kPresets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

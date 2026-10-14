@@ -45,7 +45,7 @@ const char* const kLifeModeNames[kNumLifeModes] = { "Off", "Lenia", "Turing", "K
                                                      "Rain", "Starfield", "Moire", "Fluid", "Islands" };
 const char* const kSyncModeNames[kNumSyncModes] = { "Global", "Chimera", "Swarm" };
 const char* const kMpeTargetNames[kNumMpeTargets] = { "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion" };
-const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock" };
+const char* const kFieldModeNames[kNumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" };
 const char* const kFarModeNames[kNumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char* const kLfoShapeNames[kNumLfoShapes] = { "Sine", "Triangle", "Ramp Up", "Ramp Down", "Square", "Random", "Steps" };
 const char* const kEnvShapeNames[kFactoryShapeCount] = { "Swell", "Pulse", "Bloom", "Flicker", "Wobble", "Rise In", "Fall In", "Saw Up" };
@@ -348,6 +348,10 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::MpePressDepth,   "mpe_press_depth",  "Press Depth", "MPE", 0.f,  1.f,   0.5f,  1.f,  ""),
     C(ParamId::MpeSlide,        "mpe_slide",        "Slide",      "MPE", kMpeTargetNames, kNumMpeTargets, 3),
     F(ParamId::MpeSlideDepth,   "mpe_slide_depth",  "Slide Depth", "MPE", 0.f,  1.f,   0.5f,  1.f,  ""),
+    F(ParamId::HallGrow,        "hall_grow",        "Grow",       "Hall", -1.f,  1.f,   0.f,   1.f,  ""),
+    F(ParamId::HallMemory,      "hall_memory",      "Memory",     "Hall", 60.f,  14400.f, 1200.f, 0.3f, "s"),
+    F(ParamId::TimeBend,        "time_bend",        "Time Bend",  "Time", -1.f,  1.f,   0.f,   1.f,  ""),
+    F(ParamId::RippleBend,      "ripple_bend",      "Bend",       "Ripple", 0.f, 1.f,   0.f,   1.f,  ""),
 } };
 
 } // namespace

@@ -191,6 +191,7 @@ constexpr int kCloudChannels = 4;      ///< the voices' channels on the GPU: nea
 constexpr int kCloudOutChannels = 10;  ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right, the melt's left and right
 constexpr int kModalModes = 65536;     ///< the modal hall's resonances
 constexpr int kModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
+constexpr int kHallBins = 1024;        ///< the hall's memory and the spectrum's density: bands over 20 Hz .. 20 kHz on the log axis (11.7 cents)
 
 /**
  * @brief The modal hall's settings for the next block: the host's copy, sent up with the voices.
@@ -223,6 +224,10 @@ struct ModalHall {
     float paint = 0.0f;     ///< 0 .. 1: every mode heard through the landscape at its frequency (the painted hall)
     float paintNorm = 1.0f; ///< the landscape's make-up (one over its RMS), so the painted hall keeps its level
     float paintTime = 0.0f; ///< seconds into the landscape's loop, for the painting
+    float grow = 0.0f;      ///< -1 .. 1: how far the hall's memory lengthens (growth) or shortens (erosion) its modes' decays
+    float memoryCoef = 0.0f;///< the memory's step this block, 1 - exp(-dt / Memory) (0: it does not learn)
+    float densityCoef = 0.0f;///< the spectrum's density followed this block, 1 - exp(-dt / 0.3 s)
+    int   listen = 0;       ///< 1: the partials' amplitudes are gathered over the octaves this block (for the memory or the partials' time)
     float tuned[kModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
 };
 static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header");
@@ -510,6 +515,7 @@ enum class FieldMode : std::int32_t {
     Swarm,     ///< a few attractors wander through the spectrum on chaotic paths and gather the partials near them
     Scatter,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
     Flock,     ///< every cloud's members as a flock of starlings: cohesion, alignment, separation, a wind
+    Orbit,     ///< the scale's pitches as wells in pitch and side, a magnetic field bending every move: the partials circle them
     Count      ///< number of modes
 };
 
@@ -535,11 +541,15 @@ struct SpectralField {
     FieldMode mode = FieldMode::Off;   ///< what pulls the partials
     int   count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`; Flock: winds in `pos`
     int   flockFresh = 0;              ///< Flock: 1 when the last block was no flock (its state is taken from where the partials are)
-    int   pad1 = 0;                    ///< likewise
+    int   orbitFresh = 0;              ///< Orbit: 1 when the last block was no orbit (its state is taken from where the partials are)
     float strength = 0.0f;             ///< cents a second a partial may move at most
     float radius = 60.0f;              ///< cents: an attractor's reach (the bell's width); the Scale field's stiffness
     float spring = 0.3f;               ///< per second: how fast a partial is drawn back to its own place
     float dispersion = 0.0f;           ///< seconds: the clock of the lowest partials late (positive) or of the highest (negative)
+    float orbitWell = 3.0f;            ///< Orbit: the wells' angular frequency, rad/s (their depth)
+    float orbitField = 6.0f;           ///< Orbit: the magnetic field as the circling's angular frequency, rad/s
+    float orbitDamp = 0.3f;            ///< Orbit: the damping, per second
+    float timeBend = 0.0f;             ///< -1 .. 1: each partial's clock slower (positive) or faster where the spectrum is dense
     float pos[kFieldPoints] = {};      ///< log2 Hz: the scale's pitches ascending (Scale), or the attractors (Swarm, Scatter)
     float mass[kFieldAttractors] = {}; ///< the attractors' weights; Scatter's are negative
 };
@@ -638,6 +648,16 @@ public:
     SpectralComb& comb();
     /** @brief The energy cascade's settings for the next block (the voices carry their drives). @return them */
     Turbulence& turbulence();
+
+    /**
+     * @brief The hall's memory (ModalHall::grow): per band over the octaves, how much was heard there
+     *        against the average (1), as the last snapshot brought it down.
+     * @param out  receives kHallBins values
+     * @return     true when the memory has come down at least once
+     */
+    bool hallMemory(float* out) const;
+    /** @brief Replaces the hall's memory at the next launch (a hall loaded, or a new one). @param in kHallBins values (1: nothing learnt) */
+    void setHallMemory(const float* in);
 
     /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
     void reservoirOut(float* out) const;

@@ -6,6 +6,7 @@
 
 #include "AdditivData.h"
 #include "JourneyView.h"
+#include "HallView.h"
 #include "MapView.h"
 #include "SourcesView.h"
 
@@ -117,7 +118,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     for (auto* b : { &prevPreset_, &presetName_, &nextPreset_ }) addAndMakeVisible(b);
     prevPreset_.setTooltip("The preset before");
     nextPreset_.setTooltip("The preset after");
-    presetName_.setTooltip("The preset playing: click for the bank (80 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents)");
+    presetName_.setTooltip("The preset playing: click for the bank (96 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)");
     prevPreset_.onClick = [this] { loadPreset((std::max(proc_.currentPreset(), 0) + additiv::numPresets() - 1) % additiv::numPresets()); };
     nextPreset_.onClick = [this] { loadPreset((proc_.currentPreset() + 1) % additiv::numPresets()); };
     presetName_.onClick = [this] { showPresets(); };
@@ -160,12 +161,12 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape } },
                      { "Field", F::Motion, Ids{ ParamId::FieldMode, ParamId::FieldStrength, ParamId::FieldRadius, ParamId::FieldSpring,
                                                 ParamId::FieldRate, ParamId::FieldCount } },
-                     { "Dispersion", F::Envelope, Ids{ ParamId::Dispersion } },
+                     { "Time", F::Envelope, Ids{ ParamId::Dispersion, ParamId::TimeBend } },
                      { "Living Landscape", F::Source, Ids{ ParamId::LifeMode, ParamId::LifeDepth, ParamId::LifeRate, ParamId::LifeCharacter,
                                                            ParamId::LifeZoom, ParamId::LifeSides, ParamId::LifeTurn } },
                      { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncMode, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread,
                                                          ParamId::SyncSwarm, ParamId::SyncReach, ParamId::SyncLag } },
-                     { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay } } });
+                     { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay, ParamId::RippleBend } } });
     page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
                                                  ParamId::FilterDrift } },
                      { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo } },
@@ -194,14 +195,16 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                  ParamId::Delay2Damp, ParamId::Delay2ToFar } },
                       { "Room", F::Envelope, Ids{ ParamId::EarlyLevel, ParamId::EarlySize, ParamId::EarlyAbsorb, ParamId::NearMix, ParamId::NearDecay,
                                                   ParamId::NearDamp } },
-                      { "Modal Hall", F::Motion, Ids{ ParamId::ModalLevel, ParamId::ModalDecay, ParamId::ModalDamp, ParamId::ModalTune, ParamId::ModalSpread,
-                                                      ParamId::ModalDrift, ParamId::ModalWidth, ParamId::ModalLow, ParamId::ModalBreath,
-                                                      ParamId::ModalPaint, ParamId::ModalFreeze } },
                       { "Spectral Echo", F::Space, Ids{ ParamId::SpecMix, ParamId::SpecTime, ParamId::SpecTilt, ParamId::SpecScatter,
                                                         ParamId::SpecFeedback, ParamId::SpecDamp, ParamId::SpecToFar } },
                       { "Melt", F::Motion, Ids{ ParamId::MeltMix, ParamId::MeltTime, ParamId::MeltSpread, ParamId::MeltToFar } },
                       { "Memory", F::Envelope, Ids{ ParamId::MemoryLevel, ParamId::MemoryTime, ParamId::MemoryBloom, ParamId::MemoryBlur,
                                                     ParamId::MemorySink } } });
+    {
+        auto* h = new HallPage(proc_, actions_, &live_);
+        describe_.push_back([h] { return h->describe(); });
+        tabs_.addTab("Hall", additivui::skin().panel, new ScrollPage(h, [h](int w) { return h->heightFor(w); }), true);
+    }
     {
         auto* m = new ModPage(proc_, actions_, &live_);
         describe_.push_back([m] { return m->describe(); });
@@ -485,6 +488,7 @@ void AdditivEditor::showPresets()
         if (g == additiv::kFirstSleepGroup) bank.addSectionHeader("Sleep Concerts");
         if (g == additiv::kFirstVisionGroup) bank.addSectionHeader("Visions");
         if (g == additiv::kFirstSwarmGroup) bank.addSectionHeader("Swarms & Currents");
+        if (g == additiv::kFirstHallGroup) bank.addSectionHeader("Halls & Orbits");
         juce::PopupMenu group;
         for (int i = 0; i < 64; ++i) {
             const int index = additiv::presetAt(g, i);

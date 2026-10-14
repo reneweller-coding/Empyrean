@@ -328,6 +328,31 @@ public:
      * @param cells  receives the cells, emptied when the field is off
      */
     void lifeSnapshot(std::vector<float>& cells);
+    /**
+     * @brief The hall's memory (Hall > Grow): per band over the octaves (kHallBins, 20 Hz .. 20 kHz) how
+     *        much it has heard there against the average, as the last snapshot brought it down -- or as
+     *        it was last set, until the next block has it. Any thread but the worker's.
+     * @param out  receives kHallBins values, 1 the average (a new hall: all 1)
+     * @param age  receives the seconds it has learnt
+     * @return     true when it has learnt anything (age above nothing)
+     */
+    bool hallMemory(std::vector<float>& out, double& age);
+    /**
+     * @brief A hall's memory to hear in from the next block on (a hall loaded, a state restored, or a
+     *        new hall). Any thread but the worker's.
+     * @param in   kHallBins values; empty or the wrong size: a new hall, every band 1
+     * @param age  its seconds learnt
+     */
+    void setHallMemory(const std::vector<float>& in, double age);
+    /**
+     * @brief The ripple's string as it stands after the last block, low to high (tests, diagnostics).
+     *        The worker's thread, or offline.
+     * @param out  receives kRippleCells values
+     */
+    void rippleString(float* out) const
+    {
+        for (int i = 0; i < kRippleCells; ++i) out[i] = rippleNow_[i];
+    }
 
     /** @brief The slowest block the renderer took since the last call, and starts over (diagnostics). @return milliseconds */
     float takeWorstBlockMs() { return worstBlockUs_.exchange(0, std::memory_order_relaxed) * 0.001f; }
@@ -578,6 +603,17 @@ private:
     float ripplePrev_[kRippleCells] = {};              ///< and a step before (the wave equation's leapfrog)
     float rippleStrikes_[64] = {};                     ///< the fundamentals of the notes that started this block
     int rippleStrikeCount_ = 0;                        ///< how many
+    float rippleHz_[64] = {};                          ///< the sounding voices' fundamentals this block (the ripple's bend reads where the spectrum is loud)
+    float rippleAmp_[64] = {};                         ///< and their levels
+    int rippleVoices_ = 0;                             ///< how many
+    bool orbitWas_ = false;                            ///< the last block's field was the orbit (else its state is taken afresh)
+    double hallAge_ = 0.0;                             ///< seconds the hall's memory has learnt (worker)
+    std::array<float, kHallBins> snapHall_{};          ///< the hall's memory as the last snapshot brought it down (under snapLock_)
+    double snapHallAge_ = 0.0;                         ///< and its age
+    bool snapHallValid_ = false;                       ///< snapHall_ holds what the card has (else a new hall)
+    std::array<float, kHallBins> hallPending_{};       ///< a memory to send up with the next block (under snapLock_)
+    double hallPendingAge_ = 0.0;                      ///< and its age
+    bool hallPendingSet_ = false;                      ///< hallPending_ waits for the next block
     /**
      * @brief One block of the ripple's string: struck at the harmonics of every note that started this
      *        block (rippleStrikes_, gathered by the voice loop, which clears the restart flags), then the damped wave equation stepped (leapfrog, reflecting ends, as many substeps

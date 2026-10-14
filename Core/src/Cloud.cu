@@ -382,6 +382,100 @@ __device__ float fieldStep(const SpectralField& F, float logHz, float off, float
     return fminf(fmaxf((off + step) * __expf(-F.spring * dt), -1200.0f), 1200.0f);
 }
 
+/** @brief A frequency's band on the hall's log axis (kHallBins over 20 Hz .. 20 kHz). @param f Hz @return the band */
+__device__ __forceinline__ int hallBin(float f)
+{
+    return min(max(static_cast<int>(log2f(fmaxf(f, 20.0f) * (1.0f / 20.0f)) * (static_cast<float>(kHallBins) / 9.96578428f)), 0), kHallBins - 1);
+}
+
+/**
+ * @brief One block of the Orbit field for one partial: a charged particle in pitch and side, drawn to
+ *        the nearest pitch of the scale (a well, its place in its bell kept) and bent by a magnetic
+ *        field -- the velocity turned by the field's angle each block (exactly: the turn never adds
+ *        energy), the well's pull and the damping, and a kick of white noise, so that the orbits keep
+ *        about half the radius (a damped oscillator's mean square, sigma^2 / (2 g k)). Fast small
+ *        circles ride a slow circling of the well.
+ * @param F        the field (orbitWell, orbitField, orbitDamp; radius: cents to a full side)
+ * @param prev     the last block's (offset, side, their velocities) per partial, cents and cents a second
+ * @param next     this block's
+ * @param me       the partial's index in the tables
+ * @param logHome  log2 of the partial's own place
+ * @param keep     log2 offset kept from the well (its place in its cloud's bell)
+ * @param now      the offset it has now (taken over when the orbit is fresh)
+ * @param seed     the note's dice
+ * @param up       the partial
+ * @param block    the block's index (the kicks' dice)
+ * @param restart  a new note: at home, at rest
+ * @param dt       the block's length, seconds
+ * @param side     receives its shift across the field, -0.6 .. 0.6
+ * @return         the new offset, cents
+ */
+__device__ float orbitStep(const SpectralField& F, const float4* prev, float4* next, size_t me, float logHome, float keep, float now,
+                           std::uint32_t seed, std::uint32_t up, std::uint32_t block, bool restart, float dt, float& side)
+{
+    float4 s = restart ? make_float4(0.0f, 0.0f, 0.0f, 0.0f) : (F.orbitFresh ? make_float4(now, 0.0f, 0.0f, 0.0f) : prev[me]);
+    float well = 0.0f;
+    if (F.count > 0) {
+        const float at = logHome + s.x * (1.0f / 1200.0f);
+        int lo = 0, hi = F.count - 1;
+        while (hi - lo > 1) {
+            const int mid = (lo + hi) >> 1;
+            if (F.pos[mid] <= at) lo = mid; else hi = mid;
+        }
+        const float q = fabsf(at - F.pos[lo]) <= fabsf(F.pos[hi] - at) ? F.pos[lo] : F.pos[hi];
+        well = 1200.0f * (q + keep - logHome);
+    }
+    const float R = fmaxf(F.radius, 1.0f);
+    const float k = F.orbitWell * F.orbitWell, g = fmaxf(F.orbitDamp, 0.0f);
+    float rs, rc;
+    __sincosf(F.orbitField * dt, &rs, &rc);
+    float vx = s.z * rc + s.w * rs, vy = s.w * rc - s.z * rs;   // the field turns the velocity
+    const float sigma = 0.5f * R * sqrtf(2.0f * fmaxf(g, 0.01f) * k) * sqrtf(dt);
+    const float kx = (hash01(seed ^ (block * 0x9E3779B9U), up, 20) - 0.5f) * 3.4641016f;   // unit variance
+    const float ky = (hash01(seed ^ (block * 0x85EBCA6BU), up, 21) - 0.5f) * 3.4641016f;
+    vx += dt * (-k * (s.x - well) - g * vx) + sigma * kx;
+    vy += dt * (-k * s.y - g * vy) + sigma * ky;
+    const float x = fminf(fmaxf(s.x + vx * dt, -1200.0f), 1200.0f);
+    const float y = fminf(fmaxf(s.y + vy * dt, -2.0f * R), 2.0f * R);
+    next[me] = make_float4(x, y, vx, vy);
+    side = 0.6f * fminf(fmaxf(y / R, -1.0f), 1.0f);
+    return x;
+}
+
+/**
+ * @brief The hall's ear and memory, one CUDA block: the partials' amplitudes gathered over the octaves
+ *        this block (whole numbers, cleared here) as a share of the whole, a little blurred; the spectrum's
+ *        density followed over a third of a second (the partials' own clocks read it); and, while
+ *        anything sounds and Grow is not nothing, the hall's memory a step of Memory towards it.
+ *        Summed in a fixed order.
+ * @param hdr      the header
+ * @param hist     per band the amplitude gathered this block (fixed point, 1e-12)
+ * @param memory   per band the hall's memory, 1 the average
+ * @param density  per band the spectrum's density, 1 the average
+ */
+__global__ void __launch_bounds__(kHallBins) hallKernel(const BlockHeader* hdr, unsigned long long* hist, float* memory, float* density)
+{
+    const ModalHall& mh = hdr->modal;
+    if (!mh.listen) return;
+    __shared__ float e[kHallBins];
+    __shared__ float red[kHallBins];
+    const int b = static_cast<int>(threadIdx.x);
+    const float h = static_cast<float>(hist[b]) * 1.0e-12f;
+    hist[b] = 0ULL;
+    red[b] = h;
+    __syncthreads();
+    for (int s = kHallBins / 2; s > 0; s >>= 1) {
+        if (b < s) red[b] += red[b + s];
+        __syncthreads();
+    }
+    const float total = red[0];
+    e[b] = total > 1.0e-12f ? h / total * static_cast<float>(kHallBins) : 0.0f;
+    __syncthreads();
+    const float here = 0.25f * e[max(b - 1, 0)] + 0.5f * e[b] + 0.25f * e[min(b + 1, kHallBins - 1)];
+    if (mh.densityCoef > 0.0f) density[b] += (here - density[b]) * mh.densityCoef;
+    if (mh.memoryCoef > 0.0f && total > 1.0e-9f) memory[b] += (here - memory[b]) * mh.memoryCoef;
+}
+
 /**
  * @brief One partial's complex gain at each ear: the head's shadow, the pinna and the time round
  *        the head (Brown and Duda 1998; Woodworth), the pair normalised to the pan law's power.
@@ -1253,11 +1347,17 @@ __global__ void cascadeKernel(const BlockHeader* hdr, const CloudVoice* voices, 
  * @param qa      the energy cascade, buffer A (cascadeKernel)
  * @param qb      buffer B
  * @param filterTable  per voice the transported filter (filterTransportKernel)
+ * @param hallHist     per band the amplitude gathered this block, for the hall's ear (hallKernel)
+ * @param density      per band the spectrum's density the block before (hallKernel)
+ * @param tau          per partial its own clock (Time Bend)
+ * @param orbitA       the Orbit field's state, buffer A (even blocks read it)
+ * @param orbitB       buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
                              float2* snap, const float2* lifeA, const float2* lifeB, float* theta, float* sx, const float2* order,
-                             size_t plane, float2* flockA, float2* flockB, const float* qa, const float* qb, const float* filterTable)
+                             size_t plane, float2* flockA, float2* flockB, const float* qa, const float* qb, const float* filterTable,
+                             unsigned long long* hallHist, const float* density, float* tau, float4* orbitA, float4* orbitB)
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1299,6 +1399,18 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         float slot = 0.5f;   // the partial's place among its cloud's members, evenly 0 .. 1 (the living field's rows)
         int groupFirst = 0, groupCount = 1, member = 0;   // its cloud in the voice, for the flock
         float sigmaCents = 0.0f;                            // the cloud's width, cents per unit of the bell
+        // Time Bend: the partial's own clock (its drift, its shimmer, its sync), slower -- or faster --
+        // where the spectrum is dense, read at its harmonic from the density of the block before. At
+        // nothing it is the voice's clock, kept in step, so turning it up never jumps.
+        float tp = t, clockRate = 1.0f;
+        if (hdr->field.timeBend != 0.0f) {
+            const float fh = isAir ? cv.hz * cv.airCenter : cv.hz * partialRatio(p / max(K, 1) + 1, cv.inharmonic, cv.stretch);
+            const float dense = fminf(fmaxf(log2f(1.0f + density[hallBin(fh)]) - 1.0f, 0.0f), 4.0f);
+            const float bend = hdr->field.timeBend;
+            clockRate = bend > 0.0f ? 1.0f / (1.0f + bend * dense) : 1.0f - bend * dense;
+            tp = (cv.restart ? 0.0f : tau[gid]) + clockRate * static_cast<float>(n) / fs;
+        }
+        tau[gid] = tp;
         if (!isAir) {
             h = p / K + 1;
             const int k = p - (h - 1) * K;
@@ -1312,10 +1424,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             member = k;
             sigmaCents = sigma;
             centre = cv.hz * partialRatio(h, cv.inharmonic, cv.stretch) * exp2f(z * sigma * (1.0f / 1200.0f)) + cv.shift;
-            drift = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
-                              + 0.35f * slowSine(cv.driftRate * (1.2f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
-            sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
-                                                 + 0.3f * slowSine(cv.shimmerRate * (1.3f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
+            drift = cv.drift * (0.65f * slowSine(cv.driftRate * (0.5f + hash01(seed, up, 2)), tp, hash01(seed, up, 3))
+                              + 0.35f * slowSine(cv.driftRate * (1.2f + hash01(seed, up, 4)), tp, hash01(seed, up, 5)));
+            sh = fmaxf(0.0f, 1.0f + cv.shimmer * (0.7f * slowSine(cv.shimmerRate * (0.5f + hash01(seed, up, 6)), tp, hash01(seed, up, 7))
+                                                 + 0.3f * slowSine(cv.shimmerRate * (1.3f + hash01(seed, up, 8)), tp, hash01(seed, up, 9))));
             amp0 = cv.scale * harmonicShape(h, cv.tilt, cv.oddEven, cv.brightness);
             if (hdr->turb.on > 0.0f && !cv.restart) {   // the cascade's power against the spectrum's (this block's, cascadeKernel)
                 const float* q = ((hdr->blockIndex & 1U) ? qa : qb) + static_cast<size_t>(v) * pcap;
@@ -1335,10 +1447,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             sigmaCents = 0.5f * cv.airWidth;
             centre = cv.hz * cv.airCenter * exp2f(z * 0.5f * cv.airWidth * (1.0f / 1200.0f)) + cv.shift;
             const float j = cv.airJitter;
-            drift = 40.0f * (0.6f * slowSine(j * (0.5f + hash01(seed, up, 2)), t, hash01(seed, up, 3))
-                           + 0.4f * slowSine(j * (1.3f + hash01(seed, up, 4)), t, hash01(seed, up, 5)));
-            sh = fmaxf(0.0f, 1.0f + 0.8f * (0.7f * slowSine(j * (0.7f + hash01(seed, up, 6)), t, hash01(seed, up, 7))
-                                          + 0.3f * slowSine(j * (1.6f + hash01(seed, up, 8)), t, hash01(seed, up, 9))));
+            drift = 40.0f * (0.6f * slowSine(j * (0.5f + hash01(seed, up, 2)), tp, hash01(seed, up, 3))
+                           + 0.4f * slowSine(j * (1.3f + hash01(seed, up, 4)), tp, hash01(seed, up, 5)));
+            sh = fmaxf(0.0f, 1.0f + 0.8f * (0.7f * slowSine(j * (0.7f + hash01(seed, up, 6)), tp, hash01(seed, up, 7))
+                                          + 0.3f * slowSine(j * (1.6f + hash01(seed, up, 8)), tp, hash01(seed, up, 9))));
             amp0 = cv.airScale;
         }
 
@@ -1408,10 +1520,10 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
                     dx += 0.5f * S.swarm * (ap + am);
                     dth += 0.5f * S.coupling * (ap - am);
                 }
-                x += dx * dtb;
+                x += dx * dtb * clockRate;
                 x -= 6.2831853f * floorf(x * 0.15915494f);
                 sx[gid] = x;
-                th += dth * dtb;
+                th += dth * dtb * clockRate;
                 th -= 6.2831853f * floorf(th * 0.15915494f);
                 theta[gid] = th;
                 float sxs, sxc;
@@ -1419,7 +1531,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
                 swarmCents = S.reach * sxc;
                 swarmSide = 0.5f * fminf(S.reach * (1.0f / 30.0f), 1.0f) * sxs;
                 // The heard phase turns on at the rate.
-                const float heard = th + 6.2831853f * S.rate * cv.time;
+                const float heard = th + 6.2831853f * S.rate * tp;
                 env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(heard)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
             } else {
                 const float w = 6.2831853f * S.rate * (1.0f + S.spread * u);
@@ -1441,7 +1553,7 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
                         pull = S.coupling * (z.y * co - z.x * s);   // K R sin(ψ - θ)
                     }
                 }
-                th += (w + pull) * dtb;
+                th += (w + pull) * dtb * clockRate;
                 th -= 6.2831853f * floorf(th * 0.15915494f);
                 theta[gid] = th;
                 env *= fmaxf(0.0f, 1.0f + S.depth * __sinf(th)) * rsqrtf(1.0f + 0.5f * S.depth * S.depth);
@@ -1475,6 +1587,13 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
             const float wind = hdr->field.pos[(isAir ? 0 : h - 1) & (kFieldAttractors - 1)] * 0.2f * hdr->field.strength;
             fieldOff = flockStep(hdr->field, odd ? flockB : flockA, odd ? flockA : flockB, static_cast<size_t>(v) * pcap, groupFirst, groupCount,
                                  member, seed, sigmaCents, wind, fieldOff, cv.restart != 0, static_cast<float>(n) / fs);
+        } else if (hdr->field.mode == FieldMode::Orbit) {
+            // The orbit: drawn to the scale's pitches, bent by the field into circles of pitch and side.
+            const bool odd = (hdr->blockIndex & 1U) != 0;
+            float side = 0.0f;
+            fieldOff = orbitStep(hdr->field, odd ? orbitB : orbitA, odd ? orbitA : orbitB, static_cast<size_t>(gid), log2f(fmaxf(home, 1.0f)),
+                                 z * (2.0f / 1200.0f), fieldOff, seed, up, hdr->blockIndex, cv.restart != 0, static_cast<float>(n) / fs, side);
+            place = fminf(fmaxf(place + side, -1.0f), 1.0f);
         } else {
             fieldOff = fieldStep(hdr->field, log2f(fmaxf(home, 1.0f)) + fieldOff * (1.0f / 1200.0f), fieldOff, static_cast<float>(n) / fs,
                                  z * (2.0f / 1200.0f));
@@ -1514,6 +1633,11 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
         const float level = lateBy > 0.0f ? gainAgo(ring + static_cast<size_t>(v) * kGainRing, hdr->blockIndex, lateBy * fs / static_cast<float>(n))
                                           : cv.gain;
         target = amp0 * sh * fade * env * level * exp2f(-dist) * absorb * colour;
+        // The hall's ear: this partial's amplitude in its band, in whole numbers (the sum is the same in
+        // any order). Amplitudes, not powers: a chord's upper harmonics count as heard too, not only the
+        // few loudest bands.
+        if (hdr->modal.listen && target > 0.0f)
+            atomicAdd(hallHist + hallBin(f), static_cast<unsigned long long>(target * 1.0e12f));
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>(fminf(f / fs, 0.49f) * 4294967296.0f);
 
@@ -1728,7 +1852,7 @@ __device__ __forceinline__ float modalUni(int mode, std::uint32_t salt)
  * @param land     the landscape (the painted hall reads it)
  */
 __global__ void __launch_bounds__(kModalThreads)
-modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN, const float* land)
+modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN, const float* land, const float* memory)
 {
     __shared__ float sIn[2][kModalTile];
     __shared__ float sAcc[kModalThreads / 32][2][kModalTile];
@@ -1777,7 +1901,11 @@ modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scrat
         bp -= floorf(bp);
         breathe = mh.breath * __sinf(6.2831853f * bp);
     }
-    const float T = fmaxf(0.05f, mh.decay * exp2f(breathe - mh.damp * fmaxf(0.0f, log2f(f * (1.0f / 250.0f)))));
+    // The hall's memory (Grow): where much was heard, the mode rings longer (growth) or shorter
+    // (erosion) -- up to 2^1.5 at seven times the average, half an octave the other way where nothing was.
+    float grown = 0.0f;
+    if (mh.grow != 0.0f) grown = mh.grow * fminf(fmaxf(log2f(1.0f + memory[hallBin(f)]) - 1.0f, -0.5f), 1.5f);
+    const float T = fmaxf(0.05f, mh.decay * exp2f(breathe + grown - mh.damp * fmaxf(0.0f, log2f(f * (1.0f / 250.0f)))));
     const float r = mh.freeze ? 0.99999988f : __expf(-6.9077553f / (T * fs));
     float sw, cw;
     sincosf(6.2831853f * f / fs, &sw, &cw);
@@ -2490,6 +2618,16 @@ struct CloudEngine::Impl {
     float* dCascadeA = nullptr;       ///< device: per voice and harmonic its power against the spectrum's, buffer A (even blocks read it)
     float* dCascadeB = nullptr;       ///< device: buffer B
     float* dFilterTable = nullptr;    ///< device: per voice the transported filter, kFilterBins gains
+    unsigned long long* dHallHist = nullptr;   ///< device: per band the partials' power this block (fixed point)
+    float* dHallMemory = nullptr;     ///< device: the hall's memory, per band
+    float* dDensity = nullptr;        ///< device: the spectrum's density, per band
+    float* dTau = nullptr;            ///< device: per partial its own clock
+    float4* dOrbitA = nullptr;        ///< device: the Orbit field's state, buffer A
+    float4* dOrbitB = nullptr;        ///< device: buffer B
+    float* hHallMemory = nullptr;     ///< pinned host: the memory as the last snapshot brought it down
+    float* hHallUp = nullptr;         ///< pinned host: a memory to send up
+    bool hallUp = false;              ///< the next launch sends hHallUp up first
+    bool hallDown = false;            ///< hHallMemory holds a memory
     float* dMeltHist = nullptr;       ///< device: the melt's input history, two rings of kMeltN
     float* dMeltAcc = nullptr;        ///< device: its overlap, two rings of kMeltN
     float* dMeltEnergy = nullptr;     ///< device: its held energy, per ear and band
@@ -2563,7 +2701,9 @@ struct CloudEngine::Impl {
                          static_cast<void*>(dMeltHist), static_cast<void*>(dMeltAcc), static_cast<void*>(dMeltEnergy),
                          static_cast<void*>(dMeltOmega), static_cast<void*>(dMeltPhase), static_cast<void*>(dMeltHeard), static_cast<void*>(dMeltState),
                          static_cast<void*>(dSyncX), static_cast<void*>(dFluidA), static_cast<void*>(dFluidB), static_cast<void*>(dIsles),
-                         static_cast<void*>(dCascadeA), static_cast<void*>(dCascadeB), static_cast<void*>(dFilterTable) })
+                         static_cast<void*>(dCascadeA), static_cast<void*>(dCascadeB), static_cast<void*>(dFilterTable),
+                         static_cast<void*>(dHallHist), static_cast<void*>(dHallMemory), static_cast<void*>(dDensity), static_cast<void*>(dTau),
+                         static_cast<void*>(dOrbitA), static_cast<void*>(dOrbitB) })
             if (p) cudaFree(p);
         exec = nullptr; graph = nullptr; evStart = evStop = nullptr; stream = nullptr;
         hUpload = dUpload = nullptr; hOut = dOut = dScratch = dLand = nullptr;
@@ -2577,6 +2717,9 @@ struct CloudEngine::Impl {
         dResW = nullptr; dResIn = nullptr; dResOut = nullptr; dResX = nullptr;
         dMeltHist = dMeltAcc = dMeltEnergy = dMeltOmega = dMeltPhase = dMeltHeard = nullptr; dMeltState = nullptr;
         dSyncX = nullptr; dFluidA = dFluidB = nullptr; dIsles = nullptr; dCascadeA = dCascadeB = nullptr; dFilterTable = nullptr;
+        if (hHallMemory) cudaFreeHost(hHallMemory);
+        if (hHallUp) cudaFreeHost(hHallUp);
+        dHallHist = nullptr; dHallMemory = dDensity = dTau = nullptr; dOrbitA = dOrbitB = nullptr; hHallMemory = hHallUp = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -2706,6 +2849,14 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMalloc(&m.dCascadeA, sizeof(float) * partialsTotal), "cudaMalloc cascade", error)
                 && ok(cudaMalloc(&m.dCascadeB, sizeof(float) * partialsTotal), "cudaMalloc cascade", error)
                 && ok(cudaMalloc(&m.dFilterTable, sizeof(float) * kFilterBins * static_cast<size_t>(config.voices)), "cudaMalloc filter table", error)
+                && ok(cudaMalloc(&m.dHallHist, sizeof(unsigned long long) * kHallBins), "cudaMalloc hall", error)
+                && ok(cudaMalloc(&m.dHallMemory, sizeof(float) * kHallBins), "cudaMalloc hall", error)
+                && ok(cudaMalloc(&m.dDensity, sizeof(float) * kHallBins), "cudaMalloc density", error)
+                && ok(cudaMalloc(&m.dTau, sizeof(float) * partialsTotal), "cudaMalloc clocks", error)
+                && ok(cudaMalloc(&m.dOrbitA, sizeof(float4) * partialsTotal), "cudaMalloc orbit", error)
+                && ok(cudaMalloc(&m.dOrbitB, sizeof(float4) * partialsTotal), "cudaMalloc orbit", error)
+                && ok(cudaHostAlloc(&m.hHallMemory, sizeof(float) * kHallBins, cudaHostAllocDefault), "cudaHostAlloc hall", error)
+                && ok(cudaHostAlloc(&m.hHallUp, sizeof(float) * kHallBins, cudaHostAllocDefault), "cudaHostAlloc hall", error)
                 && ok(cudaMalloc(&m.dLifeStats, sizeof(float) * 12), "cudaMalloc life stats", error)
                 && ok(cudaMalloc(&m.dResW, sizeof(float) * kReservoirN * kReservoirN), "cudaMalloc reservoir", error)
                 && ok(cudaMalloc(&m.dResIn, sizeof(float) * kReservoirN * kReservoirInputs), "cudaMalloc reservoir", error)
@@ -2753,6 +2904,11 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 && ok(cudaMemsetAsync(m.dCascadeA, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dCascadeB, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dFilterTable, 0, sizeof(float) * kFilterBins * static_cast<size_t>(config.voices), m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dHallHist, 0, sizeof(unsigned long long) * kHallBins, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dDensity, 0, sizeof(float) * kHallBins, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dTau, 0, sizeof(float) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dOrbitA, 0, sizeof(float4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
+                && ok(cudaMemsetAsync(m.dOrbitB, 0, sizeof(float4) * partialsTotal, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dLifeStats, 0, sizeof(float) * 12, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenHist, 0, sizeof(float) * 2 * kEchoN, m.stream), "cudaMemsetAsync", error)
                 && ok(cudaMemsetAsync(m.dListenPrev, 0, sizeof(float) * kEchoBins, m.stream), "cudaMemsetAsync", error)
@@ -2787,6 +2943,8 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
         good = ok(cudaStreamSynchronize(m.stream), "reservoir init", error);
         std::memset(m.hLifeStats, 0, sizeof(float) * 12);
         m.melt.clear = 1;   // the first block fills the melt's tables
+        for (int b = 0; b < kHallBins; ++b) m.hHallUp[b] = 1.0f;   // the hall new: every band at the average
+        good = good && ok(cudaMemcpy(m.dHallMemory, m.hHallUp, sizeof(float) * kHallBins, cudaMemcpyHostToDevice), "cudaMemcpy hall", error);
     }
     if (good) {
         std::memset(m.hUpload, 0, m.uploadBytes());
@@ -2815,12 +2973,14 @@ bool CloudEngine::open(const CloudConfig& config, std::string* error)
                 hdr, voices, m.pcap, m.dSyncTheta, m.dSyncX, m.dSyncOrder, partialsTotal);
             updateKernel<<<static_cast<unsigned>((partialsTotal + kThreads - 1) / kThreads), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dShapes, m.dLand, m.dRun, m.dAmp, m.dGains, m.dGainRing, m.dAmpQ, m.dSnap, m.dLifeA, m.dLifeB, m.dSyncTheta,
-                m.dSyncX, m.dSyncOrder, partialsTotal, m.dFlockA, m.dFlockB, m.dCascadeA, m.dCascadeB, m.dFilterTable);
+                m.dSyncX, m.dSyncOrder, partialsTotal, m.dFlockA, m.dFlockB, m.dCascadeA, m.dCascadeB, m.dFilterTable,
+                m.dHallHist, m.dDensity, m.dTau, m.dOrbitA, m.dOrbitB);
+            hallKernel<<<1, kHallBins, 0, m.stream>>>(hdr, m.dHallHist, m.dHallMemory, m.dDensity);
             renderKernel<<<static_cast<unsigned>(m.chunks), kThreads, 0, m.stream>>>(
                 hdr, voices, m.pcap, m.dRun, m.dGains, m.dScratch, n);
             reduceKernel<<<static_cast<unsigned>(kCloudChannels * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dScratch, m.chunks, n, m.dOut);
-            modalKernel<<<static_cast<unsigned>(kModalBlocks), kModalThreads, 0, m.stream>>>(hdr, m.dOut, m.dModal, m.dModalScratch, n, m.dLand);
+            modalKernel<<<static_cast<unsigned>(kModalBlocks), kModalThreads, 0, m.stream>>>(hdr, m.dOut, m.dModal, m.dModalScratch, n, m.dLand, m.dHallMemory);
             modalReduceKernel<<<static_cast<unsigned>(2 * n / kReduceLanes), dim3(kReduceLanes, kReduceGroups), 0, m.stream>>>(
                 hdr, m.dModalScratch, n, m.dOut);
             spectralEchoKernel<<<1, kEchoThreads, 0, m.stream>>>(hdr, m.dOut, m.dEchoHist, m.dEchoAcc, m.dEchoRing, m.dEchoState);
@@ -2897,6 +3057,20 @@ Melt& CloudEngine::melt() { return impl_->melt; }
 
 Turbulence& CloudEngine::turbulence() { return impl_->turb; }
 
+bool CloudEngine::hallMemory(float* out) const
+{
+    if (!impl_ || !impl_->hallDown) return false;
+    std::memcpy(out, impl_->hHallMemory, sizeof(float) * kHallBins);
+    return true;
+}
+
+void CloudEngine::setHallMemory(const float* in)
+{
+    if (!impl_) return;
+    std::memcpy(impl_->hHallUp, in, sizeof(float) * kHallBins);
+    impl_->hallUp = true;
+}
+
 SpectralComb& CloudEngine::comb() { return impl_->comb; }
 
 void CloudEngine::reservoirOut(float* out) const
@@ -2945,7 +3119,8 @@ void CloudEngine::launch()
     hdr->modal = m.modal;
     hdr->modal.tunedCount = std::clamp(m.modal.tunedCount, 0, kModalTuned);
     hdr->field = m.field;
-    hdr->field.count = std::clamp(m.field.count, 0, m.field.mode == FieldMode::Scale ? kFieldPoints : kFieldAttractors);
+    const bool pitches = m.field.mode == FieldMode::Scale || m.field.mode == FieldMode::Orbit;   // the scale's pitches, not attractors
+    hdr->field.count = std::clamp(m.field.count, 0, pitches ? kFieldPoints : kFieldAttractors);
     hdr->field.dispersion = std::clamp(m.field.dispersion, -2.0f, 2.0f);
     hdr->blockIndex = m.blockIndex++;
     hdr->binaural = m.binaural;
@@ -2978,11 +3153,16 @@ void CloudEngine::launch()
         v.restart = 0;
         if (v.active) v.time += dt;
     }
+    if (m.hallUp) {   // a memory loaded (or a new hall): up before the block
+        cudaMemcpyAsync(m.dHallMemory, m.hHallUp, sizeof(float) * kHallBins, cudaMemcpyHostToDevice, m.stream);
+        m.hallUp = false;
+    }
     cudaEventRecord(m.evStart, m.stream);
     cudaGraphLaunch(m.exec, m.stream);
     m.snapInFlight = m.snapAsked;
     if (m.snapAsked) {   // the picture's snapshot behind the block, before the event wait() waits for
         cudaMemcpyAsync(m.hSnap, m.dSnap, sizeof(float2) * (static_cast<size_t>(m.cfg.voices) * m.pcap / kSnapStride), cudaMemcpyDeviceToHost, m.stream);
+        cudaMemcpyAsync(m.hHallMemory, m.dHallMemory, sizeof(float) * kHallBins, cudaMemcpyDeviceToHost, m.stream);   // and the hall's memory
         if (m.life.mode != LifeMode::Off)   // and the living field, as it stands after this block's steps
             cudaMemcpyAsync(m.hLife, m.lifeParity ? m.dLifeB : m.dLifeA, sizeof(float2) * kLifeCells, cudaMemcpyDeviceToHost, m.stream);
         m.snapAsked = false;
@@ -3010,6 +3190,7 @@ const float* CloudEngine::wait()
         m.launched = false;
         if (m.snapInFlight) {
             m.snapReady = true;
+            m.hallDown = true;
             m.snapInFlight = false;
             m.lifeShown = m.life.mode != LifeMode::Off;
             if (m.lifeShown)

@@ -22,6 +22,8 @@ const char* const kPresetGroupNames[kNumPresetGroups] = {
     "Stretched Worlds", "Shifted Metals", "Comb Phasers", "Barber Poles", "Painted Light", "Prisms", "Alien Harmony", "Dream Machines",
     "Swarms", "Splinters", "Chimeras", "Twin Swarms", "Currents", "Vortex Streets", "Ink Plumes", "Islands",
     "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms",
+    "Growing Halls", "Eroded Halls", "Cathedral Years", "Worn Stone", "Slow Clocks", "Quickened Air", "Gravity Lenses", "Lingering Waves",
+    "Orbits", "Cyclotrons", "Planetaria", "Magnetic Choirs", "Event Horizons", "Memory Palaces", "Celestial Mechanics", "Living Architecture",
 };
 
 namespace {

@@ -532,7 +532,7 @@ int main()
         const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
         bool full = true;
         for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
-        check(numPresets() == 5120 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
+        check(numPresets() == 6144 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
               fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
                   bad, outOfRange, rowsLost));
     }
@@ -2168,6 +2168,201 @@ int main()
                   "pressure %+.2f dB; slide: centroid %+.2f octaves",
                   sizes ? cents(bent[0], before[0]) : 0.0, sizes ? cents(bent[1], before[1]) : 0.0, sizes ? cents(released[1], before[1]) : 0.0,
                   sizes ? cents(master[0], before[0]) : 0.0, sizes ? cents(master[1], before[1]) : 0.0, dbPress - dbRest, cSlide - cRest));
+    }
+
+    // 58. The growing hall (Phase 17a): a chord held for a minute with Grow on teaches the hall its
+    //     pitches. Growing, the hall's tail after the chord dies more slowly than a new hall's; eroding,
+    //     faster. The memory brought out of the engine and put into a new one rings as the trained hall.
+    {
+        struct Tail { double slope = 0.0, level = 0.0; };   // dB a second, dBFS
+        std::vector<float> learnt;
+        double age = 0.0;
+        double readBack = 1.0;   // the largest difference of the memory read back after a restore, of its value
+        auto play = [&](float grow, double train, const std::vector<float>* memory, bool keep, Tail& t) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::ModalLevel, 1.0f);
+            e.setParam(ParamId::ModalDecay, 6.0f);
+            e.setParam(ParamId::ModalBreath, 0.0f);   // its decays the same at every time: only the memory changes them
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::HallGrow, grow);
+            e.setParam(ParamId::HallMemory, memory != nullptr ? 14400.0f : 60.0f);
+            if (!openOffline(e, false, 177)) return false;
+            if (memory != nullptr) e.setHallMemory(*memory, 60.0);
+            for (int note : { 48, 55, 60, 64 }) e.noteOn(note, 0.8f, 0);
+            render(e, train);
+            if (keep && !e.hallMemory(learnt, age)) return false;
+            if (memory != nullptr) {
+                std::vector<float> back;
+                double backAge = 0.0;
+                e.hallMemory(back, backAge);
+                readBack = 0.0;
+                for (size_t b = 0; b < back.size() && b < memory->size(); ++b)
+                    readBack = std::max(readBack, std::fabs(static_cast<double>(back[b]) - (*memory)[b]) / std::max(0.1, static_cast<double>((*memory)[b])));
+            }
+            for (int note : { 48, 55, 60, 64 }) e.noteOff(note, 0);
+            const std::vector<float> lr = render(e, 2.5);
+            const double a = rmsDb(lr, 12000, 36000), b = rmsDb(lr, 84000, 108000);   // 0.25 .. 0.75 s, 1.75 .. 2.25 s after
+            t.slope = (a - b) / 1.5;
+            t.level = a;
+            return true;
+        };
+        Tail plain, grown, eroded, restored;
+        const bool ran = play(0.0f, 6.0, nullptr, false, plain) && play(1.0f, 60.0, nullptr, true, grown) && play(-1.0f, 60.0, nullptr, false, eroded)
+                      && play(1.0f, 6.0, &learnt, false, restored);
+        // The memory: the chord's root (C3, 130.8 Hz) heard far above the average, the most of the bands below it.
+        const int root = static_cast<int>(std::log2(130.81 / 20.0) / 9.96578428 * kHallBins);
+        double below = 0.0;
+        for (int b = 0; b < root - 40; ++b) below = std::max(below, static_cast<double>(learnt.empty() ? 1.0f : learnt[static_cast<size_t>(b)]));
+        const double atRoot = learnt.empty() ? 0.0 : *std::max_element(learnt.begin() + root - 3, learnt.begin() + root + 4);
+        check(ran && atRoot > 2.0 && below < 0.5 && std::fabs(age - 60.0) < 2.0 && grown.slope < 0.7 * plain.slope && eroded.slope > 1.25 * plain.slope
+                  && restored.slope < 0.7 * plain.slope && readBack < 0.02,
+              "hall: it grows into what it hears, erodes, and is kept",
+              fmt("memory %.1f at the root, %.2f below it, %.0f s learnt; the tail falls %.1f dB/s new, %.1f grown, %.1f eroded; "
+                  "restored into a new engine %.1f, read back within %.2f %%",
+                  atRoot, below, age, plain.slope, grown.slope, eroded.slope, restored.slope, 100.0 * readBack));
+    }
+
+    // 59. The partials' own time (Phase 17b): where the spectrum is dense their drift slows (Time Bend
+    //     positive) or quickens (negative), at the same level. The drift as heard: each partial's move
+    //     weighted by its amplitude.
+    {
+        double speed[3] = { 0.0, 0.0, 0.0 }, level[3] = { 0.0, 0.0, 0.0 };
+        bool ran = true;
+        const float bends[3] = { 0.0f, 1.0f, -1.0f };
+        for (int k = 0; k < 3; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::Drift, 30.0f);
+            e.setParam(ParamId::DriftRate, 0.3f);
+            e.setParam(ParamId::Doppler, 0.0f);
+            e.setParam(ParamId::Breath, 0.0f);
+            e.setParam(ParamId::TimeBend, bends[k]);
+            if (!openOffline(e, false, 179)) return 1;
+            for (int note : { 48, 55, 60, 64 }) e.noteOn(note, 0.8f, 0);
+            render(e, 2.0);
+            std::vector<float> L(256), R(256), dots, last, lr;
+            int per = 0;
+            double moved = 0.0, weight = 0.0;
+            long count = 0;
+            for (int b = 0; b < 750; ++b) {   // 4 s
+                e.process(L.data(), R.data(), 256);
+                for (int i = 0; i < 256; ++i) { lr.push_back(L[static_cast<size_t>(i)]); lr.push_back(R[static_cast<size_t>(i)]); }
+                if (!e.partialSnapshot(dots, per)) continue;
+                if (last.size() == dots.size())
+                    for (size_t i = 0; i + 1 < dots.size(); i += 2)
+                        if (dots[i] > 20.0f && last[i] > 20.0f && dots[i + 1] > 0.0f) {
+                            moved += dots[i + 1] * std::fabs(1200.0 * std::log2(static_cast<double>(dots[i]) / last[i]));
+                            weight += dots[i + 1];
+                            ++count;
+                        }
+                last = dots;
+            }
+            ran = ran && count > 100;
+            speed[k] = weight > 0.0 ? moved / weight : 0.0;
+            level[k] = rmsDb(lr, 0, lr.size() / 2);
+        }
+        check(ran && speed[1] < 0.75 * speed[0] && speed[2] > 1.3 * speed[0] && std::fabs(level[1] - level[0]) < 1.0 && std::fabs(level[2] - level[0]) < 1.0,
+              "time bend: the partials' drift slower where the spectrum is dense, or faster",
+              fmt("%.2f cents a snapshot plain, %.2f bent slow, %.2f bent fast; %.1f / %.1f / %.1f dBFS", speed[0], speed[1], speed[2], level[0], level[1], level[2]));
+    }
+
+    // 60. The Orbit field (Phase 17c): a partial circles its well -- its pitch swings about the
+    //     scale's pitch, back and forth many times, within the radius -- at the level of no field.
+    {
+        double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 }, mean[2] = { 0.0, 0.0 }, widest = 0.0;
+        int crossings = 0;
+        bool ran = true;
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Attack, 0.2f);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::Shimmer, 0.0f);
+            e.setParam(ParamId::Drift, 0.0f);
+            e.setParam(ParamId::CloudWidth, 0.0f);
+            e.setParam(ParamId::Doppler, 0.0f);
+            e.setParam(ParamId::Breath, 0.0f);
+            e.setParam(ParamId::FieldMode, k == 0 ? 0.0f : static_cast<float>(FieldMode::Orbit));
+            e.setParam(ParamId::FieldStrength, 0.5f);
+            e.setParam(ParamId::FieldRadius, 20.0f);   // orbits of about 10 cents: within the well (wider ones hop to the next pitch)
+            e.setParam(ParamId::FieldSpring, 0.2f);
+            e.setParam(ParamId::FieldRate, 0.2f);
+            if (!openOffline(e, false, 181)) return 1;
+            e.noteOn(60, 0.8f, 0);
+            render(e, 2.0);
+            std::vector<float> L(256), R(256), dots, lr;
+            std::vector<double> cents;
+            int per = 0;
+            for (int b = 0; b < 1875; ++b) {   // 10 s
+                e.process(L.data(), R.data(), 256);
+                for (int i = 0; i < 256; ++i) { lr.push_back(L[static_cast<size_t>(i)]); lr.push_back(R[static_cast<size_t>(i)]); }
+                if (e.partialSnapshot(dots, per) && dots.size() >= 2 && dots[0] > 20.0f) cents.push_back(1200.0 * std::log2(dots[0] / 261.6256));   // the tuning's C sets the mean
+            }
+            ran = ran && cents.size() > 200;
+            double m = 0.0, m2 = 0.0;
+            for (double c : cents) { m += c; m2 += c * c; }
+            m /= std::max<size_t>(cents.size(), 1);
+            sd[k] = std::sqrt(std::max(0.0, m2 / std::max<size_t>(cents.size(), 1) - m * m));
+            level[k] = rmsDb(lr, 0, lr.size() / 2);
+            mean[k] = m;
+            if (k == 1)
+                for (size_t i = 1; i < cents.size(); ++i) {
+                    if ((cents[i] - m) * (cents[i - 1] - m) < 0.0) ++crossings;
+                    widest = std::max(widest, std::fabs(cents[i] - mean[0]));
+                }
+        }
+        check(ran && sd[0] < 1.0 && sd[1] > 3.0 && sd[1] < 25.0 && widest < 60.0 && std::fabs(mean[1] - mean[0]) < 10.0 && crossings >= 10
+                  && std::fabs(level[1] - level[0]) < 1.5,
+              "orbit: the partials circle the scale's pitches",
+              fmt("the fundamental swings %.1f cents (%.2f without a field), at most %.0f from its pitch, mean %+.1f, %d crossings in 10 s; %.1f / %.1f dBFS",
+                  sd[1], sd[0], widest, mean[1] - mean[0], crossings, level[1], level[0]));
+    }
+
+    // 61. The ripple's bend (Phase 17b): a struck note's wave lingers where it sounds -- with Bend, 0.6 s
+    //     later the string still stands far higher at the note's fundamental; without, the wave has run on.
+    //     And the waves leaving the slow zone are no louder for it (the whole string holds no more).
+    {
+        double kept[2] = { 0.0, 0.0 }, whole[2] = { 0.0, 0.0 };
+        bool ran = true;
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, 0.0f);
+            e.setParam(ParamId::RippleDepth, 1.0f);
+            e.setParam(ParamId::RippleSpeed, 1.5f);
+            e.setParam(ParamId::RippleDecay, 8.0f);
+            e.setParam(ParamId::RippleBend, static_cast<float>(k));
+            if (!openOffline(e, false, 183)) return 1;
+            e.noteOn(50, 0.8f, 0);
+            float u[kRippleCells];
+            constexpr float perOctave = static_cast<float>(kRippleCells - 1) / 9.96578428f;
+            const float c1 = std::log2(146.83f / 20.0f) * perOctave;
+            auto atRoot = [&](double& energy) {   // the string's height at the fundamental, and its whole energy
+                e.rippleString(u);
+                double peak = 0.0;
+                energy = 0.0;
+                for (int i = 0; i < kRippleCells; ++i) {
+                    if (std::fabs(static_cast<float>(i) - c1) <= 3.0f) peak = std::max(peak, std::fabs(static_cast<double>(u[i])));
+                    energy += static_cast<double>(u[i]) * u[i];
+                }
+                return peak;
+            };
+            render(e, 0.05);   // past the latency: the strike is on the string
+            double energy0 = 0.0, energy1 = 0.0;
+            const double start = atRoot(energy0);
+            render(e, 0.6);
+            const double later = atRoot(energy1);
+            ran = ran && start > 0.0 && energy0 > 0.0;
+            kept[k] = start > 0.0 ? later / start : 0.0;
+            whole[k] = energy0 > 0.0 ? energy1 / energy0 : 0.0;
+        }
+        check(ran && kept[1] > 2.0 * kept[0] && whole[1] < 1.0, "ripple: with Bend its waves linger at the notes",
+              fmt("0.6 s after the strike the string stands at %.0f %% of its height at the fundamental plain, %.0f %% bent; "
+                  "the whole string %.0f / %.0f %% of its energy", 100.0 * kept[0], 100.0 * kept[1], 100.0 * whole[0], 100.0 * whole[1]));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

@@ -314,6 +314,58 @@ void AdditivProcessor::mapTick()
     engine_.setMapTarget(s);
 }
 
+/** @brief A hall's memory as text: its kHallBins floats, base64. @param m the memory @return the text */
+static juce::String hallText(const std::vector<float>& m)
+{
+    const juce::MemoryBlock b(m.data(), m.size() * sizeof(float));
+    return b.toBase64Encoding();
+}
+
+/** @brief A hall's memory from its text. @param s the text @param m receives the memory @return false when it is no memory */
+static bool hallFromText(const juce::String& s, std::vector<float>& m)
+{
+    juce::MemoryBlock b;
+    if (!b.fromBase64Encoding(s) || b.getSize() != sizeof(float) * static_cast<size_t>(additiv::kHallBins)) return false;
+    m.resize(static_cast<size_t>(additiv::kHallBins));
+    std::memcpy(m.data(), b.getData(), b.getSize());
+    return true;
+}
+
+juce::File AdditivProcessor::hallFolder()
+{
+    return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Halls");
+}
+
+bool AdditivProcessor::saveHall(const juce::File& file)
+{
+    std::vector<float> m;
+    double age = 0.0;
+    engine_.hallMemory(m, age);
+    juce::XmlElement xml("EmpyreanHall");
+    xml.setAttribute("version", ADDITIV_VERSION);
+    xml.setAttribute("age", age);
+    xml.setAttribute("memory", hallText(m));
+    if (!xml.writeTo(file)) return false;
+    hallName_ = file.getFileNameWithoutExtension();
+    return true;
+}
+
+bool AdditivProcessor::loadHall(const juce::File& file)
+{
+    const std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse(file);
+    std::vector<float> m;
+    if (!xml || !xml->hasTagName("EmpyreanHall") || !hallFromText(xml->getStringAttribute("memory"), m)) return false;
+    engine_.setHallMemory(m, xml->getDoubleAttribute("age"));
+    hallName_ = file.getFileNameWithoutExtension();
+    return true;
+}
+
+void AdditivProcessor::newHall()
+{
+    engine_.setHallMemory({}, 0.0);
+    hallName_.clear();
+}
+
 juce::File AdditivProcessor::routeFolder()
 {
     return juce::File::getSpecialLocation(juce::File::userDocumentsDirectory).getChildFile("Empyrean").getChildFile("Routes");
@@ -653,6 +705,16 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
         s->setAttribute("rows", juce::String(slotMods_[k]));
         for (const ParamDesc& d : additiv::paramTable()) s->setAttribute(juce::String("p_") + d.key, static_cast<double>(slotValues_[k][static_cast<size_t>(d.id)]));
     }
+    {   // the hall's memory, once it has heard anything (the instrument's, not a preset's)
+        std::vector<float> m;
+        double age = 0.0;
+        if (engine_.hallMemory(m, age)) {
+            auto* h = xml.createNewChildElement("Hall");
+            h->setAttribute("age", age);
+            h->setAttribute("name", hallName_);
+            h->setAttribute("memory", hallText(m));
+        }
+    }
     for (int cc = 0; cc < 128; ++cc) {
         const int id = ccMap_[static_cast<size_t>(cc)].load(std::memory_order_relaxed);
         if (id < 0) continue;
@@ -704,6 +766,16 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         slotMods_[k] = s->getStringAttribute("rows").toStdString();
         slotNames_[k] = s->getStringAttribute("name");
         engine_.setMorphSlot(k, slotValues_[k].data(), slotMods_[k]);
+    }
+    {   // the hall's memory as the state kept it; a state without one: a new hall
+        std::vector<float> m;
+        const juce::XmlElement* h = xml->getChildByName("Hall");
+        if (h != nullptr && hallFromText(h->getStringAttribute("memory"), m)) {
+            engine_.setHallMemory(m, h->getDoubleAttribute("age"));
+            hallName_ = h->getStringAttribute("name");
+        } else {
+            newHall();
+        }
     }
     for (auto& c : ccMap_) c.store(-1, std::memory_order_relaxed);
     for (auto* e : xml->getChildWithTagNameIterator("Learn")) {

@@ -176,6 +176,14 @@ bool Engine::prepare(const EngineConfig& config, std::string* error)
     cc.partialsPerVoice = cfg_.partialsPerVoice;
     cc.spinWait = true;
     if (!cloud_.open(cc, error)) return false;
+    {   // the hall remembers across a new start (a new sample rate, a new block): its memory goes up again
+        const std::lock_guard<std::mutex> lock(snapLock_);
+        if (!hallPendingSet_ && snapHallValid_) {
+            hallPending_ = snapHall_;
+            hallPendingAge_ = snapHallAge_;
+            hallPendingSet_ = true;
+        }
+    }
     const std::vector<EnvShape> bank = factoryShapes();
     cloud_.setShapes(bank.data(), static_cast<int>(bank.size()));
     factoryLandscapes();   // made now, not in the middle of a block
@@ -965,12 +973,43 @@ bool Engine::partialSnapshot(std::vector<float>& dots, int& perVoice)
     return true;
 }
 
+bool Engine::hallMemory(std::vector<float>& out, double& age)
+{
+    const std::lock_guard<std::mutex> lock(snapLock_);
+    out.resize(static_cast<size_t>(kHallBins));
+    if (hallPendingSet_) {
+        std::copy(hallPending_.begin(), hallPending_.end(), out.begin());
+        age = hallPendingAge_;
+    } else if (snapHallValid_) {
+        std::copy(snapHall_.begin(), snapHall_.end(), out.begin());
+        age = snapHallAge_;
+    } else {
+        std::fill(out.begin(), out.end(), 1.0f);
+        age = 0.0;
+    }
+    return age > 0.0;
+}
+
+void Engine::setHallMemory(const std::vector<float>& in, double age)
+{
+    const std::lock_guard<std::mutex> lock(snapLock_);
+    const bool whole = in.size() == static_cast<size_t>(kHallBins);
+    for (int b = 0; b < kHallBins; ++b) {
+        const float m = whole ? in[static_cast<size_t>(b)] : 1.0f;
+        hallPending_[static_cast<size_t>(b)] = std::isfinite(m) ? std::clamp(m, 0.0f, 1024.0f) : 1.0f;
+    }
+    hallPendingAge_ = whole ? std::max(0.0, age) : 0.0;
+    hallPendingSet_ = true;
+}
+
 void Engine::stepRipple(float dt)
 {
     Ripple& R = cloud_.ripple();
     R.depth = cur(ParamId::RippleDepth);
     const int strikes = rippleStrikeCount_;
     rippleStrikeCount_ = 0;
+    const int sounding = rippleVoices_;
+    rippleVoices_ = 0;
     if (R.depth <= 0.0f) {   // at rest: the string is let go, so it starts quiet when it is turned up
         std::fill(std::begin(rippleNow_), std::end(rippleNow_), 0.0f);
         std::fill(std::begin(ripplePrev_), std::end(ripplePrev_), 0.0f);
@@ -999,16 +1038,54 @@ void Engine::stepRipple(float dt)
             }
         }
     }
-    // The damped wave, u_tt = c^2 u_xx - g u_t, by leapfrog; the ends reflect.
+    // The damped wave, u_tt = (c^2 u_x)_x - g u_t, by leapfrog; the ends reflect.
     const float c = std::max(cur(ParamId::RippleSpeed), 0.01f) * kCellsPerOctave;   // cells a second
     const float g = 2.0f / std::max(cur(ParamId::RippleDecay), 0.1f);
     const int steps = std::max(1, static_cast<int>(std::ceil(c * dt / 0.9f)));
     const float h = dt / static_cast<float>(steps), r2 = (c * h) * (c * h), damp = g * h * 0.5f;
+    // Bend: the wave slower where the spectrum is loud -- the sounding voices' first sixteen harmonics,
+    // their amplitudes against the spectrum's mean, each over a sixth of an octave (as wide as a strike:
+    // a narrower slow zone lets the wave leak out at once) -- up to a ninth of its speed, so a wave
+    // lingers at the notes, gathers there and is partly thrown back, as light in a lens -- a fifth of its
+    // speed where a lone note's fundamental is, up to a seventeenth. (A slower cell is as stable.)
+    float r2c[kRippleCells];
+    std::fill(std::begin(r2c), std::end(r2c), r2);
+    const float bend = cur(ParamId::RippleBend);
+    if (bend > 0.0f && sounding > 0) {
+        float power[kRippleCells] = {};
+        float shape[16];
+        for (int k = 1; k <= 16; ++k) shape[k - 1] = harmonicShape(k, blk_.tilt, blk_.oddEven, blk_.brightness);
+        double total = 0.0;
+        for (int v = 0; v < sounding; ++v)
+            for (int k = 1; k <= 16; ++k) {
+                const float fk = rippleHz_[v] * partialRatio(k, blk_.inharmonicB, blk_.stretch) + blk_.shift;
+                if (fk < 20.0f || fk > 20000.0f) continue;
+                const float w = rippleAmp_[v] * shape[k - 1];
+                const float pos = std::log2(fk / 20.0f) * kCellsPerOctave;
+                for (int cc = std::max(0, static_cast<int>(pos) - 12); cc <= std::min(kRippleCells - 1, static_cast<int>(pos) + 13); ++cc) {
+                    const float d = (static_cast<float>(cc) - pos) / 4.0f;
+                    power[cc] += w * std::exp(-0.5f * d * d);
+                }
+                total += w;
+            }
+        if (total > 1.0e-20) {
+            const float mean = static_cast<float>(total * 10.0265 / kRippleCells);   // a bump's sum, 4 sqrt(2 pi)
+            for (int i = 0; i < kRippleCells; ++i) {
+                const float dense = std::clamp(std::log2(1.0f + power[i] / mean) - 1.0f, 0.0f, 4.0f);
+                const float ci = 1.0f / (1.0f + 4.0f * bend * dense);
+                r2c[i] = r2 * ci * ci;
+            }
+        }
+    }
+    // In the conservative form, u_tt = (c^2 u_x)_x: a wave entering a slow zone piles up there, as a
+    // wave on a shelving beach, and leaves it no louder than it came (in c^2 u_xx it would leave louder).
     float next[kRippleCells];
     for (int s = 0; s < steps; ++s) {
         for (int i = 0; i < kRippleCells; ++i) {
-            const float l = rippleNow_[i > 0 ? i - 1 : 1], rr = rippleNow_[i < kRippleCells - 1 ? i + 1 : kRippleCells - 2];
-            next[i] = (2.0f * rippleNow_[i] - (1.0f - damp) * ripplePrev_[i] + r2 * (l - 2.0f * rippleNow_[i] + rr)) / (1.0f + damp);
+            const int il = i > 0 ? i - 1 : 1, ir = i < kRippleCells - 1 ? i + 1 : kRippleCells - 2;
+            const float kl = 0.5f * (r2c[i] + r2c[il]), kr = 0.5f * (r2c[i] + r2c[ir]);
+            const float flow = kr * (rippleNow_[ir] - rippleNow_[i]) - kl * (rippleNow_[i] - rippleNow_[il]);
+            next[i] = (2.0f * rippleNow_[i] - (1.0f - damp) * ripplePrev_[i] + flow) / (1.0f + damp);
         }
         std::copy(std::begin(rippleNow_), std::end(rippleNow_), std::begin(ripplePrev_));
         std::copy(std::begin(next), std::end(next), std::begin(rippleNow_));
@@ -1288,6 +1365,10 @@ void Engine::renderBlock()
         cv.distance = std::clamp(v.distance - 0.5f * expr(MpeTarget::Nearer), 0.0f, 1.0f);
         srcW += gain * level;
         srcD += gain * level * v.distance;
+        if (rippleVoices_ < 64) {
+            rippleHz_[rippleVoices_] = static_cast<float>(v.hz);
+            rippleAmp_[rippleVoices_++] = gain * level;
+        }
         cv.airAbsorb = 1.0f;
         cv.seed = v.seed;
         cv.active = 1;
@@ -1390,6 +1471,16 @@ void Engine::renderBlock()
                 if (f >= mh.low && f <= 16000.0) mh.tuned[count++] = static_cast<float>(f);
             }
         mh.tunedCount = count;
+        // Its memory (Grow): it listens while Grow or the partials' time asks for it -- the partials'
+        // amplitudes gathered over the octaves on the card, the spectrum's density followed over a third of
+        // a second, and the memory a step of Memory towards it while anything sounds. Grow at nothing:
+        // it neither learns nor changes. It learns with the hall's level at nothing too.
+        mh.grow = cur(ParamId::HallGrow);
+        const bool bent = cur(ParamId::TimeBend) != 0.0f;
+        mh.listen = (mh.grow != 0.0f || bent) ? 1 : 0;
+        mh.memoryCoef = mh.grow != 0.0f ? 1.0f - std::exp(-dtf / std::max(cur(ParamId::HallMemory), 1.0f)) : 0.0f;
+        mh.densityCoef = mh.listen ? 1.0f - std::exp(-dtf / 0.3f) : 0.0f;
+        if (mh.memoryCoef > 0.0f && rippleVoices_ > 0) hallAge_ += dt;
         modalTime_ += dtf;
         if (modalTime_ >= 1000.0f) modalTime_ -= 1000.0f;
     }
@@ -1409,6 +1500,15 @@ void Engine::renderBlock()
         F.dispersion = cur(ParamId::Dispersion);
         F.flockFresh = (F.mode == FieldMode::Flock && !flockWas_) ? 1 : 0;
         flockWas_ = F.mode == FieldMode::Flock;
+        F.orbitFresh = (F.mode == FieldMode::Orbit && !orbitWas_) ? 1 : 0;
+        orbitWas_ = F.mode == FieldMode::Orbit;
+        // The Orbit: Pull the wells' depth (0.5 .. 8.5 rad/s), Wander the magnetic field (the circling,
+        // 0.5 .. 30 rad/s), Spring the damping -- light, the circles keep their course; heavy, they
+        // wander; Radius the cents to a full side, and the orbits' size about half of it.
+        F.orbitWell = 0.5f + 8.0f * pull;
+        F.orbitField = 0.5f + 30.0f * cur(ParamId::FieldRate);
+        F.orbitDamp = 0.05f + 1.5f * spring * spring;
+        F.timeBend = cur(ParamId::TimeBend);
         const double span = static_cast<double>(cur(ParamId::FieldRate)) * dt;
         const int steps = std::max(1, static_cast<int>(std::ceil(span / 0.002)));
         const double h = span / steps;
@@ -1421,7 +1521,7 @@ void Engine::renderBlock()
                 d(mid, k2);
                 for (int j = 0; j < 3; ++j) s[j] += h * k2[j];
             }
-        if (F.mode == FieldMode::Scale) {
+        if (F.mode == FieldMode::Scale || F.mode == FieldMode::Orbit) {
             int count = 0;
             for (int note = 0; note < 128 && count < kFieldPoints; ++note) {
                 const float lf = static_cast<float>(std::log2(frequencyOf(note) * tideMul));
@@ -1673,6 +1773,17 @@ void Engine::renderBlock()
         snapCountdown_ = std::max(1, static_cast<int>(std::lround(0.033 * cfg_.sampleRate / G)));
         cloud_.requestSnapshot();
     }
+    {   // a hall loaded (or a new one): up with this block, when the message thread is not just writing it
+        std::unique_lock<std::mutex> lock(snapLock_, std::try_to_lock);
+        if (lock.owns_lock() && hallPendingSet_) {
+            cloud_.setHallMemory(hallPending_.data());
+            hallAge_ = hallPendingAge_;
+            snapHall_ = hallPending_;
+            snapHallAge_ = hallAge_;
+            snapHallValid_ = true;
+            hallPendingSet_ = false;
+        }
+    }
     LARGE_INTEGER qpcLaunch, qpcBack;
     QueryPerformanceCounter(&qpcLaunch);
     cloud_.launch();
@@ -1690,6 +1801,10 @@ void Engine::renderBlock()
                 snapPer_ = per;
                 if (const float* cells = cloud_.lifePicture()) snapLife_.assign(cells, cells + kLifeW * kLifeH);
                 else snapLife_.clear();
+                if (cloud_.hallMemory(snapHall_.data())) {   // and the hall's memory
+                    snapHallValid_ = true;
+                    snapHallAge_ = hallAge_;
+                }
                 ++snapSeq_;
             }
         }

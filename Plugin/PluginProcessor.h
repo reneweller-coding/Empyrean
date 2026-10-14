@@ -164,6 +164,16 @@ public:
     };
     /** @brief Where the player's routes live: Documents/Empyrean/Routes. @return the folder */
     static juce::File routeFolder();
+    /** @brief Where the player's halls live: Documents/Empyrean/Halls. @return the folder */
+    static juce::File hallFolder();
+    /** @brief Writes the hall's memory (Hall page) to a file. @param file where @return false when it cannot */
+    bool saveHall(const juce::File& file);
+    /** @brief Hears a hall's memory in from a file (from the next block). @param file which @return false when it holds no hall */
+    bool loadHall(const juce::File& file);
+    /** @brief A new hall: everything it has heard forgotten. */
+    void newHall();
+    /** @brief The hall's name: the file it was last loaded from or saved to, empty for one never saved. @return the name */
+    juce::String hallName() const { return hallName_; }
     /** @brief The routes to choose from: the built-ins, then the player's files. @return them */
     std::vector<RouteEntry> routes() const;
     /** @brief Loads a route (it does not start). @param entry which @return false when it cannot be read */
@@ -274,6 +284,7 @@ private:
     additiv::Route route_;                                 ///< the route being played or written
     bool routeLoop_ = true;                                ///< it starts over after its last point
     juce::String routeName_;                               ///< its name
+    juce::String hallName_;   ///< the hall's name (hallName())
     juce::File userLandFile_;                              ///< where it came from
     int userLandVersion_ = 0;                              ///< bumped when it changes
     mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)

@@ -247,6 +247,11 @@ enum class ParamId : int {
     MpePressDepth,  ///< 0 .. 1: how far
     MpeSlide,       ///< what a note's slide (CC 74 on its channel) moves
     MpeSlideDepth,  ///< 0 .. 1: how far
+    // Phase 17 (14.10.2026): the growing hall, the partials' own time, the ripple's bend
+    HallGrow,       ///< -1 .. 1: the modal hall's memory of what it heard: positive, those pitches ring longer (growth); negative, shorter (erosion)
+    HallMemory,     ///< s: how slowly the hall's memory forms (a minute .. four hours)
+    TimeBend,       ///< -1 .. 1: each partial's clock (its drift, shimmer, sync) slower where the spectrum is dense (positive) or faster
+    RippleBend,     ///< 0 .. 1: the ripple's speed falls where the spectrum is loud: its waves linger at the notes
     Count           ///< number of parameters
 };
 
@@ -311,8 +316,8 @@ extern const char* const kMpeTargetNames[kNumMpeTargets];   ///< "Off", "Level",
 
 /** @brief What a note's pressure or slide moves (MPE), in kMpeTargetNames' order. */
 enum class MpeTarget : int { Off = 0, Level, Filter, Brightness, Width, Nearer, Shimmer, Motion };
-constexpr int kNumFieldModes = 5;   ///< entries of kFieldModeNames
-extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock" (Cloud.h FieldMode)
+constexpr int kNumFieldModes = 6;   ///< entries of kFieldModeNames
+extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" (Cloud.h FieldMode)
 constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames
 extern const char* const kFarModeNames[kNumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
 extern const char* const kRootNames[12];                  ///< "C" .. "B"
