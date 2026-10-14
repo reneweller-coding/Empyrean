@@ -136,10 +136,10 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     for (auto* b : { &prevPreset_, &presetName_, &nextPreset_ }) addAndMakeVisible(b);
     prevPreset_.setTooltip("The preset before");
     nextPreset_.setTooltip("The preset after");
-    presetName_.setTooltip("The preset playing: click for the bank (96 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)");
+    presetName_.setTooltip("The preset playing: click to browse the bank (96 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)");
     prevPreset_.onClick = [this] { loadPreset((std::max(proc_.currentPreset(), 0) + additiv::numPresets() - 1) % additiv::numPresets()); };
     nextPreset_.onClick = [this] { loadPreset((proc_.currentPreset() + 1) % additiv::numPresets()); };
-    presetName_.onClick = [this] { showPresets(); };
+    presetName_.onClick = [this] { browser_.open(); };
     addAndMakeVisible(step_);
     step_.setTooltip("Autoplay: exchange one voice of the chord now");
     step_.onClick = [this] { proc_.engine().autoplayStep(); };
@@ -167,6 +167,15 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     searchButton_.setTooltip("Find any knob, preset or action by typing a few letters (Ctrl+K)");
     searchButton_.onClick = [this] { openPalette(); };
     addChildComponent(palette_);
+    addChildComponent(browser_);
+    browser_.onChoose = [this](int factory, int user) {
+        if (factory >= 0) loadPreset(factory);
+        else if (user >= 0) {
+            history_.begin("Preset", values(), {}, true);
+            proc_.chooseUserPreset(user);
+            history_.end(values(), {});
+        }
+    };
     info_ = std::make_unique<InfoLine>(proc_, *this);
     addAndMakeVisible(*info_);
     canvasButton_.setTooltip("Canvas: the partials and the landscape alone, the whole window, the four macros under them; a click in the spectrum plays (double-click the picture, or Esc, to come back)");
@@ -414,6 +423,9 @@ void AdditivEditor::shootStep()
             const int id = static_cast<int>(shown->id);
             juce::Timer::callAfterDelay(3000, [safe = juce::Component::SafePointer<AdditivEditor>(this), id] { if (safe != nullptr) safe->revealParam(id); });
         }
+        // ADDITIV_SHOT_BROWSER: the preset browser open.
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_BROWSER", {}).isNotEmpty())
+            juce::MessageManager::callAsync([this] { browser_.open(); });
         // ADDITIV_SHOT_PALETTE: the command palette open with that typed into it.
         const juce::String query = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_PALETTE", {});
         if (query.isNotEmpty()) juce::MessageManager::callAsync([this, query] {
@@ -477,6 +489,7 @@ void AdditivEditor::resized()
     frame::layoutHeader(area, h);
     headerBottom_ = area.getY();
     palette_.setBounds(getLocalBounds());
+    browser_.setBounds(getLocalBounds());
     if (canvas_) {   // the picture is the window
         cloud_.setBounds(area);
         canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
@@ -592,7 +605,8 @@ std::vector<CommandPalette::Command> AdditivEditor::paletteCommands()
         tabs_.setCurrentTabIndex(0);
     });
     action("Help", "the manual (F1)", [this] { showHelp(true); });
-    action("Presets", "the bank's menu", [this] { showPresets(); });
+    action("Browse presets", "by name, group, star, recent, and how they sound", [this] { browser_.open(); });
+    action("Presets menu", "the bank's groups as a menu", [this] { showPresets(); });
     for (int t = 0; t < tabs_.getNumTabs(); ++t)
         action("Page: " + tabs_.getTabNames()[t], "show it", [this, t] {
             if (canvas_) setCanvas(false);

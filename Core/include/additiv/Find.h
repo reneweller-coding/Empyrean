@@ -24,6 +24,15 @@ namespace additiv {
 int findLike(const Description& d, int* out, int n, float* distance = nullptr);
 
 /**
+ * @brief A preset's measured traits, as the search compares them: brightness, motion, width and noise,
+ *        each in spreads of the bank about its mean (the preset browser filters by them).
+ * @param index  the preset
+ * @param out    receives four values
+ * @return       false for an index the table does not hold
+ */
+bool presetFeatures(int index, float* out);
+
+/**
  * @brief A recording (WAV or FLAC) described: at most two minutes from its middle, left and right
  *        (a mono file is its own left and right).
  * @param path     the file

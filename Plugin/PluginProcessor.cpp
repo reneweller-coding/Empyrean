@@ -286,10 +286,98 @@ void AdditivProcessor::applyUserPreset(int i, double glide)
 
 void AdditivProcessor::chooseUserPreset(int i)
 {
+    if (i < 0 || i >= static_cast<int>(userPresets_.size())) return;
+    browsing_ = false;
+    noteRecent(userPresets_[static_cast<size_t>(i)].name);
     journeyPlayer_.stop();
     setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
     leaveMap(false);
     applyUserPreset(i, -1.0);
+}
+
+juce::PropertiesFile& AdditivProcessor::userSettings()
+{
+    if (userSettings_ == nullptr) {
+        juce::PropertiesFile::Options o;
+        o.applicationName = "player";
+        o.folderName = "Empyrean";
+        o.filenameSuffix = ".settings";
+        o.osxLibrarySubFolder = "Application Support";
+        userSettings_ = std::make_unique<juce::PropertiesFile>(o);
+    }
+    return *userSettings_;
+}
+
+bool AdditivProcessor::favorite(const juce::String& name) const
+{
+    auto* self = const_cast<AdditivProcessor*>(this);   // the settings file is read on first use
+    return juce::StringArray::fromLines(self->userSettings().getValue("favorites")).contains(name);
+}
+
+void AdditivProcessor::setFavorite(const juce::String& name, bool on)
+{
+    juce::StringArray f = juce::StringArray::fromLines(userSettings().getValue("favorites"));
+    f.removeEmptyStrings();
+    f.removeString(name);
+    if (on) f.add(name);
+    userSettings().setValue("favorites", f.joinIntoString("\n"));
+    userSettings().saveIfNeeded();
+}
+
+juce::StringArray AdditivProcessor::recentPresets() const
+{
+    auto* self = const_cast<AdditivProcessor*>(this);
+    juce::StringArray r = juce::StringArray::fromLines(self->userSettings().getValue("recent"));
+    r.removeEmptyStrings();
+    return r;
+}
+
+void AdditivProcessor::noteRecent(const juce::String& name)
+{
+    juce::StringArray r = recentPresets();
+    r.removeString(name);
+    r.insert(0, name);
+    while (r.size() > 40) r.remove(r.size() - 1);
+    userSettings().setValue("recent", r.joinIntoString("\n"));
+    userSettings().saveIfNeeded();
+}
+
+void AdditivProcessor::previewValues(const std::vector<float>& v, const std::string& mod)
+{
+    if (!browsing_) {
+        stepOutOfBlends();
+        browseFrom_ = knobValues();
+        browseFromMod_ = engine_.modText();
+        browsing_ = true;
+    }
+    engine_.beginMorph(0.4);
+    for (int k = 0; k < additiv::kNumParams; ++k)
+        if (!additiv::keptByPresets(static_cast<ParamId>(k))) setValue(k, v[static_cast<size_t>(k)]);
+    engine_.setModText(mod);
+}
+
+void AdditivProcessor::previewPreset(int index)
+{
+    if (index < 0 || index >= additiv::numPresets()) return;
+    float values[additiv::kNumParams];
+    std::string mod;
+    additiv::presetValues(index, values, &mod);
+    previewValues(std::vector<float>(values, values + additiv::kNumParams), mod);
+}
+
+void AdditivProcessor::previewUserPreset(int i)
+{
+    if (i >= 0 && i < static_cast<int>(userPresets_.size())) previewValues(userPresets_[static_cast<size_t>(i)].values, userPresets_[static_cast<size_t>(i)].mod);
+}
+
+void AdditivProcessor::endPreview()
+{
+    if (!browsing_) return;
+    browsing_ = false;
+    engine_.beginMorph(0.4);
+    for (int k = 0; k < additiv::kNumParams; ++k)
+        if (!additiv::keptByPresets(static_cast<ParamId>(k))) setValue(k, browseFrom_[static_cast<size_t>(k)]);
+    engine_.setModText(browseFromMod_);
 }
 
 void AdditivProcessor::setReference()
@@ -325,6 +413,8 @@ void AdditivProcessor::revertKnob(int id)
 void AdditivProcessor::choosePreset(int index)
 {
     if (index < 0 || index >= additiv::numPresets()) return;
+    browsing_ = false;   // chosen while listened to: it stays
+    noteRecent(additiv::preset(index).name);
     journeyPlayer_.stop();
     setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
     if (value(static_cast<int>(ParamId::MapActive)) >= 0.5f) {

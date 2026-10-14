@@ -40,6 +40,13 @@ int findLike(const Description& d, int* out, int n, float* distance)
     return m;
 }
 
+bool presetFeatures(int index, float* out)
+{
+    if (index < 0 || index >= kFound) return false;
+    for (int k = 0; k < 4; ++k) out[k] = kFindFeatures[index][k];
+    return true;
+}
+
 bool describeFile(const std::filesystem::path& path, Description& out, double* seconds, std::string* error)
 {
     std::vector<float> L, R;

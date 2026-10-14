@@ -8,6 +8,7 @@
  */
 #pragma once
 
+#include "Browser.h"
 #include "CloudView.h"
 #include "InfoLine.h"
 #include "Palette.h"
@@ -123,6 +124,7 @@ private:
     juce::TextButton canvasButton_{ "Canvas" };                ///< the picture alone, the whole window (and back)
     juce::TextButton searchButton_{ "Search" };                ///< the command palette (Ctrl+K)
     CommandPalette palette_;                                   ///< the command palette, over everything while open
+    PresetBrowser browser_{ proc_ };                           ///< the preset browser, over everything while open
     std::unique_ptr<InfoLine> info_;                           ///< the info line at the bottom: what the control under the mouse does
     bool canvas_ = false;                                      ///< the canvas is shown
     frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play

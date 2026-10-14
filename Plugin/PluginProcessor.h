@@ -202,6 +202,25 @@ public:
     void revertKnob(int id);
     /** @} */
 
+    /** @name Browsing (the preset browser) @{ */
+    /** @brief Listens to a factory preset: the sound glides there, until endPreview() (or it is chosen). @param index the preset */
+    void previewPreset(int index);
+    /** @brief Listens to one of the player's presets. @param i its index in userPresets() */
+    void previewUserPreset(int i);
+    /** @brief Back to the sound before the listening, gliding. */
+    void endPreview();
+    /** @brief Whether a preset is being listened to. @return true then */
+    bool previewingPreset() const { return browsing_; }
+    /** @brief Whether a preset is one of the player's favourites. @param name its name @return true then */
+    bool favorite(const juce::String& name) const;
+    /** @brief Marks or unmarks a favourite. @param name its name @param on marked */
+    void setFavorite(const juce::String& name, bool on);
+    /** @brief The presets chosen lately, the newest first (at most 40). @return their names */
+    juce::StringArray recentPresets() const;
+    /** @brief The player's own settings (favourites, recent, the night mode, the tour), in their application data. @return them */
+    juce::PropertiesFile& userSettings();
+    /** @} */
+
     /** @name The Focus page (Focus.h, Find.h) @{ */
     /** @brief The knobs as they stand. @return kNumParams values */
     std::vector<float> knobValues() const;
@@ -413,6 +432,14 @@ private:
     std::array<additiv::MacroLesson, 4> lessons_{};        ///< what each macro was taught
     std::array<std::vector<float>, 4> teachBase_{};        ///< per macro the knobs when its teaching began (empty: not teaching)
     std::vector<UserPreset> userPresets_;                  ///< the player's presets (refreshUserPresets)
+    std::unique_ptr<juce::PropertiesFile> userSettings_;   ///< favourites, recent, night mode, the tour (userSettings)
+    std::vector<float> browseFrom_;                        ///< the knobs before a preset was listened to
+    std::string browseFromMod_;                            ///< and the matrix
+    bool browsing_ = false;                                ///< a preset is being listened to
+    /** @brief A preset chosen by the player goes on the recent list. @param name its name */
+    void noteRecent(const juce::String& name);
+    /** @brief Knobs and matrix applied for listening (no reference, no recent). @param v the knobs @param mod the matrix */
+    void previewValues(const std::vector<float>& v, const std::string& mod);
     juce::String currentUser_;                             ///< the player's preset playing, "" none
     std::vector<float> reference_;                         ///< the knobs of the preset the sound came from
     std::string referenceMod_;                             ///< and its matrix, as the engine writes it
