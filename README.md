@@ -82,6 +82,8 @@ offline renderer and the manual, and a portable zip.
 - **Simple ways in (the Focus page):** nudges (brighter, calmer, wider, airier) built on a measure of what every knob
   does, the few knobs that matter for this sound, variations to evolve a sound by ear, macros taught by example, and
   presets found by a recording.
+- **Sources in sight:** a modulation dock with every source live -- drag one onto any knob; the pages in sections,
+  each showing what is on in it; a window as large as the screen allows.
 - **A panel to find one's way in:** your own presets, a preset browser by how they sound, a command palette (Ctrl+K),
   an info line that explains every control, snapshots, macros as named knobs, a night mode and first steps.
 - **A panel that takes the hand:** the picture shows what the page in front edits and lets it be dragged (the filter's

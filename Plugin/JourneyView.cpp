@@ -193,7 +193,7 @@ juce::String JourneyView::describe() const
 JourneyPage::JourneyPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live)
     : params_(proc, actions,
               { { "Glide", frame::Family::Space, { ParamId::PresetGlide } },
-                { "Morph", frame::Family::Motion, { ParamId::MorphActive, ParamId::MorphPos } } },
+                { "Morph", frame::Family::Motion, { ParamId::MorphActive, ParamId::MorphPos }, { ParamId::MorphActive } } },
               live),
       view_(proc)
 {

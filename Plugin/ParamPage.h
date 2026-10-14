@@ -10,12 +10,20 @@
 #include "Frame.h"
 #include "PluginProcessor.h"
 
+#include <functional>
 #include <memory>
 #include <vector>
 
 /** @brief One page of parameter groups. */
-class ParamPage final : public juce::Component, private juce::Timer {
+class ParamPage final : public juce::Component, public juce::DragAndDropTarget, private juce::Timer {
 public:
+    /** @brief A group's state, for the page's marks in the tabs. */
+    struct GroupState {
+        juce::String title;     ///< the group's title
+        juce::Colour colour;    ///< its family's colour
+        bool gated = false;     ///< it has main controls that wake it
+        bool awake = true;      ///< a main control is up (or a row moves it)
+    };
     /**
      * @brief A group: its title, its family (the colour), its parameters in order, and what wakes it --
      *        the parameters that, all at nothing, leave the group resting (its other controls dimmed,
@@ -53,10 +61,25 @@ public:
     juce::String groupOf(int id) const;
     /** @brief Lets a parameter's control light up for a moment (the palette found it). @param id the parameter */
     void flash(int id);
+    /** @brief Every group's state now (also while the page is hidden). @return them, in order */
+    std::vector<GroupState> groupStates() const;
+
+    /** @brief A source dropped on a knob made a row: the source, the parameter, the row. */
+    std::function<void(additiv::ModSource, int, int)> onModDropped;
+    /** @brief Only a source's chip (ModDock). @param d the drag @return true for one */
+    bool isInterestedInDragSource(const SourceDetails& d) override;
+    /** @brief The knob under the source lights up. @param d the drag */
+    void itemDragMove(const SourceDetails& d) override;
+    /** @brief Nothing lights up any more. @param d the drag */
+    void itemDragExit(const SourceDetails& d) override;
+    /** @brief The source modulates the knob under it: a new row. @param d the drop */
+    void itemDropped(const SourceDetails& d) override;
 
 private:
     /** @brief Wakes or rests the groups as their gates say; repaints the knobs the matrix moves. */
     void timerCallback() override;
+    /** @brief The knob a source would modulate at a point. @param p the point @return its parameter, -1 none */
+    int targetAt(juce::Point<int> p) const;
 
     /** @brief One control in a box. */
     struct Cell {
@@ -77,6 +100,10 @@ private:
         int width = 0;                        ///< the width it needs
         bool resting = false;                 ///< every gate at nothing: its other controls dimmed
     };
+    /** @brief Whether a group has main controls. @param b the group @return true then */
+    static bool gated(const Box& b);
+    /** @brief Whether a group is awake: a main control up, or a row moving one. @param b the group @return true then */
+    bool awake(const Box& b) const;
     /**
      * @brief Where every box goes at a width: in rows, in order -- or, where a later box taken up into an
      *        earlier row's gap saves a row, in the fewest rows.
@@ -88,6 +115,8 @@ private:
     AdditivProcessor& proc_;                                                      ///< whose parameters
     std::vector<Box> boxes_;                                                      ///< the boxes
     int flashId_ = -1;                                                            ///< the control lighting up, -1 none
+    int dropId_ = -1;                                                             ///< the knob under a dragged source, -1 none
+    additiv::ModSource dropSource_ = additiv::ModSource::Off;                     ///< the source dragged
     double flashUntil_ = 0.0;                                                     ///< until when (ms)
     std::vector<additiv::ParamId> ids_;                                           ///< every parameter on the page
     juce::OwnedArray<juce::Component> controls_;                                  ///< the controls

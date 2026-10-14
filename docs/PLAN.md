@@ -526,6 +526,22 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 21k: Mehr Platz, Seiten mit Status, Modulationsleiste (gebaut, 14.10.2026, 0.15.0)
+
+Nach einer zweiten HCI-Kritik (blinde Tabs, Tab-Wechsel, Modulation nur auf eigener Seite; Vital/Pigments als
+Vorbild) und dem Hinweis des Nutzers, Musiker hätten mindestens 1920 x 1080:
+- **Startgröße nach Bildschirm:** drei Viertel der Breite des Arbeitsbereichs, Seitenverhältnis 0,625, mindestens
+  1280 x 860, höchstens 2200 breit; die zuletzt verlassene Größe kommt wieder (player.settings windowWidth/Height).
+  Das Bild oben wächst mit (ein Drittel, bis 420 px). Untergrenze bleibt 1280 x 860 (ctest `layout`).
+- **PageStrip** statt der JUCE-Tableiste: Abschnitte Sound, Harmony, Space, Modulation, Explore; je Seite ein Punkt
+  pro Gruppe mit Hauptreglern (`ParamPage::groupStates`, auch für verborgene Seiten), Name gedimmt wenn alles ruht,
+  Matrix zählt Zeilen, Journey/Map zeigen laufende Reise/Route; Tooltip „on: ...; off: ...". Morph hat jetzt ein Gate.
+- **Cloud & Filter** auf einer Seite (3 Reihen); die Bild-Overlays beider Seiten zusammen.
+- **ModDock:** Chips mit Live-Kurve (klassische 14, dazu jede Quelle, die eine Zeile liest, eine per „+");
+  Ziehen auf einen Knopf → `knobmod::addRow` (Tiefe 0,2; dieselbe Quelle auf denselben Knopf gibt keine zweite Zeile);
+  ParamPage ist DragAndDropTarget mit Vorschau-Ring. **SourceInspector:** Kurve, eigene Regler, alle Ziele mit Tiefe
+  und Entfernen; angedockt, wo das Fenster hoch genug ist (ab etwa 970 px), sonst über den Seiten.
+
 ## Phase 21j: Jede Seite passt ins Fenster (gebaut, 14.10.2026, 0.15.0)
 
 Der Nutzer musste je nach Tab scrollen oder das Fenster vergrößern. Gemessen (ADDITIV_LAYOUT, jetzt ctest `layout`)

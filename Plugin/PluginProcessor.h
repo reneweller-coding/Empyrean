@@ -62,7 +62,7 @@ public:
     /** @brief The preset last applied. @return its index (0 when none was) */
     int getCurrentProgram() override { return std::max(current_.load(std::memory_order_relaxed), 0); }
     /** @brief Applies a factory preset (message thread). @param index the preset */
-    void setCurrentProgram(int index) override { choosePreset(index); }
+    void setCurrentProgram(int index) override { choosePreset(index, false); }   // the host's: not one the player played
     /** @brief A preset's name with its group. @param index the preset @return "Group: Name" */
     const juce::String getProgramName(int index) override;
     /** @brief Nothing to rename. @param index ignored @param name ignored */
@@ -116,9 +116,10 @@ public:
      *        and the sound glides into the preset as applyPreset does. Under the A/B morph or the map
      *        a preset changed only the knobs, which they do not play: the menu seemed broken.
      *        Message thread.
-     * @param index  the preset
+     * @param index   the preset
+     * @param recent  it joins the presets played lately (the panel's choices, MIDI; not the host's)
      */
-    void choosePreset(int index);
+    void choosePreset(int index, bool recent = true);
 
     /** @name The A/B morph's slots (Morph.h) @{ */
     /** @brief A slot takes the sound as it plays now: every knob and the matrix. @param slot 0 (A) or 1 (B) */

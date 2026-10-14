@@ -434,7 +434,7 @@ void CloudView::paintOverlay(juce::Graphics& g, juce::Rectangle<float> spec, juc
         g.setColour(c);
         g.drawText(text, juce::Rectangle<float>(at.x + 10.0f, at.y - 18.0f, 220.0f, 14.0f), juce::Justification::centredLeft);
     };
-    if (page_ == "Filter") {
+    if (page_ == "Cloud & Filter") {
         const int model = juce::roundToInt(value(ParamId::FilterModel));
         const juce::Colour c = skin.family(frame::Family::Filter);
         if (model > 0) {
@@ -479,7 +479,8 @@ void CloudView::paintOverlay(juce::Graphics& g, juce::Rectangle<float> spec, juc
                 if (hz >= 20.0f) g.drawVerticalLine(juce::roundToInt(xOf(hz, spec)), spec.getY(), spec.getBottom());
             }
         }
-    } else if (page_ == "Cloud") {
+    }
+    if (page_ == "Cloud & Filter") {
         const float f0 = referenceHz();
         const juce::Colour c = skin.family(frame::Family::Source);
         // The air's band: its partials gather about Centre times the fundamental, Width wide.

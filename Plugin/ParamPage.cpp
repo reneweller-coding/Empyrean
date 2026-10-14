@@ -96,18 +96,7 @@ void ParamPage::timerCallback()
         if (juce::Time::getMillisecondCounterHiRes() > flashUntil_) flashId_ = -1;
     }
     for (Box& b : boxes_) {
-        // Awake while a gate is up, or a matrix row moves one (it lifts it from nothing).
-        bool any = false, awake = false;
-        for (const Cell& c : b.cells)
-            if (c.gate) {
-                any = true;
-                awake = awake || std::abs(proc_.value(c.id)) > 1.0e-6f;
-                for (int i = 0; i < additiv::kModRows && !awake; ++i) {
-                    const additiv::ModRow r = proc_.engine().modRow(i);
-                    awake = r.source != additiv::ModSource::Off && r.target == c.id && r.depth != 0.0f;
-                }
-            }
-        const bool resting = any && !awake;
+        const bool resting = gated(b) && !awake(b);
         if (resting != b.resting) {
             b.resting = resting;
             for (Cell& c : b.cells)
@@ -136,6 +125,71 @@ void ParamPage::timerCallback()
     }
 }
 
+bool ParamPage::gated(const Box& b)
+{
+    for (const Cell& c : b.cells)
+        if (c.gate) return true;
+    return false;
+}
+
+bool ParamPage::awake(const Box& b) const
+{
+    // Awake while a gate is up, or a matrix row moves one (it lifts it from nothing).
+    for (const Cell& c : b.cells) {
+        if (!c.gate) continue;
+        if (std::abs(proc_.value(c.id)) > 1.0e-6f) return true;
+        for (int i = 0; i < additiv::kModRows; ++i) {
+            const additiv::ModRow r = proc_.engine().modRow(i);
+            if (r.source != additiv::ModSource::Off && r.target == c.id && r.depth != 0.0f) return true;
+        }
+    }
+    return !gated(b);
+}
+
+std::vector<ParamPage::GroupState> ParamPage::groupStates() const
+{
+    std::vector<GroupState> out;
+    for (const Box& b : boxes_) out.push_back({ b.title, b.colour, gated(b), awake(b) });
+    return out;
+}
+
+int ParamPage::targetAt(juce::Point<int> p) const
+{
+    for (const Box& b : boxes_)
+        for (const Cell& c : b.cells)
+            if (dynamic_cast<juce::Slider*>(c.control) != nullptr && c.control->getBounds().expanded(4).contains(p) && knobmod::canTarget(c.id)) return c.id;
+    return -1;
+}
+
+bool ParamPage::isInterestedInDragSource(const SourceDetails& d) { return knobmod::sourceOfDrag(d.description) != additiv::ModSource::Off; }
+
+void ParamPage::itemDragMove(const SourceDetails& d)
+{
+    const int id = targetAt(d.localPosition);
+    if (id == dropId_) return;
+    dropId_ = id;
+    dropSource_ = knobmod::sourceOfDrag(d.description);
+    repaint();
+}
+
+void ParamPage::itemDragExit(const SourceDetails&)
+{
+    dropId_ = -1;
+    repaint();
+}
+
+void ParamPage::itemDropped(const SourceDetails& d)
+{
+    const int id = targetAt(d.localPosition);
+    const additiv::ModSource s = knobmod::sourceOfDrag(d.description);
+    dropId_ = -1;
+    repaint();
+    if (id < 0) return;
+    const int row = knobmod::addRow(proc_, s, id);
+    if (row >= 0) flash(id);
+    if (onModDropped) onModDropped(s, id, row);
+}
+
 juce::Component* ParamPage::controlFor(int id) const
 {
     for (const Box& b : boxes_)
@@ -161,6 +215,18 @@ void ParamPage::flash(int id)
 
 void ParamPage::paintOverChildren(juce::Graphics& g)
 {
+    // The knob a dragged source would modulate: a ring in the source's colour, and what would be made.
+    if (dropId_ >= 0)
+        if (juce::Component* c = controlFor(dropId_)) {
+            const juce::Colour col = knobmod::sourceColour(dropSource_);
+            g.setColour(col.withAlpha(0.18f));
+            g.fillRoundedRectangle(c->getBounds().toFloat().expanded(4.0f), 8.0f);
+            g.setColour(col);
+            g.drawRoundedRectangle(c->getBounds().toFloat().expanded(4.0f), 8.0f, 2.0f);
+            g.setFont(juce::FontOptions(11.0f, juce::Font::bold));
+            g.drawText(juce::String(additiv::kModSourceNames[static_cast<int>(dropSource_)]) + " -> " + additiv::paramDesc(static_cast<additiv::ParamId>(dropId_)).name,
+                       c->getBounds().withY(c->getY() - 18).withHeight(14).expanded(40, 0), juce::Justification::centred);
+        }
     // A control the palette found: a ring that fades over two seconds.
     if (flashId_ >= 0)
         if (juce::Component* c = controlFor(flashId_)) {

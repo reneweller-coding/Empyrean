@@ -443,11 +443,11 @@ void AdditivProcessor::revertKnob(int id)
     if (id >= 0 && id < additiv::kNumParams && reference_.size() == static_cast<size_t>(additiv::kNumParams)) setValue(id, reference_[static_cast<size_t>(id)]);
 }
 
-void AdditivProcessor::choosePreset(int index)
+void AdditivProcessor::choosePreset(int index, bool recent)
 {
     if (index < 0 || index >= additiv::numPresets()) return;
     browsing_ = false;   // chosen while listened to: it stays
-    noteRecent(additiv::preset(index).name);
+    if (recent) noteRecent(additiv::preset(index).name);
     journeyPlayer_.stop();
     setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
     if (value(static_cast<int>(ParamId::MapActive)) >= 0.5f) {

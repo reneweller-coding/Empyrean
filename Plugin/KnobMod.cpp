@@ -106,9 +106,40 @@ private:
 
 } // namespace
 
+bool canTarget(int id) { return id >= 0 && id < additiv::kNumParams && additiv::isModTarget(static_cast<additiv::ParamId>(id)); }
+
+int addRow(AdditivProcessor& proc, ModSource source, int id, float depth)
+{
+    if (!canTarget(id) || source == ModSource::Off) return -1;
+    for (int i = 0; i < additiv::kModRows; ++i) {   // already there: that row, not a second one
+        const ModRow r = proc.engine().modRow(i);
+        if (r.source == source && r.target == id && r.via == ModSource::Off) return i;
+    }
+    for (int i = 0; i < additiv::kModRows; ++i)
+        if (proc.engine().modRow(i).source == ModSource::Off) {
+            ModRow r;
+            r.source = source;
+            r.target = id;
+            r.depth = depth;
+            proc.engine().setModRow(i, r);
+            return i;
+        }
+    return -1;
+}
+
+juce::var dragOf(ModSource s) { return juce::var("empyrean-source:" + juce::String(static_cast<int>(s))); }
+
+ModSource sourceOfDrag(const juce::var& description)
+{
+    const juce::String s = description.toString();
+    if (!s.startsWith("empyrean-source:")) return ModSource::Off;
+    const int k = s.fromFirstOccurrenceOf(":", false, false).getIntValue();
+    return k > 0 && k < additiv::kNumModSources ? static_cast<ModSource>(k) : ModSource::Off;
+}
+
 void addMenuItems(AdditivProcessor& proc, juce::PopupMenu& m, int id)
 {
-    if (id < 0 || id >= additiv::kNumParams || !additiv::isModTarget(static_cast<additiv::ParamId>(id))) return;
+    if (!canTarget(id)) return;
     m.addSeparator();
     m.addSectionHeader("Modulation");
     int free = -1;
@@ -125,13 +156,7 @@ void addMenuItems(AdditivProcessor& proc, juce::PopupMenu& m, int id)
         with.addSectionHeader(s.name);
         for (int k = static_cast<int>(s.first); k <= static_cast<int>(s.last); ++k) {
             const auto src = static_cast<ModSource>(k);
-            with.addItem(additiv::kModSourceNames[k], free >= 0, false, [&proc, free, id, src] {
-                ModRow r;
-                r.source = src;
-                r.target = id;
-                r.depth = 0.2f;   // a fifth of the knob's range: heard, and easy to change in the menu or on the page
-                proc.engine().setModRow(free, r);
-            });
+            with.addItem(additiv::kModSourceNames[k], free >= 0, false, [&proc, id, src] { addRow(proc, src, id); });
         }
     }
     m.addSubMenu(free >= 0 ? juce::String("Modulate with") : juce::String("Modulate with (all 16 rows taken)"), with, free >= 0);

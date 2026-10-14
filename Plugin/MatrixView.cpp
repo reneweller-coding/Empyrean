@@ -85,7 +85,7 @@ void MatrixView::timerCallback()
 
 void MatrixView::resized()
 {
-    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 29 : 30;
+    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 28 : 30;
     const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
     for (int i = 0; i < additiv::kModRows; ++i) {
         Row& r = *rows_[static_cast<size_t>(i)];
@@ -111,7 +111,7 @@ void MatrixView::paint(juce::Graphics& g)
                      juce::Justification::centredLeft, 1, 0.85f);
     g.setColour(skin.dim);
     g.setFont(juce::FontOptions(11.0f));
-    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 29 : 30;
+    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 28 : 30;
     const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
     for (int i = 0; i < additiv::kModRows; ++i)
         g.drawText(juce::String(i + 1), 10 + (i / per) * (colW + 10), 28 + (i % per) * pitch, 22, 24, juce::Justification::centredRight);

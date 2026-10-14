@@ -2,15 +2,20 @@
  * @file PluginEditor.h
  * @brief The panel, on the family's frame (Frame.h): the header (logo and name; Autoplay's play and
  *        stop, its mode and Step; scale, root, motion, landscape; the status; undo, redo, help,
- *        settings), the cloud picture (CloudView), and the pages -- Cloud, Motion, Filter, Tuning,
- *        Conductor, Space, Effects, Modulation, Journey, Map. The family's keys (Space, Ctrl+Z/Y, F1, F11, Esc), its right-click menu
- *        on every control (MIDI learn, forget, default) and its window size (1280 x 860).
+ *        settings), the cloud picture (CloudView), the pages in their strip (PageStrip) -- Focus; Cloud &
+ *        Filter, Motion; Tuning, Conductor; Space, Effects, Hall; Modulation, Matrix; Journey, Map -- and
+ *        the modulation dock along the bottom (ModDock). The family's keys (Space, Ctrl+Z/Y, F1, F11, Esc)
+ *        and its right-click menu on every control (MIDI learn, forget, default). The window starts as
+ *        large as the screen allows (three quarters of its width), at least 1280 x 860, and comes back at
+ *        the size it was left at.
  */
 #pragma once
 
 #include "Browser.h"
 #include "CloudView.h"
 #include "InfoLine.h"
+#include "ModDock.h"
+#include "PageStrip.h"
 #include "Palette.h"
 #include "Tour.h"
 #include "Frame.h"
@@ -31,6 +36,7 @@ public:
 
 /** @brief The panel (see the file comment). */
 class AdditivEditor final : public juce::AudioProcessorEditor,
+                            public juce::DragAndDropContainer,
                             private juce::Timer,
                             private juce::AudioProcessorParameter::Listener {
 public:
@@ -85,6 +91,23 @@ private:
     bool revealParam(int id);
     /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
     void bindChoice(frame::Choice& box, additiv::ParamId id);
+    /**
+     * @brief The window's first size: the size it was left at, where that still fits the screen; else three
+     *        quarters of the screen's width at the window's proportions, 1280 x 860 at least (less only on
+     *        a screen smaller than that). 1280 x 860 in the screenshot and layout modes.
+     * @return pixels
+     */
+    juce::Point<int> startSize();
+    /**
+     * @brief A page's state for its strip: its groups on and off, the matrix's rows, a journey or route running.
+     * @param tab  the page
+     * @return     its state
+     */
+    PageStrip::Status pageStatus(int tab);
+    /** @brief A source chosen in the dock (or dropped on a knob): the inspector shows it, open. @param s the source @param toggle a second click on it shuts the inspector */
+    void chooseSource(additiv::ModSource s, bool toggle);
+    /** @brief The inspector open or shut (docked: remembered; over the pages: until shut). @param open open */
+    void setInspector(bool open);
 
     AdditivProcessor& proc_;                                   ///< the instrument
     frame::LookAndFeel lnf_{ additivui::skin() };              ///< first, so it outlives every component that uses it
@@ -168,6 +191,14 @@ private:
     juce::MemoryBlock shotSaved_;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
     int logTick_ = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
     bool layoutChecked_ = false;                               ///< ADDITIV_LAYOUT: the pages were measured
+    bool rememberSize_ = false;                                ///< the window's size is kept for the next start (not in the shot or layout modes)
+    PageStrip strip_;                                          ///< the pages' strip
+    std::vector<std::vector<ParamPage*>> pagesOf_;             ///< per page its parameter pages (their groups' states)
+    std::unique_ptr<ModDock> dock_;                            ///< the sources along the bottom
+    std::unique_ptr<SourceInspector> inspector_;               ///< one source seen whole
+    bool inspectorOpen_ = true;                                ///< the docked inspector is wanted (remembered)
+    bool overlayOpen_ = false;                                 ///< the inspector is open over the pages (a small window)
+    bool inspectorDocked_ = false;                             ///< the window is tall enough to dock it
     /** @brief One step of the screenshot mode (ADDITIV_SHOT), from the timer. */
     void shootStep();
     /**

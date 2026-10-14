@@ -142,6 +142,8 @@ using Ids = std::vector<ParamId>;
 
 } // namespace
 
+static void findParamPages(juce::Component* c, std::vector<ParamPage*>& out);
+
 AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEditor(proc), proc_(proc)
 {
     setLookAndFeel(&lnf_);
@@ -266,12 +268,16 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([f] { return f->describe(); });
         tabs_.addTab("Focus", additivui::skin().panel, new ScrollPage(f, [f](int w) { return f->heightFor(w); }), true);
     }
-    page("Cloud", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic,
+    page("Cloud & Filter", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic,
                                                          ParamId::Stretch, ParamId::Shift } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
                                                ParamId::ShimmerRate, ParamId::Stereo } },
                     { "Air", F::Source, Ids{ ParamId::Air, ParamId::AirCenter, ParamId::AirWidth, ParamId::AirJitter }, Ids{ ParamId::Air } },
-                    { "Turbulence", F::Source, Ids{ ParamId::Turbulence, ParamId::TurbulenceTime }, Ids{ ParamId::Turbulence } } });
+                    { "Turbulence", F::Source, Ids{ ParamId::Turbulence, ParamId::TurbulenceTime }, Ids{ ParamId::Turbulence } },
+                    { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
+                                                ParamId::FilterDrift }, Ids{ ParamId::FilterModel } },
+                    { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo }, Ids{ ParamId::CombDepth } },
+                    { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
     page("Motion", { { "Motion", F::Motion, Ids{ ParamId::Motion, ParamId::MotionRate, ParamId::MotionDepth, ParamId::Landscape }, Ids{ ParamId::Motion } },
                      { "Field", F::Motion, Ids{ ParamId::FieldMode, ParamId::FieldStrength, ParamId::FieldRadius, ParamId::FieldSpring,
                                                 ParamId::FieldRate, ParamId::FieldCount }, Ids{ ParamId::FieldMode } },
@@ -281,10 +287,6 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                      { "Partial Sync", F::Envelope, Ids{ ParamId::SyncDepth, ParamId::SyncMode, ParamId::SyncCoupling, ParamId::SyncRate, ParamId::SyncSpread,
                                                          ParamId::SyncSwarm, ParamId::SyncReach, ParamId::SyncLag }, Ids{ ParamId::SyncDepth } },
                      { "Ripple", F::Space, Ids{ ParamId::RippleDepth, ParamId::RippleSpeed, ParamId::RippleDecay, ParamId::RippleBend }, Ids{ ParamId::RippleDepth } } });
-    page("Filter", { { "Filter", F::Filter, Ids{ ParamId::FilterModel, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::KeyTrack,
-                                                 ParamId::FilterDrift }, Ids{ ParamId::FilterModel } },
-                     { "Spectral Comb", F::Filter, Ids{ ParamId::CombDepth, ParamId::CombDensity, ParamId::CombSweep, ParamId::CombStereo }, Ids{ ParamId::CombDepth } },
-                     { "Envelope", F::Envelope, Ids{ ParamId::Attack, ParamId::Decay, ParamId::Sustain, ParamId::Release } } });
     page("Tuning", { { "Tuning", F::Motion, Ids{ ParamId::Scale, ParamId::RootNote, ParamId::KeyMap, ParamId::RefPitch, ParamId::Purity } },
                      { "Tide", F::Motion, Ids{ ParamId::Tide, ParamId::TidePeriod }, Ids{ ParamId::Tide } },
                      { "Self-Tune", F::Motion, Ids{ ParamId::TuneGravity, ParamId::TuneReach, ParamId::TuneAnchor }, Ids{ ParamId::TuneGravity } } });
@@ -338,23 +340,84 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([m] { return m->describe(); });
         tabs_.addTab("Map", additivui::skin().panel, new ScrollPage(m, [m](int w) { return m->heightFor(w); }), true);
     }
-    tabs_.setTabBarDepth(32);
+    tabs_.setTabBarDepth(0);   // the strip shows the pages
     tabs_.setOutline(0);
     sendLookAndFeelChange();
+
+    // The pages' strip: the pages in their sections, each with what is on in it.
+    {
+        const juce::StringArray names = tabs_.getTabNames();
+        auto at = [&names](const char* n) { return names.indexOf(n); };
+        std::vector<PageStrip::Section> sections = { { "", { at("Focus") } },
+                                                     { "Sound", { at("Cloud & Filter"), at("Motion") } },
+                                                     { "Harmony", { at("Tuning"), at("Conductor") } },
+                                                     { "Space", { at("Space"), at("Effects"), at("Hall") } },
+                                                     { "Modulation", { at("Modulation"), at("Matrix") } },
+                                                     { "Explore", { at("Journey"), at("Map") } } };
+        for (auto& s : sections) s.pages.erase(std::remove(s.pages.begin(), s.pages.end(), -1), s.pages.end());
+        for (int t = 0; t < tabs_.getNumTabs(); ++t) {
+            std::vector<ParamPage*> pages;
+            if (auto* view = dynamic_cast<juce::Viewport*>(tabs_.getTabContentComponent(t))) findParamPages(view->getViewedComponent(), pages);
+            for (ParamPage* p : pages)
+                p->onModDropped = [this](additiv::ModSource s, int, int row) {
+                    if (row < 0)
+                        juce::AlertWindow::showMessageBoxAsync(juce::MessageBoxIconType::NoIcon, "Empyrean",
+                                                               "All sixteen rows of the matrix are taken: free one on the Matrix page.", "Close");
+                    else chooseSource(s, false);
+                };
+            pagesOf_.push_back(std::move(pages));
+        }
+        strip_.setPages(names, std::move(sections));
+        strip_.statusOf = [this](int t) { return pageStatus(t); };
+        strip_.onSelect = [this](int t) {
+            if (canvas_) setCanvas(false);
+            if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
+            tabs_.setCurrentTabIndex(t);
+            strip_.setCurrent(t);
+        };
+        addAndMakeVisible(strip_);
+        strip_.refresh();
+    }
+    // The modulation dock and its inspector.
+    dock_ = std::make_unique<ModDock>(proc_);
+    addAndMakeVisible(*dock_);
+    inspector_ = std::make_unique<SourceInspector>(proc_, actions_, *dock_);
+    addChildComponent(*inspector_);
+    dock_->sendLookAndFeelChange();   // both made before they had the frame's look
+    inspector_->sendLookAndFeelChange();
+    inspectorOpen_ = proc_.userSettings().getBoolValue("inspector", true);
+    dock_->onChoose = [this](additiv::ModSource s) { chooseSource(s, true); };
+    dock_->onToggle = [this] { setInspector(!(inspectorDocked_ ? inspectorOpen_ : overlayOpen_)); };
+    dock_->setChosen(inspector_->source());
+    inspector_->onClose = [this] { setInspector(false); };
+    inspector_->onReveal = [this](int id) { revealParam(id); };
+    inspector_->onMatrix = [this] {
+        const int t = tabs_.getTabNames().indexOf("Matrix");
+        if (t >= 0) strip_.onSelect(t);
+    };
+    // The night's veil over all of it, the overlays over the veil.
+    veil_.toFront(false);
+    palette_.toFront(false);
+    browser_.toFront(false);
+    tour_.toFront(false);
 
     for (auto* p : proc_.getParameters()) p->addListener(this);
     frame::keepKeysForEditor(*this);   // the keys stay the editor's (Space plays, not the switch last clicked)
     setWantsKeyboardFocus(true);
     setResizable(true, true);
     setResizeLimits(800, 520, 4800, 3100);
-    setSize(1280, 860);   // the family's window size
+    const auto size = startSize();
+    setSize(size.x, size.y);
     shotPrefix_ = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT", {});
+    rememberSize_ = shotPrefix_.isEmpty() && juce::SystemStats::getEnvironmentVariable("ADDITIV_LAYOUT", {}).isEmpty();
+    if (!rememberSize_) tourAsked_ = true;   // no tour in the screenshot and layout modes
     startTimerHz(15);
     timerCallback();
 }
 
 AdditivEditor::~AdditivEditor()
 {
+    proc_.userSettings().saveIfNeeded();   // the window's size
     removeMouseListener(&activity_);
     for (auto* p : proc_.getParameters()) p->removeListener(this);
     stopTimer();
@@ -429,6 +492,8 @@ void AdditivEditor::timerCallback()
     }
     status_.setText(s, juce::dontSendNotification);
     cloud_.setPage(canvas_ ? juce::String() : tabs_.getCurrentTabName());   // the picture shows what the page in front edits
+    strip_.setCurrent(tabs_.getCurrentTabIndex());
+    if (logTick_ % 4 == 0) strip_.refresh();   // what is on in every page, four times a second
     // The night: the picture calmer (half as often), the veil -- deeper in a canvas left alone for a minute and a half.
     if (!night_ || (++refreshTick_ & 1) == 0) cloud_.refresh();
     float veil = 0.0f;
@@ -529,6 +594,29 @@ void AdditivEditor::shootStep()
                 });
         if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_TOUR", {}).isNotEmpty())
             juce::Timer::callAfterDelay(1500, [safe = juce::Component::SafePointer<AdditivEditor>(this)] { if (safe != nullptr) safe->startTour(); });
+        // ADDITIV_SHOT_SOURCE: a source in the inspector (by its name), opened.
+        const juce::String sourceName = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_SOURCE", {});
+        for (int k = 1; k < additiv::kNumModSources && sourceName.isNotEmpty(); ++k)
+            if (sourceName == additiv::kModSourceNames[k])
+                juce::Timer::callAfterDelay(1000, [safe = juce::Component::SafePointer<AdditivEditor>(this), k] {
+                    if (safe != nullptr) safe->chooseSource(static_cast<additiv::ModSource>(k), false);
+                });
+        // ADDITIV_SHOT_DROP ("LFO 2>cutoff"): a source dropped on a knob, as the dock's chip drops it.
+        const juce::String drop = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_DROP", {});
+        if (drop.contains(">"))
+            juce::Timer::callAfterDelay(1500, [safe = juce::Component::SafePointer<AdditivEditor>(this), drop] {
+                if (safe == nullptr) return;
+                const additiv::ParamDesc* d = additiv::findParam(drop.fromFirstOccurrenceOf(">", false, false).trim().toRawUTF8());
+                int src = 0;
+                for (int k = 1; k < additiv::kNumModSources; ++k)
+                    if (drop.upToFirstOccurrenceOf(">", false, false).trim() == additiv::kModSourceNames[k]) src = k;
+                if (d == nullptr || src == 0 || !safe->revealParam(static_cast<int>(d->id))) return;
+                for (ParamPage* p : safe->pagesOf_[static_cast<size_t>(safe->tabs_.getCurrentTabIndex())])   // the page revealParam showed
+                    if (juce::Component* c = p->controlFor(static_cast<int>(d->id))) {
+                        p->itemDropped({ knobmod::dragOf(static_cast<additiv::ModSource>(src)), safe->dock_.get(), c->getBounds().getCentre() });
+                        break;
+                    }
+            });
         // ADDITIV_SHOT_BROWSER: the preset browser open.
         if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_BROWSER", {}).isNotEmpty())
             juce::MessageManager::callAsync([this] { browser_.open(); });
@@ -610,7 +698,7 @@ void AdditivEditor::startTour()
     s.push_back({ &play_, "Play", "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." });
     s.push_back({ &presetName_, "6144 presets", "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." });
     s.push_back({ &cloud_, "The partials themselves", "Twenty thousand sines a voice, as the graphics card has them. The page in front draws what it edits here -- the filter's curve, the register, the air -- and you can drag it. Double-click: the canvas." });
-    s.push_back({ &tabs_, "Focus", "The simple ways in: nudge the sound brighter, calmer, wider or airier; the few knobs that matter for it; snapshots; variations to evolve it by ear; macros taught by example; presets found by a recording." });
+    s.push_back({ &strip_, "Focus", "The simple ways in: nudge the sound brighter, calmer, wider or airier; the few knobs that matter for it; snapshots; variations to evolve it by ear; macros taught by example; presets found by a recording." });
     s.push_back({ &searchButton_, "Search (Ctrl+K)", "Type a few letters to find any knob (its page opens, it lights up; \"cutoff 800\" sets it), any preset or action." });
     if (info_ != nullptr) s.push_back({ info_.get(), "The info line", "Point at any control: what it does, its value and what moves it are told here." });
     s.push_back({ &save_, "Your own presets", "Save the sound as your own (Ctrl+S); a star by the name tells that it has moved from its preset, a notch on a knob where the preset had it." });
@@ -625,6 +713,7 @@ void AdditivEditor::paint(juce::Graphics& g)
 
 void AdditivEditor::resized()
 {
+    if (dock_ == nullptr) return;   // not built yet
     auto full = getLocalBounds();
     if (info_ != nullptr) {   // the info line along the bottom (not in the canvas)
         info_->setVisible(!canvas_);
@@ -646,6 +735,13 @@ void AdditivEditor::resized()
     palette_.setBounds(getLocalBounds());
     veil_.setBounds(getLocalBounds());
     browser_.setBounds(getLocalBounds());
+    strip_.setVisible(!canvas_);
+    dock_->setVisible(!canvas_);
+    if (canvas_) inspector_->setVisible(false);
+    if (rememberSize_ && juce::Desktop::getInstance().getKioskModeComponent() == nullptr) {
+        proc_.userSettings().setValue("windowWidth", getWidth());
+        proc_.userSettings().setValue("windowHeight", getHeight());
+    }
     if (canvas_) {   // the picture is the window
         cloud_.setBounds(area);
         canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
@@ -654,20 +750,119 @@ void AdditivEditor::resized()
         tour_.setBounds(getLocalBounds());
         return;
     }
-    // The picture a quarter of the room, but never what a page needs: the tallest page at this width
-    // fits under it while the picture can be 120 high.
+    // The dock along the bottom. The picture a third of the room (at most 420 high), but never what a
+    // page needs: the tallest page at this width fits under it while the picture can be 100 high. The inspector docked
+    // over the dock where that leaves the picture 150 high, else it opens over the pages when wanted.
+    const auto dockRow = area.removeFromBottom(ModDock::kHeight);
+    dock_->setBounds(dockRow);
+    area.removeFromBottom(4);
     int need = 0;
     for (int t = 0; t < tabs_.getNumTabs(); ++t)
         if (auto* sp = dynamic_cast<ScrollPage*>(tabs_.getTabContentComponent(t))) need = std::max(need, sp->heightAt(area.getWidth()));
-    const int rest = area.getHeight() - 8 - tabs_.getTabBarDepth() - need;
-    cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, std::min(area.getHeight() / 4, rest))));
+    const int under = 8 + PageStrip::kHeight + need;
+    inspectorDocked_ = area.getHeight() - under - (SourceInspector::kHeight + 6) >= 150;
+    const bool inspect = inspectorDocked_ ? inspectorOpen_ : overlayOpen_;
+    if (inspectorDocked_ && inspect) {
+        inspector_->setBounds(area.removeFromBottom(SourceInspector::kHeight));
+        area.removeFromBottom(6);
+    } else if (!inspectorDocked_) {
+        inspector_->setBounds(dockRow.getX(), dockRow.getY() - 4 - SourceInspector::kHeight, dockRow.getWidth(), SourceInspector::kHeight);
+    }
+    inspector_->setOverlay(!inspectorDocked_);
+    inspector_->setVisible(inspect);
+    dock_->setOpen(inspect);
+    const int rest = area.getHeight() - under;
+    cloud_.setBounds(area.removeFromTop(juce::jlimit(100, 420, std::min(area.getHeight() / 3, rest))));
     canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
     searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
     nightButton_.setBounds(searchButton_.getX() - 64, cloud_.getY() + 6, 58, 20);
     tour_.setBounds(getLocalBounds());
     area.removeFromTop(8);
+    const auto pagesArea = area;
+    strip_.setBounds(area.removeFromTop(PageStrip::kHeight));
     tabs_.setBounds(area);
-    if (helpView_ != nullptr) helpView_->setBounds(area);
+    if (helpView_ != nullptr) helpView_->setBounds(pagesArea);
+}
+
+juce::Point<int> AdditivEditor::startSize()
+{
+    if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT", {}).isNotEmpty() || juce::SystemStats::getEnvironmentVariable("ADDITIV_LAYOUT", {}).isNotEmpty()) {
+        // ADDITIV_SHOT_SIZE ("1920x1200"): the pictures at another size.
+        const juce::String size = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_SIZE", {});
+        const int w = size.upToFirstOccurrenceOf("x", false, false).getIntValue(), h = size.fromFirstOccurrenceOf("x", false, false).getIntValue();
+        return w >= 800 && h >= 520 ? juce::Point<int>(w, h) : juce::Point<int>(1280, 860);
+    }
+    const juce::Displays::Display* d = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    const auto user = d != nullptr ? d->userBounds.toNearestInt() : juce::Rectangle<int>(0, 0, 1920, 1040);
+    const int maxW = std::max(800, user.getWidth() - 40), maxH = std::max(520, user.getHeight() - 80);   // room for the host's frame
+    const int lastW = proc_.userSettings().getIntValue("windowWidth", 0), lastH = proc_.userSettings().getIntValue("windowHeight", 0);
+    if (lastW >= 800 && lastH >= 520 && lastW <= user.getWidth() && lastH <= user.getHeight()) return { lastW, lastH };
+    const int w = std::clamp(juce::roundToInt(static_cast<float>(user.getWidth()) * 0.75f), 1280, 2200);
+    const int h = std::max(860, juce::roundToInt(static_cast<float>(w) * 0.625f));
+    return { std::max(800, std::min(w, maxW)), std::max(520, std::min(h, maxH)) };
+}
+
+PageStrip::Status AdditivEditor::pageStatus(int tab)
+{
+    PageStrip::Status s;
+    if (tab < 0 || tab >= static_cast<int>(pagesOf_.size())) return s;
+    juce::StringArray on, off;
+    bool free = false;   // a group that never rests
+    for (ParamPage* p : pagesOf_[static_cast<size_t>(tab)])
+        for (const ParamPage::GroupState& g : p->groupStates()) {
+            if (!g.gated) {
+                free = true;
+                continue;
+            }
+            s.dots.push_back({ g.colour, g.awake });
+            (g.awake ? on : off).add(g.title);
+        }
+    const juce::String name = tabs_.getTabNames()[tab];
+    if (name == "Matrix") {
+        int rows = 0;
+        for (int i = 0; i < additiv::kModRows; ++i) {
+            const additiv::ModRow r = proc_.engine().modRow(i);
+            if (r.source != additiv::ModSource::Off && r.target >= 0) ++rows;
+        }
+        if (rows > 0) s.badge = juce::String(rows);
+        s.tip = rows == 0 ? juce::String("no row in use") : juce::String(rows) + (rows == 1 ? " row" : " rows") + " of 16 in use";
+        return s;
+    }
+    if (name == "Journey" && proc_.journeyStatus().isNotEmpty()) {
+        s.dots.push_back({ additivui::skin().accent, true });
+        on.add("a journey (" + proc_.journeyStatus() + ")");
+    }
+    if (name == "Map" && proc_.routeRunning()) {
+        s.dots.push_back({ additivui::skin().accent, true });
+        on.add("a route");
+    }
+    s.quiet = !free && !s.dots.empty() && on.isEmpty();
+    if (!on.isEmpty()) s.tip << "on: " << on.joinIntoString(", ");
+    if (!off.isEmpty()) s.tip << (s.tip.isEmpty() ? "" : "; ") << "off: " << off.joinIntoString(", ");
+    return s;
+}
+
+void AdditivEditor::chooseSource(additiv::ModSource s, bool toggle)
+{
+    const bool open = inspectorDocked_ ? inspectorOpen_ : overlayOpen_;
+    if (toggle && open && inspector_->source() == s) {
+        setInspector(false);
+        return;
+    }
+    inspector_->show(s);
+    dock_->setChosen(s);
+    setInspector(true);
+}
+
+void AdditivEditor::setInspector(bool open)
+{
+    if (inspectorDocked_) {
+        inspectorOpen_ = open;
+        if (rememberSize_) proc_.userSettings().setValue("inspector", open);   // not from the screenshot mode
+    } else {
+        overlayOpen_ = open;
+    }
+    resized();
 }
 
 bool AdditivEditor::keyPressed(const juce::KeyPress& key)
@@ -686,7 +881,8 @@ bool AdditivEditor::keyPressed(const juce::KeyPress& key)
     k.redo = [this] { apply(history_.redo(), true); };
     k.help = [this] { showHelp(helpView_ == nullptr || !helpView_->isVisible()); };
     k.escape = [this] {
-        if (canvas_) setCanvas(false);
+        if (overlayOpen_ && !inspectorDocked_) setInspector(false);
+        else if (canvas_) setCanvas(false);
         else if (helpView_ != nullptr && helpView_->isVisible()) showHelp(false);
         else if (juce::Desktop::getInstance().getKioskModeComponent() != nullptr) toggleFullScreen();
     };

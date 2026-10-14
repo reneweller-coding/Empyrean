@@ -43,10 +43,17 @@ presets.
 - **The info line:** what the control under the mouse does, its value and what moves it -- a sentence for all 210.
 - **Macros as large knobs**, named by what they move; **snapshots** with pictures; **MPE seen at the keys**;
   a **night mode** for dark rooms; **first steps** on the first start.
-- **Every page fits the window** at its usual size (1280 x 860, and still at 800 high) without scrolling: the boxes
-  fill the rows as tightly as they can, Focus stands in two columns, the matrix has a page of its own with every
-  source live beside its rows, the space's and the hall's pictures take what is left, and the picture at the top
-  gives way where a page needs the room. A test (ctest `layout`) keeps it so.
+- **Every page fits the window** (1280 x 860 and more, still at 800 high) without scrolling: the boxes fill the rows
+  as tightly as they can, Focus stands in two columns, the matrix has a page of its own with every source live beside
+  its rows, the space's and the hall's pictures take what is left, and the picture at the top gives way where a page
+  needs the room. A test (ctest `layout`) keeps it so.
+- **The window opens as large as the screen allows** (three quarters of its width, at least 1280 x 860) and comes back
+  at the size it was left at; in a large window the picture grows.
+- **The pages in sections, with what is on:** Focus; Sound (Cloud & Filter -- now one page --, Motion); Harmony;
+  Space (Space, Effects, Hall); Modulation (Modulation, Matrix); Explore. A dot beside a page's name for every group
+  with main controls, lit while it plays; a page whose groups all rest is dimmed; Matrix counts its rows.
+- **The modulation dock** along the bottom: every source a chip with its live trace -- drag it onto any knob to
+  modulate it; click it for the inspector: its trace, its own knobs, every knob it moves with depth and removal.
 - **The whole bank levelled anew:** 3530 presets from before 0.14.0 measured again with today's engine (some had
   drifted by several dB); the map and the search read the new measures.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;

@@ -20,7 +20,7 @@ public:
     /** @brief The rows' numbers and the column heads. */
     void paint(juce::Graphics& g) override;
     /** @brief The height the rows need in one or two columns. @param columns 1 or 2 @return pixels */
-    static int heightFor(int columns) { return columns == 1 ? 28 + additiv::kModRows * 29 + 4 : 28 + additiv::kModRows / 2 * 30; }
+    static int heightFor(int columns) { return columns == 1 ? 28 + additiv::kModRows * 28 + 4 : 28 + additiv::kModRows / 2 * 30; }
     /** @brief The rows in words, for the help. @return the text */
     juce::String describe() const;
 
