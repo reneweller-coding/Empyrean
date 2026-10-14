@@ -10,6 +10,7 @@
 #include "additiv/Presets.h"
 
 #include <algorithm>
+#include <functional>
 
 namespace {
 
@@ -193,22 +194,65 @@ void ParamPage::paintOverChildren(juce::Graphics& g)
 
 std::vector<juce::Rectangle<int>> ParamPage::flow(int width) const
 {
-    std::vector<juce::Rectangle<int>> out;
-    int x = kGap, y = kGap;
+    // The rows: in order, a new one whenever the next box does not fit -- unless taking a later box up
+    // into an earlier row's gap saves a row. Then the fewest rows, found by trying every box in every
+    // row so far before a new one: the first way found keeps the earlier boxes in the earlier rows.
+    const int n = static_cast<int>(boxes_.size());
+    const int room = std::max(width - 2 * kGap, kKnobCell + 2 * kPad);
+    std::vector<int> w(static_cast<size_t>(n)), row(static_cast<size_t>(n)), best(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i) w[static_cast<size_t>(i)] = std::min(boxes_[static_cast<size_t>(i)].width, room);
+    int rows = 0, sum = 0;
+    for (int i = 0, used = 0; i < n; ++i) {
+        const int wi = w[static_cast<size_t>(i)];
+        if (used > 0 && used + kGap + wi > room) { ++rows; used = 0; }
+        best[static_cast<size_t>(i)] = rows;
+        used += (used > 0 ? kGap : 0) + wi;
+        sum += wi + kGap;
+    }
+    if (n > 0) ++rows;
+    std::vector<int> used;
+    int limit = 0;
+    std::function<bool(int)> place = [&](int i) {
+        if (i == n) return true;
+        const int wi = w[static_cast<size_t>(i)];
+        for (size_t r = 0; r < used.size(); ++r)
+            if (used[r] + kGap + wi <= room) {
+                used[r] += kGap + wi;
+                row[static_cast<size_t>(i)] = static_cast<int>(r);
+                if (place(i + 1)) return true;
+                used[r] -= kGap + wi;
+            }
+        if (static_cast<int>(used.size()) >= limit) return false;
+        used.push_back(wi);
+        row[static_cast<size_t>(i)] = static_cast<int>(used.size()) - 1;
+        if (place(i + 1)) return true;
+        used.pop_back();
+        return false;
+    };
+    for (limit = std::max(1, (sum - kGap + room) / (room + kGap)); limit < rows; ++limit) {
+        used.clear();
+        if (place(0)) {
+            best = row;
+            rows = limit;
+            break;
+        }
+    }
+    std::vector<juce::Rectangle<int>> out(static_cast<size_t>(n));
+    std::vector<int> x(static_cast<size_t>(rows), kGap);
     const int h = kTitle + kCellHeight + kPad;
-    for (const Box& b : boxes_) {
-        const int w = std::min(b.width, std::max(width - 2 * kGap, kKnobCell + 2 * kPad));
-        if (x > kGap && x + w > width - kGap) { x = kGap; y += h + kGap; }
-        out.emplace_back(x, y, w, h);
-        x += w + kGap;
+    for (int i = 0; i < n; ++i) {
+        const int r = best[static_cast<size_t>(i)], wi = w[static_cast<size_t>(i)];
+        out[static_cast<size_t>(i)] = { x[static_cast<size_t>(r)], kGap + r * (h + kGap), wi, h };
+        x[static_cast<size_t>(r)] += wi + kGap;
     }
     return out;
 }
 
 int ParamPage::heightFor(int width) const
 {
-    const auto r = flow(width);
-    return r.empty() ? 0 : r.back().getBottom() + kGap;
+    int bottom = 0;   // the lowest box (a later box may sit in an earlier row)
+    for (const auto& b : flow(width)) bottom = std::max(bottom, b.getBottom());
+    return bottom > 0 ? bottom + kGap : 0;
 }
 
 void ParamPage::resized()

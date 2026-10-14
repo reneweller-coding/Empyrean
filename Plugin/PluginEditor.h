@@ -167,6 +167,13 @@ private:
     int shotTick_ = 0;                                         ///< timer ticks since the screenshots were asked for
     juce::MemoryBlock shotSaved_;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
     int logTick_ = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
+    bool layoutChecked_ = false;                               ///< ADDITIV_LAYOUT: the pages were measured
     /** @brief One step of the screenshot mode (ADDITIV_SHOT), from the timer. */
     void shootStep();
+    /**
+     * @brief ADDITIV_LAYOUT (a file): every page's height against its room at a few window sizes, written there; the
+     *        standalone then quits with the number of pages that would scroll at the window's usual size.
+     * @param out the report
+     */
+    void layoutCheck(const juce::File& out);
 };

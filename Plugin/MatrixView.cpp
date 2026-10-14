@@ -85,10 +85,11 @@ void MatrixView::timerCallback()
 
 void MatrixView::resized()
 {
-    const int colW = (getWidth() - 30) / 2;
+    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 29 : 30;
+    const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
     for (int i = 0; i < additiv::kModRows; ++i) {
         Row& r = *rows_[static_cast<size_t>(i)];
-        const int x = 10 + (i / 8) * (colW + 10) + 26, y = 28 + (i % 8) * 30;
+        const int x = 10 + (i / per) * (colW + 10) + 26, y = 28 + (i % per) * pitch;
         const int w = colW - 26;
         r.source.setBounds(x, y, w * 22 / 100, 24);
         r.target.setBounds(x + w * 23 / 100, y, w * 31 / 100, 24);
@@ -106,12 +107,14 @@ void MatrixView::paint(juce::Graphics& g)
     g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), skin.radius, 1.0f);
     g.setColour(skin.family(frame::Family::Motion));
     g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-    g.drawText("Matrix: source -> target x depth (of the target's range), scaled by a via source", 18, 4, getWidth() - 30, 20, juce::Justification::centredLeft);
+    g.drawFittedText("Matrix: source -> target x depth (of the target's range), scaled by a via source", 18, 4, getWidth() - 30, 20,
+                     juce::Justification::centredLeft, 1, 0.85f);
     g.setColour(skin.dim);
     g.setFont(juce::FontOptions(11.0f));
-    const int colW = (getWidth() - 30) / 2;
+    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 29 : 30;
+    const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
     for (int i = 0; i < additiv::kModRows; ++i)
-        g.drawText(juce::String(i + 1), 10 + (i / 8) * (colW + 10), 28 + (i % 8) * 30, 22, 24, juce::Justification::centredRight);
+        g.drawText(juce::String(i + 1), 10 + (i / per) * (colW + 10), 28 + (i % per) * pitch, 22, 24, juce::Justification::centredRight);
 }
 
 juce::String MatrixView::describe() const

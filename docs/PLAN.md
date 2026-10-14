@@ -526,6 +526,18 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 21j: Jede Seite passt ins Fenster (gebaut, 14.10.2026, 0.15.0)
+
+Der Nutzer musste je nach Tab scrollen oder das Fenster vergrößern. Gemessen (ADDITIV_LAYOUT, jetzt ctest `layout`)
+bei 1280 x 860, 527 px unter den Tabs: Focus brauchte 922, Modulation 1050, Space 772, Effects 586.
+- `ParamPage::flow`: die wenigsten Reihen; ein späterer Kasten rückt nur in die Lücke einer früheren Reihe, wenn das
+  eine Reihe spart (Effects 4 → 3, Space 3 → 2, Modulation 3 → 2).
+- Focus in zwei Spalten ab 1150 px Breite: links Nudge, Fokus, Makros; rechts Schnappschüsse, Variationen, Suche.
+- Modulation geteilt: die Modulatoren mit ihren 28 Quellen live; neue Seite Matrix: 16 Zeilen in einer Spalte, alle
+  42 Quellen live daneben. Die Quellen-Kacheln passen ihre Spalten der Höhe an.
+- Raum- und Hallbild nehmen den Rest (mindestens 200/220 px); das Bild oben weicht der höchsten Seite (120..260 px).
+- Ergebnis: bei 1280 x 860 und 1280 x 800 scrollt nichts; erst bei 760 px Höhe drei Seiten um 12-20 px.
+
 ## Phase 21: Eine Oberfläche zum Wiederfinden (gebaut, 14.10.2026, 0.15.0)
 
 Meine Vorschläge, vom Nutzer alle gewünscht (vorerst nur in Empyrean, dann Entscheidung über die Familie):

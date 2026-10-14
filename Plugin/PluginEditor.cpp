@@ -40,13 +40,24 @@ public:
     }
     /** @brief The height the page needs at the viewport's width. @return pixels */
     int pageHeight() const { return heightFor_(getMaximumVisibleWidth()); }
+    /** @brief The height the page needs at width @p w. @param w pixels @return pixels */
+    int heightAt(int w) const { return heightFor_(w); }
 
 private:
     juce::Component* page_;                 ///< the page (owned by the viewport)
     std::function<int(int)> heightFor_;     ///< its height at a width
 };
 
-/** @brief The Modulation page: the sources' knobs above, the sources live, the matrix below. */
+/** @brief The sources this page shapes: the LFOs, envelopes and macros, the fields and attractors, the reservoir. @return them */
+std::vector<additiv::ModSource> shapedSources()
+{
+    using S = additiv::ModSource;
+    return { S::Lfo1,    S::Lfo2,    S::Lfo3,    S::Lfo4,    S::Env1,    S::Env2,     S::Macro1,     S::Macro2,     S::Macro3,     S::Macro4,
+             S::Lenia1,  S::Lenia2,  S::Lenia3,  S::Lenia4,  S::LorenzX, S::LorenzY,  S::LorenzZ,    S::RosslerX,   S::RosslerY,   S::RosslerZ,
+             S::Kura1,   S::Kura2,   S::Kura3,   S::Kura4,   S::Reservoir1, S::Reservoir2, S::Reservoir3, S::Reservoir4 };
+}
+
+/** @brief The Modulation page: the modulators' knobs above, what they make live below (the matrix has a page of its own). */
 class ModPage final : public juce::Component {
 public:
     /**
@@ -65,29 +76,65 @@ public:
                                                                    ParamId::LeniaGrowth, ParamId::ChaosPeriod } },
                     { "Reservoir", frame::Family::Envelope, { ParamId::ReservoirChaos, ParamId::ReservoirMemory, ParamId::ReservoirInput } } },
                   live),
-          sources_(proc), matrix_(proc)
+          sources_(proc, shapedSources())
     {
         addAndMakeVisible(params_);
         addAndMakeVisible(sources_);
-        addAndMakeVisible(matrix_);
     }
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
-    int heightFor(int w) const { return params_.heightFor(w) + SourcesView::heightFor(w - 20) + 10 + MatrixView::idealHeight() + 10; }
-    /** @brief The knobs above, the sources live, the matrix below. */
+    int heightFor(int w) const { return params_.heightFor(w) + SourcesView::heightFor(w - 20, kShaped) + 10; }
+    /** @brief The knobs above, their sources live below in the rest. */
     void resized() override
     {
-        const int top = params_.heightFor(getWidth()), mid = SourcesView::heightFor(getWidth() - 20);
+        const int top = params_.heightFor(getWidth());
         params_.setBounds(0, 0, getWidth(), top);
-        sources_.setBounds(10, top, getWidth() - 20, mid);
-        matrix_.setBounds(10, top + mid + 10, getWidth() - 20, MatrixView::idealHeight());
+        sources_.setBounds(10, top, getWidth() - 20, std::max(SourcesView::heightFor(getWidth() - 20, kShaped), getHeight() - top - 10));
     }
     /** @brief The page in words. @return the text */
-    juce::String describe() const { return params_.describe() + matrix_.describe(); }
+    juce::String describe() const { return params_.describe(); }
 
 private:
-    ParamPage params_;     ///< the sources' knobs
-    SourcesView sources_;  ///< the sources, live
-    MatrixView matrix_;    ///< the matrix
+    static constexpr int kShaped = 28;   ///< the sources this page shapes (shapedSources)
+    ParamPage params_;                   ///< the modulators' knobs
+    SourcesView sources_;                ///< what they make, live
+};
+
+/** @brief The Matrix page: the sixteen rows in a column, every source live beside them (below two columns of rows where the page is narrow). */
+class MatrixPage final : public juce::Component {
+public:
+    /** @brief Builds the page. @param proc the processor */
+    explicit MatrixPage(AdditivProcessor& proc) : sources_(proc), matrix_(proc)
+    {
+        addAndMakeVisible(matrix_);
+        addAndMakeVisible(sources_);
+    }
+    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    int heightFor(int w) const
+    {
+        if (beside(w)) return 10 + std::max(MatrixView::heightFor(1), SourcesView::heightFor(w - 30 - kMatrixW)) + 10;
+        return 10 + MatrixView::heightFor(2) + 10 + SourcesView::heightFor(w - 20) + 10;
+    }
+    /** @brief The rows, and the sources beside or below them. */
+    void resized() override
+    {
+        const int w = getWidth(), h = getHeight();
+        if (beside(w)) {
+            matrix_.setBounds(10, 10, kMatrixW, h - 20);
+            sources_.setBounds(20 + kMatrixW, 10, w - 30 - kMatrixW, h - 20);
+        } else {
+            matrix_.setBounds(10, 10, w - 20, MatrixView::heightFor(2));
+            sources_.setBounds(10, matrix_.getBottom() + 10, w - 20, std::max(SourcesView::heightFor(w - 20), h - matrix_.getBottom() - 20));
+        }
+    }
+    /** @brief The page in words. @return the text */
+    juce::String describe() const { return matrix_.describe(); }
+
+private:
+    static constexpr int kMatrixW = 600;   ///< the rows' column, beside the sources
+    /** @brief The sources fit beside the rows' column. @param w the page's width @return true then */
+    static bool beside(int w) { return w - 30 - kMatrixW >= 440; }
+    SourcesView sources_;  ///< every source, live
+    MatrixView matrix_;    ///< the rows
 };
 
 /** @brief A short way to list ParamIds. */
@@ -277,6 +324,11 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         tabs_.addTab("Modulation", additivui::skin().panel, new ScrollPage(m, [m](int w) { return m->heightFor(w); }), true);
     }
     {
+        auto* x = new MatrixPage(proc_);
+        describe_.push_back([x] { return x->describe(); });
+        tabs_.addTab("Matrix", additivui::skin().panel, new ScrollPage(x, [x](int w) { return x->heightFor(w); }), true);
+    }
+    {
         auto* j = new JourneyPage(proc_, actions_, &live_);
         describe_.push_back([j] { return j->describe(); });
         tabs_.addTab("Journey", additivui::skin().panel, new ScrollPage(j, [j](int w) { return j->heightFor(w); }), true);
@@ -390,8 +442,14 @@ void AdditivEditor::timerCallback()
         veil_.setVisible(veil > 0.0f);
         veil_.repaint();
     }
+    // ADDITIV_LAYOUT: the pages measured, then the standalone quits.
+    if (const juce::String layout = juce::SystemStats::getEnvironmentVariable("ADDITIV_LAYOUT", {}); layout.isNotEmpty() && !layoutChecked_ && isShowing()) {
+        layoutChecked_ = true;
+        layoutCheck(juce::File(layout));
+        return;
+    }
     // The first steps, once, on the first start (not in the shot mode).
-    if (!tourAsked_ && shotPrefix_.isEmpty()) {
+    if (!tourAsked_ && shotPrefix_.isEmpty() && !layoutChecked_) {
         tourAsked_ = true;
         if (!proc_.userSettings().getBoolValue("tourDone", false))
             juce::Timer::callAfterDelay(1200, [safe = juce::Component::SafePointer<AdditivEditor>(this)] { if (safe != nullptr) safe->startTour(); });
@@ -510,6 +568,31 @@ void AdditivEditor::shootStep()
     }
 }
 
+void AdditivEditor::layoutCheck(const juce::File& out)
+{
+    const auto before = getBounds();
+    juce::String report;
+    int scrolling = 0;
+    const int sizes[][2] = { { 1280, 860 }, { 1280, 800 }, { 1280, 760 }, { 1440, 900 }, { 1920, 1000 } };
+    for (const auto& s : sizes) {
+        setSize(s[0], s[1]);
+        report << s[0] << " x " << s[1] << "\n";
+        for (int t = 0; t < tabs_.getNumTabs(); ++t)
+            if (auto* sp = dynamic_cast<ScrollPage*>(tabs_.getTabContentComponent(t))) {
+                const int need = sp->heightAt(sp->getWidth()), room = sp->getHeight();
+                report << "    " << tabs_.getTabNames()[t].paddedRight(' ', 12) << " needs " << need << ", has " << room
+                       << (need > room ? "   SCROLLS by " + juce::String(need - room) : juce::String()) << "\n";
+                if (need > room && s[0] == 1280 && s[1] == 860) ++scrolling;
+            }
+    }
+    out.replaceWithText(report);
+    setBounds(before);
+    if (standalone()) {
+        juce::JUCEApplicationBase::getInstance()->setApplicationReturnValue(scrolling);
+        juce::JUCEApplicationBase::quit();
+    }
+}
+
 void AdditivEditor::setNight(bool on)
 {
     night_ = on;
@@ -571,7 +654,13 @@ void AdditivEditor::resized()
         tour_.setBounds(getLocalBounds());
         return;
     }
-    cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, area.getHeight() / 4)));
+    // The picture a quarter of the room, but never what a page needs: the tallest page at this width
+    // fits under it while the picture can be 120 high.
+    int need = 0;
+    for (int t = 0; t < tabs_.getNumTabs(); ++t)
+        if (auto* sp = dynamic_cast<ScrollPage*>(tabs_.getTabContentComponent(t))) need = std::max(need, sp->heightAt(area.getWidth()));
+    const int rest = area.getHeight() - 8 - tabs_.getTabBarDepth() - need;
+    cloud_.setBounds(area.removeFromTop(juce::jlimit(120, 260, std::min(area.getHeight() / 4, rest))));
     canvasButton_.setBounds(cloud_.getRight() - 78, cloud_.getY() + 6, 70, 20);
     searchButton_.setBounds(canvasButton_.getX() - 76, cloud_.getY() + 6, 70, 20);
     nightButton_.setBounds(searchButton_.getX() - 64, cloud_.getY() + 6, 58, 20);

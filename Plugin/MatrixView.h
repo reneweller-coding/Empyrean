@@ -15,16 +15,18 @@ class MatrixView final : public juce::Component, private juce::Timer {
 public:
     /** @brief The rows of @p proc's engine. @param proc the processor */
     explicit MatrixView(AdditivProcessor& proc);
-    /** @brief Two columns of eight rows. */
+    /** @brief One column of sixteen rows where it is high enough (heightFor(1)), else two of eight. */
     void resized() override;
     /** @brief The rows' numbers and the column heads. */
     void paint(juce::Graphics& g) override;
-    /** @brief The height the rows need. @return pixels */
-    static int idealHeight() { return 28 + 8 * 30; }
+    /** @brief The height the rows need in one or two columns. @param columns 1 or 2 @return pixels */
+    static int heightFor(int columns) { return columns == 1 ? 28 + additiv::kModRows * 29 + 4 : 28 + additiv::kModRows / 2 * 30; }
     /** @brief The rows in words, for the help. @return the text */
     juce::String describe() const;
 
 private:
+    /** @brief The columns at the view's height. @return 1 or 2 */
+    int columns() const { return getHeight() >= heightFor(1) ? 1 : 2; }
     /** @brief One row's controls. */
     struct Row {
         juce::ComboBox source;   ///< where from

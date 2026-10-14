@@ -23,6 +23,16 @@ constexpr int kSnapH = 104;     ///< the snapshots' box
 constexpr int kVaryH = 176;     ///< the variations' box
 constexpr int kTeachH = 214;    ///< the teaching's box: four columns of a name, a large knob, three buttons, a status
 constexpr int kFindH = 132;     ///< the search's box
+// Two columns, where the page is wide enough: what changes the sound on the left (nudge, focus, teach),
+// what keeps and finds sounds on the right (snapshots, variations, find).
+constexpr int kLeftMin = 680;   ///< the left column's least width: the focus box's eight knobs
+constexpr int kRightMin = 440;  ///< the right column's least width
+constexpr int kSnapTwoH = 108;  ///< the snapshots' box in the right column: the tiles in two rows of four
+constexpr int kVaryTwoH = 206;  ///< the variations' box there: the tiles in two rows of three
+constexpr int kFindTwoH = 158;  ///< the search's box there: the presets found in three columns
+
+/** @brief The page is wide enough for two columns. @param w its width @return true for two */
+bool twoColumns(int w) { return w - 2 * kGap >= kLeftMin + kGap + kRightMin; }
 const char* const kAxis[additiv::kNudgeAxes] = { "brightness", "motion", "width", "air" };   ///< what each pair moves
 
 } // namespace
@@ -39,10 +49,12 @@ void VariationTile::paint(juce::Graphics& g)
     if (k_ >= proc_.variationCount()) return;
     g.setColour(skin.accent);
     g.setFont(juce::FontOptions(18.0f, juce::Font::bold));
+    const bool low = r.getHeight() < 60.0f;   // a low tile: the number beside what it changes, not above it
     g.drawText(juce::String(k_ + 1), r.withTrimmedLeft(8.0f).withHeight(24.0f), juce::Justification::centredLeft);
     g.setColour(skin.dim);
     g.setFont(juce::FontOptions(11.0f));
-    g.drawFittedText(proc_.variationSummary(k_), r.reduced(8.0f, 4.0f).withTrimmedTop(20.0f).toNearestInt(), juce::Justification::topLeft, 3);
+    g.drawFittedText(proc_.variationSummary(k_), (low ? r.reduced(4.0f, 3.0f).withTrimmedLeft(24.0f) : r.reduced(8.0f, 4.0f).withTrimmedTop(20.0f)).toNearestInt(),
+                     juce::Justification::topLeft, low ? 2 : 3);
 }
 
 void VariationTile::mouseDown(const juce::MouseEvent&)
@@ -58,10 +70,13 @@ void VariationTile::mouseUp(const juce::MouseEvent&)
 }
 
 /** @brief A snapshot's tile (see FocusPage). */
-class FocusPage::SnapshotTile final : public juce::Component {
+class FocusPage::SnapshotTile final : public juce::Component, public juce::SettableTooltipClient {
 public:
     /** @brief Tile @p k of @p page. @param page the page @param k 0 .. 7 */
-    SnapshotTile(FocusPage& page, int k) : page_(page), k_(k) {}
+    SnapshotTile(FocusPage& page, int k) : page_(page), k_(k)
+    {
+        setTooltip("A snapshot: click to come back to it (the sound glides there); right-click: into the morph's slot A or B, or forget it");
+    }
     /** @brief Its picture and number, or an empty frame. */
     void paint(juce::Graphics& g) override
     {
@@ -317,6 +332,23 @@ void FocusPage::filesDropped(const juce::StringArray& files, int, int)
 std::array<juce::Rectangle<int>, 6> FocusPage::boxes(int w) const
 {
     std::array<juce::Rectangle<int>, 6> r;
+    if (twoColumns(w)) {
+        const int inner = w - 2 * kGap, left = std::max(kLeftMin, (inner - kGap) / 2), right = inner - kGap - left, x1 = 2 * kGap + left;
+        int y = kGap;
+        r[0] = { kGap, y, left, kNudgeH };
+        y += kNudgeH;
+        const int focusH = focus_ != nullptr ? focus_->heightFor(left + 2 * kGap) : 0;
+        r[2] = { 0, y, left + 2 * kGap, focusH };
+        y += focusH > 0 ? focusH : kGap;
+        r[4] = { kGap, y, left, kTeachH };
+        y = kGap;
+        r[1] = { x1, y, right, kSnapTwoH };
+        y += kSnapTwoH + kGap;
+        r[3] = { x1, y, right, kVaryTwoH };
+        y += kVaryTwoH + kGap;
+        r[5] = { x1, y, right, kFindTwoH };
+        return r;
+    }
     int y = kGap;
     r[0] = { kGap, y, w - 2 * kGap, kNudgeH };
     y += kNudgeH + kGap;
@@ -324,7 +356,7 @@ std::array<juce::Rectangle<int>, 6> FocusPage::boxes(int w) const
     y += kSnapH;
     const int focusH = focus_ != nullptr ? focus_->heightFor(w) : 0;
     r[2] = { 0, y, w, focusH };
-    y += focusH;
+    y += focusH > 0 ? focusH : kGap;
     r[3] = { kGap, y, w - 2 * kGap, kVaryH };
     y += kVaryH + kGap;
     r[4] = { kGap, y, w - 2 * kGap, kTeachH };
@@ -333,7 +365,11 @@ std::array<juce::Rectangle<int>, 6> FocusPage::boxes(int w) const
     return r;
 }
 
-int FocusPage::heightFor(int w) const { return boxes(w)[5].getBottom() + kGap; }
+int FocusPage::heightFor(int w) const
+{
+    const auto r = boxes(w);
+    return std::max(r[4].getBottom(), r[5].getBottom()) + kGap;
+}
 
 void FocusPage::resized()
 {
@@ -348,12 +384,14 @@ void FocusPage::resized()
         }
         nudgeStatus_.setBounds(r[0].getX() + 12, r[0].getY() + kTitle + 34, r[0].getWidth() - 24, 20);
     }
-    {   // the snapshots: the button, then eight tiles
-        auto area = r[1].reduced(12, 0).withTrimmedTop(kTitle).withHeight(66);
+    {   // the snapshots: the button, then eight tiles -- in a row, or in two rows of four where the box is narrow
+        auto area = r[1].reduced(12, 0).withTrimmedTop(kTitle).withTrimmedBottom(10);
         snap_.setBounds(area.removeFromLeft(100).withSizeKeepingCentre(96, 28));
         area.removeFromLeft(8);
-        const int w = area.getWidth() / 8;
-        for (int k = 0; k < 8; ++k) snapTiles_[static_cast<size_t>(k)]->setBounds(area.withX(area.getX() + k * w).withWidth(w).reduced(3, 0));
+        const int across = area.getWidth() / 8 >= 90 ? 8 : 4, down = 8 / across;
+        const int w = area.getWidth() / across, h = (area.getHeight() - (down - 1) * 4) / down;
+        for (int k = 0; k < 8; ++k)
+            snapTiles_[static_cast<size_t>(k)]->setBounds(area.getX() + (k % across) * w + 3, area.getY() + (k / across) * (h + 4), w - 6, h);
     }
     if (focus_ != nullptr) focus_->setBounds(r[2]);
     {   // the variations
@@ -365,11 +403,13 @@ void FocusPage::resized()
         farName_.setBounds(top.removeFromLeft(90));
         far_.setBounds(top.removeFromLeft(220).reduced(0, 4));
         area.removeFromTop(6);
-        const int w = area.getWidth() / 6;
+        // Six tiles in a row, or two rows of three where the box is narrow (the tiles lower then).
+        const int across = area.getWidth() / 6 >= 120 ? 6 : 3, w = area.getWidth() / across;
+        const int tileH = across == 6 ? 76 : 40, keepH = across == 6 ? 24 : 22, rowH = tileH + 4 + keepH + 8;
         for (int k = 0; k < 6; ++k) {
-            auto cell = area.withX(area.getX() + k * w).withWidth(w).reduced(4, 0);
-            tiles_[static_cast<size_t>(k)]->setBounds(cell.withHeight(76));
-            keep_[static_cast<size_t>(k)].setBounds(cell.withTrimmedTop(80).withHeight(24));
+            const auto cell = juce::Rectangle<int>(area.getX() + (k % across) * w, area.getY() + (k / across) * rowH, w, rowH).reduced(4, 0);
+            tiles_[static_cast<size_t>(k)]->setBounds(cell.withHeight(tileH));
+            keep_[static_cast<size_t>(k)].setBounds(cell.withTrimmedTop(tileH + 4).withHeight(keepH));
         }
     }
     {   // the teaching: four columns, each a name, a large knob, Teach / Here / Forget, its status
@@ -395,9 +435,10 @@ void FocusPage::resized()
         top.removeFromLeft(8);
         findStatus_.setBounds(top);
         area.removeFromTop(6);
-        const int w = area.getWidth() / 4;
+        const int across = area.getWidth() >= 900 ? 4 : area.getWidth() >= 480 ? 3 : 2, w = area.getWidth() / across;
         for (size_t i = 0; i < results_.size(); ++i)
-            results_[i].setBounds(area.getX() + static_cast<int>(i % 4) * w + 2, area.getY() + static_cast<int>(i / 4) * 30, w - 4, 26);
+            results_[i].setBounds(area.getX() + static_cast<int>(i % static_cast<size_t>(across)) * w + 2,
+                                  area.getY() + static_cast<int>(i / static_cast<size_t>(across)) * 30, w - 4, 26);
     }
 }
 
@@ -405,7 +446,7 @@ void FocusPage::paint(juce::Graphics& g)
 {
     const frame::Skin& skin = additivui::skin();
     const auto r = boxes(getWidth());
-    const char* const titles[6] = { "Nudge: a little more of one thing, the level held", "Snapshots: keep the sound now, come back with a click (right-click: the morph's slots)",
+    const char* const titles[6] = { "Nudge: a little more of one thing, the level held", "Snapshots: keep the sound now, come back with a click",
                                     nullptr, "Variations: hold a tile to listen, Keep to take it",
                                     "Teach the macros by example: Teach, move the knobs, set the macro, Here",
                                     "Find by example: the presets that sound like a recording" };

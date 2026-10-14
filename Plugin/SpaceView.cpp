@@ -207,7 +207,7 @@ SpacePage::SpacePage(AdditivProcessor& proc, const frame::ControlActions& action
 }
 
 /** @brief The space's box: its least height. */
-constexpr int kSpaceViewHeight = 320;
+constexpr int kSpaceViewHeight = 200;
 
 int SpacePage::heightFor(int w) const { return params_.heightFor(w) + kSpaceViewHeight + 10; }
 

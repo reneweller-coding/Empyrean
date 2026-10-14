@@ -10,8 +10,10 @@
 using additiv::ModSource;
 using knobmod::sourceColour;
 
-SourcesView::SourcesView(AdditivProcessor& proc) : proc_(proc)
+SourcesView::SourcesView(AdditivProcessor& proc, std::vector<ModSource> shown) : proc_(proc), shown_(std::move(shown))
 {
+    if (shown_.empty())
+        for (int s = 1; s < additiv::kNumModSources; ++s) shown_.push_back(static_cast<ModSource>(s));
     for (auto& h : history_) h.fill(0.0f);
     proc_.engine().setSourcesWatched(true);
     startTimerHz(30);
@@ -24,11 +26,24 @@ SourcesView::~SourcesView()
 
 int SourcesView::columns(int w) { return std::max(1, (w - 20 + kGap) / (kCellW + kGap)); }
 
-int SourcesView::heightFor(int w)
+int SourcesView::mostColumns(int w) { return std::max(columns(w), (w - 20 + kGap) / (kCellMinW + kGap)); }
+
+int SourcesView::heightFor(int w, int count)
 {
-    const int count = additiv::kNumModSources - 1, cols = columns(w);
-    const int rows = (count + cols - 1) / cols;
-    return kHead + rows * (kCellH + kGap) + 6;
+    const int cols = mostColumns(w), rows = (count + cols - 1) / cols;
+    return kHead + rows * (kCellMinH + kGap) + 6;
+}
+
+std::pair<int, int> SourcesView::grid(int w, int h, int count)
+{
+    const int most = mostColumns(w);
+    int cols = columns(w), cellH = kCellH;
+    for (;; ++cols) {
+        const int rows = (count + cols - 1) / cols;
+        cellH = (h - kHead - 6) / rows - kGap;
+        if (cellH >= 36 || cols >= most) break;
+    }
+    return { cols, std::clamp(cellH, kCellMinH, kCellMaxH) };
 }
 
 void SourcesView::timerCallback()
@@ -50,12 +65,12 @@ void SourcesView::paint(juce::Graphics& g)
     g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     g.drawText("Sources, live: the last four seconds of each", 18, 4, getWidth() - 30, 20, juce::Justification::centredLeft);
 
-    const int cols = columns(getWidth());
+    const auto [cols, cellH] = grid(getWidth(), getHeight(), static_cast<int>(shown_.size()));
     const float cellW = static_cast<float>(getWidth() - 20 - (cols - 1) * kGap) / static_cast<float>(cols);
-    for (int s = 1; s < additiv::kNumModSources; ++s) {
-        const int i = s - 1;
-        const juce::Rectangle<float> cell(10.0f + static_cast<float>(i % cols) * (cellW + kGap), static_cast<float>(kHead + (i / cols) * (kCellH + kGap)),
-                                          cellW, static_cast<float>(kCellH));
+    for (size_t n = 0; n < shown_.size(); ++n) {
+        const int i = static_cast<int>(n), s = static_cast<int>(shown_[n]);
+        const juce::Rectangle<float> cell(10.0f + static_cast<float>(i % cols) * (cellW + kGap), static_cast<float>(kHead + (i / cols) * (cellH + kGap)),
+                                          cellW, static_cast<float>(cellH));
         g.setColour(skin.raised.withAlpha(0.55f));
         g.fillRoundedRectangle(cell, 4.0f);
         const ModSource src = static_cast<ModSource>(s);

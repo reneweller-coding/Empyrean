@@ -181,7 +181,7 @@ HallPage::HallPage(AdditivProcessor& proc, const frame::ControlActions& actions,
 }
 
 /** @brief The memory's box: its height. */
-constexpr int kHallViewHeight = 300;
+constexpr int kHallViewHeight = 220;
 
 int HallPage::heightFor(int w) const { return params_.heightFor(w) + kHallViewHeight + 10; }
 

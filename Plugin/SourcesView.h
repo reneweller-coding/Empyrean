@@ -11,32 +11,58 @@
 #include "additiv/Modulation.h"
 
 #include <array>
+#include <utility>
+#include <vector>
 
 /** @brief The live sources (see the file comment). */
 class SourcesView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The sources of @p proc's engine; while it lives, the engine computes them all. @param proc the processor */
-    explicit SourcesView(AdditivProcessor& proc);
+    /**
+     * @brief The sources of @p proc's engine, all or those listed; while it lives, the engine computes them all.
+     * @param proc   the processor
+     * @param shown  the sources drawn, in order (empty: every one)
+     */
+    explicit SourcesView(AdditivProcessor& proc, std::vector<additiv::ModSource> shown = {});
     /** @brief Lets the engine stop computing what no row reads. */
     ~SourcesView() override;
     /** @brief The traces in a grid. */
     void paint(juce::Graphics& g) override;
-    /** @brief The height the grid needs at a width. @param w pixels @return pixels */
-    static int heightFor(int w);
+    /**
+     * @brief The least height the grid needs at a width: as many columns as fit, the cells at their lowest. Given more,
+     *        the cells grow.
+     * @param w      pixels
+     * @param count  the sources drawn
+     * @return       pixels
+     */
+    static int heightFor(int w, int count = additiv::kNumModSources - 1);
 
 private:
     static constexpr int kHistory = 120;          ///< samples a trace holds: four seconds at 30 a second
     static constexpr int kCellW = 150;            ///< a cell's least width
-    static constexpr int kCellH = 42;             ///< a cell's height
+    static constexpr int kCellH = 42;             ///< a cell's height, as it likes it
+    static constexpr int kCellMinW = 120;         ///< a cell's least width, when the grid is pressed for height
+    static constexpr int kCellMinH = 32;          ///< a cell's least height
+    static constexpr int kCellMaxH = 60;          ///< a cell's greatest height
     static constexpr int kGap = 6;                ///< between the cells
     static constexpr int kHead = 26;              ///< the heading's height
 
     /** @brief Samples every source (while the window is open, so a trace is full when the page is opened); repaints when on screen. */
     void timerCallback() override;
-    /** @brief The columns at a width. @param w pixels @return columns */
+    /** @brief The columns at a width, the cells as wide as they like. @param w pixels @return columns */
     static int columns(int w);
+    /** @brief The most columns at a width, the cells at their narrowest. @param w pixels @return columns */
+    static int mostColumns(int w);
+    /**
+     * @brief The grid at a size: as wide as the cells like, more columns only while the cells would be too low.
+     * @param w      pixels
+     * @param h      pixels
+     * @param count  cells
+     * @return       the columns and the cells' height
+     */
+    static std::pair<int, int> grid(int w, int h, int count);
 
     AdditivProcessor& proc_;                                                            ///< whose engine
     std::array<std::array<float, kHistory>, additiv::kNumModSources> history_{};       ///< per source its last values, a ring
     int head_ = 0;                                                                      ///< where the next sample goes
+    std::vector<additiv::ModSource> shown_;                                             ///< the sources drawn, in order
 };

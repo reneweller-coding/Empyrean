@@ -43,6 +43,10 @@ presets.
 - **The info line:** what the control under the mouse does, its value and what moves it -- a sentence for all 210.
 - **Macros as large knobs**, named by what they move; **snapshots** with pictures; **MPE seen at the keys**;
   a **night mode** for dark rooms; **first steps** on the first start.
+- **Every page fits the window** at its usual size (1280 x 860, and still at 800 high) without scrolling: the boxes
+  fill the rows as tightly as they can, Focus stands in two columns, the matrix has a page of its own with every
+  source live beside its rows, the space's and the hall's pictures take what is left, and the picture at the top
+  gives way where a page needs the room. A test (ctest `layout`) keeps it so.
 - **The whole bank levelled anew:** 3530 presets from before 0.14.0 measured again with today's engine (some had
   drifted by several dB); the map and the search read the new measures.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;

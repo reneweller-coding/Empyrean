@@ -2,8 +2,8 @@
  * @file ParamPage.h
  * @brief A page of the panel: group boxes in their family's colour, each holding the frame's knobs,
  *        choosers and switches for a list of parameters, bound to the host's parameters. The boxes
- *        flow left to right and wrap; every control has the right-click menu (MIDI learn, forget,
- *        default).
+ *        flow left to right and wrap, in as few rows as they allow; every control has the right-click
+ *        menu (MIDI learn, forget, default).
  */
 #pragma once
 
@@ -78,9 +78,10 @@ private:
         bool resting = false;                 ///< every gate at nothing: its other controls dimmed
     };
     /**
-     * @brief Where every box goes at a width.
+     * @brief Where every box goes at a width: in rows, in order -- or, where a later box taken up into an
+     *        earlier row's gap saves a row, in the fewest rows.
      * @param width  pixels
-     * @return       the boxes' rectangles, in order
+     * @return       the boxes' rectangles, in the boxes' order
      */
     std::vector<juce::Rectangle<int>> flow(int width) const;
 

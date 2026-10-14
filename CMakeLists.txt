@@ -124,5 +124,9 @@ if(ADDITIV_BUILD_PLUGIN)
                      --validate "$<TARGET_FILE_DIR:Empyrean_VST3>/../..")
             set_tests_properties(pluginval PROPERTIES LABELS "audio;slow")
         endif()
+        # Every page fits the window's usual size (1280 x 860) without scrolling: the standalone measures them
+        # (ADDITIV_LAYOUT), writes what each needs at a few sizes into layout.txt and quits with the number that scroll.
+        add_test(NAME layout COMMAND "$<TARGET_FILE:Empyrean_Standalone>")
+        set_tests_properties(layout PROPERTIES LABELS "gui" ENVIRONMENT "ADDITIV_LAYOUT=${CMAKE_CURRENT_BINARY_DIR}/layout.txt" TIMEOUT 120)
     endif()
 endif()
