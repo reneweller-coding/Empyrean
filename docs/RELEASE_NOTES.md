@@ -28,6 +28,13 @@ presets.
   dot where it moves the knob now); a knob's right-click menu lists its rows with their depths and offers every
   source to modulate it with.
 - **The groups:** a group's main controls are marked, and a group whose main controls stand at nothing rests, dimmed.
+- **Follow Light** (Conductor): the conductors choose notes whose harmonics fall where the landscape (or the living
+  field) is bright.
+- **The Focus page**, the simple ways in, first among the pages: **Nudge** (darker/brighter, calmer/livelier,
+  narrower/wider, purer/airier: every heard knob a little the measured way, the level held), **Focus** (the knobs that do
+  the most for this sound), **Variations** (six near the sound, hold to listen, Keep to evolve it), **Teach** (a macro
+  learns a gesture by example) and **Find** (the presets that sound like a recording, ringed on the map). Built on a
+  measure of what every shaping knob does around 48 presets.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;
   Depth and Keys Depth as rings to drag.
 

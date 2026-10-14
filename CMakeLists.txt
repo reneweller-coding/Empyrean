@@ -59,6 +59,9 @@ add_library(AdditivCore STATIC
     Core/src/Journeys.cpp
     Core/src/PresetMap.cpp
     Core/src/Route.cpp
+    Core/src/Describe.cpp
+    Core/src/Find.cpp
+    Core/src/Focus.cpp
     Core/src/Engine.cpp)
 target_include_directories(AdditivCore PUBLIC Core/include PRIVATE ThirdParty/dr_libs)
 target_compile_definitions(AdditivCore PRIVATE $<$<COMPILE_LANGUAGE:CXX>:_WIN32_WINNT=0x0A00 UNICODE _UNICODE _CRT_SECURE_NO_WARNINGS>)

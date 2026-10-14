@@ -6,6 +6,7 @@
 
 #include "AdditivData.h"
 #include "JourneyView.h"
+#include "FocusView.h"
 #include "HallView.h"
 #include "KnobMod.h"
 #include "MapView.h"
@@ -159,6 +160,15 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
         describe_.push_back([p] { return p->describe(); });
         tabs_.addTab(name, additivui::skin().panel, new ScrollPage(p, [p](int w) { return p->heightFor(w); }), true);
     };
+    {   // the simple ways in, first
+        auto* f = new FocusPage(proc_, actions_, &live_, [this](const juce::String& name, std::function<void()> change) {
+            history_.begin(name, values(), {}, true);
+            change();
+            history_.end(values(), {});
+        });
+        describe_.push_back([f] { return f->describe(); });
+        tabs_.addTab("Focus", additivui::skin().panel, new ScrollPage(f, [f](int w) { return f->heightFor(w); }), true);
+    }
     page("Cloud", { { "Spectrum", F::Source, Ids{ ParamId::Partials, ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic,
                                                          ParamId::Stretch, ParamId::Shift } },
                     { "Cloud", F::Source, Ids{ ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift, ParamId::DriftRate, ParamId::Shimmer,
@@ -185,7 +195,7 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
                                                        ParamId::BrainHoldMin, ParamId::BrainHoldMax }, Ids{ ParamId::BrainOn } },
                         { "Register", F::Motion, Ids{ ParamId::BrainLow, ParamId::BrainHigh } },
                         { "Harmony", F::Motion, Ids{ ParamId::BrainConsonance, ParamId::BrainWander, ParamId::AutoLead, ParamId::AutoTension,
-                                                     ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::AutoStep } },
+                                                     ParamId::AutoRootMove, ParamId::BrainTimbre, ParamId::BrainCascade, ParamId::BrainLight, ParamId::AutoStep } },
                         { "Brain 2", F::Envelope, Ids{ ParamId::Brain2On, ParamId::Brain2Interval, ParamId::Brain2Density, ParamId::Brain2Rate,
                                                        ParamId::Brain2Depth }, Ids{ ParamId::Brain2On } },
                         { "MPE", F::Filter, Ids{ ParamId::MpeOn, ParamId::MpeBend, ParamId::MpePress, ParamId::MpePressDepth, ParamId::MpeSlide,
@@ -368,6 +378,8 @@ void AdditivEditor::shootStep()
                     if (val == d->choices[c]) v = static_cast<float>(c);
                 proc_.setValue(static_cast<int>(d->id), v);
             }
+        // ADDITIV_SHOT_VARY: the Focus page's six variations made, for their picture.
+        if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_VARY", {}).isNotEmpty()) proc_.makeVariations(0.3f);
     }
     if (shotPrefix_.isEmpty() || ++shotTick_ < start || (shotTick_ - start) % 3 != 0) return;
     const int t = (shotTick_ - start) / 3;

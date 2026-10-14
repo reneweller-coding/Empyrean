@@ -674,6 +674,18 @@ void Engine::readParams()
             offset[row.target] += row.depth * amount * source(row.source, row.setup);
             modded[row.target] = true;
         }
+        // The macros taught by example (Focus.h), each at its macro's value -- like rows, before the gates.
+        {
+            std::unique_lock<std::mutex> lock(lessonLock_, std::try_to_lock);
+            if (lock.owns_lock())
+                for (size_t m = 0; m < 4; ++m)
+                    if (lessonPendingSet_[m]) {
+                        lessons_[m] = lessonsPending_[m];
+                        lessonPendingSet_[m] = false;
+                    }
+        }
+        for (size_t m = 0; m < 4; ++m)
+            if (lessons_[m].count >= 2) lessons_[m].apply(in.macro[m], offset, modded);
         // A gated amount is heard by its gate, the matrix's push too: nothing where its kind changes.
         for (int g = 0; g < kMorphGates; ++g) offset[static_cast<int>(kGatedAmounts[g])] *= sound_.gate[g];
         cutoffPush_ = offset[static_cast<int>(ParamId::Cutoff)];
@@ -861,6 +873,93 @@ void Engine::refreshLandscape()
     landChoice_ = choice;
 }
 
+void Engine::updateLight()
+{
+    const float amount = cur(ParamId::BrainLight);
+    if (amount <= 0.0f) {
+        lightOn_ = false;
+        return;
+    }
+    if (lightOn_ && --lightCountdown_ > 0) return;
+    lightCountdown_ = 8;
+    // The light over the spectrum's axis (20 Hz .. 20 kHz, log, as the partials read it), 128 points.
+    constexpr int kPoints = 128;
+    float profile[kPoints];
+    bool have = false;
+    const int lifeMode = std::clamp(static_cast<int>(std::lround(cur(ParamId::LifeMode))), 0, kNumLifeModes - 1);
+    const float lifeDepth = cur(ParamId::LifeDepth);
+    if (lifeMode != 0 && lifeDepth > 0.0f) {
+        if (const float* cells = cloud_.lifePicture()) {   // the living field: its columns, averaged along
+            float column[kLifeW];
+            for (int x = 0; x < kLifeW; ++x) {
+                float s = 0.0f;
+                for (int y = 0; y < kLifeH; ++y) s += cells[static_cast<size_t>(y) * kLifeW + x];
+                column[x] = s / static_cast<float>(kLifeH);
+            }
+            const float zoom = cur(ParamId::LifeZoom);
+            for (int i = 0; i < kPoints; ++i) {
+                float x = (static_cast<float>(i) + 0.5f) / kPoints * zoom * static_cast<float>(kLifeW);
+                x -= std::floor(x / static_cast<float>(kLifeW)) * static_cast<float>(kLifeW);
+                profile[i] = 1.0f - lifeDepth + lifeDepth * column[std::min(static_cast<int>(x), kLifeW - 1)];
+            }
+            have = true;
+        }
+    }
+    const float motionDepth = cur(ParamId::MotionDepth);
+    if (!have && motionUsesLandscape(static_cast<MotionKind>(std::lround(cur(ParamId::Motion)))) && motionDepth > 0.0f && landChoice_ >= 0) {
+        // The landscape as a new note reads it: its first eight seconds at the motion's rate.
+        auto readLand = [&](const Landscape& l) {
+            if (l.columns < 2 || l.rows < 1) return;
+            const int rows = std::clamp(static_cast<int>(std::lround(8.0f * cur(ParamId::MotionRate) / std::max(l.rowSeconds, 0.001f))), 1, l.rows);
+            for (int i = 0; i < kPoints; ++i) {
+                const int c = std::min(static_cast<int>((static_cast<float>(i) + 0.5f) / kPoints * static_cast<float>(l.columns)), l.columns - 1);
+                float s = 0.0f;
+                for (int r = 0; r < rows; ++r) s += l.amps[static_cast<size_t>(r) * l.columns + c];
+                profile[i] = 1.0f - motionDepth + motionDepth * s / static_cast<float>(rows);
+            }
+            have = true;
+        };
+        if (landChoice_ == kUserLandscape) {
+            if (userLandLock_.try_lock()) {   // the editor handing one over: the light as it was
+                readLand(userLand_);
+                userLandLock_.unlock();
+            } else if (lightOn_) {
+                return;
+            }
+        } else {
+            readLand(factoryLandscapes().land[static_cast<size_t>(landChoice_)]);
+        }
+    }
+    if (!have) {
+        lightOn_ = false;
+        return;
+    }
+    // Per note: its harmonics' weight in the light (the voice's own spectrum), against the register's mean.
+    float score[128];
+    double mean = 0.0;
+    int counted = 0;
+    for (int n = 0; n < 128; ++n) {
+        const double f0 = frequencyOf(n);
+        double s = 0.0, w = 0.0;
+        for (int h = 0; h < std::max(brainSpec_.count, 1) && h < BrainSpectrum::kMax; ++h) {
+            const double fh = f0 * (brainSpec_.count > 0 ? brainSpec_.ratio[h] : static_cast<double>(h + 1));
+            if (fh < kLandLowHz || fh > 20000.0) continue;
+            const double a = brainSpec_.count > 0 ? brainSpec_.amp[h] : 1.0 / (h + 1);
+            const int i = std::clamp(static_cast<int>(std::log2(fh / kLandLowHz) / 9.96578428 * kPoints), 0, kPoints - 1);
+            s += a * profile[i];
+            w += a;
+        }
+        score[n] = w > 0.0 ? static_cast<float>(s / w) : 0.0f;
+        if (n >= bp_.low && n <= bp_.high) { mean += score[n]; ++counted; }
+    }
+    mean = counted > 0 ? mean / counted : 0.5;
+    // The factor: the light's share against the register's, cubed at full Follow Light -- twice the
+    // light, eight times as likely.
+    for (int n = 0; n < 128; ++n)
+        light_[n] = std::clamp(static_cast<float>(std::pow(std::max(score[n], 0.01f) / std::max(mean, 0.01), 3.0 * amount)), 0.02f, 50.0f);
+    lightOn_ = true;
+}
+
 double Engine::frequencyOf(int note) const
 {
     // Purity blends 12-TET (0) with the scale (1) in the log domain, as in Noctuary.
@@ -961,6 +1060,14 @@ void Engine::lifeSnapshot(std::vector<float>& cells)
 {
     const std::lock_guard<std::mutex> lock(snapLock_);
     cells = snapLife_;
+}
+
+void Engine::setMacroLesson(int macro, const MacroLesson& lesson)
+{
+    if (macro < 0 || macro >= 4) return;
+    const std::lock_guard<std::mutex> lock(lessonLock_);
+    lessonsPending_[static_cast<size_t>(macro)] = lesson;
+    lessonPendingSet_[static_cast<size_t>(macro)] = true;
 }
 
 void Engine::rippleSnapshot(std::vector<float>& cells)
@@ -1162,6 +1269,9 @@ void Engine::renderBlock()
         if (bp_.on) brain_.requestFill();
         if (blk_.brain2) brain2_.requestFill();
     }
+    updateLight();
+    bp_.light = lightOn_ ? light_ : nullptr;
+    bp2_.light = bp_.light;
     auto freqOf = [this](int note) { return frequencyOf(note); };
     brain_.update(dt, bp_, -1, freqOf, [this](const BrainEvent& e) {
         if (e.type == BrainEvent::Type::NoteOn) startNote(e.note, e.velocity, brainDistance(), 1, 0);

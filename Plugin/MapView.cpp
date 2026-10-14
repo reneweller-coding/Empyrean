@@ -99,6 +99,20 @@ void MapView::paint(juce::Graphics& g)
     g.drawText("moving", juce::Rectangle<float>(p.getX() - 8.0f + p.getHeight() - 60.0f, p.getBottom() - 14.0f, 60.0f, 14.0f), juce::Justification::centredRight);
     g.restoreState();
 
+    // The presets the last search by example found (Focus page), ringed, numbered nearest first.
+    {
+        const auto& found = proc_.found();
+        g.setFont(juce::FontOptions(10.0f, juce::Font::bold));
+        for (size_t i = 0; i < found.size(); ++i) {
+            float x = 0.0f, y = 0.0f;
+            additiv::presetMapPosition(found[i], x, y);
+            const auto s = toScreen(x, y);
+            g.setColour(skin.accent.withAlpha(i == 0 ? 1.0f : 0.7f));
+            g.drawEllipse(s.x - 6.0f, s.y - 6.0f, 12.0f, 12.0f, i == 0 ? 2.0f : 1.2f);
+            g.drawText(juce::String(static_cast<int>(i) + 1), juce::Rectangle<float>(s.x + 6.0f, s.y - 14.0f, 14.0f, 12.0f), juce::Justification::centredLeft);
+        }
+    }
+
     // The route: its line, its numbered points, the one under way.
     const additiv::Route& r = proc_.route();
     if (r.count() > 0) {

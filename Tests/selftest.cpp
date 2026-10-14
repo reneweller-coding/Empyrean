@@ -7,7 +7,11 @@
  */
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/Describe.h"
+#include "additiv/Find.h"
+#include "additiv/Focus.h"
 #include "additiv/Landscape.h"
+#include "additiv/Motion.h"
 #include "additiv/Presets.h"
 #include "additiv/Route.h"
 #include "additiv/PresetMap.h"
@@ -2363,6 +2367,210 @@ int main()
         check(ran && kept[1] > 2.0 * kept[0] && whole[1] < 1.0, "ripple: with Bend its waves linger at the notes",
               fmt("0.6 s after the strike the string stands at %.0f %% of its height at the fundamental plain, %.0f %% bent; "
                   "the whole string %.0f / %.0f %% of its energy", 100.0 * kept[0], 100.0 * kept[1], 100.0 * whole[0], 100.0 * whole[1]));
+    }
+
+    // 62. Follow Light (Phase 19a): a landscape bright only between 200 and 400 Hz, read by the Aurora
+    //     motion. Following the light, the conductor puts far more of its notes there than without
+    //     (without, the band is already the middle of its register, which it favours; and its rules
+    //     against doublings and crowding keep spreading the chord).
+    {
+        Landscape band;
+        band.columns = 128;
+        band.rows = 64;
+        band.rowSeconds = 0.5f;
+        band.amps.assign(static_cast<size_t>(band.columns) * band.rows, 0.02f);
+        for (int r = 0; r < band.rows; ++r)
+            for (int c = 0; c < band.columns; ++c) {
+                const float hz = landscapeColumnHz(c, band.columns);
+                if (hz >= 200.0f && hz <= 400.0f) band.amps[static_cast<size_t>(r) * band.columns + c] = 1.0f;
+            }
+        double share[2] = { 0.0, 0.0 };
+        int seen[2] = { 0, 0 };
+        for (int k = 0; k < 2; ++k) {
+            Engine e;
+            quietEffects(e);
+            e.setParam(ParamId::Motion, static_cast<float>(MotionKind::Aurora));
+            e.setParam(ParamId::MotionDepth, 1.0f);
+            e.setParam(ParamId::Landscape, static_cast<float>(kUserLandscape));
+            e.setParam(ParamId::AutoMode, 0.0f);   // Free: notes come and go on their own timers
+            e.setParam(ParamId::BrainRate, 2.0f);
+            e.setParam(ParamId::BrainHoldMin, 1.0f);
+            e.setParam(ParamId::BrainHoldMax, 3.0f);
+            e.setParam(ParamId::BrainLow, 36.0f);
+            e.setParam(ParamId::BrainHigh, 84.0f);
+            e.setParam(ParamId::BrainLight, static_cast<float>(k));
+            e.setUserLandscape(band);
+            if (!openOffline(e, true, 191)) return 1;
+            std::vector<float> L(256), R(256);
+            int inBand = 0, all = 0;
+            for (int b = 0; b < 187 * 120; ++b) {   // two minutes, a look every second
+                e.process(L.data(), R.data(), 256);
+                if (b % 187 != 0 || b < 187 * 10) continue;
+                for (int i = 0; i < kMaxViewVoices; ++i) {
+                    const VoiceView v = e.voiceView(i);
+                    if (v.source != 1 || v.hz <= 0.0f || v.gain <= 0.0f) continue;
+                    ++all;
+                    if (v.hz >= 190.0f && v.hz <= 420.0f) ++inBand;
+                }
+            }
+            seen[k] = all;
+            share[k] = all > 0 ? static_cast<double>(inBand) / all : 0.0;
+        }
+        check(seen[0] > 100 && seen[1] > 100 && share[1] > 0.6 && share[1] > share[0] + 0.2, "conductor: Follow Light puts the notes where the landscape is bright",
+              fmt("fundamentals in the bright band (200 .. 400 Hz): %.0f %% without, %.0f %% following the light (%d / %d voices seen)",
+                  100.0 * share[0], 100.0 * share[1], seen[0], seen[1]));
+    }
+
+    // The measuring chord as additiv_presets plays it (conductor off, attack at most half a second,
+    // master at 0 dB, 512-sample blocks, 14 s): the description of the last eight seconds and the
+    // level of the loudest second -- so that what is measured here is what the bank was measured by.
+    auto measureLike = [&](const float* values, const std::string& mod, Description& d, double& db) {
+        Engine e;
+        e.setRealtime(false);
+        for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+        e.setModText(mod);
+        e.setParam(ParamId::BrainOn, 0.0f);
+        e.setParam(ParamId::Attack, std::min(values[static_cast<int>(ParamId::Attack)], 0.5f));
+        e.setParam(ParamId::MasterGain, 0.0f);
+        EngineConfig c;
+        c.maxHostBlock = 512;
+        c.realtimeGpuClass = false;
+        std::string error;
+        if (!e.prepare(c, &error)) return false;
+        for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
+        const int blocks = static_cast<int>(14.0 * 48000.0 / 512), keepFrom = blocks - static_cast<int>(8.0 * 48000.0 / 512);
+        std::vector<float> L(512), R(512), keptL, keptR;
+        double sq = 0.0, loudest = 0.0;
+        int inWindow = 0;
+        for (int b = 0; b < blocks; ++b) {
+            e.process(L.data(), R.data(), 512);
+            if (b >= keepFrom) {
+                keptL.insert(keptL.end(), L.begin(), L.end());
+                keptR.insert(keptR.end(), R.begin(), R.end());
+            }
+            for (int i = 0; i < 512; ++i) sq += 0.5 * (static_cast<double>(L[static_cast<size_t>(i)]) * L[static_cast<size_t>(i)] + static_cast<double>(R[static_cast<size_t>(i)]) * R[static_cast<size_t>(i)]);
+            if (++inWindow == 93) {   // 48000 / 512: about a second
+                loudest = std::max(loudest, sq / (93.0 * 512.0));
+                sq = 0.0;
+                inWindow = 0;
+            }
+        }
+        d = describe(keptL, keptR, 48000.0);
+        db = 10.0 * std::log10(std::max(loudest, 1e-20));
+        return true;
+    };
+
+    // 63. Nudges (Phase 20): around a preset, Brighter raises the measured brightness and Wider the
+    //     width, each by a good part of what the measured sensitivities predict, the level held; Calmer
+    //     (a rule: the motion measured over eight seconds is too unsteady to steer by) slows every rate
+    //     that moves something by 1.23 a quarter step and touches no knob at nothing.
+    {
+        const int index = 64;   // Choirs' first
+        float values[kNumParams], up[kNumParams], wide[kNumParams], calm[kNumParams];
+        std::string mod;
+        presetValues(index, values, &mod);
+        const float wantB = nudge(values, 0, 1.0f, 0.5f, up);
+        const float wantW = nudge(values, 2, 1.0f, 0.5f, wide);
+        nudge(values, 1, -1.0f, 0.25f, calm);
+        Description d0, d1, d2;
+        double l0 = 0.0, l1 = 0.0, l2 = 0.0;
+        const bool ran = measureLike(values, mod, d0, l0) && measureLike(up, mod, d1, l1) && measureLike(wide, mod, d2, l2);
+        const double gotB = (d1.brightness - d0.brightness) / measureSpread(Measure::Brightness);
+        const double gotW = (d2.width - d0.width) / measureSpread(Measure::Width);
+        // The rule: rates down by 1.23 (within their ranges), nothing that was at nothing moved.
+        bool rule = values[static_cast<int>(ParamId::MotionRate)] > 0.0f;
+        for (ParamId id : { ParamId::MotionRate, ParamId::DriftRate, ParamId::ShimmerRate }) {
+            const float v = values[static_cast<int>(id)], c = calm[static_cast<int>(id)];
+            if (v > 0.0f && paramHeard(id, values)) rule = rule && (std::fabs(c - std::max(v / std::exp2(0.3f), paramDesc(id).min)) < 1.0e-4f);
+        }
+        for (int i = 0; i < kNumParams; ++i)
+            if (values[i] == 0.0f && paramDesc(static_cast<ParamId>(i)).min == 0.0f) rule = rule && calm[i] == 0.0f && up[i] == 0.0f && wide[i] == 0.0f;
+        std::string movedB, movedW;   // the knobs each moved, for the report
+        for (int pass = 0; pass < 2; ++pass) {
+            const float* to = pass == 0 ? up : wide;
+            std::string& s = pass == 0 ? movedB : movedW;
+            for (int i = 0; i < kNumParams; ++i)
+                if (to[i] != values[i]) s += fmt("%s %+.2f ", paramTable()[static_cast<size_t>(i)].key,
+                                                 toNorm(paramTable()[static_cast<size_t>(i)], to[i]) - toNorm(paramTable()[static_cast<size_t>(i)], values[i]));
+        }
+        check(ran && rule && wantB > 0.2f && gotB > 0.4 * wantB && wantW > 0.2f && gotW > 0.4 * wantW && std::fabs(l1 - l0) < 1.5 && std::fabs(l2 - l0) < 1.5,
+              "nudge: brighter is brighter, wider is wider, calmer is slower",
+              fmt("brighter: predicted %.2f, measured %.2f spreads (%+.1f dB; %s); wider: predicted %.2f, measured %.2f (%+.1f dB; %s); calmer by its rule: %s",
+                  wantB, gotB, l1 - l0, movedB.c_str(), wantW, gotW, l2 - l0, movedW.c_str(), rule ? "yes" : "NO"));
+    }
+
+    // 64. Variations: the same dice give the same variation, other dice another; a few heard shaping
+    //     knobs move (four to eight), nothing else but the master that holds the level.
+    {
+        float values[kNumParams], a[kNumParams], b[kNumParams], c[kNumParams];
+        presetValues(64, values, nullptr);
+        vary(values, 0.4f, 7, a);
+        vary(values, 0.4f, 7, b);
+        vary(values, 0.4f, 8, c);
+        int count = 0;
+        const ParamId* shaping = nullptr;
+        int shapingCount = 0;
+        shaping = shapingParams(shapingCount);
+        bool onlyShaping = true, onlyHeard = true;
+        for (int i = 0; i < kNumParams; ++i) {
+            if (a[i] == values[i] || static_cast<ParamId>(i) == ParamId::MasterGain) continue;
+            ++count;
+            onlyShaping = onlyShaping && std::find(shaping, shaping + shapingCount, static_cast<ParamId>(i)) != shaping + shapingCount;
+            onlyHeard = onlyHeard && paramHeard(static_cast<ParamId>(i), values);
+        }
+        const bool same = std::equal(a, a + kNumParams, b), differ = !std::equal(a, a + kNumParams, c);
+        check(same && differ && count >= 1 && count <= 8 && onlyShaping && onlyHeard, "variations: repeatable, different, a few heard knobs",
+              fmt("%d knobs moved, %s, %s, %s", count, same ? "the same dice the same" : "NOT repeatable", differ ? "other dice another" : "other dice the SAME",
+                  onlyShaping && onlyHeard ? "all heard shaping knobs" : "some NOT heard or not shaping"));
+    }
+
+    // 65. A macro taught by example: at its places the knobs stand where they were taught, between them
+    //     half way, and the macro's value glides them.
+    {
+        Engine e;
+        quietEffects(e);
+        if (!openOffline(e, false, 199)) return 1;
+        MacroLesson lesson;
+        float zero[kNumParams] = {}, moved[kNumParams] = {};
+        moved[static_cast<int>(ParamId::Tilt)] = -0.2f;
+        moved[static_cast<int>(ParamId::Shimmer)] = 0.1f;
+        lesson.set(0.0f, zero);
+        lesson.set(1.0f, moved);
+        e.setMacroLesson(0, lesson);
+        const float tilt0 = toNorm(paramDesc(ParamId::Tilt), e.param(ParamId::Tilt));
+        e.setParam(ParamId::Macro1, 0.5f);
+        render(e, 0.5);
+        const float half = e.playedNorm(ParamId::Tilt);
+        e.setParam(ParamId::Macro1, 1.0f);
+        render(e, 0.5);
+        const float whole = e.playedNorm(ParamId::Tilt);
+        e.setParam(ParamId::Macro1, 0.0f);
+        render(e, 0.5);
+        const float none = e.playedNorm(ParamId::Tilt);
+        check(std::fabs(half - (tilt0 - 0.1f)) < 0.005f && std::fabs(whole - (tilt0 - 0.2f)) < 0.005f && (std::isnan(none) || std::fabs(none - tilt0) < 0.005f)
+                  && lesson.knobs() == 2,
+              "macro: taught by example, it glides between its places",
+              fmt("tilt %.3f untaught, %.3f at Macro 0.5, %.3f at 1, %.3f at 0 again (%d knobs taught)", tilt0, half, whole, std::isnan(none) ? tilt0 : none, lesson.knobs()));
+    }
+
+    // 66. Search by example: a preset measured as the bank was measured is found, nearest first.
+    {
+        const int index = 100;
+        float values[kNumParams];
+        std::string mod;
+        presetValues(index, values, &mod);
+        Description d;
+        double db = 0.0;
+        int found[5] = { -1, -1, -1, -1, -1 };
+        float dist[5] = {};
+        const bool ran = measureLike(values, mod, d, db);
+        const int n = ran ? findLike(d, found, 5, dist) : 0;
+        int rank = -1;
+        for (int i = 0; i < n; ++i)
+            if (found[i] == index) rank = i;
+        check(ran && rank >= 0 && rank < 3 && dist[rank] < 0.05f, "find: a preset is found by its own sound",
+              fmt("%s found %s (distance %.3f); nearest: %s", preset(index).name, rank >= 0 ? fmt("at %d", rank + 1).c_str() : "NOT", rank >= 0 ? dist[rank] : -1.0f,
+                  n > 0 ? preset(found[0]).name : "-"));
     }
 
     std::printf(g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures);

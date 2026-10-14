@@ -79,6 +79,9 @@ offline renderer and the manual, and a portable zip.
   flow, feedback, rain, starfield, moire -- read by every partial.
 - **The preset map:** every preset on a square by how it sounds, measured (darker to brighter, still to moving); the
   cursor blends the presets round it, routes walk it with a travel and a hold time for each waypoint.
+- **Simple ways in (the Focus page):** nudges (brighter, calmer, wider, airier) built on a measure of what every knob
+  does, the few knobs that matter for this sound, variations to evolve a sound by ear, macros taught by example, and
+  presets found by a recording.
 - **A panel that takes the hand:** the picture shows what the page in front edits and lets it be dragged (the filter's
   curve, the air's band, the register, the hall's lowest mode); a Canvas mode for listening; every modulation as an
   arc round its knob, made and changed from the knob's menu; the space seen from above.

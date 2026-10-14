@@ -526,6 +526,36 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 20: Einfache Wege hinein -- die Fokus-Seite (gebaut, 14.10.2026, 0.15.0)
+
+Ideen aus der Forschung, vom Nutzer gewählt (ohne CLAP-Textsuche): semantische Stupser (Social-EQ, SAFE), Fokus
+(schrittweises Aufdecken), Variationen mit Vorhören (interaktive Evolution nach Dahlstedt, Side Views nach Terry &
+Mynatt), Makro aus Beispielen (Wekinator, Fiebrink), Suche nach Beispiel (SynthAssist, Cartwright & Pardo).
+- **Messung:** `additiv_presets --sensitivity`: um 48 Presets (je Gruppe zweite) jeder der 47 formenden Regler um 0,15
+  seines Wegs verstellt, Helligkeit/Bewegung/Breite/Rauschen/Pegel neu gemessen; `make_nudges.py` mittelt je Regler über
+  die Presets, in denen er zu hören ist (Gate offen), und schreibt `Nudges.inc` samt Gates. `describe()` liegt jetzt im
+  Kern (`Describe.h`).
+- **Stupser:** erst kürzester Schritt über alle gehörten Regler mit Pegel und anderen Maßen per Gram-Schmidt
+  herausprojiziert -- Prüfung (`--nudgecheck`, 8 Presets × 8 Stupser): ein Viertel falsche Richtung, Sprünge bis 4 dB.
+  Jetzt: die bis zu vier spezifischsten Regler (viel für das Maß, wenig für die anderen und den Pegel), Pegel gehalten,
+  ein Mengenregler auf null bleibt null (Air von 0 auf 0,07 machte einen Chor 5,9 dB lauter) → Helligkeit und Breite
+  16/16, Rauschen 15/16 richtig, Pegel meist ±1 dB. Bewegung blieb 10/16 (8-s-Fenster gegen minutenlange Zyklen):
+  ruhiger/lebendiger jetzt als Regel (alle Raten ×/÷ 1,23, Drift und Schimmern ±0,04). **Fokus:** Summe der Empfindlichkeiten in
+  Spreizungen, höchstens drei je Gruppe. **Variationen:** 4–8 gehörte Regler zufällig, Pegel über Master nach der
+  gemessenen Pegel-Empfindlichkeit. **Makro-Lektionen:** relative Versätze je Ort (bis 4 Orte), in der Engine wie
+  Matrixzeilen vor den Gates, im Zustand gespeichert. **Suche:** vier Merkmale (Bewegung log), je Spreizung skaliert
+  (`make_find.py` → `Find.inc`), WAV/FLAC stereo (`loadStereo`).
+
+## Phase 19: Der Dirigent folgt dem Licht; Kristallisation als Hörversuch (gebaut, 14.10.2026, 0.15.0)
+
+- **Follow Light:** je Kandidat das Licht an seinen Harmonischen (Klangspektrum des Dirigenten) -- lebende Landschaft
+  über die Spalten gemittelt, sonst die Landschaft der Aurora-Bewegung über die ersten 8 s; Faktor (Licht/Mittel des
+  Registers)^(3·Follow Light) in beiden Zügen des Dirigenten. Gemessen: Band 200–400 Hz hell → 38 % ohne, 69 % mit.
+- **Kristallisation** ohne neuen Code als Hörproben (`work/renders/crystal`): LFO-3-Gezeiten (8 min) über Feldstärke,
+  Purity, Wolkenbreite, Schimmern und Kopplung, Lautheit schmilzt; und Root Age (je länger die Harmonie steht, desto
+  gefrorener). `empy_render --mod` für Matrixzeilen von der Kommandozeile. Ob eine eigene Front-Dynamik folgt, entscheidet
+  das Anhören.
+
 ## Phase 18: Die Oberfläche nimmt die Hand (gebaut, 14.10.2026, 0.15.0)
 
 Eine Kritik der Oberfläche nach HCI-Maßstäben (Hierarchie, direkte Manipulation, Modulation am Regler, 2D-Raum,

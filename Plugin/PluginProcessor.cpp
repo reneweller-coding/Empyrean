@@ -7,6 +7,8 @@
 #include "PluginEditor.h"
 
 #include "additiv/Motion.h"
+#include "additiv/Find.h"
+#include "additiv/Focus.h"
 #include "additiv/Presets.h"
 
 #include <algorithm>
@@ -328,6 +330,179 @@ static bool hallFromText(const juce::String& s, std::vector<float>& m)
     if (!b.fromBase64Encoding(s) || b.getSize() != sizeof(float) * static_cast<size_t>(additiv::kHallBins)) return false;
     m.resize(static_cast<size_t>(additiv::kHallBins));
     std::memcpy(m.data(), b.getData(), b.getSize());
+    return true;
+}
+
+// ---- the Focus page
+
+std::vector<float> AdditivProcessor::knobValues() const
+{
+    std::vector<float> v(static_cast<size_t>(additiv::kNumParams));
+    for (int i = 0; i < additiv::kNumParams; ++i) v[static_cast<size_t>(i)] = value(i);
+    return v;
+}
+
+void AdditivProcessor::applyValues(const std::vector<float>& v, double glide)
+{
+    if (v.size() != static_cast<size_t>(additiv::kNumParams)) return;
+    if (glide > 0.0) engine_.beginMorph(glide);
+    for (int i = 0; i < additiv::kNumParams; ++i)
+        if (!additiv::keptByPresets(static_cast<ParamId>(i)) && v[static_cast<size_t>(i)] != value(i)) setValue(i, v[static_cast<size_t>(i)]);
+}
+
+void AdditivProcessor::stepOutOfBlends()
+{
+    if (value(static_cast<int>(ParamId::MapActive)) >= 0.5f) leaveMap(true);
+    if (value(static_cast<int>(ParamId::MorphActive)) >= 0.5f) setValue(static_cast<int>(ParamId::MorphActive), 0.0f);
+}
+
+float AdditivProcessor::nudgeSound(int axis, float sign)
+{
+    stepOutOfBlends();
+    const std::vector<float> now = knobValues();
+    std::vector<float> to(now.size());
+    const float got = additiv::nudge(now.data(), axis, sign, 0.25f, to.data());
+    applyValues(to, 0.6);
+    return got;
+}
+
+void AdditivProcessor::makeVariations(float far)
+{
+    stepOutOfBlends();
+    varFar_ = std::clamp(far, 0.05f, 1.0f);
+    parent_ = knobValues();
+    variations_.assign(6, std::vector<float>(parent_.size()));
+    for (size_t k = 0; k < variations_.size(); ++k) additiv::vary(parent_.data(), varFar_, varSeed_++, variations_[k].data());
+}
+
+void AdditivProcessor::previewVariation(int k)
+{
+    if (k >= 0 && k < variationCount()) {
+        if (previewing_ < 0) previewFrom_ = knobValues();
+        previewing_ = k;
+        applyValues(variations_[static_cast<size_t>(k)], 0.4);
+    } else if (previewing_ >= 0) {
+        previewing_ = -1;
+        applyValues(previewFrom_, 0.4);
+    }
+}
+
+void AdditivProcessor::takeVariation(int k)
+{
+    if (k < 0 || k >= variationCount()) return;
+    if (previewing_ >= 0) {   // the sound before the listening is where it is kept from
+        previewing_ = -1;
+        applyValues(previewFrom_, 0.0);
+    }
+    parents_.push_back(parent_);
+    if (parents_.size() > 32) parents_.erase(parents_.begin());
+    applyValues(variations_[static_cast<size_t>(k)], 0.5);
+    makeVariations(varFar_);
+}
+
+bool AdditivProcessor::variationBack()
+{
+    if (parents_.empty()) return false;
+    const std::vector<float> back = parents_.back();
+    parents_.pop_back();
+    applyValues(back, 0.5);
+    makeVariations(varFar_);
+    return true;
+}
+
+juce::String AdditivProcessor::variationSummary(int k) const
+{
+    if (k < 0 || k >= variationCount() || parent_.size() != static_cast<size_t>(additiv::kNumParams)) return {};
+    std::vector<std::pair<float, int>> moved;
+    for (int i = 0; i < additiv::kNumParams; ++i) {
+        const additiv::ParamDesc& d = additiv::paramTable()[static_cast<size_t>(i)];
+        if (d.id == ParamId::MasterGain) continue;
+        const float dn = additiv::toNorm(d, variations_[static_cast<size_t>(k)][static_cast<size_t>(i)]) - additiv::toNorm(d, parent_[static_cast<size_t>(i)]);
+        if (std::fabs(dn) > 0.01f) moved.emplace_back(dn, i);
+    }
+    std::sort(moved.begin(), moved.end(), [](const auto& a, const auto& b) { return std::fabs(a.first) > std::fabs(b.first); });
+    juce::String s;
+    for (size_t j = 0; j < moved.size() && j < 3; ++j)
+        s << (j > 0 ? ", " : "") << additiv::paramTable()[static_cast<size_t>(moved[j].second)].name << (moved[j].first > 0.0f ? " up" : " down");
+    if (moved.size() > 3) s << " ...";
+    return s;
+}
+
+void AdditivProcessor::teachBegin(int m)
+{
+    if (m < 0 || m >= 4) return;
+    stepOutOfBlends();
+    teachBase_[static_cast<size_t>(m)] = knobValues();
+    additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+    std::array<float, additiv::kNumParams> zero{};
+    if (l.count < 2) {   // a new lesson: its first place is the sound now
+        l = additiv::MacroLesson{};
+        l.set(value(static_cast<int>(ParamId::Macro1) + m), zero.data());
+    }
+    engine_.setMacroLesson(m, l);
+}
+
+bool AdditivProcessor::teachHere(int m)
+{
+    if (!teaching(m)) return false;
+    const std::vector<float>& from = teachBase_[static_cast<size_t>(m)];
+    additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+    const float at = value(static_cast<int>(ParamId::Macro1) + m);
+    // What the macro already carries here, and what the knobs moved since: the new place.
+    std::array<float, additiv::kNumParams> carried{}, delta{};
+    l.apply(at, carried.data(), nullptr);
+    for (int i = 0; i < additiv::kNumParams; ++i) {
+        const additiv::ParamDesc& d = additiv::paramTable()[static_cast<size_t>(i)];
+        if (!additiv::teachable(d.id)) continue;
+        const float dn = additiv::toNorm(d, value(i)) - additiv::toNorm(d, from[static_cast<size_t>(i)]) + carried[static_cast<size_t>(i)];
+        delta[static_cast<size_t>(i)] = std::fabs(dn) > 0.002f ? dn : 0.0f;
+    }
+    l.set(at, delta.data());
+    // The macro carries the change, the knobs go back where the teaching began -- in the same moment, no
+    // glide: a glide of the knobs under a lesson already in force would count the change twice for its length.
+    engine_.setMacroLesson(m, l);
+    for (int i = 0; i < additiv::kNumParams; ++i)
+        if (additiv::teachable(static_cast<ParamId>(i)) && value(i) != from[static_cast<size_t>(i)]) setValue(i, from[static_cast<size_t>(i)]);
+    return true;
+}
+
+void AdditivProcessor::teachForget(int m)
+{
+    if (m < 0 || m >= 4) return;
+    lessons_[static_cast<size_t>(m)] = additiv::MacroLesson{};
+    teachBase_[static_cast<size_t>(m)].clear();
+    engine_.setMacroLesson(m, lessons_[static_cast<size_t>(m)]);
+}
+
+juce::String AdditivProcessor::teachStatus(int m) const
+{
+    if (m < 0 || m >= 4) return {};
+    const additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+    juce::String s;
+    if (l.count >= 2) {
+        s << l.count << " places (";
+        for (int i = 0; i < l.count; ++i) s << (i > 0 ? ", " : "") << juce::String(l.pos[i], 2);
+        s << "), " << l.knobs() << " knobs";
+    } else {
+        s << "nothing taught";
+    }
+    if (teaching(m)) s << " -- teaching: move the knobs, set the macro, press Here";
+    return s;
+}
+
+bool AdditivProcessor::findLike(const juce::File& file, juce::String& why)
+{
+    additiv::Description d;
+    std::string error;
+    if (!additiv::describeFile(file.getFullPathName().toStdString(), d, nullptr, &error)) {
+        why = juce::String(error);
+        return false;
+    }
+    int idx[12];
+    float dist[12];
+    const int n = additiv::findLike(d, idx, 12, dist);
+    found_.assign(idx, idx + n);
+    foundDistance_.assign(dist, dist + n);
     return true;
 }
 
@@ -706,6 +881,21 @@ void AdditivProcessor::getStateInformation(juce::MemoryBlock& dest)
         s->setAttribute("rows", juce::String(slotMods_[k]));
         for (const ParamDesc& d : additiv::paramTable()) s->setAttribute(juce::String("p_") + d.key, static_cast<double>(slotValues_[k][static_cast<size_t>(d.id)]));
     }
+    for (int m = 0; m < 4; ++m) {   // the macros taught by example: per place its value and the knobs it moves
+        const additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+        if (l.count < 2) continue;
+        auto* e = xml.createNewChildElement("Lesson");
+        e->setAttribute("macro", m);
+        for (int i = 0; i < l.count; ++i) {
+            juce::String knobs;
+            for (int p = 0; p < additiv::kNumParams; ++p)
+                if (l.delta[i][static_cast<size_t>(p)] != 0.0f)
+                    knobs << additiv::paramTable()[static_cast<size_t>(p)].key << "=" << juce::String(l.delta[i][static_cast<size_t>(p)], 5) << ";";
+            auto* place = e->createNewChildElement("Place");
+            place->setAttribute("at", static_cast<double>(l.pos[i]));
+            place->setAttribute("knobs", knobs);
+        }
+    }
     {   // the hall's memory, once it has heard anything (the instrument's, not a preset's)
         std::vector<float> m;
         double age = 0.0;
@@ -768,6 +958,24 @@ void AdditivProcessor::setStateInformation(const void* data, int size)
         slotNames_[k] = s->getStringAttribute("name");
         engine_.setMorphSlot(k, slotValues_[k].data(), slotMods_[k]);
     }
+    for (int m = 0; m < 4; ++m) {   // the taught macros as the state kept them; none named: none
+        lessons_[static_cast<size_t>(m)] = additiv::MacroLesson{};
+        teachBase_[static_cast<size_t>(m)].clear();
+    }
+    for (auto* e : xml->getChildWithTagNameIterator("Lesson")) {
+        const int m = e->getIntAttribute("macro", -1);
+        if (m < 0 || m >= 4) continue;
+        additiv::MacroLesson& l = lessons_[static_cast<size_t>(m)];
+        for (auto* place : e->getChildWithTagNameIterator("Place")) {
+            std::array<float, additiv::kNumParams> delta{};
+            for (const juce::String& kv : juce::StringArray::fromTokens(place->getStringAttribute("knobs"), ";", ""))
+                if (const additiv::ParamDesc* d = additiv::findParam(kv.upToFirstOccurrenceOf("=", false, false).toRawUTF8()))
+                    if (additiv::teachable(d->id))
+                        delta[static_cast<size_t>(d->id)] = std::clamp(kv.fromFirstOccurrenceOf("=", false, false).getFloatValue(), -1.0f, 1.0f);
+            l.set(std::clamp(static_cast<float>(place->getDoubleAttribute("at")), 0.0f, 1.0f), delta.data());
+        }
+    }
+    for (int m = 0; m < 4; ++m) engine_.setMacroLesson(m, lessons_[static_cast<size_t>(m)]);
     {   // the hall's memory as the state kept it; a state without one: a new hall
         std::vector<float> m;
         const juce::XmlElement* h = xml->getChildByName("Hall");

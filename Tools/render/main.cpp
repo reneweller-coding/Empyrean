@@ -4,7 +4,7 @@
  *        or hours, a chord played and held, or a journey for a whole night -- into 24-bit WAVs,
  *        with a line every ten seconds.
  *
- *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]...
+ *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *                    [--route NAME|FILE] [--route-speed X]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
@@ -221,6 +221,7 @@ int main(int argc, char** argv)
     fs::path out = repoRoot() / "work" / "renders" / "render.wav";
     std::uint64_t seed = 0x5EEDu;
     std::vector<std::string> sets;
+    std::string modRows;   // --mod
     std::vector<int> chord;
     std::string presetName, journeyName, routeName;
     double routeSpeed = 1.0;
@@ -233,6 +234,7 @@ int main(int argc, char** argv)
         else if (a == "--out" && has) out = argv[++i];
         else if (a == "--seed" && has) seed = std::strtoull(argv[++i], nullptr, 10);
         else if (a == "--set" && has) sets.push_back(argv[++i]);
+        else if (a == "--mod" && has) modRows = argv[++i];   // matrix rows in the text form, after the preset's (Modulation.h)
         else if (a == "--hold" && has) hold = std::atof(argv[++i]);
         else if (a == "--no-brain") brain = false;
         else if (a == "--preset" && has) presetName = argv[++i];
@@ -250,7 +252,7 @@ int main(int argc, char** argv)
                 p = c + 1;
             }
         } else {
-            std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--chord 50,57,62] [--hold S] [--no-brain]\n"
+            std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
                                  "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
                                  "empy_render --dump-params\n");
             return 1;
@@ -301,6 +303,7 @@ int main(int argc, char** argv)
     }
     for (const std::string& s : sets)
         if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
+    if (!modRows.empty()) e.setModText(modRows);   // replaces the preset's matrix
     if (!brain) e.setParam(ParamId::BrainOn, 0.0f);
     EngineConfig c;
     c.sampleRate = 48000.0;

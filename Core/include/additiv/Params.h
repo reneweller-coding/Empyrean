@@ -252,6 +252,8 @@ enum class ParamId : int {
     HallMemory,     ///< s: how slowly the hall's memory forms (a minute .. four hours)
     TimeBend,       ///< -1 .. 1: each partial's clock (its drift, shimmer, sync) slower where the spectrum is dense (positive) or faster
     RippleBend,     ///< 0 .. 1: the ripple's speed falls where the spectrum is loud: its waves linger at the notes
+    // Phase 19 (14.10.2026)
+    BrainLight,     ///< 0 .. 1: the conductors prefer notes whose harmonics fall where the landscape (or the living field) is bright
     Count           ///< number of parameters
 };
 

@@ -103,6 +103,17 @@ bool landscapeFromAudio(const std::filesystem::path& path, float rangeDb, float 
                         Landscape& out, std::string* error);
 
 /**
+ * @brief A recording (WAV or FLAC, by its contents) as left and right; a mono file is its own both.
+ * @param path   the file
+ * @param left   receives the first channel
+ * @param right  receives the second
+ * @param rate   receives the sample rate
+ * @param error  receives the reason when it fails (may be null)
+ * @return       true when read
+ */
+bool loadStereo(const std::filesystem::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error);
+
+/**
  * @brief Crossfades the end of a landscape into its beginning and drops the end, so it loops without a jump.
  * @param l         the landscape
  * @param fraction  0 .. 0.5: the share of rows crossfaded

@@ -64,9 +64,12 @@ std::uint32_t le32(const unsigned char* p) { return le16(p) | (le16(p + 2) << 16
  * @param mono   receives the channels' average
  * @param rate   receives the sample rate
  * @param error  receives the reason when it fails
+ * @param left   receives the first channel, when not null
+ * @param right  receives the second (the first again for a mono file), when not null
  * @return       true when decoded
  */
-bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, double& rate, std::string* error)
+bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, double& rate, std::string* error,
+               std::vector<float>* left = nullptr, std::vector<float>* right = nullptr)
 {
     if (d.size() < 12 || std::memcmp(d.data(), "RIFF", 4) != 0 || std::memcmp(d.data() + 8, "WAVE", 4) != 0)
         return fail(error, "not a RIFF/WAVE file");
@@ -96,6 +99,8 @@ bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, do
     const size_t bytes = bits / 8;
     const size_t frames = dataBytes / (bytes * channels);
     mono.assign(frames, 0.0f);
+    if (left != nullptr) left->assign(frames, 0.0f);
+    if (right != nullptr) right->assign(frames, 0.0f);
     for (size_t f = 0; f < frames; ++f) {
         float sum = 0.0f;
         for (std::uint32_t c = 0; c < channels; ++c) {
@@ -107,6 +112,8 @@ bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, do
             else if (bits == 24) x = static_cast<float>(static_cast<std::int32_t>((static_cast<std::uint32_t>(s[0]) << 8) | (static_cast<std::uint32_t>(s[1]) << 16) | (static_cast<std::uint32_t>(s[2]) << 24)) >> 8) / 8388608.0f;
             else x = static_cast<float>(static_cast<std::int32_t>(le32(s))) / 2147483648.0f;
             sum += x;
+            if (left != nullptr && c == 0) (*left)[f] = x;
+            if (right != nullptr && (c == 1 || (c == 0 && channels == 1))) (*right)[f] = x;
         }
         mono[f] = sum / static_cast<float>(channels);
     }
@@ -142,6 +149,38 @@ bool loadMono(const fs::path& path, std::vector<float>& mono, double& rate, std:
         return true;
     }
     return decodeWav(bytes, mono, rate, error);
+}
+
+/**
+ * @brief A recording as left and right (loadStereo's work, here beside the mono reader).
+ * @param path   the file
+ * @param left   receives the first channel
+ * @param right  receives the second
+ * @param rate   receives the sample rate
+ * @param error  receives the reason when it fails
+ * @return       true when read
+ */
+bool readStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
+{
+    std::vector<unsigned char> bytes;
+    if (!readFile(path, bytes)) return fail(error, "cannot read " + path.string());
+    if (bytes.size() >= 4 && std::memcmp(bytes.data(), "fLaC", 4) == 0) {
+        unsigned int channels = 0, sampleRate = 0;
+        drflac_uint64 frames = 0;
+        float* pcm = drflac_open_memory_and_read_pcm_frames_f32(bytes.data(), bytes.size(), &channels, &sampleRate, &frames, nullptr);
+        if (!pcm || channels == 0) { if (pcm) drflac_free(pcm, nullptr); return fail(error, "cannot decode the FLAC file " + path.string()); }
+        left.assign(static_cast<size_t>(frames), 0.0f);
+        right.assign(static_cast<size_t>(frames), 0.0f);
+        for (size_t f = 0; f < left.size(); ++f) {
+            left[f] = pcm[f * channels];
+            right[f] = pcm[f * channels + (channels > 1 ? 1 : 0)];
+        }
+        drflac_free(pcm, nullptr);
+        rate = sampleRate;
+        return true;
+    }
+    std::vector<float> mono;
+    return decodeWav(bytes, mono, rate, error, &left, &right);
 }
 
 /**
@@ -548,6 +587,20 @@ bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, fl
     f.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
     if (!f) return fail(error, "cannot write " + path.string());
     return true;
+}
+
+/**
+ * @brief A recording (WAV or FLAC) as left and right; a mono file is its own both (Landscape.h).
+ * @param path   the file
+ * @param left   receives the first channel
+ * @param right  receives the second
+ * @param rate   receives the sample rate
+ * @param error  receives the reason when it fails (may be null)
+ * @return       true when read
+ */
+bool loadStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
+{
+    return readStereo(path, left, right, rate, error);
 }
 
 } // namespace additiv

@@ -164,6 +164,65 @@ public:
     };
     /** @brief Where the player's routes live: Documents/Empyrean/Routes. @return the folder */
     static juce::File routeFolder();
+    /** @name The Focus page (Focus.h, Find.h) @{ */
+    /** @brief The knobs as they stand. @return kNumParams values */
+    std::vector<float> knobValues() const;
+    /**
+     * @brief Sets the knobs a preset sets (the listener's stay), the engine gliding there.
+     * @param v      kNumParams values
+     * @param glide  seconds (0: at once)
+     */
+    void applyValues(const std::vector<float>& v, double glide);
+    /**
+     * @brief A nudge: every heard shaping knob a little towards brighter, livelier, wider or airier (or
+     *        the other way), the level held.
+     * @param axis  0 .. kNudgeAxes-1
+     * @param sign  +1 or -1
+     * @return      the predicted change, in spreads of the measure
+     */
+    float nudgeSound(int axis, float sign);
+    /** @brief Six variations around the sound now (Focus.h vary). @param far how far, 0 .. 1 */
+    void makeVariations(float far);
+    /** @brief How many variations there are. @return 0 or 6 */
+    int variationCount() const { return static_cast<int>(variations_.size()); }
+    /** @brief Listens to a variation, gliding there (-1: back to the sound before, gliding). @param k which */
+    void previewVariation(int k);
+    /** @brief Which variation is being listened to. @return it, -1 none */
+    int previewing() const { return previewing_; }
+    /** @brief Keeps a variation: it becomes the sound, and the next six are made around it. @param k which */
+    void takeVariation(int k);
+    /** @brief Back to the sound before the last variation kept, and six around it. @return false when there is none */
+    bool variationBack();
+    /** @brief What a variation changes most, in words. @param k which @return the text */
+    juce::String variationSummary(int k) const;
+    /** @brief Begins to teach a macro: the sound now is its place at its value now. @param m 0 .. 3 */
+    void teachBegin(int m);
+    /**
+     * @brief The sound now becomes the macro's place at its value now; the knobs go back to where the
+     *        teaching began (the macro carries the change from now on, so nothing is heard to move).
+     * @param m  0 .. 3
+     * @return   false when the macro is not being taught
+     */
+    bool teachHere(int m);
+    /** @brief Forgets what a macro was taught. @param m 0 .. 3 */
+    void teachForget(int m);
+    /** @brief Whether a macro is being taught. @param m 0 .. 3 @return true then */
+    bool teaching(int m) const { return m >= 0 && m < 4 && !teachBase_[static_cast<size_t>(m)].empty(); }
+    /** @brief What a macro was taught, in words. @param m 0 .. 3 @return the text */
+    juce::String teachStatus(int m) const;
+    /**
+     * @brief The presets that sound most like a recording (Find.h).
+     * @param file  WAV or FLAC
+     * @param why   receives the reason when it cannot be read
+     * @return      false when it cannot; found() holds them, nearest first
+     */
+    bool findLike(const juce::File& file, juce::String& why);
+    /** @brief The presets the last search found, nearest first. @return them */
+    const std::vector<int>& found() const { return found_; }
+    /** @brief Their distances, in spreads. @return them */
+    const std::vector<float>& foundDistance() const { return foundDistance_; }
+    /** @} */
+
     /** @brief Where the player's halls live: Documents/Empyrean/Halls. @return the folder */
     static juce::File hallFolder();
     /** @brief Writes the hall's memory (Hall page) to a file. @param file where @return false when it cannot */
@@ -271,6 +330,8 @@ private:
      * @param keepSound  apply that preset (false: a journey takes over at once)
      */
     void leaveMap(bool keepSound);
+    /** @brief The map and the A/B morph let go (the map onto its nearest preset): a nudge, a variation or a lesson starts from knobs that sound. */
+    void stepOutOfBlends();
 
     frame::JamBus jam_{ kApp };                            ///< the family jam's bus
     frame::Headset headset_;                               ///< the hands from the Quest app (bridge mode)
@@ -296,6 +357,17 @@ private:
     bool routeLoop_ = true;                                ///< it starts over after its last point
     juce::String routeName_;                               ///< its name
     juce::String hallName_;   ///< the hall's name (hallName())
+    std::vector<std::vector<float>> variations_;           ///< the six variations, each kNumParams values
+    std::vector<float> parent_;                            ///< the sound they were made around
+    std::vector<std::vector<float>> parents_;              ///< the sounds before, for Back
+    std::vector<float> previewFrom_;                       ///< the sound before a variation was listened to
+    int previewing_ = -1;                                  ///< the variation listened to, -1 none
+    float varFar_ = 0.3f;                                  ///< how far the last variations went
+    std::uint64_t varSeed_ = 1;                            ///< their dice
+    std::array<additiv::MacroLesson, 4> lessons_{};        ///< what each macro was taught
+    std::array<std::vector<float>, 4> teachBase_{};        ///< per macro the knobs when its teaching began (empty: not teaching)
+    std::vector<int> found_;                               ///< the last search's presets
+    std::vector<float> foundDistance_;                     ///< and their distances
     juce::File userLandFile_;                              ///< where it came from
     int userLandVersion_ = 0;                              ///< bumped when it changes
     mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)

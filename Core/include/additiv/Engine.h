@@ -28,6 +28,7 @@
 #include "additiv/ClusterBrain.h"
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
+#include "additiv/Focus.h"
 #include "additiv/Landscape.h"
 #include "additiv/Modulation.h"
 #include "additiv/Morph.h"
@@ -350,6 +351,13 @@ public:
      * @param cells  receives the cells
      */
     void rippleSnapshot(std::vector<float>& cells);
+    /**
+     * @brief A macro taught by example (Focus.h): from the next block it moves the knobs it learnt, at its
+     *        macro's value. Any thread but the worker's.
+     * @param macro   0 .. 3
+     * @param lesson  the lesson (fewer than two places: none)
+     */
+    void setMacroLesson(int macro, const MacroLesson& lesson);
     /** @brief Where the spectral comb's notches stand, in notches (SpectralComb::phase), for the picture. Any thread. @return 0 .. 1 */
     float combPhase() const { return combPhaseView_.load(std::memory_order_relaxed); }
     /**
@@ -615,6 +623,17 @@ private:
     float rippleAmp_[64] = {};                         ///< and their levels
     int rippleVoices_ = 0;                             ///< how many
     bool orbitWas_ = false;                            ///< the last block's field was the orbit (else its state is taken afresh)
+    float light_[128] = {};                            ///< Follow Light: per MIDI note the conductors' factor
+    int lightCountdown_ = 0;                           ///< blocks until the light is read again
+    bool lightOn_ = false;                             ///< light_ holds factors (else the conductors ignore it)
+    /**
+     * @brief Follow Light: where the landscape is bright, read as the partials read it -- the living
+     *        field's columns (averaged along), or, while the Aurora motion reads a landscape, its first
+     *        eight seconds at the motion's rate (a new note reads it from its start) -- and per note how
+     *        much of its harmonics' weight falls into the light against the conductor's register.
+     *        Every eighth block; nothing while Follow Light is at nothing.
+     */
+    void updateLight();
     double hallAge_ = 0.0;                             ///< seconds the hall's memory has learnt (worker)
     std::array<float, kHallBins> snapHall_{};          ///< the hall's memory as the last snapshot brought it down (under snapLock_)
     double snapHallAge_ = 0.0;                         ///< and its age
@@ -624,6 +643,10 @@ private:
     bool hallPendingSet_ = false;                      ///< hallPending_ waits for the next block
     std::vector<float> snapRipple_;                    ///< the ripple's string at the last snapshot (under snapLock_), empty while it rests
     std::atomic<float> combPhaseView_{ 0.0f };         ///< the comb's phase after the last block, for the picture
+    std::array<MacroLesson, 4> lessons_{};             ///< the taught macros the worker plays
+    std::array<MacroLesson, 4> lessonsPending_{};      ///< taught macros waiting for the next block (under lessonLock_)
+    std::array<bool, 4> lessonPendingSet_{};           ///< which wait
+    std::mutex lessonLock_;                            ///< guards the pending ones (the worker only tries it)
     /**
      * @brief One block of the ripple's string: struck at the harmonics of every note that started this
      *        block (rippleStrikes_, gathered by the voice loop, which clears the restart flags), then the damped wave equation stepped (leapfrog, reflecting ends, as many substeps

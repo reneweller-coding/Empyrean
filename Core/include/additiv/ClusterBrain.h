@@ -881,6 +881,7 @@ struct BrainParams {
     bool  consecutive = false;     ///< the keyboard walks the scale degree by degree, so a MIDI step is not a semitone and the rules read cents (F6)
     /** @} */
     const BrainSpectrum* spectrum = nullptr;   ///< the voice's partial template for Timbre, owned by the engine (brainSpec_); null or empty means the ratio score alone
+    const float* light = nullptr;   ///< Follow Light (Empyrean): per MIDI note a factor on the candidate, from where the landscape is bright (1 leaves it alone); null: none
     /**
      * @brief The equivalent rectangular bandwidth of the auditory filter at f, in hertz
      * (Glasberg and Moore 1990): ERB = 24.7 (0.00437 f + 1).
@@ -1648,6 +1649,7 @@ public:
                     w *= static_cast<float>(std::pow(std::max(harmonicityOf(set, m, p), 1.0e-4), 5.0 * static_cast<double>(p.harmonic)));
             }
             if (p.series > 0.0f) w *= static_cast<float>(seriesWeight(fc, rootFreq, p));
+            if (p.light != nullptr) w *= p.light[c];   // Follow Light: where the landscape is bright
             if (p.key > 0.0f) w *= static_cast<float>(keyWeightOf(fc, key, p.key, modalProfile()));
             if (p.even > 0.0f) {
                 double set[kSlots + 1];
@@ -2609,6 +2611,7 @@ private:
                 score *= std::pow(std::max(h, 1.0e-4), 5.0 * static_cast<double>(p.harmonic));
             }
             if (p.series > 0.0f) score *= seriesWeight(fc, rootFreq, p);
+            if (p.light != nullptr) score *= p.light[c];   // Follow Light: where the landscape is bright
             // An octave of something already sounding is a doubling, not a new colour.
             for (const auto& s : slots_) if (s.note >= 0 && pitchClassEqual(freqOf(s.note), fc)) score *= 0.2;
             if (pitchClassEqual(fc, rootFreq)) score *= 0.5;

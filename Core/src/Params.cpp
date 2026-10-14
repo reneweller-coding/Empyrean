@@ -352,6 +352,7 @@ const std::array<ParamDesc, kNumParams> kTable = { {
     F(ParamId::HallMemory,      "hall_memory",      "Memory",     "Hall", 60.f,  14400.f, 1200.f, 0.3f, "s"),
     F(ParamId::TimeBend,        "time_bend",        "Time Bend",  "Time", -1.f,  1.f,   0.f,   1.f,  ""),
     F(ParamId::RippleBend,      "ripple_bend",      "Bend",       "Ripple", 0.f, 1.f,   0.f,   1.f,  ""),
+    F(ParamId::BrainLight,      "brain_light",      "Follow Light", "Conductor", 0.f, 1.f, 0.f,  1.f,  ""),
 } };
 
 } // namespace
