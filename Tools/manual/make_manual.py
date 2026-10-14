@@ -27,19 +27,28 @@ ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 PRODUCT = "Empyrean"
 TITLE = "Empyrean"   # the cover's
 
-# The sections of the parameter table on each tab (Plugin/PluginEditor.cpp builds the tabs).
+# The sections of the parameter table on each tab (Plugin/PluginEditor.cpp builds the tabs). A chapter may name the
+# sections it shows itself, in its heading's third field ("== The cloud | Cloud & Filter | Cloud, Air, Turbulence =="),
+# where two chapters share a tab.
 TABS = {
-    "Cloud": ["Cloud", "Air"],
-    "Motion": ["Motion", "Field", "Life", "Sync", "Ripple"],
-    "Filter": ["Filter", "Comb", "Envelope"],
+    "Focus": [],
+    "Cloud & Filter": ["Cloud", "Air", "Turbulence", "Filter", "Comb", "Envelope"],
+    "Motion": ["Motion", "Time", "Field", "Life", "Sync", "Ripple"],
     "Tuning": ["Tuning"],
-    "Conductor": ["Conductor"],
+    "Conductor": ["Conductor", "MPE"],
     "Space": ["Space", "Master", "Binaural"],
-    "Effects": ["Echo", "Room", "Modal", "Spectral Echo", "Melt", "Memory"],
+    "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Memory"],
+    "Hall": ["Modal", "Hall"],
     "Modulation": ["Modulation"],
+    "Matrix": [],
     "Journey": ["Morph"],
     "Map": ["Map"],
 }
+
+
+def slug(tab):
+    """A tab's name as make_shots.py names its picture: "Cloud & Filter" -> "Cloud-Filter"."""
+    return re.sub(r"[^A-Za-z0-9]+", "-", tab).strip("-")
 
 CSS = """
 @page { size: A4; margin: 17mm 15mm 15mm 15mm; }
@@ -75,12 +84,17 @@ def version():
 
 
 def chapters():
-    """The help's chapters: [{title, modules: [tab or 'all'], paragraphs: [text]}]."""
+    """The help's chapters: [{title, modules: [tab or 'all'], sections: [own sections, or none], paragraphs: [text, or
+    ("picture", name) for a line "[name]"]}]."""
     out = []
     for line in open(os.path.join(ROOT, "Plugin", "Resources", "chapters.txt"), encoding="utf-8").read().splitlines():
         m = re.match(r"^==\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*==\s*$", line)
+        pic = re.match(r"^\[(.+)\]\s*$", line.strip())
         if m:
-            out.append({"title": m.group(1), "modules": [x.strip() for x in m.group(2).split(",") if x.strip()], "paragraphs": [""]})
+            out.append({"title": m.group(1), "modules": [x.strip() for x in m.group(2).split(",") if x.strip()],
+                        "sections": [x.strip() for x in m.group(3).split(",") if x.strip()], "paragraphs": [""]})
+        elif out and pic:
+            out[-1]["paragraphs"] += [("picture", pic.group(1)), ""]
         elif out and not line.startswith("#"):
             if line.strip():
                 out[-1]["paragraphs"][-1] += (" " if out[-1]["paragraphs"][-1] else "") + line.strip()
@@ -137,7 +151,7 @@ def presets():
 
 APPENDIX_MIDI = [
     ("Notes", "play over the conductor (velocity: the note's level, and a source of the matrix)"),
-    ("Controller 0, then program change", "a preset: the bank names the group (0 .. 15), the program the preset in it (0 .. 63)"),
+    ("Controller 0, then program change", "a preset: the bank names the group (0 .. 95, as the appendix numbers them), the program the preset in it (0 .. 63)"),
     ("Controller 1 (mod wheel)", "a source of the matrix; the factory presets open the filter or the brightness with it"),
     ("Controller 64 (hold pedal)", "keeps notes sounding until it comes up"),
     ("Controller 74", "the filter's cutoff"),
@@ -182,7 +196,12 @@ def main():
     if unknown:
         print("chapters name tabs that do not exist: " + ", ".join(unknown))
         return 1
-    placed = {s for t in tabs_named for s in TABS[t]}
+    own = lambda c: c["sections"] or [s for t in c["modules"] if t != "all" for s in TABS[t]]
+    placed = {s for c in chs for s in own(c)}
+    strange = sorted(s for c in chs for s in c["sections"] if s not in sections)
+    if strange:
+        print("chapters name sections the table has not: " + ", ".join(strange))
+        return 1
     holes = [s for s in sections if s not in placed]
     if holes:
         print("sections on no page of the manual: " + ", ".join(holes))
@@ -195,6 +214,7 @@ def main():
     shots = {}
     for path in glob.glob(os.path.join(ROOT, "docs", "screenshots", "page-*-*.png")):
         shots[os.path.splitext(os.path.basename(path))[0].split("-", 2)[2]] = path
+    pictured = set()   # a tab's picture in the first chapter that names it
     front = os.path.join(ROOT, "docs", "screenshot.png")
 
     parts = ["<!DOCTYPE html><html><head><meta charset='utf-8'><title>%s Manual</title><style>%s</style></head><body>" % (PRODUCT, CSS)]
@@ -210,14 +230,21 @@ def main():
     for i, c in enumerate(chs):
         parts.append("<div class='chapter' id='c%d'><h2>%s</h2>" % (i, html.escape(c["title"])))
         for tab in c["modules"]:
-            if tab in shots:
-                parts.append("<img class='shot' src='%s'>" % rel(shots[tab]))
+            if slug(tab) in shots and tab not in pictured:
+                parts.append("<img class='shot' src='%s'>" % html.escape(rel(shots[slug(tab)]), quote=True))
+                pictured.add(tab)
         for text in c["paragraphs"]:
+            if isinstance(text, tuple):
+                path = os.path.join(ROOT, "docs", "screenshots", text[1] + ".png")
+                if os.path.exists(path):
+                    parts.append("<img class='shot' src='%s'>" % html.escape(rel(path), quote=True))
+                else:
+                    print("no picture " + text[1] + " (python Tools/manual/make_shots.py)")
+                continue
             parts.append("<p>%s</p>" % html.escape(text))
-        for tab in c["modules"]:
-            for s in TABS.get(tab, []):
-                if s in sections:
-                    parts.append(table(s, sections[s]))
+        for s in own(c):
+            if s in sections:
+                parts.append(table(s, sections[s]))
         parts.append("</div>")
     n = len(chs)
     parts.append("<div class='chapter' id='c%d'><h2>MIDI</h2><table><tr><th>Message</th><th>What it does</th></tr>%s</table></div>"

@@ -1,14 +1,17 @@
 """The manual's screenshots: every tab as a whole page, from the standalone, muted.
 
-    python Tools/manual/make_shots.py [path\\to\\Empyrean.exe]   -> docs/screenshots/page-N-<tab>.png
+    python Tools/manual/make_shots.py [path\\to\\Empyrean.exe]   -> docs/screenshots/page-N-<tab>.png, <picture>.png
 
 One run of the standalone in the screenshot mode (Plugin/PluginEditor.cpp, shootStep): the preset PRESET loaded,
 SETTLE seconds for the clouds to sound, then every tab on its own tick, the window grown until nothing of the page
 scrolls (ADDITIV_SHOT_FULL). Muted (ADDITIV_MUTE): the engine runs and is seen, nothing is heard. Besides:
-docs/screenshot.png, the first tab at the window's usual size, the picture on the project's front page.
+docs/screenshot.png, the first tab at the window's usual size, the picture on the project's front page. And the
+pictures a chapter asks for with a line "[name]" in chapters.txt (EXTRAS): the command palette, the preset browser,
+the modulation dock with a source dropped on a knob. A tab's name becomes a file name as slug() makes it.
 """
 import glob
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,11 +20,23 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 PRODUCT = "Empyrean"
 PRESET = "Velvet Dreaming"   # Sleep Concert: the conductor, Breathe, the far reverb
 SETTLE = 8                   # seconds: the preset fills its chord at speed (Engine::requestFill), the attack rises
+# The chapters' own pictures: name -> (what the screenshot mode is asked, the tab photographed).
+EXTRAS = {
+    "palette": ({"ADDITIV_SHOT_PALETTE": "cutoff"}, 0),
+    "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, 0),
+    "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, 1),
+}
 
 
-def run(exe, prefix, full):
-    """One run of the standalone; the pictures land at <prefix>-<n>-<tab>.png."""
+def slug(tab):
+    """A tab's name as a file name: "Cloud & Filter" -> "Cloud-Filter" (make_manual.py reads it so)."""
+    return re.sub(r"[^A-Za-z0-9]+", "-", tab).strip("-")
+
+
+def run(exe, prefix, full, extra=None):
+    """One run of the standalone; the pictures land at <prefix>-<n>-<slug of the tab>.png."""
     env = dict(os.environ, ADDITIV_SHOT=prefix, ADDITIV_SHOT_AFTER=str(SETTLE), ADDITIV_PRESET=PRESET, ADDITIV_MUTE="1")
+    env.update(extra or {})
     if full:
         env["ADDITIV_SHOT_FULL"] = "1"
     else:
@@ -29,7 +44,14 @@ def run(exe, prefix, full):
     for old in glob.glob(prefix + "-*.png"):
         os.remove(old)
     subprocess.run([exe], env=env, timeout=300, check=False)
-    return sorted(glob.glob(prefix + "-*.png"), key=lambda p: int(os.path.basename(p).split("-")[1]))
+    named = []
+    for p in glob.glob(prefix + "-*.png"):
+        n, tab = os.path.splitext(os.path.basename(p))[0][len(os.path.basename(prefix)) + 1:].split("-", 1)
+        to = "%s-%s-%s.png" % (prefix, n, slug(tab))
+        if to != p:
+            os.replace(p, to)
+        named.append(to)
+    return sorted(named, key=lambda p: int(os.path.basename(p)[len(os.path.basename(prefix)) + 1:].split("-")[0]))
 
 
 def main():
@@ -51,6 +73,15 @@ def main():
     for p in small[1:]:
         os.remove(p)
     print("docs/screenshot.png")
+    for name, (extra, tab) in EXTRAS.items():
+        got = run(exe, os.path.join(out, "extra"), False, extra)
+        if len(got) <= tab:
+            sys.exit("no picture for " + name)
+        shutil.move(got[tab], os.path.join(out, name + ".png"))
+        for p in got:
+            if os.path.exists(p):
+                os.remove(p)
+        print("docs/screenshots/%s.png" % name)
 
 
 if __name__ == "__main__":
