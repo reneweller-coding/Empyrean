@@ -167,6 +167,8 @@ AdditivEditor::AdditivEditor(AdditivProcessor& proc) : juce::AudioProcessorEdito
     searchButton_.setTooltip("Find any knob, preset or action by typing a few letters (Ctrl+K)");
     searchButton_.onClick = [this] { openPalette(); };
     addChildComponent(palette_);
+    info_ = std::make_unique<InfoLine>(proc_, *this);
+    addAndMakeVisible(*info_);
     canvasButton_.setTooltip("Canvas: the partials and the landscape alone, the whole window, the four macros under them; a click in the spectrum plays (double-click the picture, or Esc, to come back)");
     canvasButton_.onClick = [this] { setCanvas(!canvas_); };
     cloud_.onDoubleClick = [this] { setCanvas(!canvas_); };
@@ -407,6 +409,11 @@ void AdditivEditor::shootStep()
             proc_.saveUserPreset(saveName, why);
             proc_.setValue(static_cast<int>(ParamId::Tilt), proc_.value(static_cast<int>(ParamId::Tilt)) + 0.4f);
         }
+        // ADDITIV_SHOT_SHOW: a knob shown as the palette shows it (its page, lit, told about in the info line).
+        if (const additiv::ParamDesc* shown = additiv::findParam(juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_SHOW", {}).toRawUTF8())) {
+            const int id = static_cast<int>(shown->id);
+            juce::Timer::callAfterDelay(3000, [safe = juce::Component::SafePointer<AdditivEditor>(this), id] { if (safe != nullptr) safe->revealParam(id); });
+        }
         // ADDITIV_SHOT_PALETTE: the command palette open with that typed into it.
         const juce::String query = juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_PALETTE", {});
         if (query.isNotEmpty()) juce::MessageManager::callAsync([this, query] {
@@ -451,7 +458,12 @@ void AdditivEditor::paint(juce::Graphics& g)
 
 void AdditivEditor::resized()
 {
-    auto area = getLocalBounds().reduced(12, 8);
+    auto full = getLocalBounds();
+    if (info_ != nullptr) {   // the info line along the bottom (not in the canvas)
+        info_->setVisible(!canvas_);
+        if (!canvas_) info_->setBounds(full.removeFromBottom(24));
+    }
+    auto area = full.reduced(12, 8);
     frame::Header h;
     h.logo = &logo_;
     h.title = &title_;
@@ -546,6 +558,7 @@ bool AdditivEditor::revealParam(int id)
                 const auto at = view->getViewedComponent()->getLocalPoint(control, juce::Point<int>(0, 0));
                 view->setViewPosition(0, std::max(0, at.y - 80));
                 page->flash(id);
+                if (info_ != nullptr) info_->showParam(id);
                 return true;
             }
     }
