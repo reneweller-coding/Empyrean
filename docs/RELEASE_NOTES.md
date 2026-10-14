@@ -35,6 +35,8 @@ presets.
   the most for this sound), **Variations** (six near the sound, hold to listen, Keep to evolve it), **Teach** (a macro
   learns a gesture by example) and **Find** (the presets that sound like a recording, ringed on the map). Built on a
   measure of what every shaping knob does around 48 presets.
+- **The whole bank levelled anew:** 3530 presets from before 0.14.0 measured again with today's engine (some had
+  drifted by several dB); the map and the search read the new measures.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;
   Depth and Keys Depth as rings to drag.
 

@@ -545,6 +545,10 @@ Mynatt), Makro aus Beispielen (Wekinator, Fiebrink), Suche nach Beispiel (SynthA
   gemessenen Pegel-Empfindlichkeit. **Makro-Lektionen:** relative Versätze je Ort (bis 4 Orte), in der Engine wie
   Matrixzeilen vor den Gates, im Zustand gespeichert. **Suche:** vier Merkmale (Bewegung log), je Spreizung skaliert
   (`make_find.py` → `Find.inc`), WAV/FLAC stereo (`loadStereo`).
+- **Bank neu gemessen:** der Selbsttest der Suche fand „Pale Choir“ nicht an seinem eigenen Klang -- die Engine-
+  Änderungen seit Phase 16 hatten die 3530 älteren Presets verschoben (863 über 1 dB, 173 über 2 dB, bis 9,7 dB neben
+  dem Pegel der Bank). Neu gemessen (75 min), gepegelt, Karte und Suchtabelle neu. Lehre: nach Engine-Änderungen, die
+  den Klang aller Presets berühren, eine Stichprobe alter Presets nachmessen.
 
 ## Phase 19: Der Dirigent folgt dem Licht; Kristallisation als Hörversuch (gebaut, 14.10.2026, 0.15.0)
 
