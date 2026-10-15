@@ -364,27 +364,38 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::COMB_DEPTH } },
             { "Envelope", F::ENVELOPE,
               IdsT{ ParamIdE::ATTACK, ParamIdE::DECAY, ParamIdE::SUSTAIN, ParamIdE::RELEASE } } } );
-    page( "Motion",
-          { { "Motion", F::MOTION,
-              IdsT{ ParamIdE::MOTION, ParamIdE::MOTION_RATE, ParamIdE::MOTION_DEPTH, ParamIdE::LANDSCAPE },
-              IdsT{ ParamIdE::MOTION } },
-            { "Field", F::MOTION,
-              IdsT{ ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, ParamIdE::FIELD_RADIUS, ParamIdE::FIELD_SPRING,
-                    ParamIdE::FIELD_RATE, ParamIdE::FIELD_COUNT },
-              IdsT{ ParamIdE::FIELD_MODE } },
-            { "Time", F::ENVELOPE, IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND },
-              IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND } },
-            { "Living Landscape", F::SOURCE,
-              IdsT{ ParamIdE::LIFE_MODE, ParamIdE::LIFE_DEPTH, ParamIdE::LIFE_RATE, ParamIdE::LIFE_CHARACTER,
-                    ParamIdE::LIFE_ZOOM, ParamIdE::LIFE_SIDES, ParamIdE::LIFE_TURN },
-              IdsT{ ParamIdE::LIFE_MODE } },
-            { "Partial Sync", F::ENVELOPE,
-              IdsT{ ParamIdE::SYNC_DEPTH, ParamIdE::SYNC_MODE, ParamIdE::SYNC_COUPLING, ParamIdE::SYNC_RATE,
-                    ParamIdE::SYNC_SPREAD, ParamIdE::SYNC_SWARM, ParamIdE::SYNC_REACH, ParamIdE::SYNC_LAG },
-              IdsT{ ParamIdE::SYNC_DEPTH } },
-            { "Ripple", F::SPACE,
-              IdsT{ ParamIdE::RIPPLE_DEPTH, ParamIdE::RIPPLE_SPEED, ParamIdE::RIPPLE_DECAY, ParamIdE::RIPPLE_BEND },
-              IdsT{ ParamIdE::RIPPLE_DEPTH } } } );
+    page( "Motion", { { "Motion", F::MOTION,
+                        IdsT{ ParamIdE::MOTION, ParamIdE::MOTION_RATE, ParamIdE::MOTION_DEPTH, ParamIdE::LANDSCAPE },
+                        IdsT{ ParamIdE::MOTION } },
+                      { "Field", F::MOTION,
+                        IdsT{ ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, ParamIdE::FIELD_RADIUS,
+                              ParamIdE::FIELD_SPRING, ParamIdE::FIELD_RATE, ParamIdE::FIELD_COUNT },
+                        IdsT{ ParamIdE::FIELD_MODE } },
+                      { "Time", F::ENVELOPE, IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND },
+                        IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND } },
+                      { "Living Landscape", F::SOURCE,
+                        IdsT{ ParamIdE::LIFE_MODE, ParamIdE::LIFE_DEPTH, ParamIdE::LIFE_RATE, ParamIdE::LIFE_CHARACTER,
+                              ParamIdE::LIFE_ZOOM, ParamIdE::LIFE_SIDES, ParamIdE::LIFE_TURN },
+                        IdsT{ ParamIdE::LIFE_MODE } },
+                      { "Partial Sync", F::ENVELOPE,
+                        IdsT{ ParamIdE::SYNC_DEPTH, ParamIdE::SYNC_MODE, ParamIdE::SYNC_COUPLING, ParamIdE::SYNC_RATE,
+                              ParamIdE::SYNC_SPREAD, ParamIdE::SYNC_SWARM, ParamIdE::SYNC_REACH, ParamIdE::SYNC_LAG },
+                        IdsT{ ParamIdE::SYNC_DEPTH } },
+                      { "Ripple", F::SPACE,
+                        IdsT{ ParamIdE::RIPPLE_DEPTH, ParamIdE::RIPPLE_SPEED, ParamIdE::RIPPLE_DECAY,
+                              ParamIdE::RIPPLE_BEND, ParamIdE::RIPPLE_BREATHERS },
+                        IdsT{ ParamIdE::RIPPLE_DEPTH } } } );
+    // Phase 26: the harmonics' own lives, the horizon and the grains.
+    page( "Harmonics",
+          { { "Overblow", F::SOURCE, IdsT{ ParamIdE::OVERBLOW, ParamIdE::OVERBLOW_TIME }, IdsT{ ParamIdE::OVERBLOW } },
+            { "Subharmonics", F::SOURCE, IdsT{ ParamIdE::SUBHARMONICS, ParamIdE::SUB_TIME },
+              IdsT{ ParamIdE::SUBHARMONICS } },
+            { "Horizon", F::SOURCE, IdsT{ ParamIdE::HORIZON, ParamIdE::HORIZON_HEIGHT }, IdsT{ ParamIdE::HORIZON } },
+            { "Seasons", F::ENVELOPE, IdsT{ ParamIdE::SEASONS, ParamIdE::SEASON_TIME }, IdsT{ ParamIdE::SEASONS } },
+            { "Avalanche", F::MOTION, IdsT{ ParamIdE::AVALANCHE, ParamIdE::AVALANCHE_RATE, ParamIdE::AVALANCHE_GLOW },
+              IdsT{ ParamIdE::AVALANCHE } },
+            { "Grain", F::SOURCE, IdsT{ ParamIdE::GRAIN, ParamIdE::GRAIN_LENGTH, ParamIdE::GRAIN_DENSITY },
+              IdsT{ ParamIdE::GRAIN } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [tp] { return tp->describe(); } );
@@ -484,7 +495,8 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
         const juce::StringArray         names = m_tabs.getTabNames();
         auto                            at = [&names]( const char *n ) { return names.indexOf( n ); };
         std::vector<PageStrip::Section> sections = { { "", { at( "Focus" ) } },
-                                                     { "Sound", { at( "Cloud & Filter" ), at( "Motion" ) } },
+                                                     { "Sound",
+                                                       { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ) } },
                                                      { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
                                                      { "Space", { at( "Space" ), at( "Effects" ), at( "Hall" ) } },
                                                      { "Modulation", { at( "Modulation" ) } },
@@ -1048,7 +1060,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "6144 presets",
+        { &m_presetName, "7168 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1704,6 +1716,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstVisionGroup ) bank.addSectionHeader( "Visions" );
         if ( g == additiv::FirstSwarmGroup ) bank.addSectionHeader( "Swarms & Currents" );
         if ( g == additiv::FirstHallGroup ) bank.addSectionHeader( "Halls & Orbits" );
+        if ( g == additiv::FirstLivesGroup ) bank.addSectionHeader( "Harmonic Lives" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

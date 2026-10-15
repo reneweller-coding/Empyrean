@@ -38,8 +38,8 @@ const char *const LifeModeNames[NumLifeModes] = { "Off",    "Lenia", "Turing",  
                                                   "Spiral", "Flow",  "Feedback", "Rain",         "Starfield",
                                                   "Moire",  "Fluid", "Islands" };
 const char *const SyncModeNames[NumSyncModes] = { "Global", "Chimera", "Swarm" };
-const char *const MpeTargetNames[NumMpeTargets] = { "Off",   "Level",  "Filter",  "Brightness",
-                                                    "Width", "Nearer", "Shimmer", "Motion" };
+const char *const MpeTargetNames[NumMpeTargets] = { "Off",    "Level",   "Filter", "Brightness", "Width",
+                                                    "Nearer", "Shimmer", "Motion", "Breath" };
 const char *const FieldModeNames[NumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
@@ -361,6 +361,21 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::RIPPLE_BEND, "ripple_bend", "Bend", "Ripple", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::BRAIN_LIGHT, "brain_light", "Follow Light", "Conductor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::BRAIN_FOUNDATION, "brain_foundation", "Foundation", "Conductor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::OVERBLOW, "overblow", "Overblow", "Overblow", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::OVERBLOW_TIME, "overblow_time", "Overblow Time", "Overblow", 0.1f, 10.f, 0.6f, 0.4f, "s" ),
+    F( ParamIdE::SEASONS, "seasons", "Seasons", "Seasons", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SEASON_TIME, "season_time", "Year", "Seasons", 20.f, 3600.f, 240.f, 0.3f, "s" ),
+    F( ParamIdE::AVALANCHE, "avalanche", "Avalanche", "Avalanche", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::AVALANCHE_RATE, "avalanche_rate", "Grains Falling", "Avalanche", 0.03f, 5.f, 0.3f, 0.4f, "/s" ),
+    F( ParamIdE::AVALANCHE_GLOW, "avalanche_glow", "Glow", "Avalanche", 0.1f, 5.f, 0.6f, 0.5f, "s" ),
+    F( ParamIdE::SUBHARMONICS, "subharmonics", "Subharmonics", "Subharmonics", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SUB_TIME, "sub_time", "Sub Time", "Subharmonics", 0.1f, 10.f, 1.f, 0.5f, "s" ),
+    F( ParamIdE::HORIZON, "horizon", "Horizon", "Horizon", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::HORIZON_HEIGHT, "horizon_height", "Horizon Height", "Horizon", 1.f, 6.f, 3.f, 1.f, "oct" ),
+    F( ParamIdE::GRAIN, "grain", "Grain", "Grain", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::GRAIN_LENGTH, "grain_length", "Grain Length", "Grain", 0.01f, 1.f, 0.08f, 0.4f, "s" ),
+    F( ParamIdE::GRAIN_DENSITY, "grain_density", "Grain Density", "Grain", 0.01f, 1.f, 0.3f, 0.5f, "" ),
+    F( ParamIdE::RIPPLE_BREATHERS, "ripple_breathers", "Breathers", "Ripple", 0.f, 1.f, 0.f, 1.f, "" ),
 } };
 
 }   // namespace

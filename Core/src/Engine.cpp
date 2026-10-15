@@ -767,10 +767,12 @@ void Engine::readParams()
                     for ( int ha = 1; ha <= 8; ++ha )
                         for ( int hb = 1; hb <= 8; ++hb )
                         {
-                            const double fa =
-                                va.m_hz * partialRatio( ha, m_blk.m_inharmonicB, m_blk.m_stretch ) + m_blk.m_shift;
-                            const double fb =
-                                vb.m_hz * partialRatio( hb, m_blk.m_inharmonicB, m_blk.m_stretch ) + m_blk.m_shift;
+                            const double fa = va.m_hz * partialRatio( ha, m_blk.m_inharmonicB, m_blk.m_stretch,
+                                                                      m_blk.m_horizon, m_blk.m_horizonRatio ) +
+                                              m_blk.m_shift;
+                            const double fb = vb.m_hz * partialRatio( hb, m_blk.m_inharmonicB, m_blk.m_stretch,
+                                                                      m_blk.m_horizon, m_blk.m_horizonRatio ) +
+                                              m_blk.m_shift;
                             const double s = 0.24 / ( 0.021 * std::min( fa, fb ) + 19.0 ), d = std::fabs( fb - fa ) * s;
                             const double w = static_cast<double>( va.m_lastGain ) * vb.m_lastGain / ( ha * hb );
                             rough += w * ( std::exp( -3.5 * d ) - std::exp( -5.75 * d ) );
@@ -907,6 +909,20 @@ void Engine::readParams()
     m_blk.m_brain2 = g( ParamIdE::BRAIN2_ON ) >= 0.5f;
     m_blk.m_brain2Interval = static_cast<int>( std::lround( g( ParamIdE::BRAIN2_INTERVAL ) ) );
     m_blk.m_brain2Depth = g( ParamIdE::BRAIN2_DEPTH );
+    m_blk.m_overblow = g( ParamIdE::OVERBLOW );
+    m_blk.m_overblowTime = g( ParamIdE::OVERBLOW_TIME );
+    m_blk.m_seasons = g( ParamIdE::SEASONS );
+    m_blk.m_seasonTime = g( ParamIdE::SEASON_TIME );
+    m_blk.m_avalanche = g( ParamIdE::AVALANCHE );
+    m_blk.m_avalancheRate = g( ParamIdE::AVALANCHE_RATE );
+    m_blk.m_avalancheGlow = g( ParamIdE::AVALANCHE_GLOW );
+    m_blk.m_subharmonics = g( ParamIdE::SUBHARMONICS );
+    m_blk.m_subTime = g( ParamIdE::SUB_TIME );
+    m_blk.m_horizon = g( ParamIdE::HORIZON );
+    m_blk.m_horizonRatio = std::exp2( g( ParamIdE::HORIZON_HEIGHT ) );
+    m_blk.m_grain = g( ParamIdE::GRAIN );
+    m_blk.m_grainLength = g( ParamIdE::GRAIN_LENGTH );
+    m_blk.m_grainDuty = g( ParamIdE::GRAIN_DENSITY );
 
     m_bp.m_on = g( ParamIdE::BRAIN_ON ) >= 0.5f;
     m_bp.m_mode = static_cast<BrainModeE>(
@@ -978,7 +994,8 @@ void Engine::updateFoundation()
 
 void Engine::refreshSpectrum()
 {
-    const float key[5] = { m_blk.m_tilt, m_blk.m_oddEven, m_blk.m_brightness, m_blk.m_inharmonicB, m_blk.m_stretch };
+    const float key[7] = { m_blk.m_tilt,    m_blk.m_oddEven, m_blk.m_brightness,  m_blk.m_inharmonicB,
+                           m_blk.m_stretch, m_blk.m_horizon, m_blk.m_horizonRatio };
     if ( std::equal( std::begin( key ), std::end( key ), std::begin( m_specKey ) ) ) return;
     std::copy( std::begin( key ), std::end( key ), std::begin( m_specKey ) );
     // The conductors judge timbre against the voice's own harmonic spectrum, both stretches included
@@ -986,7 +1003,8 @@ void Engine::refreshSpectrum()
     m_brainSpec.m_count = BrainSpectrum::Max;
     for ( int h = 1; h <= BrainSpectrum::Max; ++h )
     {
-        m_brainSpec.m_ratio[h - 1] = static_cast<double>( partialRatio( h, m_blk.m_inharmonicB, m_blk.m_stretch ) );
+        m_brainSpec.m_ratio[h - 1] = static_cast<double>(
+            partialRatio( h, m_blk.m_inharmonicB, m_blk.m_stretch, m_blk.m_horizon, m_blk.m_horizonRatio ) );
         m_brainSpec.m_amp[h - 1] = harmonicShape( h, m_blk.m_tilt, m_blk.m_oddEven, m_blk.m_brightness );
     }
     if ( m_scaleChoice == TimbreScaleIndex ) m_scaleChoice = -1;   // the Timbre scale follows the spectrum
@@ -1234,6 +1252,16 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     v.m_age = 0.0;
     v.m_stealing = false;
     v.m_stealBlocks = 0;
+    // Phase 26: the harmonics' lives begin at rest; the subharmonics' clouds are kept for the note if it
+    // starts while they are wanted (the partials are shared out once, so they never jump).
+    v.m_share = { 1.0f, 0.0f, 0.0f, 0.0f };
+    v.m_blowWander.init( m_blowRng );
+    v.m_pileLive = false;
+    v.m_pileDepth = 0.0f;
+    v.m_glow.fill( 0.0f );
+    v.m_glowTarget.fill( 0.0f );
+    v.m_subOn = m_blk.m_subharmonics > 0.0f;
+    v.m_sub.fill( 0.0f );
     m_cloud.voice( i ).m_releaseAt = -1.0f;
 }
 
@@ -1387,6 +1415,14 @@ void Engine::stepRipple( float dt )
 {
     Ripple &R = m_cloud.ripple();
     R.m_depth = cur( ParamIdE::RIPPLE_DEPTH );
+    // Breathers (Phase 26): the string as a sine-Gordon chain, u_tt = (c^2 u_x)_x - g u_t - m^2 sin u, its
+    // mass up to 1 Hz. A strike shaped like a breather (a bell about as wide as c / m) stays where it fell
+    // and pulses there below the mass's frequency -- it cannot run away as a wave, there is no wave that
+    // slow -- instead of parting into two halves; the string is read as the angle it is (2 sin(u/2)), so
+    // a kink that turned it a whole round leaves nothing behind.
+    const float breathers = std::clamp( cur( ParamIdE::RIPPLE_BREATHERS ), 0.0f, 1.0f );
+    const float bell = std::min( 1.0f, 2.0f * breathers );
+    R.m_periodic = bell;
     const int strikes = m_rippleStrikeCount;
     m_rippleStrikeCount = 0;
     const int sounding = m_rippleVoices;
@@ -1407,28 +1443,37 @@ void Engine::stepRipple( float dt )
     // and the step before, a displacement at rest, which parts into two halves running up and down
     // (a struck velocity would leave a standing plateau behind in one dimension: measured, 3 dB
     // louder where the notes are and no motion).
-    for ( int s = 0; s < strikes; ++s )
-    {
-        for ( int h = 1; h <= 8; ++h )
-        {
-            const float pos = std::log2( std::max( m_rippleStrikes[s] * h, 20.0f ) / 20.0f ) * CellsPerOctave;
-            for ( int c = std::max( 0, static_cast<int>( pos ) - 24 );
-                  c <= std::min( RippleCells - 1, static_cast<int>( pos ) + 24 ); ++c )
-            {
-                const float d = ( static_cast<float>( c ) - pos ) / 5.0f;
-                // 6/h: a passing half-wave of the fundamental's strike takes the loudness from near silence
-                // to twice (tanh saturates); at 2/h it moved a harmonic by a dB or two, too tame to hear.
-                const float bump = ( 6.0f / static_cast<float>( h ) ) * ( 1.0f - d * d ) * std::exp( -0.5f * d * d );
-                m_rippleNow[c] += bump;
-                m_ripplePrev[c] += bump;
-            }
-        }
-    }
     // The damped wave, u_tt = (c^2 u_x)_x - g u_t, by leapfrog; the ends reflect.
     const float c = std::max( cur( ParamIdE::RIPPLE_SPEED ), 0.01f ) * CellsPerOctave;   // cells a second
     const float g = 2.0f / std::max( cur( ParamIdE::RIPPLE_DECAY ), 0.1f );
     const int   steps = std::max( 1, static_cast<int>( std::ceil( c * dt / 0.9f ) ) );
     const float h = dt / static_cast<float>( steps ), r2 = ( c * h ) * ( c * h ), damp = g * h * 0.5f;
+    const float mass2 = breathers * 39.478418f;   // (2 pi 1 Hz)^2 at full
+    for ( int s = 0; s < strikes; ++s )
+    {
+        for ( int k = 1; k <= 8; ++k )
+        {
+            const float pos = std::log2( std::max( m_rippleStrikes[s] * k, 20.0f ) / 20.0f ) * CellsPerOctave;
+            // With breathers the first four harmonics are struck as bells, each drifting a little up or
+            // down (a moving breather: the step before is the bell a step behind).
+            const float drift = bell > 0.0f && k <= 4 ? c * ( 0.05f + 0.1f * m_breatherRng.uniform() ) *
+                                                            ( m_breatherRng.uniform() < 0.5f ? -1.0f : 1.0f )
+                                                      : 0.0f;
+            for ( int cc = std::max( 0, static_cast<int>( pos ) - 24 );
+                  cc <= std::min( RippleCells - 1, static_cast<int>( pos ) + 24 ); ++cc )
+            {
+                const float d = ( static_cast<float>( cc ) - pos ) / 5.0f;
+                // 6/h: a passing half-wave of the fundamental's strike takes the loudness from near silence
+                // to twice (tanh saturates); at 2/h it moved a harmonic by a dB or two, too tame to hear.
+                const float hat = ( 6.0f / static_cast<float>( k ) ) * ( 1.0f - d * d ) * std::exp( -0.5f * d * d );
+                const float db = ( static_cast<float>( cc ) - pos + drift * h ) / 5.0f;
+                const float bellNow = k <= 4 ? 4.0f * std::exp( -0.5f * d * d ) : 0.0f;
+                const float bellPrev = k <= 4 ? 4.0f * std::exp( -0.5f * db * db ) : 0.0f;
+                m_rippleNow[cc] += ( 1.0f - bell ) * hat + bell * bellNow;
+                m_ripplePrev[cc] += ( 1.0f - bell ) * hat + bell * bellPrev;
+            }
+        }
+    }
     // Bend: the wave slower where the spectrum is loud -- the sounding voices' first sixteen harmonics,
     // their amplitudes against the spectrum's mean, each over a sixth of an octave (as wide as a strike:
     // a narrower slow zone lets the wave leak out at once) -- up to a ninth of its speed, so a wave
@@ -1447,8 +1492,9 @@ void Engine::stepRipple( float dt )
         for ( int v = 0; v < sounding; ++v )
             for ( int k = 1; k <= 16; ++k )
             {
-                const float fk =
-                    m_rippleHz[v] * partialRatio( k, m_blk.m_inharmonicB, m_blk.m_stretch ) + m_blk.m_shift;
+                const float fk = m_rippleHz[v] * partialRatio( k, m_blk.m_inharmonicB, m_blk.m_stretch, m_blk.m_horizon,
+                                                               m_blk.m_horizonRatio ) +
+                                 m_blk.m_shift;
                 if ( fk < 20.0f || fk > 20000.0f ) continue;
                 const float w = m_rippleAmp[v] * shape[k - 1];
                 const float pos = std::log2( fk / 20.0f ) * CellsPerOctave;
@@ -1481,7 +1527,8 @@ void Engine::stepRipple( float dt )
             const int   il = i > 0 ? i - 1 : 1, ir = i < RippleCells - 1 ? i + 1 : RippleCells - 2;
             const float kl = 0.5f * ( r2c[i] + r2c[il] ), kr = 0.5f * ( r2c[i] + r2c[ir] );
             const float flow = kr * ( m_rippleNow[ir] - m_rippleNow[i] ) - kl * ( m_rippleNow[i] - m_rippleNow[il] );
-            next[i] = ( 2.0f * m_rippleNow[i] - ( 1.0f - damp ) * m_ripplePrev[i] + flow ) / ( 1.0f + damp );
+            const float pull = mass2 > 0.0f ? h * h * mass2 * std::sin( m_rippleNow[i] ) : 0.0f;
+            next[i] = ( 2.0f * m_rippleNow[i] - ( 1.0f - damp ) * m_ripplePrev[i] + flow - pull ) / ( 1.0f + damp );
         }
         std::copy( std::begin( m_rippleNow ), std::end( m_rippleNow ), std::begin( m_ripplePrev ) );
         std::copy( std::begin( next ), std::end( next ), std::begin( m_rippleNow ) );
@@ -1491,11 +1538,252 @@ void Engine::stepRipple( float dt )
     {
         if ( !std::isfinite( m_rippleNow[i] ) ) m_rippleNow[i] = 0.0f;
         R.m_u[i] = m_rippleNow[i];
-        const double t = std::tanh( static_cast<double>( m_rippleNow[i] ) );
+        const float  u = m_rippleNow[i] + R.m_periodic * ( 2.0f * std::sin( 0.5f * m_rippleNow[i] ) - m_rippleNow[i] );
+        const double t = std::tanh( static_cast<double>( u ) );
         mean2 += t * t;
     }
     R.m_makeup = static_cast<float>(
         1.0 / std::sqrt( 1.0 + static_cast<double>( R.m_depth ) * R.m_depth * mean2 / RippleCells ) );
+}
+
+void Engine::stepSeasons( float dt )
+{
+    const float want = std::clamp( m_blk.m_seasons, 0.0f, 1.0f );
+    m_seasonDepth += ( want - m_seasonDepth ) * ( 1.0f - std::exp( -dt / 0.5f ) );
+    if ( want <= 0.0f && m_seasonDepth < 1.0e-4f )
+    {   // at rest: the families keep their shares, the cycle goes on from there when it is turned up
+        m_seasonDepth = 0.0f;
+        return;
+    }
+    // A family wins 1 against each of the next two and loses 2 against each of the two before; the
+    // mutation, a hundredth, keeps every family alive (none falls below a few thousandths), so a round
+    // takes 12.9 of the dynamics' time units (measured, Python): it is scaled to Year.
+    constexpr float Win = 1.0f, Loss = 2.0f, Mutation = 0.01f, Round = 12.9f;
+    const float     rate = Round / std::max( m_blk.m_seasonTime, 1.0f );
+    float          *x = m_seasonShare.data();
+    float           f[SeasonFamilies];
+    float           mean = 0.0f;
+    for ( int i = 0; i < SeasonFamilies; ++i )
+    {
+        f[i] =
+            Win * ( x[( i + 1 ) % SeasonFamilies] + x[( i + 2 ) % SeasonFamilies] ) -
+            Loss * ( x[( i + SeasonFamilies - 1 ) % SeasonFamilies] + x[( i + SeasonFamilies - 2 ) % SeasonFamilies] );
+        mean += x[i] * f[i];
+    }
+    float sum = 0.0f;
+    for ( int i = 0; i < SeasonFamilies; ++i )
+    {
+        x[i] = std::max( 0.0f, x[i] + dt * rate * ( x[i] * ( f[i] - mean ) + Mutation * ( 0.2f - x[i] ) ) );
+        sum += x[i];
+    }
+    for ( int i = 0; i < SeasonFamilies; ++i ) x[i] = sum > 0.0f ? x[i] / sum : 0.2f;
+}
+
+void Engine::stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, float breath )
+{
+    int life = 0;
+
+    // Overblow: the registers (the note's 1st, 2nd, 3rd, 4th harmonic as its fundamental) as shares, in
+    // replicator dynamics -- each prefers a breath (0, 0.45, 0.72, 0.95), the one sounding holds by its
+    // share (so a register jumps up later than it falls back: hysteresis), a little mutation lets a
+    // register return. The breath: the knob, by the note's velocity and MPE's Breath, with a slow
+    // unrest of its own, so a note near a threshold flickers between two registers.
+    if ( m_blk.m_overblow > 0.0f || v.m_share[0] < 0.999f )
+    {
+        constexpr float Best[4] = { 0.0f, 0.45f, 0.72f, 0.95f };
+        constexpr float Width = 0.5f, Hold = 0.12f;
+        const bool      on = m_blk.m_overblow > 0.0f;
+        const float     P = on ? m_blk.m_overblow * ( 0.55f + 0.45f * v.m_velocity + 0.5f * breath ) +
+                                     0.04f * m_blk.m_overblow * v.m_blowWander.update( dt, 0.15f, m_blowRng )
+                               : 0.0f;
+        const float     eps = on ? 0.0005f : 0.0f;
+        const float     tau = std::max( 0.1f * m_blk.m_overblowTime, 0.01f );
+        const int       sub = std::max( 1, static_cast<int>( std::ceil( dt / ( 0.2f * tau ) ) ) );
+        const float     h = dt / static_cast<float>( sub );
+        float          *s = v.m_share.data();
+        for ( int step = 0; step < sub; ++step )
+        {
+            float F[4], mean = 0.0f;
+            for ( int k = 0; k < 4; ++k )
+            {
+                F[k] = -std::fabs( P - Best[k] ) / Width + Hold * s[k];
+                mean += s[k] * F[k];
+            }
+            float sum = 0.0f;
+            for ( int k = 0; k < 4; ++k )
+            {
+                s[k] = std::max( 0.0f, s[k] + h * ( s[k] * ( F[k] - mean ) + eps * ( 0.25f - s[k] ) ) / tau );
+                sum += s[k];
+            }
+            for ( int k = 0; k < 4; ++k ) s[k] = sum > 0.0f ? s[k] / sum : ( k == 0 ? 1.0f : 0.0f );
+        }
+        if ( !on && s[0] >= 0.999f ) v.m_share = { 1.0f, 0.0f, 0.0f, 0.0f };
+        for ( int k = 0; k < 4; ++k ) cv.m_register[k] = s[k];
+        life |= 1;
+    }
+
+    // Seasons: the family whose turn it is louder, the others softer (stepSeasons).
+    if ( m_seasonDepth > 0.0f )
+    {
+        for ( int i = 0; i < SeasonFamilies; ++i )
+            cv.m_season[i] = 1.0f - m_seasonDepth +
+                             m_seasonDepth * std::sqrt( static_cast<float>( SeasonFamilies ) * m_seasonShare[i] );
+        life |= 2;
+    }
+
+    // Avalanche: the Oslo rice pile (Christensen et al. 1996) on harmonics 2 .. 49 -- the slope at each
+    // harmonic, a threshold of 1 or 2 drawn anew after every toppling, a grain falling on harmonic 2 now
+    // and then. A site over its threshold topples: it gives a grain to either neighbour (the first only
+    // upwards, the last lets one go). One generation of topplings every 35 ms, so an avalanche runs up
+    // and down the harmonics where it can be heard; every toppling lights its harmonic. Even in one
+    // dimension this pile is critical: avalanches of every size, mostly small, rarely through the whole.
+    constexpr float PileStep = 0.035f;
+    const bool      piling = m_blk.m_avalanche > 0.0f;
+    if ( piling && !v.m_pileLive )
+    {   // laid out near its critical slope at once (a pile that had to grow first would take minutes)
+        v.m_pileDice.seed( 0xA5A5A5A5ull ^ v.m_seed );
+        for ( int i = 0; i < AvalancheSites; ++i )
+        {
+            const std::uint8_t th = v.m_pileDice.uniform() < 0.5f ? 1 : 2;
+            v.m_threshold[static_cast<size_t>( i )] = th;
+            v.m_slope[static_cast<size_t>( i )] =
+                static_cast<std::uint8_t>( v.m_pileDice.uniform() < 0.73f ? th : th - 1 );
+        }
+        v.m_grainDue =
+            -std::log( std::max( 1.0f - v.m_pileDice.uniform(), 1.0e-6f ) ) / std::max( m_blk.m_avalancheRate, 0.01f );
+        v.m_pileClock = 0.0f;
+        v.m_pileLive = true;
+    }
+    if ( v.m_pileLive )
+    {
+        v.m_pileDepth += ( m_blk.m_avalanche - v.m_pileDepth ) * ( 1.0f - std::exp( -dt / 0.1f ) );
+        if ( piling )
+        {
+            // Grains fall while the note sounds, as much as it sounds.
+            v.m_grainDue -= dt * std::min( 1.0f, 2.0f * gain );
+            while ( v.m_grainDue <= 0.0f )
+            {
+                ++v.m_slope[0];
+                v.m_grainDue += -std::log( std::max( 1.0f - v.m_pileDice.uniform(), 1.0e-6f ) ) /
+                                std::max( m_blk.m_avalancheRate, 0.01f );
+            }
+            v.m_pileClock += dt;
+            while ( v.m_pileClock >= PileStep )
+            {
+                v.m_pileClock -= PileStep;
+                std::array<std::uint8_t, AvalancheSites> over{};
+                int                                      count = 0;
+                for ( int i = 0; i < AvalancheSites; ++i )
+                    if ( v.m_slope[static_cast<size_t>( i )] > v.m_threshold[static_cast<size_t>( i )] )
+                    {
+                        over[static_cast<size_t>( i )] = 1;
+                        ++count;
+                    }
+                if ( count == 0 ) break;
+                for ( int i = 0; i < AvalancheSites; ++i )
+                {
+                    if ( !over[static_cast<size_t>( i )] ) continue;
+                    const size_t at = static_cast<size_t>( i );
+                    if ( i == AvalancheSites - 1 )
+                    {   // the top lets the grain go
+                        v.m_slope[at] = static_cast<std::uint8_t>( v.m_slope[at] - 1 );
+                        ++v.m_slope[at - 1];
+                    }
+                    else
+                    {
+                        v.m_slope[at] = static_cast<std::uint8_t>( v.m_slope[at] - 2 );
+                        ++v.m_slope[at + 1];
+                        if ( i > 0 ) ++v.m_slope[at - 1];
+                    }
+                    v.m_threshold[at] = v.m_pileDice.uniform() < 0.5f ? 1 : 2;
+                    v.m_glowTarget[at] = 1.0f;
+                }
+            }
+        }
+        // The glow: lit at once, fading over Glow; heard softened over 40 ms (no click).
+        const float fade = std::exp( -dt / std::max( m_blk.m_avalancheGlow, 0.05f ) );
+        const float soft = 1.0f - std::exp( -dt / 0.04f );
+        float       most = 0.0f;
+        for ( int i = 0; i < AvalancheSites; ++i )
+        {
+            const size_t at = static_cast<size_t>( i );
+            v.m_glowTarget[at] *= fade;
+            v.m_glow[at] += ( v.m_glowTarget[at] - v.m_glow[at] ) * soft;
+            most = std::max( most, v.m_glow[at] );
+            // up to three times the harmonic's amplitude (+9.5 dB) at full Avalanche
+            cv.m_glow[i] = 2.0f * v.m_pileDepth * v.m_glow[at];
+        }
+        if ( !piling && ( most < 1.0e-4f || v.m_pileDepth < 1.0e-4f ) )
+            v.m_pileLive = false;
+        else
+            life |= 4;
+    }
+
+    // The make-up: the voice's power over its first harmonics kept as it was without these lives (the
+    // harmonics above are too soft to matter), so the registers, the seasons and the glints move the
+    // power between harmonics and do not make the voice louder or softer.
+    const float hz = std::max( cv.m_hz, 1.0f );
+    const int   Hm = std::clamp( static_cast<int>( 0.9f * 20000.0f / hz ), 1, 256 );
+    float       shape[8] = {};   // harmonics 1 .. 7 at rest, for the pumps below
+    float       makeup = 1.0f;
+    if ( life != 0 || v.m_subOn )
+    {
+        double before = 0.0, after = 0.0;
+        for ( int k = 1; k <= Hm; ++k )
+        {
+            const float a = harmonicShape( k, cv.m_tilt, cv.m_oddEven, cv.m_brightness );
+            float       f = 1.0f;
+            if ( life & 1 ) f *= registerGain( k, cv.m_register );
+            if ( ( life & 2 ) && k > 1 ) f *= cv.m_season[seasonFamily( k )];
+            if ( ( life & 4 ) && k >= 2 && k < 2 + AvalancheSites ) f *= 1.0f + cv.m_glow[k - 2];
+            before += static_cast<double>( a ) * a;
+            after += static_cast<double>( a * f ) * ( a * f );
+            if ( k <= 7 ) shape[k] = a * f;
+        }
+        makeup = after > 1.0e-30 ? static_cast<float>( std::sqrt( before / after ) ) : 1.0f;
+        for ( int k = 1; k <= 7; ++k ) shape[k] *= makeup;
+    }
+    cv.m_harmonicLife = life;
+    cv.m_lifeMakeup = makeup;
+
+    // Subharmonics: parametric down-conversion, as in a Faraday experiment or a parametric amplifier.
+    // Sub cloud m/2 (m = 1, 3, 5, 7) is pumped by harmonic m, sub m/4 by sub m/2: above a threshold the
+    // pump makes it grow from a seed, the more the further above (slowly near it: it seems to come from
+    // nothing), saturating; the power it gets the pump gives up. The pump's strength: the knob, the
+    // note's strength and envelope, MPE's Breath. Below 20 .. 40 Hz a sub cloud is not pumped at all
+    // (nothing would be heard of the power taken from the pump).
+    cv.m_subClouds = v.m_subOn ? 1 : 0;
+    if ( v.m_subOn )
+    {
+        constexpr float Threshold = 0.25f, Saturation = 1.5f, Seed = 1.0e-3f;
+        const float     strength = 0.4f + 0.6f * v.m_velocity;
+        const float     D = m_blk.m_subharmonics * 1.3f * strength * strength * gain * ( 1.0f + breath );
+        const float     tau = std::max( m_blk.m_subTime, 0.05f );
+        auto            grow = [&]( float a, float pump, float subHz )
+        {
+            const float heard = std::clamp( ( subHz - 20.0f ) / 20.0f, 0.0f, 1.0f );
+            if ( pump <= 1.0e-9f ) return 0.0f;
+            const float x = a / pump;
+            const float r = ( D * heard * pump - Threshold ) - Saturation * x * x;
+            return std::clamp( a + dt * a * r / tau, Seed * pump, 0.999f * pump );
+        };
+        float sub[SubClouds];
+        for ( int j = 0; j < 4; ++j )
+        {
+            const int   m = 2 * j + 1;
+            const float pump =
+                shape[m] / std::max( harmonicShape( 1, cv.m_tilt, cv.m_oddEven, cv.m_brightness ), 1.0e-9f );
+            v.m_sub[static_cast<size_t>( j )] = grow( v.m_sub[static_cast<size_t>( j )], pump, hz * subRatio( j ) );
+            v.m_sub[static_cast<size_t>( j + 4 )] = grow( v.m_sub[static_cast<size_t>( j + 4 )],
+                                                          v.m_sub[static_cast<size_t>( j )], hz * subRatio( j + 4 ) );
+            const float a1 = v.m_sub[static_cast<size_t>( j )], a2 = v.m_sub[static_cast<size_t>( j + 4 )];
+            sub[j] = std::sqrt( std::max( a1 * a1 - a2 * a2, 0.0f ) );   // what it kept of what it got
+            sub[j + 4] = a2;
+            cv.m_pumpKeep[j] =
+                pump > 1.0e-9f ? std::sqrt( std::max( 1.0f - ( a1 * a1 ) / ( pump * pump ), 0.0f ) ) : 1.0f;
+        }
+        for ( int j = 0; j < SubClouds; ++j ) cv.m_sub[j] = sub[j];
+    }
 }
 
 void Engine::captureGhost( int i )
@@ -1671,7 +1959,8 @@ void Engine::renderBlock()
         {
             float kLogH[9] = { 0.0f };   // log2 of where harmonics 1 .. 8 lie (both stretches)
             for ( int h = 1; h <= 8; ++h )
-                kLogH[h] = std::log2( partialRatio( h, m_blk.m_inharmonicB, m_blk.m_stretch ) );
+                kLogH[h] = std::log2(
+                    partialRatio( h, m_blk.m_inharmonicB, m_blk.m_stretch, m_blk.m_horizon, m_blk.m_horizonRatio ) );
             std::array<float, 64> lb{}, moved{};
             for ( int a = 0; a < nv && a < 64; ++a )
             {
@@ -1723,6 +2012,7 @@ void Engine::renderBlock()
     float landMakeup = 1.0f;
     if ( motionUsesLandscape( motion ) )
         landMakeup = 1.0f / std::max( 0.125f, 1.0f - m_blk.m_motionDepth + m_blk.m_motionDepth * m_landRms );
+    stepSeasons( dtf );
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
@@ -1848,6 +2138,15 @@ void Engine::renderBlock()
         // instrument is, below): a soft chord stays pure.
         const float strength = 0.4f + 0.6f * v.m_velocity;
         cv.m_turbulence = m_turbDrive * strength * strength * strength;
+        // Phase 26: the horizon, the grains, the harmonics' own lives.
+        cv.m_horizon = m_blk.m_horizon;
+        cv.m_horizonRatio = m_blk.m_horizonRatio;
+        cv.m_grain = m_blk.m_grain;
+        cv.m_grainLength = m_blk.m_grainLength;
+        cv.m_grainDuty = m_blk.m_grainDuty;
+        // a grain partial sounds sin^4 of its window a share Density of its time: mean square 3/8 Density
+        cv.m_grainNorm = 1.0f / std::sqrt( 0.375f * std::clamp( m_blk.m_grainDuty, 0.01f, 1.0f ) );
+        stepHarmonics( v, cv, dtf, gain, std::clamp( expr( MpeTargetE::BREATH ), 0.0f, 1.0f ) );
         cv.m_presenceDb = m_blk.m_presence;
         cv.m_lowCut = m_blk.m_padLowCut;
         cv.m_filterModel = static_cast<int>( model );

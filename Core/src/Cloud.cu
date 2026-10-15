@@ -1190,6 +1190,11 @@ __global__ void syncOrderKernel( const BlockHeader *hdr, const CloudVoice *voice
         first = HP;
         count = cv.m_partials - HP;
     }
+    else if ( g > H && g <= H + cv.m_subClouds )
+    {   // a sub cloud (Subharmonics), after the harmonics' clouds
+        first = ( g - 1 ) * K;
+        count = K;
+    }
     else
         return;
     const SyncModeE mode = hdr->m_sync.m_mode;
@@ -1581,16 +1586,20 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     float      f = 0.0f;
     float      fieldOff = cv.m_restart ? 0.0f : __uint_as_float( run[gid].w );   // the field's offset, cents
     float      place = cv.m_stereo * ( 2.0f * hash01( seed, up, 10 ) - 1.0f );   // -1 .. 1 across the field
-    const int  H = cv.m_harmonics, K = cv.m_members;
+    const int  H = cv.m_harmonics, K = cv.m_members, S = cv.m_subClouds;
     const int  HP = cv.m_harmonicPartials;
     const bool isAir = p >= HP;
-    if ( isAir || p < H * K )
+    if ( isAir || p < ( H + S ) * K )
     {
         // Who the partial is: a member of harmonic h's cloud, or one of the air band's partials.
         int   h = 1;
         float z = 0.0f, centre, amp0, sh, drift;
         float slot = 0.5f;   // the partial's place among its cloud's members, evenly 0 .. 1 (the living field's rows)
         int   groupFirst = 0, groupCount = 1, member = 0;   // its cloud in the voice, for the flock
+        bool  isSub = false;                                // a member of a sub cloud (Subharmonics)
+        int   sub = 0;                                      // which
+        int   group = H;                                    // its cloud's row in the sync's table (air: H)
+        float grainEnv = 1.0f;                              // its grain's window (Grains), 1 when continuous
         float sigmaCents = 0.0f;                            // the cloud's width, cents per unit of the bell
         // Time Bend: the partial's own clock (its drift, its shimmer, its sync), slower -- or faster --
         // where the spectrum is dense, read at its harmonic from the density of the block before. At
@@ -1598,8 +1607,11 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         float tp = t, clockRate = 1.0f;
         if ( hdr->m_field.m_timeBend != 0.0f )
         {
-            const float fh = isAir ? cv.m_hz * cv.m_airCenter
-                                   : cv.m_hz * partialRatio( p / max( K, 1 ) + 1, cv.m_inharmonic, cv.m_stretch );
+            const int   cl = p / max( K, 1 );   // its cloud: a harmonic, or after them a sub cloud
+            const float fh = isAir    ? cv.m_hz * cv.m_airCenter
+                             : cl < H ? cv.m_hz * partialRatio( cl + 1, cv.m_inharmonic, cv.m_stretch, cv.m_horizon,
+                                                                cv.m_horizonRatio )
+                                      : cv.m_hz * subRatio( cl - H );
             const float dense = fminf( fmaxf( log2f( 1.0f + density[hallBin( fh )] ) - 1.0f, 0.0f ), 4.0f );
             const float bend = hdr->m_field.m_timeBend;
             clockRate = bend > 0.0f ? 1.0f / ( 1.0f + bend * dense ) : 1.0f - bend * dense;
@@ -1608,21 +1620,47 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         tau[gid] = tp;
         if ( !isAir )
         {
-            h = p / K + 1;
-            const int k = p - ( h - 1 ) * K;
+            const int cl = p / K;   // its cloud: harmonics 0 .. H - 1, then the sub clouds
+            isSub = cl >= H;
+            sub = isSub ? cl - H : 0;
+            h = isSub ? 1 : cl + 1;
+            group = isSub ? H + 1 + sub : h - 1;
+            const int k = p - cl * K;
             slot = ( static_cast<float>( k ) + 0.5f ) / static_cast<float>( K );
+            // Grains (Phase 26): a share of the partials sounds in grains -- a Hann window of its own length,
+            // a share `duty` of its time on, at a phase of its own -- and every grain is born at a new place
+            // in its cloud and in the field; it jumps there while it is silent. Its power over time is the
+            // continuous partial's (grainNorm).
+            std::uint32_t jitterSeed = seed;
+            if ( cv.m_grain > 0.0f && hash01( seed, up, 62 ) < cv.m_grain )
+            {
+                const float len = cv.m_grainLength * ( 0.6f + 0.8f * hash01( seed, up, 60 ) );
+                const float period = len / fminf( fmaxf( cv.m_grainDuty, 0.01f ), 1.0f );
+                const float tg = tp + period * hash01( seed, up, 61 );
+                const float idx = floorf( tg / period );
+                const float u = ( tg - idx * period ) / len;
+                const float w = u < 1.0f ? __sinf( 3.1415927f * u ) : 0.0f;
+                grainEnv = w * w * cv.m_grainNorm;
+                jitterSeed = hash32( seed ^ ( static_cast<std::uint32_t>( idx ) * 0x9E3779B9U ) );
+                place = cv.m_stereo * ( 2.0f * hash01( jitterSeed, up, 10 ) - 1.0f );
+            }
             // The member's place in its harmonic's cloud: stratified over the bell curve, so K members
-            // always cover it evenly and only jitter within their own slice.
+            // always cover it evenly and only jitter within their own slice (a grain anywhere in it).
             if ( K > 1 )
-                z = normcdfinvf( ( static_cast<float>( k ) + 0.5f + 0.9f * ( hash01( seed, up, 1 ) - 0.5f ) ) /
-                                 static_cast<float>( K ) );
-            const float sigma = 0.5f * cv.m_width * __powf( static_cast<float>( h ), cv.m_widthSlope );
-            groupFirst = ( h - 1 ) * K;
+                z = jitterSeed != seed
+                        ? normcdfinvf( fminf( fmaxf( hash01( jitterSeed, up, 1 ), 1.0e-4f ), 1.0f - 1.0e-4f ) )
+                        : normcdfinvf( ( static_cast<float>( k ) + 0.5f + 0.9f * ( hash01( seed, up, 1 ) - 0.5f ) ) /
+                                       static_cast<float>( K ) );
+            const float hr = isSub ? subRatio( sub ) : static_cast<float>( h );
+            const float sigma = 0.5f * cv.m_width * __powf( hr, cv.m_widthSlope );
+            groupFirst = cl * K;
             groupCount = K;
             member = k;
             sigmaCents = sigma;
             centre =
-                cv.m_hz * partialRatio( h, cv.m_inharmonic, cv.m_stretch ) * exp2f( z * sigma * ( 1.0f / 1200.0f ) ) +
+                cv.m_hz *
+                    ( isSub ? hr : partialRatio( h, cv.m_inharmonic, cv.m_stretch, cv.m_horizon, cv.m_horizonRatio ) ) *
+                    exp2f( z * sigma * ( 1.0f / 1200.0f ) ) +
                 cv.m_shift;
             drift =
                 cv.m_drift *
@@ -1634,10 +1672,29 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                                                 0.3f * slowSine( cv.m_shimmerRate * ( 1.3f + hash01( seed, up, 8 ) ),
                                                                  tp, hash01( seed, up, 9 ) ) ) );
             amp0 = cv.m_scale * harmonicShape( h, cv.m_tilt, cv.m_oddEven, cv.m_brightness );
-            if ( hdr->m_turb.m_on > 0.0f && !cv.m_restart )
-            {   // the cascade's power against the spectrum's (this block's, cascadeKernel)
-                const float *q = ( ( hdr->m_blockIndex & 1U ) ? qa : qb ) + static_cast<size_t>( v ) * pcap;
-                amp0 *= sqrtf( fmaxf( 1.0f + q[h - 1], 0.0f ) );
+            if ( isSub )
+            {   // Subharmonics: the engine's amplitude for the cloud, against harmonic 1's
+                amp0 *= cv.m_sub[sub];
+            }
+            else
+            {
+                if ( hdr->m_turb.m_on > 0.0f && !cv.m_restart )
+                {   // the cascade's power against the spectrum's (this block's, cascadeKernel)
+                    const float *q = ( ( hdr->m_blockIndex & 1U ) ? qa : qb ) + static_cast<size_t>( v ) * pcap;
+                    amp0 *= sqrtf( fmaxf( 1.0f + q[h - 1], 0.0f ) );
+                }
+                // The harmonics' own lives (Phase 26, Engine::stepHarmonics): the registers that sound, the
+                // family whose season it is, the avalanche's glow; the make-up keeps the voice's power.
+                if ( cv.m_harmonicLife != 0 )
+                {
+                    float g = cv.m_lifeMakeup;
+                    if ( cv.m_harmonicLife & 1 ) g *= registerGain( h, cv.m_register );
+                    if ( ( cv.m_harmonicLife & 2 ) && h > 1 ) g *= cv.m_season[seasonFamily( h )];
+                    if ( ( cv.m_harmonicLife & 4 ) && h >= 2 && h < 2 + AvalancheSites ) g *= 1.0f + cv.m_glow[h - 2];
+                    amp0 *= g;
+                }
+                // The power the harmonics 1, 3, 5 and 7 handed down to their subharmonics.
+                if ( S > 0 && h <= 7 && ( h & 1 ) ) amp0 *= cv.m_pumpKeep[h >> 1];
             }
         }
         else
@@ -1673,10 +1730,12 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
             log2f( fmaxf( centre, LandLowHz ) * ( 1.0f / LandLowHz ) ) * ( 1.0f / 9.96578428f );   // log2(1000)
         c.m_src[0] = 0.0f;
         c.m_src[1] = fminf( fmaxf( pitchPos, 0.0f ), 1.0f );
-        c.m_src[2] = isAir ? 0.5f : ( H > 1 ? static_cast<float>( h - 1 ) / static_cast<float>( H - 1 ) : 0.0f );
+        c.m_src[2] = isAir   ? 0.5f
+                     : isSub ? 0.0f
+                             : ( H > 1 ? static_cast<float>( h - 1 ) / static_cast<float>( H - 1 ) : 0.0f );
         c.m_src[3] = fminf( fmaxf( ( z + 3.0f ) * ( 1.0f / 6.0f ), 0.0f ), 1.0f );
         c.m_src[4] = 0.0f;   // Random: laneValue throws its own die per parameter
-        c.m_src[5] = ( isAir || ( h & 1 ) ) ? 0.0f : 1.0f;
+        c.m_src[5] = ( isAir || isSub || ( h & 1 ) ) ? 0.0f : 1.0f;
         c.m_seed = seed;
         c.m_p = up;
         // The dispersion: this partial's clock late by its share of the dispersion, by its pitch.
@@ -1724,7 +1783,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                 th = 6.2831853f * hash01( seed, up, 13 );
             }
             const float  u = 2.0f * hash01( seed, up, 12 ) - 1.0f;
-            const size_t at = static_cast<size_t>( v ) * pcap + ( isAir ? H : h - 1 );
+            const size_t at = static_cast<size_t>( v ) * pcap + group;
             float        s, co;
             __sincosf( th, &s, &co );
             if ( S.m_mode == SyncModeE::SWARM )
@@ -1795,8 +1854,9 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         {
             const float x = c.m_src[1] * static_cast<float>( RippleCells - 1 );
             const int   x0 = min( static_cast<int>( x ), RippleCells - 2 );
-            const float u = hdr->m_ripple.m_u[x0] +
+            float       u = hdr->m_ripple.m_u[x0] +
                             ( hdr->m_ripple.m_u[x0 + 1] - hdr->m_ripple.m_u[x0] ) * ( x - static_cast<float>( x0 ) );
+            u += hdr->m_ripple.m_periodic * ( 2.0f * __sinf( 0.5f * u ) - u );   // Breathers: periodic in the angle
             env *= fmaxf( 0.0f, 1.0f + hdr->m_ripple.m_depth * tanhf( u ) ) * hdr->m_ripple.m_makeup;
         }
         // The living landscape: the field at this partial's frequency and its place in its cloud.
@@ -1823,7 +1883,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
             // The flock: every cloud a flock of its own, blown by the wind of its own attractor.
             const bool  odd = ( hdr->m_blockIndex & 1U ) != 0;
             const float wind =
-                hdr->m_field.m_pos[( isAir ? 0 : h - 1 ) & ( FieldAttractors - 1 )] * 0.2f * hdr->m_field.m_strength;
+                hdr->m_field.m_pos[( isAir ? 0 : group ) & ( FieldAttractors - 1 )] * 0.2f * hdr->m_field.m_strength;
             fieldOff = flockStep( hdr->m_field, odd ? flockB : flockA, odd ? flockA : flockB,
                                   static_cast<size_t>( v ) * pcap, groupFirst, groupCount, member, seed, sigmaCents,
                                   wind, fieldOff, cv.m_restart != 0, static_cast<float>( n ) / fs );
@@ -1886,7 +1946,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         const float level = lateBy > 0.0f ? gainAgo( ring + static_cast<size_t>( v ) * GainRing, hdr->m_blockIndex,
                                                      lateBy * fs / static_cast<float>( n ) )
                                           : cv.m_gain;
-        target = amp0 * sh * fade * env * level * exp2f( -dist ) * absorb * colour;
+        target = amp0 * sh * fade * env * grainEnv * level * exp2f( -dist ) * absorb * colour;
         // The hall's ear: this partial's amplitude in its band, in whole numbers (the sum is the same in
         // any order). Amplitudes, not powers: a chord's upper harmonics count as heard too, not only the
         // few loudest bands.
@@ -3012,17 +3072,19 @@ struct CloudEngine::Impl
     /** @brief What a voice's power sum was computed for: when none of it changed, the sum is reused. */
     struct ShapeKey
     {
-        float m_hz = -1.0f;          ///< fundamental
-        int   m_harmonics = 0;       ///< harmonics summed
-        float m_tilt = 0.0f;         ///< spectral tilt
-        float m_oddEven = 0.0f;      ///< odd/even weight
-        float m_brightness = 0.0f;   ///< brightness window
-        float m_inharmonic = 0.0f;   ///< stretch
-        float m_presenceDb = 0.0f;   ///< presence bell
-        float m_distance = 0.0f;     ///< the presence's distance
-        float m_lowCut = 0.0f;       ///< pad low cut
-        float m_stretch = 1.0f;      ///< the harmonics' stretch exponent
-        float m_shift = 0.0f;        ///< the partials' shift, Hz
+        float m_hz = -1.0f;            ///< fundamental
+        int   m_harmonics = 0;         ///< harmonics summed
+        float m_tilt = 0.0f;           ///< spectral tilt
+        float m_oddEven = 0.0f;        ///< odd/even weight
+        float m_brightness = 0.0f;     ///< brightness window
+        float m_inharmonic = 0.0f;     ///< stretch
+        float m_presenceDb = 0.0f;     ///< presence bell
+        float m_distance = 0.0f;       ///< the presence's distance
+        float m_lowCut = 0.0f;         ///< pad low cut
+        float m_stretch = 1.0f;        ///< the harmonics' stretch exponent
+        float m_shift = 0.0f;          ///< the partials' shift, Hz
+        float m_horizon = 0.0f;        ///< the horizon's amount
+        float m_horizonRatio = 1.0f;   ///< the horizon over the fundamental
         /**
          * @brief Equal in every field.
          * @param[in] o  the other key
@@ -3033,7 +3095,7 @@ struct CloudEngine::Impl
             return m_hz == o.m_hz && m_harmonics == o.m_harmonics && m_tilt == o.m_tilt && m_oddEven == o.m_oddEven &&
                    m_brightness == o.m_brightness && m_inharmonic == o.m_inharmonic && m_presenceDb == o.m_presenceDb &&
                    m_distance == o.m_distance && m_lowCut == o.m_lowCut && m_stretch == o.m_stretch &&
-                   m_shift == o.m_shift;
+                   m_shift == o.m_shift && m_horizon == o.m_horizon && m_horizonRatio == o.m_horizonRatio;
         }
     };
     std::vector<ShapeKey> m_shapeKey;   ///< per voice: what powerSum was made for
@@ -3267,20 +3329,33 @@ struct CloudEngine::Impl
         // Harmonics below the cutoff: f0 h^s sqrt(1 + B h^2) + shift < cutoff -- rising in h, so the
         // last one below is found by halving.
         const float s = std::clamp( v.m_stretch, 0.5f, 2.0f );
-        int         lo = 1, hi = HP;
-        auto        below = [&]( int h )
-        { return hz * partialRatio( h, std::max( 0.0f, v.m_inharmonic ), s ) + v.m_shift < cutoff; };
-        if ( below( hi ) )
-            lo = hi;
-        else
-            while ( hi - lo > 1 )
-            {
-                const int mid = ( lo + hi ) / 2;
-                ( below( mid ) ? lo : hi ) = mid;
-            }
-        const int H = std::clamp( lo, 1, HP );
+        const float hzn = std::clamp( v.m_horizon, 0.0f, 1.0f ), R = std::max( v.m_horizonRatio, 1.0f );
+        auto        count = [&]( float amount )
+        {
+            int  lo = 1, hi = HP;
+            auto below = [&]( int h )
+            { return hz * partialRatio( h, std::max( 0.0f, v.m_inharmonic ), s, amount, R ) + v.m_shift < cutoff; };
+            if ( below( hi ) )
+                lo = hi;
+            else
+                while ( hi - lo > 1 )
+                {
+                    const int mid = ( lo + hi ) / 2;
+                    ( below( mid ) ? lo : hi ) = mid;
+                }
+            return lo;
+        };
+        int H = count( 0.0f );
+        // Bent towards a horizon below the cutoff no harmonic ever reaches it: as many as unbent (at
+        // least 48), the rest of them crowded under the horizon.
+        if ( hzn > 0.0f ) H = std::min( count( hzn ), std::max( H, 48 ) );
+        H = std::clamp( H, 1, HP );
+        // Subharmonics: their clouds after the harmonics', as many members each.
+        const int S = v.m_subClouds > 0 && HP > SubClouds ? SubClouds : 0;
+        if ( S > 0 ) H = std::min( H, HP - S );
+        v.m_subClouds = S;
         v.m_harmonics = H;
-        v.m_members = HP / H;
+        v.m_members = std::max( HP / ( H + S ), 1 );
         v.m_harmonicPartials = HP;
         const ShapeKey key{ hz,
                             H,
@@ -3292,13 +3367,15 @@ struct CloudEngine::Impl
                             std::clamp( v.m_distance, 0.0f, 1.0f ),
                             v.m_lowCut,
                             s,
-                            v.m_shift };
+                            v.m_shift,
+                            hzn,
+                            R };
         if ( !( m_shapeKey[i] == key ) )
         {
             double sum = 0.0;
             for ( int h = 1; h <= H; ++h )
             {
-                const float  fh = std::max( hz * partialRatio( h, v.m_inharmonic, s ) + v.m_shift, 1.0f );
+                const float  fh = std::max( hz * partialRatio( h, v.m_inharmonic, s, hzn, R ) + v.m_shift, 1.0f );
                 const double a = static_cast<double>( harmonicShape( h, v.m_tilt, v.m_oddEven, v.m_brightness ) ) *
                                  presenceGain( fh, v.m_presenceDb, key.m_distance ) * lowCutGain( fh, v.m_lowCut );
                 sum += a * a;

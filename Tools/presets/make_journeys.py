@@ -63,6 +63,8 @@ WHOLE_NIGHTS = [
                                          "Twin Swarms"]),
     ("Whole Night - Halls & Orbits", ["Cathedral Years", "Planetaria", "Worn Stone", "Growing Halls", "Slow Clocks", "Event Horizons",
                                       "Memory Palaces", "Orbits"]),
+    ("Whole Night - Harmonic Lives", ["Turning Years", "Night Ecology", "Breathing Grains", "Aurora Curtains", "Glacier Calving",
+                                      "Breath Registers", "Subterranea", "Halo Horizons"]),
 ]
 
 
@@ -70,13 +72,13 @@ def param_table():
     """key -> (kind, min, max, default, skew) from Core/src/Params.cpp."""
     text = (ROOT / "Core" / "src" / "Params.cpp").read_text(encoding="utf-8")
     table = {}
-    for m in re.finditer(r'\bF\(ParamId::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?', text):
+    for m in re.finditer(r'\bF\(\s*ParamIdE?::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?', text):
         table[m.group(1)] = ("float", float(m.group(2)), float(m.group(3)), float(m.group(4)), float(m.group(5)))
-    for m in re.finditer(r'\bI\(ParamId::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?', text):
+    for m in re.finditer(r'\bI\(\s*ParamIdE?::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*([-\d.]+)f?,\s*([-\d.]+)f?,\s*([-\d.]+)f?', text):
         table[m.group(1)] = ("int", float(m.group(2)), float(m.group(3)), float(m.group(4)), 1.0)
-    for m in re.finditer(r'\bC\(ParamId::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*\w+,\s*\w+,\s*(\d+)\)', text):
+    for m in re.finditer(r'\bC\(\s*ParamIdE?::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*\w+,\s*\w+,\s*(\d+)\s*\)', text):
         table[m.group(1)] = ("choice", 0.0, 0.0, float(m.group(2)), 1.0)
-    for m in re.finditer(r'\bB\(ParamId::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*(true|false)\)', text):
+    for m in re.finditer(r'\bB\(\s*ParamIdE?::\w+,\s*"(\w+)",\s*"[^"]*",\s*"[^"]*",\s*(true|false)\s*\)', text):
         table[m.group(1)] = ("bool", 0.0, 1.0, 1.0 if m.group(2) == "true" else 0.0, 1.0)
     return table
 

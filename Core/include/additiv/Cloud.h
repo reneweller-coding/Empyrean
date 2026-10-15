@@ -32,6 +32,8 @@
 #include <memory>
 #include <string>
 
+#include "additiv/Spectrum.h"
+
 namespace additiv
 {
 
@@ -177,11 +179,25 @@ struct CloudVoice
     float m_filterCutoffs[VoiceFilters] = {};   ///< its cutoff, Hz
     float m_filterQs[VoiceFilters] = {};        ///< its Q
     float m_filterVowels[VoiceFilters] = {};    ///< its vowel (Formant)
-    float m_fpad0 = 0.0f;                       ///< keeps the struct a multiple of 16 bytes
-    float m_fpad1 = 0.0f;                       ///< likewise
-    float m_fpad2 = 0.0f;                       ///< likewise
-    float m_pad2 = 0.0f;                        ///< keeps the struct a multiple of 16 bytes
-    float m_pad3 = 0.0f;                        ///< likewise
+    // Phase 26: the harmonics' own lives, worked out by the engine every block (Engine::stepHarmonics)
+    // and read by the update kernel at each harmonic. All at rest when `harmonicLife` is 0.
+    int   m_harmonicLife = 0;                           ///< which of them act: 1 registers, 2 seasons, 4 avalanche glow
+    float m_lifeMakeup = 1.0f;                          ///< the voice's amplitude make-up for them (its power kept)
+    float m_register[4] = { 1.0f, 0.0f, 0.0f, 0.0f };   ///< Overblow: the registers' shares (1, 2, 3, 4 times f0)
+    float m_season[SeasonFamilies] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };   ///< Seasons: each family's amplitude
+    float m_glow[AvalancheSites] = {};   ///< Avalanche: harmonics 2 .. 49, the glow's amplitude added (0 none)
+    int   m_subClouds = 0;               ///< Subharmonics: clouds reserved after the harmonics (0 or SubClouds)
+    float m_sub[SubClouds] = {};         ///< their amplitudes, against harmonic 1's at rest
+    float m_pumpKeep[4] = { 1.0f, 1.0f, 1.0f, 1.0f };   ///< harmonics 1, 3, 5, 7: the amplitude left them
+    float m_horizon = 0.0f;        ///< 0 .. 1: the harmonics bent towards the horizon (horizonBend)
+    float m_horizonRatio = 8.0f;   ///< the horizon over the fundamental
+    float m_grain = 0.0f;          ///< 0 .. 1: the partials sounding as grains (0: continuous)
+    float m_grainLength = 0.08f;   ///< s: a grain's mean length
+    float m_grainDuty = 0.3f;      ///< 0 .. 1: the share of its time a partial sounds
+    float m_grainNorm = 1.0f;      ///< the grains' make-up, so their power is the continuous one's
+    float m_pad2 = 0.0f;           ///< keeps the struct a multiple of 16 bytes
+    float m_pad3 = 0.0f;           ///< likewise
+    float m_pad4 = 0.0f;           ///< likewise
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
@@ -512,7 +528,7 @@ struct Ripple
 {
     float m_depth = 0.0f;          ///< 0 .. 1: (1 + depth tanh u) times the make-up (0: nothing read)
     float m_makeup = 1.0f;         ///< one over the root of (1 + depth^2 mean tanh^2 u)
-    float m_pad0 = 0.0f;           ///< keeps the table 16-byte aligned
+    float m_periodic = 0.0f;       ///< 0 .. 1: read as 2 sin(u / 2) instead of u (Breathers: the string's angle)
     float m_pad1 = 0.0f;           ///< likewise
     float m_u[RippleCells] = {};   ///< the string's displacement, cell by cell
 };

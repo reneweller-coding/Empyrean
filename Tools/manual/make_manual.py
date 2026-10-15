@@ -34,6 +34,7 @@ TABS = {
     "Focus": [],
     "Cloud & Filter": ["Cloud", "Air", "Turbulence", "Filter", "Comb", "Envelope"],
     "Motion": ["Motion", "Time", "Field", "Life", "Sync", "Ripple"],
+    "Harmonics": ["Overblow", "Subharmonics", "Horizon", "Seasons", "Avalanche", "Grain"],
     "Tuning": ["Tuning"],
     "Conductor": ["Conductor", "MPE"],
     "Space": ["Space", "Master", "Binaural"],

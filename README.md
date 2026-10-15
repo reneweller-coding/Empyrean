@@ -100,11 +100,14 @@ offline renderer and the manual, and a portable zip.
 - **The partials' own time and orbits:** each partial's clock slower (or faster) where the spectrum is dense; the
   ripple lingering at the notes; the Orbit field, the scale's pitches as wells and a magnetic field bending every
   partial into circles of pitch and place.
-- **6144 presets** in 96 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
-  visions, swarms and currents, halls and orbits), levelled by their loudest second.
+- **The harmonics' own lives:** registers that overblow as in a flute, seasons of overtone families taking turns,
+  avalanches on a rice pile running up the harmonics, subharmonics pumped from below (a floor that opens under a held
+  chord); grains, a horizon the harmonics crowd under, breathers on the ripple.
+- **7168 presets** in 112 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions, swarms and currents, halls and orbits, harmonic lives), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (168 come with it, eight of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (234 come with it, ten of them whole nights).
 
 ## Build
 

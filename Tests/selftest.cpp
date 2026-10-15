@@ -26,6 +26,7 @@
 #include <chrono>
 #include <cmath>
 #include <complex>
+#include <functional>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -603,7 +604,7 @@ int main()
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 6144 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 7168 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -3078,6 +3079,372 @@ int main()
             fmt(
                 "the lowest note the root, under C3: %.0f %% without, %.0f %% with it; chord notes less than a fifth over it: %d of %d looks",
                 100.0 * rootShare[0], 100.0 * rootShare[1], under, looks[1] ) );
+    }
+
+    // Phase 26: a plain note to listen into -- no motion, drift or shimmer, the effects off -- and what the
+    // engine sets every partial to, from the picture's snapshot (every eighth partial's frequency and target
+    // amplitude): a cloud's members beat against each other, so its level in the sound wanders by decibels
+    // from second to second; its members' targets do not.
+    auto plainNote = []( Engine &e )
+    {
+        quietEffects( e );
+        e.setParam( ParamIdE::MOTION, 0.0f );
+        e.setParam( ParamIdE::DRIFT, 0.0f );
+        e.setParam( ParamIdE::SHIMMER, 0.0f );
+        e.setParam( ParamIdE::CLOUD_WIDTH, 4.0f );
+        e.setParam( ParamIdE::FILTER_MODEL, 0.0f );
+        e.setParam( ParamIdE::ATTACK, 0.05f );
+        e.setParam( ParamIdE::RELEASE, 0.5f );
+    };
+    // The power of the first voice's members within 50 cents of a frequency (0: all of them), from a snapshot.
+    auto powerAt = []( const std::vector<float> &dots, int per, double hz )
+    {
+        double sum = 0.0;
+        for ( int i = 0; i < per; ++i )
+        {
+            const double f = dots[static_cast<size_t>( 2 * i )], a = dots[static_cast<size_t>( 2 * i + 1 )];
+            if ( f <= 0.0 ) continue;
+            if ( hz <= 0.0 || std::fabs( 1200.0 * std::log2( f / hz ) ) < 50.0 ) sum += a * a;
+        }
+        return sum;
+    };
+    // Runs an engine for a while, handing every snapshot after `from` seconds to `look`.
+    auto watch = []( Engine &e, double seconds, double from,
+                     const std::function<void( const std::vector<float> &, int, double )> &look )
+    {
+        std::vector<float> L( 128 ), R( 128 ), dots;
+        int                per = 0;
+        const int          blocks = static_cast<int>( seconds * 375.0 );
+        for ( int k = 0; k < blocks; ++k )
+        {
+            e.process( L.data(), R.data(), 128 );
+            const double t = k / 375.0;
+            if ( e.partialSnapshot( dots, per ) && t >= from ) look( dots, per, t );
+        }
+    };
+    auto dB = []( double ratio ) { return 10.0 * std::log10( std::max( ratio, 1.0e-30 ) ); };
+
+    // 68. Overblow (Phase 26a): with breath the octave takes over -- the fundamental falls far under the
+    //     second harmonic, the voice's power stays. And it holds: a note overblown, then given less breath,
+    //     stays up where a note starting with that little breath stays down (hysteresis).
+    {
+        auto play = [&]( float first, float then, double &oneOverTwo, double &power )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::OVERBLOW, first );
+            if ( !openOffline( e, false, 191 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            render( e, 3.0 );
+            const double f0 = soundingHz( e );
+            e.setParam( ParamIdE::OVERBLOW, then );
+            double p1 = 0.0, p2 = 0.0, all = 0.0;
+            watch( e, 4.0, 2.0,
+                   [&]( const std::vector<float> &dots, int per, double )
+                   {
+                       p1 += powerAt( dots, per, f0 );
+                       p2 += powerAt( dots, per, 2.0 * f0 );
+                       all += powerAt( dots, per, 0.0 );
+                   } );
+            oneOverTwo = dB( p1 / std::max( p2, 1.0e-30 ) );
+            power = all;
+            return f0 > 0.0 && all > 0.0;
+        };
+        double     plain = 0.0, blown = 0.0, held = 0.0, low = 0.0, wPlain = 0.0, wBlown = 0.0, w0 = 0.0, w1 = 0.0;
+        const bool ran = play( 0.0f, 0.0f, plain, wPlain ) && play( 0.5f, 0.5f, blown, wBlown ) &&
+                         play( 0.5f, 0.25f, held, w0 ) && play( 0.25f, 0.25f, low, w1 );
+        check( ran && plain > 5.0 && blown < -20.0 && std::fabs( dB( wBlown / wPlain ) ) < 1.0 && held < -15.0 &&
+                   low > 5.0,
+               "overblow: the octave takes over, the power stays, and it holds (hysteresis)",
+               fmt( "fundamental over octave: %+.1f dB plain, %+.1f blown (power %+.2f dB); at the same little breath "
+                    "%+.1f after blowing, %+.1f from the start",
+                    plain, blown, dB( wBlown / wPlain ), held, low ) );
+    }
+
+    // 69. Seasons (Phase 26b): five families take turns -- over a 20 s year, the fifth's family (harmonic 3)
+    //     and the third's (harmonic 5) each swing by more than 10 dB, loudest at different times, while the
+    //     voice's power holds within a decibel.
+    {
+        Engine e;
+        plainNote( e );
+        e.setParam( ParamIdE::SEASONS, 1.0f );
+        e.setParam( ParamIdE::SEASON_TIME, 20.0f );
+        bool ran = openOffline( e, false, 193 );
+        e.noteOn( 45, 0.8f, 0 );
+        render( e, 0.5 );
+        const double f0 = soundingHz( e );
+        double       lo3 = 1e9, hi3 = -1e9, lo5 = 1e9, hi5 = -1e9, loW = 1e9, hiW = -1e9, at3 = 0.0, at5 = 0.0;
+        watch( e, 50.0, 10.0,
+               [&]( const std::vector<float> &dots, int per, double t )
+               {
+                   const double l3 = dB( powerAt( dots, per, 3.0 * f0 ) ), l5 = dB( powerAt( dots, per, 5.0 * f0 ) ),
+                                w = dB( powerAt( dots, per, 0.0 ) );
+                   if ( l3 > hi3 )
+                   {
+                       hi3 = l3;
+                       at3 = t;
+                   }
+                   if ( l5 > hi5 )
+                   {
+                       hi5 = l5;
+                       at5 = t;
+                   }
+                   lo3 = std::min( lo3, l3 );
+                   lo5 = std::min( lo5, l5 );
+                   loW = std::min( loW, w );
+                   hiW = std::max( hiW, w );
+               } );
+        ran = ran && f0 > 0.0;
+        check(
+            ran && hi3 - lo3 > 10.0 && hi5 - lo5 > 10.0 && std::fabs( at3 - at5 ) > 1.0 && hiW - loW < 1.0,
+            "seasons: the families take turns, the power holds",
+            fmt( "harmonic 3 swings %.1f dB (loudest at %.0f s), harmonic 5 %.1f dB (at %.0f s); power within %.2f dB",
+                 hi3 - lo3, at3, hi5 - lo5, at5, hiW - loW ) );
+    }
+
+    // 70. Avalanche (Phase 26c): the rice pile on a held note -- over a minute, many moments with a harmonic
+    //     glinting 4 dB over its usual level, some with six or more glinting at once; without it none. The
+    //     same seed renders the same bits.
+    {
+        auto play = [&]( float depth, int &events, int &large, std::vector<float> *keep )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::AVALANCHE, depth );
+            e.setParam( ParamIdE::AVALANCHE_RATE, 1.0f );
+            e.setParam( ParamIdE::AVALANCHE_GLOW, 0.4f );
+            if ( !openOffline( e, false, 197 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            render( e, 0.5 );
+            const double                     f0 = soundingHz( e );
+            constexpr int                    Hs = 12;
+            std::vector<std::vector<double>> lev( Hs );
+            std::vector<float>               lr;
+            std::vector<float>               L( 128 ), R( 128 ), dots;
+            int                              per = 0;
+            for ( int k = 0; k < 375 * 60; ++k )
+            {
+                e.process( L.data(), R.data(), 128 );
+                if ( keep && k < 375 * 10 )
+                    for ( int i = 0; i < 128; ++i )
+                    {
+                        lr.push_back( L[static_cast<size_t>( i )] );
+                        lr.push_back( R[static_cast<size_t>( i )] );
+                    }
+                if ( k >= 375 * 4 && e.partialSnapshot( dots, per ) )
+                    for ( int h = 0; h < Hs; ++h )
+                        lev[static_cast<size_t>( h )].push_back( dB( powerAt( dots, per, ( h + 2 ) * f0 ) ) );
+            }
+            if ( keep ) *keep = lr;
+            events = large = 0;
+            const size_t        n = lev[0].size();
+            std::vector<double> median( Hs );
+            for ( int h = 0; h < Hs; ++h )
+            {
+                std::vector<double> col = lev[static_cast<size_t>( h )];
+                std::nth_element( col.begin(), col.begin() + static_cast<long>( n / 2 ), col.end() );
+                median[static_cast<size_t>( h )] = col[n / 2];
+            }
+            bool wasLit = false;
+            for ( size_t w = 0; w < n; ++w )
+            {
+                int lit = 0;
+                for ( int h = 0; h < Hs; ++h )
+                    if ( lev[static_cast<size_t>( h )][w] > median[static_cast<size_t>( h )] + 4.0 ) ++lit;
+                if ( lit >= 1 && !wasLit ) ++events;   // a glint begins
+                if ( lit >= 6 ) ++large;
+                wasLit = lit >= 1;
+            }
+            return f0 > 0.0 && n > 100;
+        };
+        int                events = 0, large = 0, quiet = 0, quietLarge = 0, e2 = 0, l2 = 0;
+        std::vector<float> a, b;
+        const bool         ran =
+            play( 1.0f, events, large, &a ) && play( 0.0f, quiet, quietLarge, nullptr ) && play( 1.0f, e2, l2, &b );
+        const bool same =
+            a.size() == b.size() && !a.empty() && std::memcmp( a.data(), b.data(), sizeof( float ) * a.size() ) == 0;
+        check( ran && events >= 10 && large >= 3 && quiet == 0 && same,
+               "avalanche: glints of every size on the harmonics, the same each time",
+               fmt( "in a minute: %d glints, %d moments with six or more harmonics at once; without it %d; %s", events,
+                    large, quiet, same ? "bit for bit" : "differs" ) );
+    }
+
+    // 71. Subharmonics (Phase 26d): a loud held note grows a cloud an octave under it from nothing --
+    //     absent at first, within 15 dB of the fundamental after 20 s -- and it fades again when the pump
+    //     stops; without it there is none. The voice's power stays within a decibel.
+    {
+        auto play = [&]( float depth, double &early, double &late, double &after, double &power )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::SUBHARMONICS, depth );
+            e.setParam( ParamIdE::SUB_TIME, 0.5f );
+            if ( !openOffline( e, false, 199 ) ) return false;
+            e.noteOn( 45, 1.0f, 0 );
+            render( e, 0.2 );
+            const double f0 = soundingHz( e );
+            auto         ratio = [&]( double from, double to, double &sumAll )
+            {
+                double sub = 0.0, fund = 0.0;
+                sumAll = 0.0;
+                watch( e, to - from, 0.0,
+                       [&]( const std::vector<float> &dots, int per, double )
+                       {
+                           sub += powerAt( dots, per, 0.5 * f0 );
+                           fund += powerAt( dots, per, f0 );
+                           sumAll += powerAt( dots, per, 0.0 );
+                       } );
+                return dB( sub / std::max( fund, 1.0e-30 ) );
+            };
+            double w = 0.0;
+            render( e, 0.3 );
+            early = ratio( 0.5, 1.5, w );
+            render( e, 17.5 );
+            late = ratio( 19.0, 21.0, power );
+            e.setParam( ParamIdE::SUBHARMONICS, 0.0f );   // the pump stops: the floor closes
+            render( e, 3.0 );
+            after = ratio( 24.0, 25.0, w );
+            return f0 > 0.0;
+        };
+        double     early = 0, late = 0, after = 0, w = 0, early0 = 0, late0 = 0, after0 = 0, w0 = 0;
+        const bool ran = play( 1.0f, early, late, after, w ) && play( 0.0f, early0, late0, after0, w0 );
+        check( ran && early < -35.0 && late > -15.0 && after < late - 10.0 && late0 < -100.0 &&
+                   std::fabs( dB( w / w0 ) ) < 1.0,
+               "subharmonics: an octave below grows from nothing, and fades",
+               fmt( "half the fundamental against it: %+.1f dB at first, %+.1f after 20 s, %+.1f 3 s after the pump "
+                    "stopped; without: %+.1f; power %+.2f dB",
+                    early, late, after, late0, dB( w / w0 ) ) );
+    }
+
+    // 72. Horizon (Phase 26f): bent fully towards a horizon three octaves up, no partial of the note
+    //     lies above it (and its cloud), where without it they reach past 10 kHz; the second harmonic
+    //     stays within 15 cents of its place (6 bent, the rest its cloud).
+    {
+        auto play = [&]( float amount, double &top, double &second, double &f0 )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::HORIZON, amount );
+            e.setParam( ParamIdE::HORIZON_HEIGHT, 3.0f );
+            if ( !openOffline( e, false, 211 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            std::vector<float> L( 128 ), R( 128 ), dots;
+            int                per = 0;
+            bool               got = false;
+            for ( int k = 0; k < 375 * 2; ++k )
+            {
+                e.process( L.data(), R.data(), 128 );
+                if ( k > 375 && e.partialSnapshot( dots, per ) ) got = true;
+            }
+            f0 = soundingHz( e );
+            top = 0.0;
+            second = 0.0;
+            for ( int i = 0; got && i < per; ++i )
+            {
+                const double hz = dots[static_cast<size_t>( 2 * i )], amp = dots[static_cast<size_t>( 2 * i + 1 )];
+                if ( amp > 0.0 ) top = std::max( top, hz );
+                if ( std::fabs( 1200.0 * std::log2( std::max( hz, 1.0 ) / ( 2.0 * f0 ) ) ) < 60.0 )
+                    second = std::max( second, std::fabs( 1200.0 * std::log2( hz / ( 2.0 * f0 ) ) ) );
+            }
+            return got && f0 > 0.0;
+        };
+        double     topBent = 0, second = 0, topPlain = 0, second0 = 0, f0 = 0, f1 = 0;
+        const bool ran = play( 1.0f, topBent, second, f0 ) && play( 0.0f, topPlain, second0, f1 );
+        check( ran && topBent < 8.0 * f0 * 1.06 && topPlain > 10000.0 && second < 15.0,
+               "horizon: the harmonics crowd under it and never pass it",
+               fmt( "the highest partial %.0f Hz bent (the horizon at %.0f Hz), %.0f Hz plain; the second harmonic's "
+                    "members within %.1f cents",
+                    topBent, 8.0 * f0, topPlain, second ) );
+    }
+
+    // 73. Grains (Phase 26g): all partials in grains a tenth of their time -- in the picture most of them
+    //     are silent at any moment, where without grains none is; the level stays within 1.5 dB.
+    {
+        auto play = [&]( float share, double &silent, double &db )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::CLOUD_WIDTH, 25.0f );
+            e.setParam( ParamIdE::GRAIN, share );
+            e.setParam( ParamIdE::GRAIN_LENGTH, 0.05f );
+            e.setParam( ParamIdE::GRAIN_DENSITY, 0.1f );
+            if ( !openOffline( e, false, 223 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            std::vector<float> L( 128 ), R( 128 ), dots, lr;
+            int                per = 0, quiet = 0, all = 0;
+            for ( int k = 0; k < 375 * 6; ++k )
+            {
+                e.process( L.data(), R.data(), 128 );
+                if ( k >= 375 * 2 )
+                    for ( int i = 0; i < 128; ++i )
+                    {
+                        lr.push_back( L[static_cast<size_t>( i )] );
+                        lr.push_back( R[static_cast<size_t>( i )] );
+                    }
+                if ( k > 375 && e.partialSnapshot( dots, per ) )
+                    for ( int i = 0; i < per; ++i )
+                    {
+                        if ( dots[static_cast<size_t>( 2 * i )] <= 0.0f ) continue;
+                        ++all;
+                        if ( dots[static_cast<size_t>( 2 * i + 1 )] < 1.0e-7f ) ++quiet;
+                    }
+            }
+            silent = all > 0 ? static_cast<double>( quiet ) / all : 0.0;
+            db = rmsDb( lr, 0, lr.size() / 2 );
+            return all > 0;
+        };
+        double     silent = 0, db = 0, silent0 = 0, db0 = 0;
+        const bool ran = play( 1.0f, silent, db ) && play( 0.0f, silent0, db0 );
+        check( ran && silent > 0.7 && silent0 < 0.01 && std::fabs( db - db0 ) < 1.5,
+               "grains: the partials sound in grains, the level stays",
+               fmt( "%.0f %% of the partials silent in the picture with grains, %.1f %% without; level %+.2f dB",
+                    100.0 * silent, 100.0 * silent0, db - db0 ) );
+    }
+
+    // 74. Breathers (Phase 26e): with the string a sine-Gordon chain a struck note's humps stay where they
+    //     fell, drifting slowly -- after 8 s most of the string's (periodic) energy is still within 28 cells
+    //     (about an octave) of the note's first four harmonics, where without breathers the waves have run
+    //     up and down the whole string.
+    {
+        auto play = [&]( float breathers, double &held )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::RIPPLE_DEPTH, 1.0f );
+            e.setParam( ParamIdE::RIPPLE_SPEED, 0.8f );
+            e.setParam( ParamIdE::RIPPLE_DECAY, 30.0f );
+            e.setParam( ParamIdE::RIPPLE_BREATHERS, breathers );
+            if ( !openOffline( e, false, 227 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            render( e, 0.05 );
+            const double f0 = soundingHz( e );
+            render( e, 8.0 );
+            float           u[RippleCells];
+            constexpr float perOctave = static_cast<float>( RippleCells - 1 ) / 9.96578428f;
+            e.rippleString( u );
+            double inside = 0.0, total = 0.0;
+            for ( int i = 0; i < RippleCells; ++i )
+            {
+                const double w = std::tanh( 2.0 * std::sin( 0.5 * u[i] ) ), en = w * w;
+                total += en;
+                for ( int k = 1; k <= 4; ++k )
+                    if ( std::fabs( static_cast<float>( i ) -
+                                    std::log2( static_cast<float>( f0 ) * static_cast<float>( k ) / 20.0f ) *
+                                        perOctave ) <= 28.0f )
+                    {
+                        inside += en;
+                        break;
+                    }
+            }
+            held = total > 1.0e-9 ? inside / total : 0.0;
+            return f0 > 0.0 && total > 1.0e-9;
+        };
+        double     withB = 0.0, without = 0.0;
+        const bool ran = play( 1.0f, withB ) && play( 0.0f, without );
+        check( ran && withB > 0.8 && without < 0.65, "ripple: breathers stay where the note struck",
+               fmt( "after 8 s, %.0f %% of the string's energy within an octave of where the note struck with "
+                    "breathers, %.0f %% without",
+                    100.0 * withB, 100.0 * without ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

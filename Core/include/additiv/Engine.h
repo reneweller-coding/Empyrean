@@ -554,6 +554,20 @@ private:
         Event  m_next;                    ///< the note waiting for a stolen voice (type 0; -1 = cancelled)
         int    m_nextSource = 0;          ///< whose note that is
         float  m_nextDistance = 0.0f;     ///< and where it will stand
+        // Phase 26: the harmonics' own lives (stepHarmonics)
+        std::array<float, 4> m_share{ 1.0f, 0.0f, 0.0f, 0.0f };        ///< Overblow: the registers' shares (1, 2, 3, 4)
+        Drifter              m_blowWander;                             ///< Overblow: the breath's own slow unrest
+        Rng                  m_pileDice;                               ///< Avalanche: the pile's dice, from the note's
+        std::array<std::uint8_t, AvalancheSites> m_slope{};            ///< Avalanche: the pile's slope at each harmonic
+        std::array<std::uint8_t, AvalancheSites> m_threshold{};        ///< the slope it topples over there (1 or 2)
+        std::array<float, AvalancheSites>        m_glowTarget{};       ///< the glow a toppling lit, fading over Glow
+        std::array<float, AvalancheSites>        m_glow{};             ///< the glow heard (the target, softened)
+        float                                    m_grainDue = 0.0f;    ///< s until the next grain falls on the pile
+        float                                    m_pileClock = 0.0f;   ///< s owed to the pile's generations
+        float m_pileDepth = 0.0f;               ///< Avalanche as it glides (turning it off fades the glow)
+        bool  m_pileLive = false;               ///< the pile is laid out for this note
+        bool  m_subOn = false;                  ///< Subharmonics: clouds reserved for this note (decided at its start)
+        std::array<float, SubClouds> m_sub{};   ///< their amplitudes, against harmonic 1's at rest
     };
 
     void workerLoop();    ///< the worker: renders while the ring is short of the latency
@@ -637,14 +651,15 @@ private:
     ClusterBrain       m_brain2;      ///< the second conductor, in the background (Noctuary's Brain 2)
     BrainParams        m_bp2;         ///< its knobs
     BrainSpectrum      m_brainSpec;   ///< the cloud's spectrum for its Timbre judgement
-    float     m_specKey[5] = { -1.0f, 0.0f, 0.0f, 0.0f,
-                               1.0f };   ///< tilt, odd/even, brightness, inharmonic, stretch the spectrum was built for
-    Rng       m_rng;                     ///< the engine's dice (seeds, distances)
-    Rng       m_side;              ///< a side stream for the drifters, so switching them on never moves the notes' dice
-    Drifter   m_tide;              ///< the whole instrument's slow lean (Tide)
-    int       m_landChoice = -1;   ///< the landscape on the GPU
-    Landscape m_userLand;          ///< the player's own, as setUserLandscape left it (under m_userLandLock)
-    float     m_userLandRms = 1.0f;            ///< its RMS
+    float              m_specKey[7] = {
+        -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f
+    };   ///< tilt, odd/even, brightness, inharmonic, stretch, horizon and its ratio the spectrum was built for
+    Rng              m_rng;    ///< the engine's dice (seeds, distances)
+    Rng              m_side;   ///< a side stream for the drifters, so switching them on never moves the notes' dice
+    Drifter          m_tide;   ///< the whole instrument's slow lean (Tide)
+    int              m_landChoice = -1;        ///< the landscape on the GPU
+    Landscape        m_userLand;               ///< the player's own, as setUserLandscape left it (under m_userLandLock)
+    float            m_userLandRms = 1.0f;     ///< its RMS
     std::mutex       m_userLandLock;           ///< guards m_userLand (the worker only tries it)
     std::atomic<int> m_userLandVersion{ 0 };   ///< bumped by setUserLandscape
     int              m_userLandSeen = 0;       ///< the version on the GPU
@@ -816,6 +831,25 @@ private:
      * @param[in] dt  the block's length, seconds
      */
     void stepRipple( float dt );
+    /**
+     * @brief One block of the seasons (Phase 26): five families of harmonics in a cyclic tournament --
+     *        each beats the next two and loses more to the two before (replicator dynamics, Hofbauer and
+     *        Sigmund), so the heteroclinic cycle draws them in, and a little mutation keeps it a regular
+     *        round that neither dies out nor stalls: one round in Year seconds.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepSeasons( float dt );
+    /**
+     * @brief One block of a voice's harmonics' own lives (Phase 26), written into its GPU copy: its
+     *        registers (Overblow), the avalanches on its rice pile, the subharmonics its loud harmonics
+     *        pump, the seasons' factors, and the make-up that keeps its power.
+     * @param[in,out] v         the voice
+     * @param[in,out] cv        its GPU copy (tilt, odd/even, brightness and pitch already set)
+     * @param[in]     dt        the block's length, seconds
+     * @param[in]     gain      its envelope this block
+     * @param[in]     breath    MPE's Breath on it, 0 .. 1
+     */
+    void stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, float breath );
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost
@@ -863,6 +897,10 @@ private:
     float              m_lifeAcc = 0.0f;         ///< its steps owed, carried between blocks
     double             m_lifeSeconds = 0.0;      ///< seconds the field has lived (the Fluid's jets lean by it)
     double             m_islandDrift = 0.0;      ///< the Islands' drift across, cells of their grid
+    std::array<float, SeasonFamilies> m_seasonShare{ 0.6f, 0.1f, 0.1f, 0.1f, 0.1f };   ///< Seasons: each family's share
+    float                             m_seasonDepth = 0.0f;   ///< Seasons as it glides (half a second)
+    Rng   m_blowRng;            ///< Overblow's dice (its own stream: switching it on never moves the other drifters)
+    Rng   m_breatherRng;        ///< the breathers' dice (their drift)
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
@@ -927,6 +965,20 @@ private:
         bool  m_brain2 = false;         ///< the second conductor plays
         int   m_brain2Interval = -12;   ///< semitones
         float m_brain2Depth = 0.9f;     ///< its plane
+        float m_overblow = 0.0f;        ///< Overblow, 0 .. 1
+        float m_overblowTime = 0.6f;    ///< s
+        float m_seasons = 0.0f;         ///< Seasons, 0 .. 1
+        float m_seasonTime = 240.0f;    ///< s, a whole round
+        float m_avalanche = 0.0f;       ///< Avalanche, 0 .. 1
+        float m_avalancheRate = 0.3f;   ///< grains a second
+        float m_avalancheGlow = 0.6f;   ///< s
+        float m_subharmonics = 0.0f;    ///< Subharmonics, 0 .. 1
+        float m_subTime = 1.0f;         ///< s
+        float m_horizon = 0.0f;         ///< Horizon, 0 .. 1
+        float m_horizonRatio = 8.0f;    ///< the horizon over the fundamental
+        float m_grain = 0.0f;           ///< Grain, 0 .. 1
+        float m_grainLength = 0.08f;    ///< s
+        float m_grainDuty = 0.3f;       ///< Grain Density, 0 .. 1
     } m_blk;                            ///< read by readParams()
 
     std::vector<Event>         m_queue;        ///< audio thread -> renderer, a single-producer single-consumer ring

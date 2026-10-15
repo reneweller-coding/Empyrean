@@ -258,6 +258,22 @@ enum class ParamIdE : int
     // Phase 19 (14.10.2026)
     BRAIN_LIGHT,   ///< 0 .. 1: the conductors prefer notes whose harmonics fall where the landscape (or the living field) is bright
     BRAIN_FOUNDATION,   ///< 0 .. 1: a voice on the conductor's root in the octave from C2 (or Lowest, when lower), held while the root stands (its level; 0 none)
+    // Phase 26 (15.10.2026): the harmonics' own lives, grains, the horizon, breathers
+    OVERBLOW,   ///< 0 .. 1: the breath: a note's registers (1, 2, 3, 4 times its fundamental) compete for it, a stronger one jumps up
+    OVERBLOW_TIME,    ///< s: how long a register takes to take over
+    SEASONS,          ///< 0 .. 1: five families of harmonics take turns, one after another, in a slow cycle
+    SEASON_TIME,      ///< s: the whole cycle through the five (a year)
+    AVALANCHE,        ///< 0 .. 1: a rice pile on every note's harmonics: avalanches of every size run up them as glints
+    AVALANCHE_RATE,   ///< grains a second falling on the pile (how restless it is)
+    AVALANCHE_GLOW,   ///< s: how long a harmonic glows after it toppled
+    SUBHARMONICS,     ///< 0 .. 1: a loud note pumps clouds at half (and a quarter) its harmonics: the period doubles
+    SUB_TIME,         ///< s: how fast the subharmonics grow and fade
+    HORIZON,          ///< 0 .. 1: the harmonics bend towards a horizon they never pass, crowding below it
+    HORIZON_HEIGHT,   ///< octaves: the horizon over the fundamental
+    GRAIN,            ///< 0 .. 1: the share of the partials that sound in grains, each born at a new place
+    GRAIN_LENGTH,     ///< s: a grain's mean length
+    GRAIN_DENSITY,    ///< 0 .. 1: the share of its time a grain partial sounds
+    RIPPLE_BREATHERS,   ///< 0 .. 1: the ripple's string becomes a sine-Gordon chain: a note's strike stays as a breather that pulses where it fell
     COUNT               ///< number of parameters
 };
 
@@ -336,9 +352,9 @@ extern const char *const LifeModeNames
     [NumLifeModes];   ///< "Off", "Lenia", "Turing", the animated pictures, "Fluid", "Islands" (Cloud.h LifeMode)
 constexpr int            NumSyncModes = 3;              ///< entries of SyncModeNames
 extern const char *const SyncModeNames[NumSyncModes];   ///< "Global", "Chimera", "Swarm" (Cloud.h SyncMode)
-constexpr int            NumMpeTargets = 8;             ///< entries of MpeTargetNames
-extern const char *const
-    MpeTargetNames[NumMpeTargets];   ///< "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion"
+constexpr int            NumMpeTargets = 9;             ///< entries of MpeTargetNames
+extern const char *const MpeTargetNames
+    [NumMpeTargets];   ///< "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion", "Breath"
 
 /** @brief What a note's pressure or slide moves (MPE), in MpeTargetNames' order. */
 enum class MpeTargetE : int
@@ -350,7 +366,8 @@ enum class MpeTargetE : int
     WIDTH,
     NEARER,
     SHIMMER,
-    MOTION
+    MOTION,
+    BREATH   ///< Overblow's breath and the subharmonics' pump (Phase 26)
 };
 constexpr int NumFieldModes = 6;   ///< entries of FieldModeNames
 extern const char *const

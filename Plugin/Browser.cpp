@@ -16,8 +16,8 @@ namespace
 {
 
 /** @brief The bank's sections, as the menu sections them. */
-const char *const Sections[6] = { "Sounds",  "Living Systems",    "Sleep Concerts",
-                                  "Visions", "Swarms & Currents", "Halls & Orbits" };
+const char *const Sections[7] = { "Sounds",            "Living Systems", "Sleep Concerts", "Visions",
+                                  "Swarms & Currents", "Halls & Orbits", "Harmonic Lives" };
 /** @brief The traits' ends. */
 const char *const TraitLow[4] = { "darker", "stiller", "narrower", "purer" };
 const char *const TraitHigh[4] = { "brighter", "more moving", "wider", "airier" };   ///< and their other ends
@@ -357,7 +357,7 @@ void PresetBrowser::open()
     m_categories.push_back( { "Favourites", 1, 0 } );
     m_categories.push_back( { "Recently played", 2, 0 } );
     m_categories.push_back( { "Yours", 3, 0 } );
-    for ( int s = 0; s < 6; ++s )
+    for ( int s = 0; s < 7; ++s )
     {
         m_categories.push_back( { Sections[s], 4, s } );
         for ( int g = s * 16; g < ( s + 1 ) * 16 && g < additiv::NumPresetGroups; ++g )

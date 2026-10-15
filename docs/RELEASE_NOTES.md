@@ -1,5 +1,32 @@
 # Release notes
 
+## 0.16.0 (15.10.2026, not released)
+
+The harmonics get lives of their own: registers that overblow, seasons of overtone families, avalanches, a floor that
+opens beneath a held chord. And grains, a horizon, breathers on the ripple, 1024 more presets.
+
+- **Overblow** (the new page Harmonics): every note's registers -- its fundamental, its octave, its twelfth, its double
+  octave -- compete for a breath, as in a flute. The register that sounds holds on, so a note jumps up later than it
+  falls back, and one near the edge flickers between two. The breath: the knob, how hard the note is played, and MPE
+  pressure (the new target Breath).
+- **Subharmonics** (Harmonics): a loud harmonic pumps a cloud at half its frequency, and that one a cloud at half
+  again -- the period doubles, as in a Faraday experiment. It grows from nothing, slowly near its threshold: hold a loud
+  chord and a dark floor opens beneath it; let go and it closes. The power comes from the pumping harmonic.
+- **Horizon** (Harmonics): the harmonics bend towards a horizon they never pass; the low ones stay, the high ones
+  crowd below it into a halo. The conductors and Self-Tune hear the bent harmonics.
+- **Seasons** (Harmonics): five families of harmonics -- the octaves, fifths, thirds, sevenths and ninths over the
+  fundamental -- take turns in a slow round, as in rock-paper-scissors, never settling and never dying out.
+- **Avalanche** (Harmonics): a rice pile on every note's harmonics (the Oslo model): mostly small glints, now and then a
+  slide through a dozen harmonics, rarely one through all of them -- the statistics of sand piles and earthquakes.
+- **Grain** (Harmonics): a share of the partials sounds in grains, each born at a new place in its cloud and the field.
+  With the full twenty thousand partials it makes the cloud breathe and rustle; with a few hundred it glitters.
+- **Breathers** (Motion > Ripple): the ripple's string as a sine-Gordon chain -- a note's strike stays where it fell as
+  a breather, pulsing there and drifting slowly, instead of running off as a wave.
+- **7168 presets:** sixteen new groups of harmonic lives (Overblown Flutes, Breath Registers, Four Seasons, Turning
+  Years, Avalanches, Glacier Calving, Subterranea, Period Doubling, Halo Horizons, Aurora Curtains, Rainfall Grains,
+  Breathing Grains, Breather Chains, Harmonic Ecology, Night Ecology, Wild Harmonics); 395 of the presets before took
+  the new means where they fit -- only added: every value they had stays.
+
 ## 0.15.0 (14.10.2026, not released)
 
 A hall that grows into the music played in it, each partial's own time, a ripple that lingers, orbits, and 1024 more

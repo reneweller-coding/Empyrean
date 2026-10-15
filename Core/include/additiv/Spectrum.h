@@ -87,18 +87,83 @@ ADDITIV_HD inline float stretchOf( int h, float B )
 }
 
 /**
- * @brief Where harmonic h of a voice lies, as a multiple of its fundamental: h stretched to
- *        h^s (Stretch: an octave of s times 1200 cents, Sethares' stretched timbres) and then by
- *        the stiff string.
- * @param[in] h  the harmonic
- * @param[in] B  the inharmonicity
- * @param[in] s  the stretch's exponent (1: harmonic)
- * @return h^s sqrt(1 + B h^2)
+ * @brief The horizon (Phase 26): a ratio r over the fundamental bent towards a horizon R times above
+ *        it, 1 + (R - 1) tanh((r - 1) / (R - 1)) -- the lowest harmonics stay where they were (the slope at
+ *        the fundamental is 1), the higher ones crowd ever closer below the horizon and never pass it.
+ *        `amount` blends from r (0) to the bent ratio (1); both rise with r, so the blend does too.
+ * @param[in] r       the ratio before
+ * @param[in] amount  0 .. 1
+ * @param[in] R       the horizon over the fundamental, above 1
+ * @return the ratio after
  */
-ADDITIV_HD inline float partialRatio( int h, float B, float s )
+ADDITIV_HD inline float horizonBend( float r, float amount, float R )
+{
+    if ( amount <= 0.0f || R <= 1.0f ) return r;
+    const float span = R - 1.0f;
+    return r + amount * ( 1.0f + span * tanhf( ( r - 1.0f ) / span ) - r );
+}
+
+/**
+ * @brief Where harmonic h of a voice lies, as a multiple of its fundamental: h stretched to
+ *        h^s (Stretch: an octave of s times 1200 cents, Sethares' stretched timbres), then by
+ *        the stiff string, then bent towards the horizon (horizonBend).
+ * @param[in] h        the harmonic
+ * @param[in] B        the inharmonicity
+ * @param[in] s        the stretch's exponent (1: harmonic)
+ * @param[in] horizon  0 .. 1: how far the harmonics bend towards the horizon (0: not at all)
+ * @param[in] R        the horizon over the fundamental
+ * @return h^s sqrt(1 + B h^2), bent
+ */
+ADDITIV_HD inline float partialRatio( int h, float B, float s, float horizon = 0.0f, float R = 1.0f )
 {
     const float hf = static_cast<float>( h );
-    return ( s == 1.0f ? hf : exp2f( s * log2f( hf ) ) ) * stretchOf( h, B );
+    return horizonBend( ( s == 1.0f ? hf : exp2f( s * log2f( hf ) ) ) * stretchOf( h, B ), horizon, R );
+}
+
+constexpr int SeasonFamilies = 5;    ///< Seasons: the families of harmonics that take turns
+constexpr int AvalancheSites = 48;   ///< Avalanche: the harmonics the rice pile lies on (2 .. 49)
+constexpr int SubClouds = 8;         ///< Subharmonics: the clouds below and between the harmonics
+
+/**
+ * @brief Seasons: harmonic h's family, by the odd number h is a power of two times -- the octaves of
+ *        the fundamental (2, 4, 8 ..), of the fifth (3, 6, 12 ..), of the third (5, 10 ..), of the
+ *        seventh (7, 14 ..), of the ninth (9, 18 ..); 11 and above go round again.
+ * @param[in] h  the harmonic, 2 ..
+ * @return 0 .. SeasonFamilies - 1
+ */
+ADDITIV_HD inline int seasonFamily( int h )
+{
+    while ( h > 1 && ( h & 1 ) == 0 ) h >>= 1;
+    return ( ( h - 1 ) / 2 ) % SeasonFamilies;
+}
+
+/**
+ * @brief Subharmonics: where sub cloud j lies over the fundamental -- the period doubled (1/2, 3/2,
+ *        5/2, 7/2: pumped by harmonics 1, 3, 5, 7) and doubled again (1/4, 3/4, 5/4, 7/4: pumped by the
+ *        four above).
+ * @param[in] j  0 .. SubClouds - 1
+ * @return the ratio
+ */
+ADDITIV_HD inline float subRatio( int j )
+{
+    return j < 4 ? 0.5f * static_cast<float>( 2 * j + 1 ) : 0.25f * static_cast<float>( 2 * ( j - 4 ) + 1 );
+}
+
+/**
+ * @brief Overblow: the amplitude of harmonic h under the registers' shares -- a register k (the note's
+ *        k-th harmonic as its fundamental) keeps the harmonics it divides, so the shares of every
+ *        register dividing h add, as powers.
+ * @param[in] h      the harmonic, 1 ..
+ * @param[in] share  the four registers' shares (1, 2, 3, 4), summing to 1
+ * @return the amplitude factor, 0 .. 1
+ */
+ADDITIV_HD inline float registerGain( int h, const float *share )
+{
+    float p = share[0];
+    if ( ( h & 1 ) == 0 ) p += share[1];
+    if ( h % 3 == 0 ) p += share[2];
+    if ( ( h & 3 ) == 0 ) p += share[3];
+    return sqrtf( fminf( p, 1.0f ) );
 }
 
 /**

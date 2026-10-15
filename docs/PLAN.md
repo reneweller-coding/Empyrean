@@ -529,6 +529,74 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 26: Die eigenen Leben der Harmonischen, Körner, Horizont, Breather (gebaut, 15.10.2026, 0.16.0)
+
+Drei Texte des Nutzers über neue Klangerzeuger (Gabor-Atome, Schrödinger-Spektren, Weierstraß-Kaskaden,
+Möbius-Oszillator, Rijke-Rohr/Überblasen; Spin-Glas, Klein-Gordon-Membran, Billard, holographische Beugung,
+Lotka-Volterra; subharmonische Kaskaden, erregbare Medien, Sandhaufen, hyperbolische Spektren, Voice-Braiding).
+Meine Einschätzung im Gespräch: gebaut, was im 128er-Block auf den Harmonischen arbeitet, sich nicht über die 110 bis
+333 Partials einer Harmonischen wegmittelt (Phase 0b) und kein bestehendes Modul wiederholt. Nicht gebaut: Möbius
+(Moorers Discrete Summation Formula von 1976; aliast und versteckt Obertöne vor Filter, Landschaft, Turbulence),
+Spin-Glas (Kuramoto, Chimera, Swarm gibt es; gleichgerichtete Spins sind ein Sinus), Klein-Gordon-Membran und Billard
+(eigene Instrumente; Strahlen machen keine Scars), Beugung (je Partial 10^10 Operationen; per FFT ein Weichzeichner der
+Landschaft), Weierstraß (= Shepard), erregbare Medien (Flock, Swarm, Orbit bewegen die Wolken schon), Braiding.
+Prototypen der Dynamik in Python (scratch), dann Kern, Selbsttests, Seiten, Hilfe, 1024 Presets.
+
+- **26a Overblow:** vier Register (1, 2, 3, 4 × f0) als Anteile, Replikatordynamik; jedes bevorzugt einen Atem (0,
+  0,45, 0,72, 0,95), das klingende hält durch seinen Anteil (Hold 0,12: Hysterese), Mutation 0,0005. Atem = Knopf ×
+  (0,55 + 0,45 Anschlag + 0,5 MPE-Breath) + eigene langsame Unruhe (±0,04 × Knopf). Harmonische h klingt mit
+  √(Summe der Anteile der Register, die h teilen) (`registerGain`). Erster Versuch nach Lambs Modenkonkurrenz
+  (Wachstumsraten mit Kreuzsättigung): wechselte erst, wenn alle Register leise waren -- verworfen.
+- **26b Seasons:** fünf Familien nach dem ungeraden Teil von h (Oktaven, Quinten, Terzen, Septimen, Nonen;
+  `seasonFamily`) in einem zyklischen Turnier (jede schlägt die nächsten zwei mit 1, verliert gegen die zwei davor mit
+  2), Replikatordynamik mit Mutation 0,01: der heterokline Zyklus zieht an, die Mutation hält ihn regelmäßig (Anteile
+  0,002 .. 0,91; Gewinn > Verlust dämpft dagegen auf den Mittelpunkt -- in Python gemessen). Eine Runde 12,9
+  Zeiteinheiten, auf Year skaliert. Global (jede Stimme in derselben Jahreszeit; je Stimme mittelte es sich weg).
+  Grundton bleibt; Amplitude der Familie 1 − d + d √(5x).
+- **26c Avalanche:** Oslo-Reishaufen (Christensen et al. 1996; in 1D kritisch, der BTW-Sandhaufen nicht) auf den
+  Harmonischen 2 .. 49 je Stimme, Schwellen 1/2 nach jedem Kippen neu, eine Generation je 35 ms (die Lawine läuft
+  hörbar), jedes Kippen leuchtet seine Harmonische (bis +9,5 dB, Glow, 40 ms weich). Gemessen (Python): eine Lawine
+  kippt im Mittel so oft, wie der Haufen lang ist -- bei 1 Korn/s und Glow 1,5 s leuchtet die 2. Harmonische 70 % der
+  Zeit; daher 0,3 Körner/s und Glow 0,6 s als Vorgabe (12 % / 3 %, zwölf oder mehr gemeinsam 5 % der Zeit).
+- **26d Subharmonics:** acht Wolken nach den Harmonischen (½, 3/2, 5/2, 7/2 gepumpt von 1, 3, 5, 7; ¼ .. 7/4 von
+  diesen), Partials gleichmäßig (`m_members = HP / (H + 8)`), je Note bei ihrem Beginn reserviert (nie umverteilt).
+  Parametrisch: da/dt = a ((D A − 0,25) − 1,5 (a/A)²) / τ ab 10⁻³ A, die Leistung kommt aus der Pumpe
+  (`m_pumpKeep`); unter 20 .. 40 Hz nicht gepumpt. D = Knopf × 1,3 × Stärke² × Hüllkurve × (1 + Breath).
+- **26e Breathers:** der Ripple als Sine-Gordon-Kette (Masse bis 1 Hz); Schläge als Glocken (Breite c/m), je Harmonische
+  1 .. 4 mit kleiner Drift (0,05 .. 0,15 c); gelesen als 2 sin(u/2) (ein Kink hinterlässt nichts). Gemessen
+  (Python): ein angepasster Schlag bleibt bei 1 Hz ~18 s lokalisiert; bei 0,5 Hz zerlief er wie eine lineare Welle.
+- **26f Horizon:** `horizonBend`: 1 + (R − 1) tanh((r − 1)/(R − 1)), Steigung 1 am Grundton, überall (`partialRatio`
+  mit Horizont: Kernel, Normierung, Dirigent, Self-Tune, Rauheit, Ripple). Unter dem Horizont erreichen die
+  Harmonischen den Cutoff nie: so viele wie ungebogen (mindestens 48).
+- **26g Grains:** ein Anteil der Partials als Körner (Hann², Länge ±40 %, Dichte = Anteil der Zeit an, eigene Phase),
+  jedes Korn an einem neuen Ort der Wolke und im Feld (springt, während es still ist), Make-up 1/√(3 Dichte / 8).
+  Hörversuch: bei 20.000 Partials klingen auch bei 5 % Dichte Tausende Körner zugleich -- der Pegel schwankt in 20 ms
+  nicht mehr als ohne (3,2 gegen 3,5 dB); hörbar körnig erst mit wenigen Partials (2000: 4,2 dB, 1000: 5,4 dB).
+- **Kern:** `CloudVoice` trägt je Stimme die Anteile, Familien, das Glühen (48), die Subwolken, den Horizont und die
+  Körner (768 Bytes); `Engine::stepHarmonics` rechnet Register, Haufen, Subharmonische und das Make-up (die Leistung der
+  ersten 256 Harmonischen bleibt), `stepSeasons` die Jahreszeiten. Der Update-Kernel liest es je Harmonische; der
+  Sync-Tisch kennt die Subwolken (Zeilen H+1 ..). MPE-Ziel **Breath** (Überblasen und Pumpe).
+- **Seiten:** eine neue Seite **Harmonics** (Abschnitt Sound) mit Overblow, Subharmonics, Horizon, Seasons,
+  Avalanche und Grain; Breathers im Ripple (Motion). Erst auf Cloud & Filter und Motion verteilt: beide wurden 10
+  Pixel zu hoch (ctest `layout`).
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Harmonic Lives“): Overblown Flutes, Breath Registers, Four Seasons,
+  Turning Years, Avalanches, Glacier Calving, Subterranea (hoch gesetzter Dirigent, Root Age vertieft den Boden), Period
+  Doubling, Halo Horizons, Aurora Curtains, Rainfall Grains, Breathing Grains, Breather Chains, Harmonic Ecology, Night
+  Ecology, Wild Harmonics; 395 der 6144 bestehenden bekamen die neuen Mittel, gezogen nach allem anderen, auch nach dem
+  Fundament -- nur hinzugefügt, kein Wert, den sie hatten, ändert sich (geprüft). Gefunden: `make_journeys.param_table`
+  las seit der CGVR-Formatierung keinen Parameter mehr (`F( ParamIdE::`); Karte, Reisen und Nudges wären ohne Werte
+  gerechnet worden -- die Muster vertragen jetzt Leerraum.
+
+**Gemessen [M]:** Selbsttest 74/74 (68 Overblow: Grundton −31,9 dB unter der Oktave, Leistung −0,06 dB, nach dem
+Überblasen bei wenig Atem −22,6, von Anfang an +7,2; 69 Seasons: Harmonische 3 und 5 schwingen 23 / 26 dB, Leistung
+±0,02 dB; 70 Avalanche: 22 Glanzlichter und 64 Momente mit sechs oder mehr in einer Minute, ohne 0, bitgleich; 71
+Subharmonics: −40,4 → +3,3 dB nach 20 s, −24,0 drei Sekunden nach dem Pumpenstopp, Leistung −0,03 dB; 72 Horizon:
+höchster Partial 885 Hz bei 881 Hz Horizont; 73 Grains: 90 % der Partials still im Bild, Pegel +0,65 dB; 74 Breathers:
+93 gegen 55 % der Energie in einer Oktave um den Schlag). Gemessen wird am Ziel jedes Partials (Schnappschuss), nicht
+am Klang: die Mitglieder einer schmalen Wolke schweben gegeneinander, ihr Pegel wandert im Sekundenfenster um dB.
+Hörbeispiele: `work/renders/phase26/` (Referenz, Overblow mit LFO-Atem, Seasons, Avalanche, Subharmonics unter einem
+hohen Akkord, Horizon, Körner dicht/atmend/glitzernd/spärlich, Ripple mit und ohne Breather).
+
 ## Phase 25: Die Karte zoomt, das Fenster bleibt, wo es war (gebaut, 15.10.2026, 0.15.0)
 
 Nutzer: „Bitte baue das mit dem Zoom noch ein.“ und „Beim Schließen sollte sich der Synth die Größe und Position merken“:

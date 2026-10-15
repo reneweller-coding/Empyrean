@@ -248,6 +248,28 @@ const Info InfoTable[] = {
     { "time_bend", "Each partial's own clock, slower (or faster) where the spectrum is dense." },
     { "ripple_bend", "The ripple's waves slower where the notes sound: they linger and pile up there." },
     { "brain_light", "The conductors choose notes whose harmonics fall where the landscape is bright." },
+    { "overblow",
+      "The breath: a note's registers compete for it, and a stronger one jumps up an octave, a twelfth or two, as "
+      "a flute overblows." },
+    { "overblow_time", "How long a register takes to take over from the one before." },
+    { "seasons", "Five families of harmonics take turns, each in its season: the octaves, fifths, thirds, sevenths "
+                 "and ninths over the fundamental." },
+    { "season_time", "One year: the whole round through the five seasons." },
+    { "avalanche", "A rice pile on every note's harmonics: avalanches of every size run up them as glints, now "
+                   "and then through the whole." },
+    { "avalanche_rate", "How many grains fall on the pile a second: how restless it is." },
+    { "avalanche_glow", "How long a harmonic glows after it toppled." },
+    { "subharmonics", "A loud note pumps clouds at half its harmonics, then at a quarter: a dark floor opens under "
+                      "it, from nothing, and closes again." },
+    { "sub_time", "How fast the subharmonics grow and fade." },
+    { "horizon", "The harmonics bend towards a horizon they never pass: the low ones stay, the high ones crowd "
+                 "below it into a halo." },
+    { "horizon_height", "Where the horizon stands, in octaves over each note." },
+    { "grain", "The share of the partials that sound in grains, each grain born at a new place in its cloud." },
+    { "grain_length", "A grain's length." },
+    { "grain_density", "How much of its time a grain partial sounds: low is sparse and glittering, high is dense." },
+    { "ripple_breathers", "The ripple as a chain of pendulums: a note's strike stays where it fell as a breather, "
+                          "pulsing there, and drifts slowly." },
 };
 
 }   // namespace

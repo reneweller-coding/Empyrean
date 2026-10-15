@@ -109,6 +109,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Memory Palaces",
     "Celestial Mechanics",
     "Living Architecture",
+    "Overblown Flutes",
+    "Breath Registers",
+    "Four Seasons",
+    "Turning Years",
+    "Avalanches",
+    "Glacier Calving",
+    "Subterranea",
+    "Period Doubling",
+    "Halo Horizons",
+    "Aurora Curtains",
+    "Rainfall Grains",
+    "Breathing Grains",
+    "Breather Chains",
+    "Harmonic Ecology",
+    "Night Ecology",
+    "Wild Harmonics",
 };
 
 namespace

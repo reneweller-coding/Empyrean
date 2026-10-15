@@ -21,6 +21,11 @@ The fourth sixteen are visions (13.10.2026): the animated pictures of the living
 (KaleidoscopeEnhanced's transforms), the spectral comb, Stretch and Shift, each group with one in
 front. Phase 13 was added to the first forty-eight too, drawn after everything else.
 
+Then the swarms and currents (Phase 16), the halls and orbits (Phase 17), and the harmonics' lives
+(Phase 26, 15.10.2026): registers that overblow, seasons of overtone families, avalanches on a rice
+pile, subharmonics pumped from below, grains, the horizon and breathers -- sixteen groups, and the new
+means in the groups before where they fit, drawn after everything else (the conductor's floor too).
+
 Levelling: Tools/presets (additiv_presets) renders every preset and writes work/presets/levels.json;
 run this script again and every preset's master_gain brings it to the bank's common level.
 
@@ -56,7 +61,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Swarms", "Splinters", "Chimeras", "Twin Swarms", "Currents", "Vortex Streets", "Ink Plumes", "Islands",
           "Labyrinths", "Archipelagos", "Gong Blooms", "Bronze Swells", "Shimmer Cascades", "Pressure Pads", "Expressive Voices", "Living Storms",
           "Growing Halls", "Eroded Halls", "Cathedral Years", "Worn Stone", "Slow Clocks", "Quickened Air", "Gravity Lenses", "Lingering Waves",
-          "Orbits", "Cyclotrons", "Planetaria", "Magnetic Choirs", "Event Horizons", "Memory Palaces", "Celestial Mechanics", "Living Architecture"]
+          "Orbits", "Cyclotrons", "Planetaria", "Magnetic Choirs", "Event Horizons", "Memory Palaces", "Celestial Mechanics", "Living Architecture",
+          "Overblown Flutes", "Breath Registers", "Four Seasons", "Turning Years", "Avalanches", "Glacier Calving", "Subterranea", "Period Doubling",
+          "Halo Horizons", "Aurora Curtains", "Rainfall Grains", "Breathing Grains", "Breather Chains", "Harmonic Ecology", "Night Ecology", "Wild Harmonics"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -253,6 +260,38 @@ NAMES = {
                             ["Mechanics", "Ephemeris", "Almanac", "Transit", "Conjunction", "Syzygy", "Eclipse", "Occultation"]),
     "Living Architecture": (["Living", "Breathing", "Growing", "Shifting", "Sentient", "Evolving", "Organic", "Unfolding"],
                             ["Architecture", "Edifice", "Structure", "Tower", "Spire", "Citadel", "Pavilion", "Bastion"]),
+    "Overblown Flutes": (["Overblown", "Breathy", "Fluttering", "Reedy", "Windblown", "Piping", "Whistling", "Airy"],
+                         ["Flute", "Shakuhachi", "Ney", "Fife", "Pipe", "Recorder", "Ocarina", "Panpipe"]),
+    "Breath Registers": (["Rising", "Swelling", "Lungful", "Exhaled", "Inhaled", "Billowing", "Sighing", "Bellowed"],
+                         ["Register", "Bellows", "Windchest", "Tremulant", "Ventil", "Wind Line", "Pallet", "Tracker"]),
+    "Four Seasons": (["Vernal", "Estival", "Autumnal", "Hibernal", "Equinoctial", "Seasonal", "Ripening", "Budding"],
+                     ["Season", "Harvest", "Thaw", "Blossom", "Frost", "Fallow", "Pasture", "Orchard"]),
+    "Turning Years": (["Perennial", "Annual", "Cyclic", "Recurring", "Returning", "Yearlong", "Unceasing", "Evergreen"],
+                      ["Year", "Almanack", "Calendar", "Solar Wheel", "Rotation", "Round", "Cycle", "Revolution"]),
+    "Avalanches": (["Sliding", "Tumbling", "Cascading", "Slumping", "Thundering", "Rushing", "Shearing", "Toppling"],
+                   ["Avalanche", "Scree", "Rockfall", "Snowslide", "Landslip", "Talus", "Moraine", "Couloir"]),
+    "Glacier Calving": (["Calving", "Groaning", "Creaking", "Splitting", "Cracking", "Drifting", "Booming", "Fracturing"],
+                        ["Glacier", "Icefall", "Serac", "Crevasse", "Berg", "Floe", "Icefield", "Ice Shelf"]),
+    "Subterranea": (["Subterranean", "Underground", "Cavernous", "Buried", "Nether", "Bedrock", "Hidden", "Chthonic"],
+                    ["Floor", "Hypogeum", "Grotto", "Catacomb", "Mineshaft", "Aquifer", "Root Cellar", "Keep"]),
+    "Period Doubling": (["Halved", "Doubled", "Bifurcating", "Forking", "Branching", "Cascaded", "Split", "Parametric"],
+                        ["Period", "Octave Below", "Fork", "Bifurcation", "Ladder", "Feigenbaum", "Subharmonic", "Faraday"]),
+    "Halo Horizons": (["Haloed", "Converging", "Gathering", "Crowded", "Approaching", "Asymptotic", "Brimming", "Compressed"],
+                      ["Skyline", "Vanishing Point", "Limit", "Asymptote", "Boundary", "Aureole", "Nimbus", "Firmament"]),
+    "Aurora Curtains": (["Wavering", "Draped", "Hanging", "Rippling", "Northern", "Folding", "Glimmering", "Unfurled"],
+                        ["Curtain", "Veil", "Drapery", "Arc of Light", "Corona Band", "Streamer", "Ribbon", "Banner"]),
+    "Rainfall Grains": (["Pattering", "Drizzling", "Spattering", "Dripping", "Sprinkled", "Misting", "Pelting", "Dappled"],
+                        ["Rainfall", "Mizzle", "Sleet", "Hail", "Sprinkle", "Droplet", "Shower", "Spatter"]),
+    "Breathing Grains": (["Granular", "Grained", "Sifted", "Powdered", "Milled", "Sanded", "Seeded", "Dusted"],
+                         ["Grain", "Pollen", "Seed", "Sand", "Silt", "Flour", "Dust Cloud", "Spore"]),
+    "Breather Chains": (["Pulsing", "Throbbing", "Beating", "Heaving", "Lilting", "Swaying", "Rocking", "Nodding"],
+                        ["Breather", "Soliton", "Kink", "Pendulum Chain", "Hump", "Pulse", "Lantern Chain", "Bead"]),
+    "Harmonic Ecology": (["Grazing", "Foraging", "Competing", "Thriving", "Teeming", "Symbiotic", "Feral", "Ecological"],
+                         ["Ecology", "Meadowland", "Biome", "Habitat", "Food Web", "Niche", "Ecosystem", "Commons"]),
+    "Night Ecology": (["Nocturne", "Moonlit", "Dusky", "Owlish", "Dew-Laden", "Shadowed", "Whispering", "Sleeping"],
+                      ["Marsh", "Heath", "Fen", "Bog", "Moor", "Brake", "Hollow", "Spinney"]),
+    "Wild Harmonics": (["Wild", "Untamed", "Unruly", "Restless", "Storm-Torn", "Blustering", "Ragged", "Feverish"],
+                       ["Harmonics", "Overtones", "Partials", "Spectra", "Cyclone", "Squall", "Maelstrom", "Whirlwind"]),
 }
 
 
@@ -1622,7 +1661,7 @@ RECIPES = RECIPES + [v_kaleido, v_tunnel, v_spiral, v_flow, v_feedback, v_rain, 
 # ---- Phase 16 (14.10.2026): swarms and chimeras, the Fluid and the Islands, turbulence, MPE.
 
 LIFE_FLUID, LIFE_ISLANDS = 11, 12
-MPE_T = {"Off": 0, "Level": 1, "Filter": 2, "Brightness": 3, "Width": 4, "Nearer": 5, "Shimmer": 6, "Motion": 7}
+MPE_T = {"Off": 0, "Level": 1, "Filter": 2, "Brightness": 3, "Width": 4, "Nearer": 5, "Shimmer": 6, "Motion": 7, "Breath": 8}
 
 
 def set_swarm(r, state, depth=(0.3, 0.7), rate=(0.1, 1.2), reach=(10, 50)):
@@ -2169,6 +2208,303 @@ def p17_effects(r, group):
                 set_orbit(r)
 
 
+# ---- Phase 26 (15.10.2026): the harmonics' own lives -- registers that overblow, seasons of overtone
+# families, avalanches on a rice pile, subharmonics pumped from below -- and grains, the horizon, breathers.
+
+SLEEP_GROUPS = tuple(GROUPS[32:48])
+
+
+def set_overblow(r, blow=(0.2, 0.45), time=(0.3, 1.5)):
+    """Overblow near its thresholds (the octave from a breath of about 0.26, the twelfth from 0.6): how hard
+    a note is played decides its register, and a note near an edge flickers."""
+    r.set("overblow", f(r.u(*blow), 2))
+    r.set("overblow_time", f(r.lg(*time), 2))
+
+
+def set_breath_press(r, depth=(0.4, 0.9)):
+    """MPE's pressure as the breath (Overblow's, and the subharmonics' pump)."""
+    r.set("mpe_press", MPE_T["Breath"])
+    r.set("mpe_press_depth", f(r.u(*depth), 2))
+
+
+def set_seasons(r, depth=(0.5, 0.9), year=(120, 600)):
+    """The seasons of the overtone families, a whole round in Year seconds."""
+    r.set("seasons", f(r.u(*depth), 2))
+    r.set("season_time", f(r.lg(*year), 0))
+
+
+def set_avalanche(r, depth=(0.5, 0.9), rate=(0.15, 0.6), glow=(0.3, 1.0)):
+    """The rice pile on every note's harmonics: below a grain a second it is mostly still."""
+    r.set("avalanche", f(r.u(*depth), 2))
+    r.set("avalanche_rate", f(r.lg(*rate), 3))
+    r.set("avalanche_glow", f(r.lg(*glow), 2))
+
+
+def set_subs(r, depth=(0.5, 0.9), time=(0.5, 2.0)):
+    """The subharmonics: a loud note grows a floor under it, the slower the nearer its threshold."""
+    r.set("subharmonics", f(r.u(*depth), 2))
+    r.set("sub_time", f(r.lg(*time), 2))
+
+
+def set_horizon(r, amount=(0.6, 1.0), height=(2.0, 4.0), colour=True):
+    """The harmonics bent towards a horizon `height` octaves up -- with their upper harmonics left in, so the
+    halo is heard (colour: a new group's sound may be brightened for it; a preset from before keeps its own)."""
+    r.set("horizon", f(r.u(*amount), 2))
+    r.set("horizon_height", f(r.u(*height), 2))
+    if not colour:
+        return
+    if num(r, "tilt", 1.2) > 1.1:
+        r.set("tilt", f(r.u(0.6, 1.1), 2))
+    if num(r, "brightness", 1.0) < 0.8:
+        r.set("brightness", f(r.u(0.8, 1.0), 2))
+
+
+def set_grains(r, share=(0.5, 1.0), length=(0.02, 0.1), density=(0.03, 0.15)):
+    """A share of the partials in grains, each born at a new place in its cloud."""
+    r.set("grain", f(r.u(*share), 2))
+    r.set("grain_length", f(r.lg(*length), 3))
+    r.set("grain_density", f(r.lg(*density), 3))
+
+
+def set_breathers(r, amount=(0.6, 1.0), lengthen=True):
+    """The ripple as a sine-Gordon chain: its strikes stay as breathers, long-lived (a ripple is set where there
+    is none; one there is kept, its decay lengthened unless the preset is from before and keeps its own)."""
+    if num(r, "ripple_depth", 0.0) <= 0.0:
+        set_ripple(r, (0.5, 0.9), (0.6, 1.5), (15, 30))
+    elif lengthen:
+        r.set("ripple_decay", f(max(num(r, "ripple_decay", 6.0), r.lg(15, 30)), 2))
+    r.set("ripple_breathers", f(r.u(*amount), 2))
+
+
+P26_POOLS = {
+    "blow": [("lfo4", "overblow", (0.1, 0.25)), ("pressure", "overblow", (0.2, 0.4)), ("lfo2", "overblow", (0.08, 0.2))],
+    "season": [("lfo2", "seasons", (0.1, 0.25)), ("root_age", "seasons", (0.1, 0.3))],
+    "avalanche": [("lfo2", "avalanche_rate", (0.1, 0.25)), ("loudness", "avalanche", (0.1, 0.3)),
+                  ("flux", "avalanche_rate", (0.1, 0.2))],
+    "sub": [("pressure", "subharmonics", (0.2, 0.4)), ("lfo3", "subharmonics", (0.1, 0.25)),
+            ("root_age", "subharmonics", (0.15, 0.3))],
+    "horizon": [("lfo3", "horizon_height", (0.08, 0.2)), ("lfo2", "horizon", (0.1, 0.25)),
+                ("lorenz_x", "horizon_height", (0.06, 0.15))],
+    "grain": [("lfo2", "grain_density", (0.1, 0.25)), ("lfo4", "grain_length", (0.05, 0.15)), ("kura1", "grain", (0.1, 0.2))],
+    "breather": [("lfo3", "ripple_breathers", (0.1, 0.2)), ("flux", "ripple_depth", (0.1, 0.2))],
+}
+
+
+def p26_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P26_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        elif src == "lfo4":
+            setup(r, "breath")
+        elif src.startswith("kura"):
+            setup(r, "kura")
+        elif src.startswith(("lorenz", "rossler")):
+            setup(r, "chaos")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def high_register(r, low=(55, 62)):
+    """The conductor up high, so a floor can open under it (and no Foundation: brain_low 55 and up)."""
+    if r.p.get("brain_on") == 0:
+        return
+    lo = r.rng.randint(*low)
+    r.set("brain_low", lo)
+    r.set("brain_high", r.rng.randint(lo + 18, min(lo + 30, 96)))
+
+
+def e_flutes(r):
+    based(r, "Organs", "Air & Noise", "Choirs", "Strings", "Glass")
+    set_overblow(r, (0.2, 0.45), (0.2, 1.0))
+    if r.rng.random() < 0.6:
+        set_breath_press(r)
+    p26_rows(r, ["blow"], 1)
+
+
+def e_registers(r):
+    based(r, *CALM)
+    set_overblow(r, (0.1, 0.3), (0.6, 3.0))
+    setup(r, "breath")
+    r.row("lfo4", "overblow", round(r.u(0.15, 0.3), 3))   # the register rises and falls with a slow breath
+    sleep_rows(r, ["tide"], 1)
+
+
+def e_seasons(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Shimmer", "Sleep Concert", "Bells")
+    set_seasons(r, (0.5, 0.9), (60, 300))
+    p26_rows(r, ["season"], 1)
+
+
+def e_years(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_seasons(r, (0.4, 0.8), (600, 3600))
+    sleep_rows(r, ["breath", "tide"], 2)
+
+
+def e_avalanches(r):
+    based(r, "Bells", "Glass", "Keys", "Strings", "Shimmer", "Microtonal")
+    set_avalanche(r, (0.5, 0.9), (0.15, 0.6), (0.3, 1.0))
+    p26_rows(r, ["avalanche"], 1)
+
+
+def e_glacier(r):
+    based(r, "Dark Drones", "Deep Space", "Shepard & Tides", "Sleep Concert", "Organs")
+    set_avalanche(r, (0.6, 1.0), (0.05, 0.2), (1.0, 3.0))
+    sleep_rows(r, ["tide"], 1)
+
+
+def e_subterranea(r):
+    based(r, "Glass", "Shimmer", "Choirs", "Strings", "Bells")
+    set_subs(r, (0.6, 1.0), (0.8, 3.0))
+    high_register(r)
+    r.row("root_age", "subharmonics", round(r.u(0.15, 0.3), 3))   # the longer the harmony stands, the deeper
+    p26_rows(r, ["sub"], 1)
+
+
+def e_doubling(r):
+    based(r, "Bells", "Organs", "Dark Drones", "Strings", "Choirs")
+    set_subs(r, (0.6, 1.0), (0.3, 1.5))
+    set_breath_press(r)
+    if r.rng.random() < 0.4:   # up and down at once: turbulence above, the subharmonics below
+        set_turb(r, amount=(0.3, 0.7))
+    p26_rows(r, ["sub"], 1)
+
+
+def e_halo(r):
+    based(r, "Choirs", "Organs", "Strings", "Sleep Concert", "Deep Space", "Shimmer")
+    set_horizon(r, (0.7, 1.0), (2.0, 4.0))
+    p26_rows(r, ["horizon"], 1)
+
+
+def e_curtains(r):
+    based(r, "Deep Space", "Shepard & Tides", "Sleep Concert", "Choirs", "Shimmer")
+    set_horizon(r, (0.5, 1.0), (1.5, 3.5))
+    setup(r, "tide")
+    r.row("lfo3", "horizon_height", round(r.u(0.1, 0.25), 3))   # the halo travels like a curtain
+    p26_rows(r, ["horizon"], 1)
+
+
+def e_rain(r):
+    based(r, "Glass", "Bells", "Keys", "Shimmer", "Air & Noise", "Strings")
+    set_grains(r, (0.6, 1.0), (0.015, 0.08), (0.02, 0.12))
+    p26_rows(r, ["grain"], 1)
+
+
+def e_grain_breath(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Organs", "Deep Space", "Air & Noise")
+    set_grains(r, (0.5, 1.0), (0.15, 0.8), (0.25, 0.7))
+    p26_rows(r, ["grain"], 1)
+
+
+def e_breathers(r):
+    based(r, "Keys", "Bells", "Glass", "Strings", "Pendulums", "Waves")
+    set_breathers(r)
+    if r.p.get("brain_on") != 0:   # every change of the conductor's strikes the string
+        r.set("auto_rate", f(r.lg(10, 40), 1))
+    p26_rows(r, ["breather"], 1)
+
+
+def e_ecology(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("blow", "season", "avalanche", "sub") if r.rng.random() < 0.5]
+    if "blow" in kinds:
+        set_overblow(r, (0.15, 0.4), (0.3, 1.5))
+    if "season" in kinds:
+        set_seasons(r, (0.4, 0.8), (90, 480))
+    if "avalanche" in kinds:
+        set_avalanche(r, (0.4, 0.8), (0.1, 0.4), (0.4, 1.2))
+    if "sub" in kinds:
+        set_subs(r, (0.5, 0.9), (0.5, 2.0))
+    p26_rows(r, kinds, 2)
+
+
+def e_night(r):
+    based(r, *CALM)
+    sleepy(r)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("season", "sub", "breather", "grain") if r.rng.random() < 0.5]
+    if "season" in kinds:
+        set_seasons(r, (0.3, 0.7), (900, 3600))
+    if "sub" in kinds:
+        set_subs(r, (0.4, 0.8), (2.0, 6.0))
+    if "breather" in kinds:
+        set_breathers(r, (0.5, 0.9))
+        r.set("ripple_depth", f(min(num(r, "ripple_depth", 0.4), 0.4), 2))
+    if "grain" in kinds:
+        set_grains(r, (0.3, 0.7), (0.3, 1.0), (0.3, 0.7))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def e_wild(r):
+    based(r, *ALL)
+    set_overblow(r, (0.3, 0.7), (0.1, 0.5))
+    set_avalanche(r, (0.7, 1.0), (0.5, 2.0), (0.2, 0.6))
+    if r.rng.random() < 0.5:
+        set_subs(r, (0.6, 1.0), (0.3, 1.0))
+    if r.rng.random() < 0.4:
+        set_grains(r, (0.3, 0.7), (0.02, 0.1), (0.05, 0.2))
+    p26_rows(r, ["blow", "avalanche"], 2)
+
+
+RECIPES = RECIPES + [e_flutes, e_registers, e_seasons, e_years, e_avalanches, e_glacier, e_subterranea, e_doubling,
+                     e_halo, e_curtains, e_rain, e_grain_breath, e_breathers, e_ecology, e_night, e_wild]
+
+
+# The new means in the groups before, where they fit, drawn after everything else (what a preset had stays):
+# kind -> the share of the group's presets that get it. The sleep concerts get the gentle kinds, gently.
+P26_FX = {
+    "Organs": dict(blow=0.2), "Choirs": dict(blow=0.1, season=0.1), "Strings": dict(season=0.1),
+    "Bells": dict(sub=0.15, avalanche=0.1), "Glass": dict(avalanche=0.15, grain=0.1), "Keys": dict(avalanche=0.1),
+    "Dark Drones": dict(sub=0.2, horizon=0.1), "Deep Space": dict(horizon=0.15), "Shimmer": dict(grain=0.15),
+    "Air & Noise": dict(grain=0.2), "Ripples": dict(breather=0.3), "Gong Blooms": dict(sub=0.3),
+    "Bronze Swells": dict(sub=0.25), "Pressure Pads": dict(blow=0.25), "Expressive Voices": dict(blow=0.2),
+    "Snowfall": dict(grain=0.25), "Night Rain": dict(grain=0.25), "Raindrops": dict(grain=0.2),
+    "Warm Drones": dict(season=0.2), "Slow Tides": dict(season=0.2), "Lingering Waves": dict(breather=0.35),
+    "Planetaria": dict(season=0.2), "Celestial Mechanics": dict(season=0.2), "Event Horizons": dict(horizon=0.3),
+    "Gravity Lenses": dict(horizon=0.2), "Living Storms": dict(avalanche=0.25), "Shimmer Cascades": dict(avalanche=0.2),
+}
+
+
+def p26_effects(r, group):
+    """Phase 26 in one of the first ninety-six groups, drawn after everything else (the floor too)."""
+    fx = P26_FX.get(group, {})
+    gentle = group in SLEEP_GROUPS
+    for kind, share in fx.items():
+        if r.rng.random() >= share:
+            continue
+        if kind == "blow":
+            set_overblow(r, (0.15, 0.35), (0.5, 2.0))   # by velocity: their pressure keeps what it moved
+        elif kind == "season":
+            set_seasons(r, (0.3, 0.6) if gentle else (0.4, 0.8), (900, 3600) if gentle else (120, 600))
+        elif kind == "avalanche":
+            set_avalanche(r, (0.4, 0.8), (0.1, 0.4), (0.4, 1.2))
+        elif kind == "sub":
+            set_subs(r, (0.4, 0.8), (1.0, 4.0))
+        elif kind == "horizon":
+            set_horizon(r, (0.4, 0.8), (2.5, 4.5), colour=False)
+        elif kind == "grain":
+            if gentle:
+                set_grains(r, (0.2, 0.5), (0.3, 1.0), (0.3, 0.7))
+            else:
+                set_grains(r, (0.3, 0.7), (0.02, 0.2), (0.05, 0.3))
+        elif kind == "breather":
+            set_breathers(r, (0.5, 0.9), lengthen=False)
+
+
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
     a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was."""
@@ -2200,6 +2536,8 @@ def build():
             if g < 80:   # and phase 17 after that
                 p17_effects(r, group)
             foundation(r)   # and the conductor's floor after everything
+            if g < 96:   # and phase 26 after it, so what a preset had stays as it was
+                p26_effects(r, GROUPS[g])
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
@@ -2214,7 +2552,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 96 groups of 64 (Presets.h).",
+             "/// The factory presets: 112 groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')
