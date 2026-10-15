@@ -404,6 +404,12 @@ public:
     void journeyAddCurrent();
     /** @brief How many presets the journey being written has. @return the count */
     int journeyDraftSteps() const { return static_cast<int>(draft_.steps.size()); }
+    /** @brief The journey being written (the timeline edits it). @return it */
+    const additiv::Journey& journeyDraft() const { return draft_; }
+    /** @brief The journey being written, replaced (a step moved, longer, gone; or a copy of another to edit). @param j the journey */
+    void setJourneyDraft(const additiv::Journey& j) { draft_ = j; }
+    /** @brief The journey under way goes on from another step, gliding into it as into any. @param step its index */
+    void skipJourneyTo(int step);
     /** @brief Writes the journey being written to a file (named after it when it has no name). @param file where @return false when it cannot */
     bool saveJourneyDraft(const juce::File& file);
     /** @} */

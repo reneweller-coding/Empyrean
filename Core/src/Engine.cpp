@@ -1306,6 +1306,12 @@ void Engine::renderBlock()
         for (int i = 0; i < n; ++i) viewScale_[static_cast<size_t>(i)].store(cents[i], std::memory_order_relaxed);
         viewScaleCount_.store(n, std::memory_order_relaxed);
         viewRootHz_.store(static_cast<float>(f0), std::memory_order_relaxed);
+        // Every key's pitch, anew only when what tunes it changed.
+        const double key[5] = { static_cast<double>(scaleChoice_), static_cast<double>(rootPc_), ref, static_cast<double>(blk_.purity), snapKeys_ ? 1.0 : 0.0 };
+        if (!std::equal(std::begin(key), std::end(key), std::begin(noteHzKey_))) {
+            std::copy(std::begin(key), std::end(key), std::begin(noteHzKey_));
+            for (int k = 0; k < 128; ++k) viewNoteHz_[static_cast<size_t>(k)].store(static_cast<float>(frequencyOf(k)), std::memory_order_relaxed);
+        }
     }
 
     // 1. The played notes that are due, in the order they came, each on its own sample.

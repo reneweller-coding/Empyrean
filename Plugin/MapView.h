@@ -24,8 +24,10 @@ public:
     void resized() override;
     /** @brief A click: on a preset the cursor goes there, elsewhere to that place; with Shift a waypoint is added. @param e the click */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief The cursor follows the mouse. @param e the drag */
+    /** @brief The cursor follows the mouse -- or the waypoint taken. @param e the drag */
     void mouseDrag(const juce::MouseEvent& e) override;
+    /** @brief A waypoint let go. @param e the release */
+    void mouseUp(const juce::MouseEvent& e) override;
     /** @brief The preset under the mouse, for its name. @param e the move */
     void mouseMove(const juce::MouseEvent& e) override;
     /** @brief No name when the mouse has left. @param e the exit */
@@ -46,6 +48,9 @@ private:
     AdditivProcessor& proc_;            ///< whose bank and cursor
     juce::Image points_;                ///< every preset's point, drawn once per size
     int hover_ = -1;                    ///< the preset under the mouse, -1 none
+    int dragPoint_ = -1;                ///< the waypoint being moved, -1 none
+    /** @brief The waypoint at a point. @param p pixels @return its index, -1 none */
+    int waypointAt(juce::Point<float> p) const;
 };
 
 /** @brief The route editor beside the map. */

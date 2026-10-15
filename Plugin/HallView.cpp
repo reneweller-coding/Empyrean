@@ -40,6 +40,8 @@ HallView::HallView(AdditivProcessor& proc) : proc_(proc)
 
 void HallView::timerCallback()
 {
+    // Not over a stroke, nor before the engine has taken it in (a block or two).
+    if (painting_ || juce::Time::getMillisecondCounterHiRes() - paintedAt_ < 400.0) return;
     proc_.engine().hallMemory(memory_, age_);
     const juce::String s = statusText();
     if (status_.getText() != s) status_.setText(s, juce::dontSendNotification);
@@ -69,6 +71,60 @@ void HallView::resized()
     save_.setBounds(16, h - 34, 28, 26);
     load_.setBounds(48, h - 34, 28, 26);
     new_.setBounds(84, h - 34, 90, 26);
+}
+
+void HallView::mouseDown(const juce::MouseEvent& e)
+{
+    if (!plot().contains(e.position) || memory_.size() != static_cast<size_t>(additiv::kHallBins)) return;
+    painting_ = true;
+    // The memory acts only while the hall grows from it: Grow switched on (a little) for the painting to be heard.
+    if (proc_.value(static_cast<int>(ParamId::HallGrow)) == 0.0f) {
+        proc_.setValue(static_cast<int>(ParamId::HallGrow), 0.4f);
+        note_ = "Grow set to 0.4 so that the painted memory is heard";
+    } else {
+        note_.clear();
+    }
+    if (proc_.value(static_cast<int>(ParamId::ModalLevel)) <= 0.0f) note_ = "The modal hall is off (Modal Hall at 0): turn it up to hear what is painted";
+    last_ = e.position;
+    paintStroke(e.position, e.position);
+}
+
+void HallView::mouseDrag(const juce::MouseEvent& e)
+{
+    if (!painting_) return;
+    paintStroke(last_, e.position);
+    last_ = e.position;
+}
+
+void HallView::mouseUp(const juce::MouseEvent&)
+{
+    painting_ = false;
+    paintedAt_ = juce::Time::getMillisecondCounterHiRes();
+}
+
+void HallView::paintStroke(juce::Point<float> from, juce::Point<float> to)
+{
+    const juce::Rectangle<float> r = plot();
+    // Height to the memory a band needs for that many octaves of decay at Grow 1 (the curve's own scale, inverted).
+    auto memoryAt = [&r](float y) {
+        const float oct = std::clamp((r.getBottom() - y) / r.getHeight() * 2.0f - 0.5f, -0.5f, 1.5f);
+        return std::exp2(oct + 1.0f) - 1.0f;
+    };
+    auto binAt = [&r](float x) { return (x - r.getX()) / r.getWidth() * static_cast<float>(additiv::kHallBins); };
+    const float b0 = binAt(from.x), b1 = binAt(to.x);
+    const float lo = std::min(b0, b1), hi = std::max(b0, b1);
+    constexpr float kBrush = 10.0f;   // bands either side: about two semitones
+    for (int b = std::max(0, static_cast<int>(lo - 3.0f * kBrush)); b < std::min(additiv::kHallBins, static_cast<int>(hi + 3.0f * kBrush) + 1); ++b) {
+        const float fb = static_cast<float>(b) + 0.5f;
+        const float t = hi > lo ? std::clamp((fb - b0) / (b1 - b0), 0.0f, 1.0f) : 0.0f;
+        const float want = memoryAt(from.y + (to.y - from.y) * t);
+        const float d = fb < lo ? lo - fb : (fb > hi ? fb - hi : 0.0f);
+        const float w = std::exp(-0.5f * (d / kBrush) * (d / kBrush));
+        float& m = memory_[static_cast<size_t>(b)];
+        m += (want - m) * w;
+    }
+    proc_.engine().setHallMemory(memory_, age_);
+    repaint();
 }
 
 void HallView::paint(juce::Graphics& g)
@@ -118,6 +174,10 @@ void HallView::paint(juce::Graphics& g)
     g.fillPath(fill);
     g.setColour(learning ? colour : colour.withAlpha(0.5f));
     g.strokePath(curve, juce::PathStrokeType(1.5f));
+    g.setColour(skin.dim);
+    g.setFont(juce::FontOptions(11.0f));
+    g.drawText(note_.isNotEmpty() ? note_ : juce::String("Paint the memory with the mouse: up, the modes there ring longer; down, shorter"),
+               r.withHeight(14.0f).translated(0.0f, 2.0f), juce::Justification::centredRight);
 }
 
 void HallView::save()
@@ -199,5 +259,5 @@ juce::String HallPage::describe() const
            "band by band over the octaves, a step of Memory (a minute to four hours) towards the spectrum while anything sounds. "
            "Growth lets the bands it heard much ring longer -- a room that grows into the music played in it; erosion lets them "
            "ring shorter, so it wears away where it was used and the rest rings on. The memory stays through every preset, is "
-           "kept with the session, and a hall can be saved, loaded, or begun anew.\n";
+           "kept with the session, and a hall can be saved, loaded, or begun anew. The curve can be painted with the mouse: above the line the memory rises, below it falls (with Grow at nothing, painting sets it to 0.4, so that it is heard).\n";
 }

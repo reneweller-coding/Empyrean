@@ -190,9 +190,33 @@ void MapView::paint(juce::Graphics& g)
     }
 }
 
+int MapView::waypointAt(juce::Point<float> p) const
+{
+    const additiv::Route& r = proc_.route();
+    for (int i = r.count() - 1; i >= 0; --i)
+        if (toScreen(r.point(i).x, r.point(i).y).getDistanceFrom(p) <= 9.0f) return i;
+    return -1;
+}
+
 void MapView::mouseDown(const juce::MouseEvent& e)
 {
     if (!plane().expanded(4.0f).contains(e.position)) return;
+    // A waypoint: dragged where it should be, or (right-click) removed.
+    if (const int w = waypointAt(e.position); w >= 0) {
+        if (e.mods.isPopupMenu()) {
+            juce::PopupMenu m;
+            m.addItem("Remove waypoint " + juce::String(w + 1), [this, w] {
+                proc_.removeWaypoint(w);
+                repaint();
+            });
+            m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withTargetScreenArea(juce::Rectangle<int>(e.getScreenX(), e.getScreenY(), 1, 1)));
+            return;
+        }
+        if (!e.mods.isShiftDown()) {
+            dragPoint_ = w;
+            return;
+        }
+    }
     const int hit = presetAt(e.position, 7.0f);
     const auto m = toMap(e.position);
     if (e.mods.isShiftDown()) {   // a waypoint: the preset under the mouse, or this place
@@ -210,10 +234,29 @@ void MapView::mouseDown(const juce::MouseEvent& e)
 
 void MapView::mouseDrag(const juce::MouseEvent& e)
 {
+    if (dragPoint_ >= 0 && dragPoint_ < proc_.route().count()) {   // the waypoint follows; over a preset it snaps to it
+        additiv::Waypoint w = proc_.route().point(dragPoint_);
+        const int hit = presetAt(e.position, 7.0f);
+        float x = 0.0f, y = 0.0f;
+        if (hit >= 0) additiv::presetMapPosition(hit, x, y);
+        else {
+            const auto m = toMap(e.position);
+            x = m.x;
+            y = m.y;
+        }
+        w.x = std::clamp(x, 0.0f, 1.0f);
+        w.y = std::clamp(y, 0.0f, 1.0f);
+        w.preset = hit;
+        proc_.setWaypoint(dragPoint_, w);
+        repaint();
+        return;
+    }
     if (e.mods.isShiftDown()) return;
     const auto m = toMap(e.position);
     proc_.moveCursor(m.x, m.y);
 }
+
+void MapView::mouseUp(const juce::MouseEvent&) { dragPoint_ = -1; }
 
 void MapView::mouseMove(const juce::MouseEvent& e) { hover_ = plane().expanded(4.0f).contains(e.position) ? presetAt(e.position, 7.0f) : -1; }
 
@@ -465,7 +508,7 @@ juce::String MapPage::describe() const
     return params_.describe() + route_.describe()
          + "\nThe map lays every preset on a square: across from darker to brighter, up from still to moving. With Map on, the "
            "sound is the blend of the presets round the cursor (Radius: how far, in the spacing of the presets there), and it follows the cursor over Map Glide. Click "
-           "a preset to go there, drag to wander; Shift-click adds a waypoint. A route walks the cursor from waypoint to waypoint: "
+           "a preset to go there, drag to wander; Shift-click adds a waypoint, a waypoint dragged moves (over a preset it snaps to it), a right-click removes it. A route walks the cursor from waypoint to waypoint: "
            "each reached over its travel time -- the time the sound takes to turn into the next -- and held for its hold time, "
            "Route Speed faster or slower, round and round with Loop.\n";
 }

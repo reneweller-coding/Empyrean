@@ -17,7 +17,7 @@ JourneyView::JourneyView(AdditivProcessor& proc) : proc_(proc)
         s.name.setColour(juce::Label::textColourId, additivui::skin().ink);
         s.name.setFont(juce::FontOptions(13.0f));
         s.fromSound.setTooltip(juce::String("Slot ") + (k == 0 ? "A" : "B") + " takes the sound as it plays now: every knob and the matrix");
-        s.fromPreset.setTooltip(juce::String("Slot ") + (k == 0 ? "A" : "B") + " takes a preset from the bank");
+        s.fromPreset.setTooltip(juce::String("Slot ") + (k == 0 ? "A" : "B") + " takes a preset from the bank, or one of your snapshots");
         s.fromSound.onClick = [this, k] { proc_.setSlotFromSound(k); };
         s.fromPreset.onClick = [this, k] { choosePreset(k); };
         addAndMakeVisible(s.name);
@@ -95,6 +95,12 @@ void JourneyView::timerCallback()
 void JourneyView::choosePreset(int slot)
 {
     juce::PopupMenu bank;
+    const auto& shots = proc_.snapshots();   // the Focus page's snapshots first: a morph between two of one's own
+    if (!shots.empty()) {
+        bank.addSectionHeader("Snapshots (Focus page)");
+        for (size_t k = 0; k < shots.size(); ++k) bank.addItem(100000 + static_cast<int>(k), "Snapshot " + juce::String(static_cast<int>(k) + 1));
+        bank.addSeparator();
+    }
     for (int g = 0; g < additiv::kNumPresetGroups; ++g) {
         if (g == 0) bank.addSectionHeader("Sounds");
         if (g == additiv::kNumSoundGroups) bank.addSectionHeader("Living Systems");
@@ -112,7 +118,8 @@ void JourneyView::choosePreset(int slot)
     }
     juce::Component* target = &slots_[slot & 1].fromPreset;
     bank.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(target), [this, slot](int id) {
-        if (id > 0) proc_.setSlotFromPreset(slot, id - 1);
+        if (id >= 100000) proc_.snapshotToSlot(id - 100000, slot);
+        else if (id > 0) proc_.setSlotFromPreset(slot, id - 1);
     });
 }
 
@@ -186,7 +193,7 @@ juce::String JourneyView::describe() const
     s << "\nA preset chosen glides from the sound before it over Glide (0: at once). With Morph on, the sound is the blend of the two "
          "slots at A - B: every number on its way, the filter fading from one into the other, a motion or a living landscape fading "
          "out where it changes and in again. A journey holds each of its presets for a time drawn from its range and glides into the "
-         "next; the journeys that come with the instrument are made from the bank (Whole Night: about six and a half hours round).\n";
+         "next; the journeys that come with the instrument are made from the bank (Whole Night: about six and a half hours round). The timeline shows the journey chosen: a click on a step goes there. Below it, the one being written: drag a step's edge (how long it stays), its ramp (how long it glides in), the step itself (its place); right-click removes it; Edit a copy takes the journey above to change. A morph slot takes a snapshot of the Focus page too (Preset ..., first in the menu).\n";
     return s;
 }
 
@@ -212,11 +219,92 @@ void JourneyPage::resized()
 
 // ========================================================================================================= timeline
 
-JourneyTimeline::JourneyTimeline(AdditivProcessor& proc, const JourneyView& view) : proc_(proc), view_(view) { startTimerHz(2); }
+JourneyTimeline::JourneyTimeline(AdditivProcessor& proc, const JourneyView& view) : proc_(proc), view_(view)
+{
+    copy_.setTooltip("Takes the journey above into the one being written, to edit here and save with the disk above");
+    copy_.onClick = [this] {
+        additiv::Journey j;
+        if (!upper(j)) return;
+        j.name = j.name.empty() ? std::string("My Journey") : j.name + " (mine)";
+        proc_.setJourneyDraft(j);
+        repaint();
+    };
+    addAndMakeVisible(copy_);
+    startTimerHz(2);
+}
 
 void JourneyTimeline::timerCallback()
 {
     if (isShowing()) repaint();
+}
+
+bool JourneyTimeline::upper(additiv::Journey& out) const
+{
+    if (proc_.journeyPlayer().running()) {
+        out = proc_.journeyPlayer().journey();
+        return true;
+    }
+    return view_.chosen(out);
+}
+
+juce::Rectangle<float> JourneyTimeline::band(int which) const
+{
+    auto r = getLocalBounds().toFloat().reduced(18.0f, 0.0f).withTrimmedTop(28.0f).withTrimmedBottom(6.0f);
+    if (proc_.journeyDraftSteps() == 0) return which == 0 ? r.withTrimmedBottom(20.0f) : juce::Rectangle<float>();
+    const float h = (r.getHeight() - 20.0f - 22.0f) / 2.0f;   // two bands, the hours under the first, a title over the second
+    return which == 0 ? r.withHeight(h) : r.withTrimmedTop(h + 20.0f + 22.0f);
+}
+
+std::vector<JourneyTimeline::Block> JourneyTimeline::blocks(const additiv::Journey& j, juce::Rectangle<float> r)
+{
+    std::vector<Block> out;
+    double total = 0.0;
+    for (const additiv::JourneyStep& s : j.steps) total += 0.5 * (s.fadeLo + s.fadeHi) + 0.5 * (s.dwellLo + s.dwellHi);
+    if (total <= 0.0) return out;
+    double t = 0.0;
+    for (const additiv::JourneyStep& s : j.steps) {
+        Block b;
+        b.x0 = r.getX() + r.getWidth() * static_cast<float>(t / total);
+        t += 0.5 * (s.fadeLo + s.fadeHi);
+        b.xg = r.getX() + r.getWidth() * static_cast<float>(t / total);
+        t += 0.5 * (s.dwellLo + s.dwellHi);
+        b.x1 = r.getX() + r.getWidth() * static_cast<float>(t / total);
+        out.push_back(b);
+    }
+    return out;
+}
+
+void JourneyTimeline::drawBand(juce::Graphics& g, const additiv::Journey& j, juce::Rectangle<float> r, int lit, double done, bool faint) const
+{
+    const frame::Skin& skin = additivui::skin();
+    const juce::Colour hue = skin.family(frame::Family::Motion);
+    const auto bs = blocks(j, r);
+    g.setFont(juce::FontOptions(11.0f));
+    for (size_t i = 0; i < bs.size(); ++i) {
+        const Block& b = bs[i];
+        const bool now = static_cast<int>(i) == lit;
+        const juce::Colour c = now ? hue : (faint ? skin.raised : skin.raised.brighter(0.15f));
+        juce::Path ramp;   // the glide: rising into the step
+        ramp.startNewSubPath(b.x0, r.getBottom());
+        ramp.lineTo(b.xg, r.getY());
+        ramp.lineTo(b.xg, r.getBottom());
+        ramp.closeSubPath();
+        g.setColour(c.withAlpha(now ? 0.35f : 0.6f));
+        g.fillPath(ramp);
+        g.setColour(c.withAlpha(now ? 0.35f : 0.8f));
+        g.fillRect(juce::Rectangle<float>::leftTopRightBottom(b.xg, r.getY(), b.x1 - 1.0f, r.getBottom()));
+        if (now) {
+            g.setColour(hue.withAlpha(0.85f));
+            g.fillRect(juce::Rectangle<float>::leftTopRightBottom(b.xg, r.getY(), b.xg + (b.x1 - 1.0f - b.xg) * static_cast<float>(done), r.getBottom()));
+        }
+        if (static_cast<int>(i) == dropAt_ && r == band(1)) {   // where a moved block would land
+            g.setColour(skin.accent);
+            g.fillRect(b.x0 - 1.5f, r.getY() - 2.0f, 3.0f, r.getHeight() + 4.0f);
+        }
+        g.setColour(now ? skin.bg : skin.ink.withAlpha(faint ? 0.55f : 0.85f));
+        g.drawFittedText(j.steps[i].preset, juce::Rectangle<float>(b.xg + 4.0f, r.getY() + 2.0f, std::max(0.0f, b.x1 - b.xg - 8.0f), r.getHeight() - 4.0f).toNearestInt(),
+                         juce::Justification::centredLeft, 2, 0.7f);
+    }
 }
 
 void JourneyTimeline::paint(juce::Graphics& g)
@@ -227,67 +315,165 @@ void JourneyTimeline::paint(juce::Graphics& g)
     g.fillRoundedRectangle(b, skin.radius);
     g.setColour(skin.edge);
     g.drawRoundedRectangle(b.reduced(0.5f), skin.radius, 1.0f);
+    const juce::Colour hue = skin.family(frame::Family::Motion);
     const additiv::JourneyPlayer& player = proc_.journeyPlayer();
-    additiv::Journey j;
     const bool running = player.running();
-    if (running) j = player.journey();
-    else if (!view_.chosen(j)) {
-        g.setColour(skin.dim);
-        g.setFont(juce::FontOptions(12.5f));
+    additiv::Journey j;
+    const bool any = upper(j);
+    double total = 0.0;
+    for (const additiv::JourneyStep& s : j.steps) total += 0.5 * (s.fadeLo + s.fadeHi) + 0.5 * (s.dwellLo + s.dwellHi);
+    g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
+    g.setColour(running ? hue : skin.dim);
+    if (!any) {
         g.drawText("Choose a journey in the box above: its steps are drawn here over time, the one under way lit while it runs.",
-                   b.reduced(18.0f, 0.0f), juce::Justification::centredLeft);
+                   b.reduced(18.0f, 4.0f).withHeight(20.0f), juce::Justification::centredLeft);
+    } else {
+        juce::String head = juce::String(j.name) + "   " + juce::String(static_cast<int>(j.steps.size())) + " steps, about "
+                            + juce::String(additiv::Journey::timeText(total)) + (j.cyclic ? ", then again" : "");
+        if (running) head << "   -- step " << (player.step() + 1) << ", " << juce::String(additiv::Journey::timeText(player.remaining())) << " left in it (click a step: there)";
+        else head << "   (not under way: a click on a step starts it there)";
+        g.drawText(head, b.reduced(18.0f, 4.0f).withHeight(20.0f).withTrimmedRight(120.0f), juce::Justification::centredLeft);
+        const auto r0 = band(0);
+        double done = 0.0;
+        if (running && player.step() >= 0 && player.step() < static_cast<int>(j.steps.size())) {
+            const additiv::JourneyStep& s = j.steps[static_cast<size_t>(player.step())];
+            done = juce::jlimit(0.0, 1.0, 1.0 - player.remaining() / std::max(0.5 * (s.dwellLo + s.dwellHi), 1.0));
+        }
+        drawBand(g, j, r0, running ? player.step() : -1, done, !running);
+        g.setColour(skin.dim);   // the hours under it
+        g.setFont(juce::FontOptions(11.0f));
+        const double every = total > 4.0 * 3600.0 ? 3600.0 : (total > 3600.0 ? 1800.0 : 600.0);
+        for (double h = 0.0; total > 0.0 && h <= total; h += every) {
+            const float x = r0.getX() + r0.getWidth() * static_cast<float>(h / total);
+            g.drawVerticalLine(juce::roundToInt(x), r0.getBottom(), r0.getBottom() + 4.0f);
+            g.drawText(juce::String(additiv::Journey::timeText(h)), juce::Rectangle<float>(x - 30.0f, r0.getBottom() + 4.0f, 60.0f, 14.0f), juce::Justification::centred);
+        }
+    }
+    // The one being written, to edit.
+    const additiv::Journey& d = proc_.journeyDraft();
+    if (!d.steps.empty()) {
+        const auto r1 = band(1);
+        double dt = 0.0;
+        for (const additiv::JourneyStep& s : d.steps) dt += 0.5 * (s.fadeLo + s.fadeHi) + 0.5 * (s.dwellLo + s.dwellHi);
+        g.setColour(skin.accent);
+        g.setFont(juce::FontOptions(12.5f, juce::Font::bold));
+        g.drawText("Being written: " + juce::String(d.name.empty() ? "your journey" : d.name) + ", " + juce::String(static_cast<int>(d.steps.size()))
+                       + " steps, about " + juce::String(additiv::Journey::timeText(dt))
+                       + "   -- drag an edge: how long it stays; the ramp: how long it glides; the block: where it goes; right-click: remove",
+                   juce::Rectangle<float>(r1.getX(), r1.getY() - 21.0f, r1.getWidth(), 18.0f), juce::Justification::centredLeft);
+        drawBand(g, d, r1, -1, 0.0, false);
+    }
+}
+
+void JourneyTimeline::resized() { copy_.setBounds(getWidth() - 118, 5, 104, 20); }
+
+int JourneyTimeline::draftAt(juce::Point<float> p, Drag& drag) const
+{
+    drag = Drag::None;
+    const auto r = band(1);
+    if (r.isEmpty() || !r.expanded(4.0f).contains(p)) return -1;
+    const auto bs = blocks(proc_.journeyDraft(), r);
+    for (size_t i = 0; i < bs.size(); ++i) {
+        const Block& b = bs[i];
+        if (p.x < b.x0 || p.x > b.x1 + 4.0f) continue;
+        if (p.x >= b.x1 - 6.0f) drag = Drag::Dwell;
+        else if (p.x < b.xg) drag = Drag::Glide;
+        else drag = Drag::Move;
+        return static_cast<int>(i);
+    }
+    return -1;
+}
+
+void JourneyTimeline::mouseMove(const juce::MouseEvent& e)
+{
+    Drag d = Drag::None;
+    draftAt(e.position, d);
+    setMouseCursor(d == Drag::Dwell || d == Drag::Glide ? juce::MouseCursor::LeftRightResizeCursor
+                   : d == Drag::Move                     ? juce::MouseCursor::DraggingHandCursor
+                                                         : juce::MouseCursor::NormalCursor);
+}
+
+void JourneyTimeline::mouseDown(const juce::MouseEvent& e)
+{
+    // The journey above: a click on a step goes there (starting the one chosen there when none runs).
+    const auto r0 = band(0);
+    additiv::Journey j;
+    if (r0.contains(e.position) && upper(j)) {
+        const auto bs = blocks(j, r0);
+        for (size_t i = 0; i < bs.size(); ++i)
+            if (e.position.x >= bs[i].x0 && e.position.x < bs[i].x1) {
+                if (!proc_.journeyPlayer().running()) {
+                    for (const auto& entry : proc_.journeys())
+                        if (entry.name.toStdString() == j.name || (entry.builtin >= 0 && juce::String(j.name) == entry.name)) {
+                            proc_.startJourney(entry);
+                            break;
+                        }
+                }
+                proc_.skipJourneyTo(static_cast<int>(i));
+                repaint();
+                return;
+            }
         return;
     }
-    // Each step as long as it lasts on average: its glide in, then its dwell.
+    // The one being written.
+    Drag d = Drag::None;
+    const int i = draftAt(e.position, d);
+    if (i < 0) return;
+    if (e.mods.isPopupMenu()) {
+        juce::PopupMenu m;
+        m.addItem("Remove " + juce::String(proc_.journeyDraft().steps[static_cast<size_t>(i)].preset), [this, i] {
+            additiv::Journey dj = proc_.journeyDraft();
+            dj.steps.erase(dj.steps.begin() + i);
+            proc_.setJourneyDraft(dj);
+            repaint();
+        });
+        m.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(this).withTargetScreenArea(juce::Rectangle<int>(e.getScreenX(), e.getScreenY(), 1, 1)));
+        return;
+    }
+    drag_ = d;
+    dragStep_ = i;
+    dragX_ = e.position.x;
+    before_ = proc_.journeyDraft().steps[static_cast<size_t>(i)];
     double total = 0.0;
-    std::vector<double> glide, dwell;
-    for (const additiv::JourneyStep& s : j.steps) {
-        glide.push_back(0.5 * (s.fadeLo + s.fadeHi));
-        dwell.push_back(0.5 * (s.dwellLo + s.dwellHi));
-        total += glide.back() + dwell.back();
+    for (const additiv::JourneyStep& s : proc_.journeyDraft().steps) total += 0.5 * (s.fadeLo + s.fadeHi) + 0.5 * (s.dwellLo + s.dwellHi);
+    perPixel_ = total / std::max(1.0f, band(1).getWidth());
+    startTimerHz(10);
+}
+
+void JourneyTimeline::mouseDrag(const juce::MouseEvent& e)
+{
+    if (drag_ == Drag::None || dragStep_ < 0 || dragStep_ >= proc_.journeyDraftSteps()) return;
+    additiv::Journey dj = proc_.journeyDraft();
+    additiv::JourneyStep& s = dj.steps[static_cast<size_t>(dragStep_)];
+    const double moved = (e.position.x - dragX_) * perPixel_;   // seconds, on the scale the drag began with
+    if (drag_ == Drag::Dwell || drag_ == Drag::Glide) {
+        const double lo = drag_ == Drag::Dwell ? before_.dwellLo : before_.fadeLo, hi = drag_ == Drag::Dwell ? before_.dwellHi : before_.fadeHi;
+        const double mean = 0.5 * (lo + hi), least = drag_ == Drag::Dwell ? 30.0 : 0.0;
+        const double now = std::max(least, mean + (drag_ == Drag::Glide ? -moved : moved));   // the ramp: dragged left, a longer glide
+        const double k = mean > 0.0 ? now / mean : 1.0;   // the span kept in proportion
+        const double newLo = mean > 0.0 ? lo * k : now, newHi = mean > 0.0 ? hi * k : now;
+        if (drag_ == Drag::Dwell) { s.dwellLo = newLo; s.dwellHi = newHi; }
+        else { s.fadeLo = newLo; s.fadeHi = newHi; }
+        proc_.setJourneyDraft(dj);
+    } else {   // the block: where it would land
+        Drag ignored = Drag::None;
+        dropAt_ = draftAt({ e.position.x, band(1).getCentreY() }, ignored);
     }
-    const juce::Colour lit = skin.family(frame::Family::Motion);
-    g.setColour(running ? lit : skin.dim);
-    g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
-    juce::String head = juce::String(j.name) + "   " + juce::String(static_cast<int>(j.steps.size())) + " steps, about " + juce::String(additiv::Journey::timeText(total))
-                        + (j.cyclic ? ", then again" : "");
-    if (running) head << "   -- step " << (player.step() + 1) << ", " << juce::String(additiv::Journey::timeText(player.remaining())) << " left in it";
-    else head << "   (not under way)";
-    g.drawText(head, b.reduced(18.0f, 4.0f).withHeight(20.0f), juce::Justification::centredLeft);
-    const auto band = b.reduced(18.0f, 0.0f).withTrimmedTop(32.0f).withTrimmedBottom(26.0f);
-    if (total <= 0.0 || band.getWidth() < 20.0f) return;
-    double t = 0.0;
-    g.setFont(juce::FontOptions(11.0f));
-    for (size_t i = 0; i < j.steps.size(); ++i) {
-        const float x0 = band.getX() + band.getWidth() * static_cast<float>(t / total);
-        const float xg = band.getX() + band.getWidth() * static_cast<float>((t + glide[i]) / total);
-        t += glide[i] + dwell[i];
-        const float x1 = band.getX() + band.getWidth() * static_cast<float>(t / total);
-        const bool now = running && static_cast<int>(i) == player.step();
-        const juce::Colour c = now ? lit : (running ? skin.raised.brighter(0.15f) : skin.raised);
-        juce::Path ramp;   // the glide: rising into the step
-        ramp.startNewSubPath(x0, band.getBottom());
-        ramp.lineTo(xg, band.getY());
-        ramp.lineTo(xg, band.getBottom());
-        ramp.closeSubPath();
-        g.setColour(c.withAlpha(now ? 0.35f : 0.6f));
-        g.fillPath(ramp);
-        g.setColour(c.withAlpha(now ? 0.35f : 0.8f));
-        g.fillRect(juce::Rectangle<float>::leftTopRightBottom(xg, band.getY(), x1 - 1.0f, band.getBottom()));
-        if (now) {   // how far the dwell has gone
-            const double done = juce::jlimit(0.0, 1.0, 1.0 - player.remaining() / std::max(dwell[i], 1.0));
-            g.setColour(lit.withAlpha(0.85f));
-            g.fillRect(juce::Rectangle<float>::leftTopRightBottom(xg, band.getY(), xg + (x1 - 1.0f - xg) * static_cast<float>(done), band.getBottom()));
-        }
-        g.setColour(now ? skin.bg : skin.ink.withAlpha(running ? 0.8f : 0.55f));
-        g.drawFittedText(j.steps[i].preset, juce::Rectangle<float>(xg + 4.0f, band.getY() + 2.0f, std::max(0.0f, x1 - xg - 8.0f), band.getHeight() - 4.0f).toNearestInt(),
-                         juce::Justification::centredLeft, 2, 0.7f);
+    repaint();
+}
+
+void JourneyTimeline::mouseUp(const juce::MouseEvent&)
+{
+    if (drag_ == Drag::Move && dropAt_ >= 0 && dropAt_ != dragStep_ && dragStep_ < proc_.journeyDraftSteps()) {
+        additiv::Journey dj = proc_.journeyDraft();
+        const additiv::JourneyStep s = dj.steps[static_cast<size_t>(dragStep_)];
+        dj.steps.erase(dj.steps.begin() + dragStep_);
+        dj.steps.insert(dj.steps.begin() + std::min(dropAt_, static_cast<int>(dj.steps.size())), s);
+        proc_.setJourneyDraft(dj);
     }
-    // Hours under the band.
-    g.setColour(skin.dim);
-    for (double h = 0.0; h <= total; h += total > 4.0 * 3600.0 ? 3600.0 : (total > 3600.0 ? 1800.0 : 600.0)) {
-        const float x = band.getX() + band.getWidth() * static_cast<float>(h / total);
-        g.drawVerticalLine(juce::roundToInt(x), band.getBottom(), band.getBottom() + 4.0f);
-        g.drawText(juce::String(additiv::Journey::timeText(h)), juce::Rectangle<float>(x - 30.0f, band.getBottom() + 5.0f, 60.0f, 14.0f), juce::Justification::centred);
-    }
+    drag_ = Drag::None;
+    dragStep_ = -1;
+    dropAt_ = -1;
+    startTimerHz(2);
+    repaint();
 }

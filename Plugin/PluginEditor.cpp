@@ -700,6 +700,12 @@ void AdditivEditor::shootStep()
         for (const auto& entry : proc_.journeys())
             if (journeyName.isNotEmpty() && entry.name == journeyName) {
                 proc_.startJourney(entry);
+                // ADDITIV_SHOT_DRAFT: and a copy of it as the journey being written (the timeline's second band).
+                if (juce::SystemStats::getEnvironmentVariable("ADDITIV_SHOT_DRAFT", {}).isNotEmpty()) {
+                    additiv::Journey copy = proc_.journeyPlayer().journey();
+                    copy.name += " (mine)";
+                    proc_.setJourneyDraft(copy);
+                }
                 break;
             }
         // ADDITIV_SHOT_UNDO: after a drop (ADDITIV_SHOT_DROP), Undo at four seconds -- the matrix as it was.

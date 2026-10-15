@@ -11,6 +11,8 @@
 #include "ParamPage.h"
 #include "PluginProcessor.h"
 
+#include <vector>
+
 /** @brief The tuning's picture (see the file comment). */
 class TuningView final : public juce::Component, private juce::Timer {
 public:
@@ -20,8 +22,22 @@ public:
     void paint(juce::Graphics& g) override;
     /** @brief The picture in words, for the help. @return the text */
     juce::String describe() const;
+    /** @brief A click on a line of the scale plays it (in the octave clicked); with Shift it is held, with the others held. @param e the press */
+    void mouseDown(const juce::MouseEvent& e) override;
+    /** @brief The note let go -- unless held. @param e the release */
+    void mouseUp(const juce::MouseEvent& e) override;
+    /** @brief Every held note let go when the page is left. */
+    void visibilityChanged() override;
 
 private:
+    /** @brief The ruler's area. @return pixels */
+    juce::Rectangle<float> area() const;
+    /** @brief The root's equal-tempered pitch, never nothing. @return hertz */
+    float rootHz0() const;
+    /** @brief Lets every note go. */
+    void releaseAll();
+    int playing_ = -1;              ///< the note the mouse plays, -1 none
+    std::vector<int> held_;         ///< the notes held with Shift
     /** @brief Fifteen times a second while it is seen. */
     void timerCallback() override;
 

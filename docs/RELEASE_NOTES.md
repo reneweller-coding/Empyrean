@@ -54,7 +54,13 @@ presets.
   every change to the matrix -- and a preset's matrix with the preset, which it did not before.
 - **Spans and links:** Lowest - Highest and Hold Min - Max as one bar with two ends; a chain links an echo's Time L and R.
 - **Tuning shows the tuning:** the octave over the root with the scale's pitches in cents off the steps, and the voices
-  where they sound, Self-Tune's pull as a tail. **Journeys** get a timeline of their steps.
+  where they sound, Self-Tune's pull as a tail; a click on a line plays it, Shift-click holds it, so an interval can
+  be heard locking. **Journeys** get a timeline of their steps: a click goes to a step; the journey being written is
+  changed there by hand (a step's edge, its glide's ramp, its place; right-click removes it), and Edit a copy makes one
+  of the instrument's journeys yours.
+- **By hand:** the hall's memory painted with the mouse (Grow comes on at 0.4 when it was at nothing); the map's
+  waypoints dragged (snapping to a preset) and removed with a right-click; a morph slot takes a snapshot of the Focus
+  page.
 - **Words in the palette:** "dark calm wide" (or dunkel, ruhig, breit ...) finds the presets measured so.
 - **Zoom** (100 - 150 %) in the settings, beside the window's size; the last page comes back; the foundation's key is
   underlined in the picture.

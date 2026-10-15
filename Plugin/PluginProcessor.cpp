@@ -1020,6 +1020,14 @@ juce::String AdditivProcessor::journeyStatus() const
     return s;
 }
 
+void AdditivProcessor::skipJourneyTo(int step)
+{
+    if (!journeyPlayer_.running() || journey_.steps.empty()) return;
+    journeyPlayer_.start(journey_, static_cast<std::uint64_t>(juce::Time::currentTimeMillis()) | 1ull, step);
+    journeyLastTick_ = 0.0;
+    journeyTick();   // the step begins now
+}
+
 void AdditivProcessor::journeyAddCurrent()
 {
     const int cp = currentPreset();

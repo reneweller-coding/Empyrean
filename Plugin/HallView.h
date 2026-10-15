@@ -24,8 +24,16 @@ public:
     void paint(juce::Graphics& g) override;
     /** @brief What it shows, in words. @return the text */
     juce::String describe() const;
+    /** @brief A stroke begins: the memory painted where the mouse is. @param e the press */
+    void mouseDown(const juce::MouseEvent& e) override;
+    /** @brief The stroke goes on, every band between the last place and this one painted. @param e the drag */
+    void mouseDrag(const juce::MouseEvent& e) override;
+    /** @brief The stroke ends. @param e the release */
+    void mouseUp(const juce::MouseEvent& e) override;
 
 private:
+    /** @brief Paints the memory along a stroke, a soft brush round each band. @param from where the stroke was @param to where it is */
+    void paintStroke(juce::Point<float> from, juce::Point<float> to);
     /** @brief The memory fetched anew, a few times a second. */
     void timerCallback() override;
     /** @brief The curve's area in the box. @return pixels */
@@ -40,6 +48,10 @@ private:
     AdditivProcessor& proc_;                       ///< the processor
     std::vector<float> memory_;                    ///< the memory as last fetched, kHallBins bands, 1 the average
     double age_ = 0.0;                             ///< its seconds learnt
+    bool painting_ = false;                        ///< a stroke is under way: the memory is not fetched over it
+    double paintedAt_ = 0.0;                       ///< when the last stroke ended (ms): the engine takes it at its next block
+    juce::Point<float> last_;                      ///< where the stroke was
+    juce::String note_;                            ///< what the painting did besides (Grow switched on ...)
     /** @brief Saves the hall. */
     frame::IconButton save_{ frame::IconButton::Icon::Save, "Writes the hall's memory into Documents/Empyrean/Halls under a name" };
     /** @brief Loads a hall. */

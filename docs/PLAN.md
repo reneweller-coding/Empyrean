@@ -526,6 +526,23 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 24: Hand anlegen -- Zeitleiste, Hallgedächtnis, Wegpunkte, Hörlineal (gebaut, 15.10.2026, 0.15.0)
+
+Nutzer: „Ja bitte, setze das um.“ (vierte Kritik, mein angepasster Plan; keine Routenvorschau, kein Auto-Füllen):
+- **Journey-Zeitleiste:** oben die gewählte/laufende Reise, Klick auf einen Schritt springt dorthin
+  (`skipJourneyTo`, startet sie, wenn keine läuft); unten der Entwurf (`journeyDraft`/`setJourneyDraft`): rechte
+  Kante = Verweilen, Rampe = Gleiten (nach links länger), Block = Reihenfolge (Einfügemarke), Rechtsklick entfernt;
+  Spannen lo/hi skalieren proportional, Pixelmaß beim Ziehbeginn fest. „Edit a copy“ übernimmt die obere Reise.
+- **Hallgedächtnis malen:** Gauß-Pinsel über 10 Bänder, Höhe -> Oktaven -0,5..1,5 -> Gedächtnis `2^(oct+1)-1`
+  (`Engine::setHallMemory`); Grow 0 -> 0,4 mit Hinweis, Modal Hall 0 -> Hinweis.
+- **Wegpunkte:** ziehen (rastet auf Presets ein), Rechtsklick entfernt; Menüs an der Maus statt unter der Fläche.
+- **Hörlineal (Tuning):** Klick auf eine Skalenlinie spielt die nächste Taste dieser Tonhöhe (`Engine::noteHz`, aus der
+  Tastenzuordnung gerechnet) in der Oktave der Höhe; Shift hält, Verlassen der Seite lässt los.
+- **Snapshots** im „Preset ...“-Menü der Morph-Slots (zuerst, `snapshotToSlot`).
+- Mit echter Maus geprüft. Fallstrick beim Testen: ein synthetischer Rechtsklick auf ein JUCE-Menü lässt die rechte
+  Taste in Windows gedrückt (GetAsyncKeyState), danach verwirft JUCE jeden Linksklick als Zweitklick -- vor dem
+  Weitertesten `mouse_event(RIGHTUP)`; Menüpunkte per Tastatur oder Down/Up mit Pause wählen.
+
 ## Phase 23: Feinschliff nach der dritten Kritik, ASIO (gebaut, 15.10.2026, 0.15.0)
 
 Nutzer: „baue das alles ein, auch das ASIO SDK“ (die Kritikpunkte und meine Vorschläge):

@@ -315,6 +315,8 @@ public:
     }
     /** @brief The root's equal-tempered pitch, the panel's zero for cents. Any thread. @return hertz */
     float rootHz() const { return viewRootHz_.load(std::memory_order_relaxed); }
+    /** @brief A key's pitch as the scale, the root, A4 and Purity tune it now (before Tide and Self-Tune), for the panel. Any thread. @param note MIDI @return hertz */
+    float noteHz(int note) const { return note >= 0 && note < 128 ? viewNoteHz_[static_cast<size_t>(note)].load(std::memory_order_relaxed) : 0.0f; }
 
     /** @brief Callbacks that found the ring short (real time only). @return count since prepare() */
     std::uint64_t underruns() const { return underruns_.load(std::memory_order_relaxed); }
@@ -850,6 +852,8 @@ private:
     std::array<std::atomic<float>, 48> viewScale_{};                 ///< the scale folded into an octave, cents over the root (scaleCents)
     std::atomic<int> viewScaleCount_{ 0 };                           ///< how many
     std::atomic<float> viewRootHz_{ 261.63f };                       ///< the root's equal-tempered pitch (rootHz)
+    std::array<std::atomic<float>, 128> viewNoteHz_{};               ///< every key's pitch (noteHz)
+    double noteHzKey_[5] = { -1, -1, -1, -1, -1 };                   ///< what they were worked out for: scale, root, A4, Purity, keys
 };
 
 } // namespace additiv

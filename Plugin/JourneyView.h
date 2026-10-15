@@ -70,22 +70,60 @@ private:
 
 /**
  * @brief The journey's timeline: its steps as a band over time, each as wide as it lasts (its glide a ramp into it),
- *        the preset's name on it; the step under way lit and filling as its time runs. Before a journey runs, the
- *        one chosen in the box, faint.
+ *        the preset's name on it; the step under way lit and filling as its time runs, and a click on another goes
+ *        there. Before a journey runs, the one chosen in the box, faint. Under it, once one is being written, the
+ *        player's own journey to edit by the hand: a block's right edge dragged sets how long it stays, its ramp how
+ *        long it glides in, the block itself dragged moves it, a right-click removes it. "Edit a copy" takes the
+ *        journey above into it.
  */
 class JourneyTimeline final : public juce::Component, private juce::Timer {
 public:
     /** @brief The timeline of @p proc's journeys. @param proc the processor @param view the box it previews */
     JourneyTimeline(AdditivProcessor& proc, const JourneyView& view);
-    /** @brief The band, the steps, where the journey is. @param g where */
+    /** @brief The bands, the steps, where the journey is. @param g where */
     void paint(juce::Graphics& g) override;
+    /** @brief The copy button. */
+    void resized() override;
+    /** @brief A step clicked (skip there), or a stroke on the one being written begins. @param e the press */
+    void mouseDown(const juce::MouseEvent& e) override;
+    /** @brief The edge, the ramp or the block follows. @param e the drag */
+    void mouseDrag(const juce::MouseEvent& e) override;
+    /** @brief A moved block lands where it was let go. @param e the release */
+    void mouseUp(const juce::MouseEvent& e) override;
+    /** @brief The cursor says what a drag would do. @param e the move */
+    void mouseMove(const juce::MouseEvent& e) override;
 
 private:
-    /** @brief Twice a second while it is seen. */
+    /** @brief One step's place in a band: where its glide begins, where it stands, where it ends. */
+    struct Block {
+        float x0 = 0.0f;   ///< the glide's start
+        float xg = 0.0f;   ///< the step's own start
+        float x1 = 0.0f;   ///< its end
+    };
+    /** @brief What a drag on the journey being written does. */
+    enum class Drag { None, Dwell, Glide, Move };
+    /** @brief Twice a second while it is seen (ten while a drag is on). */
     void timerCallback() override;
+    /** @brief The journey above: the one under way, else the one chosen. @param out receives it @return false when there is none */
+    bool upper(additiv::Journey& out) const;
+    /** @brief A band's rectangle. @param which 0 the journey above, 1 the one being written @return pixels */
+    juce::Rectangle<float> band(int which) const;
+    /** @brief The blocks of a journey in a band, on its own time scale. @param j the journey @param r the band @return them */
+    static std::vector<Block> blocks(const additiv::Journey& j, juce::Rectangle<float> r);
+    /** @brief Draws a journey in a band. @param g where @param j the journey @param r the band @param lit the step lit, -1 none @param done how far it has gone, 0 .. 1 @param faint drawn faint */
+    void drawBand(juce::Graphics& g, const additiv::Journey& j, juce::Rectangle<float> r, int lit, double done, bool faint) const;
+    /** @brief The block of the one being written under a point. @param p the point @param drag receives what a drag there does @return its index, -1 none */
+    int draftAt(juce::Point<float> p, Drag& drag) const;
 
-    AdditivProcessor& proc_;    ///< whose journeys
-    const JourneyView& view_;   ///< the box
+    AdditivProcessor& proc_;            ///< whose journeys
+    const JourneyView& view_;           ///< the box
+    juce::TextButton copy_{ "Edit a copy" };   ///< the journey above into the one being written
+    Drag drag_ = Drag::None;            ///< the drag under way
+    int dragStep_ = -1;                 ///< its step
+    float dragX_ = 0.0f;                ///< where it began
+    double perPixel_ = 1.0;             ///< seconds a pixel when it began (the scale held while dragging)
+    additiv::JourneyStep before_;       ///< the step as it was when it began
+    int dropAt_ = -1;                   ///< where a moved block would land, -1 nowhere
 };
 
 /** @brief The Journey page: its knobs (the glide, the morph) above, the slots and journeys below, the timeline under them. */
@@ -106,7 +144,7 @@ public:
     juce::String describe() const { return params_.describe() + view_.describe(); }
 
 private:
-    static constexpr int kTimelineMin = 110;   ///< the timeline's least height
+    static constexpr int kTimelineMin = 110;   ///< the timeline's least height (it takes what the page leaves; two bands once a journey is being written)
     ParamPage params_;          ///< the glide and the morph's knobs
     JourneyView view_;          ///< the slots and the journeys
     JourneyTimeline timeline_;  ///< the journey over time
