@@ -11,6 +11,7 @@
  *        is a "+" that keeps the sound. Teach: a macro learns a gesture by example -- Teach, move the
  *        knobs, set the macro, Set here (or Cancel); a taught macro has a small x to forget it. Find: a
  *        recording, opened or dropped, and the presets that sound most like it (also ringed on the map).
+ * @author Rene Weller
  */
 #pragma once
 
@@ -26,13 +27,26 @@
 /** @brief One variation's tile: what it changes; held, it is listened to. */
 class VariationTile final : public juce::Component {
 public:
-    /** @brief Tile @p k of @p proc's variations. @param proc the processor @param k 0 .. 5 */
+    /**
+     * @brief Tile @p k of @p proc's variations.
+     * @param[in,out] proc  the processor
+     * @param[in]     k     0 .. 5
+     */
     VariationTile(AdditivProcessor& proc, int k) : m_proc(proc), m_k(k) {}
-    /** @brief Its number and what it changes. */
+    /**
+     * @brief Its number and what it changes.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief Listens to it. @param e the press */
+    /**
+     * @brief Listens to it.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief Back to the sound before. @param e the release */
+    /**
+     * @brief Back to the sound before.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
     /** @brief It was listened to (its Keep is shown). */
     std::function<void(int)> m_onHeard;
@@ -49,37 +63,63 @@ public:
     using UndoableT = std::function<void(const juce::String&, std::function<void()>)>;
     /**
      * @brief Builds the page.
-     * @param proc      the processor
-     * @param actions   the knobs' right-click menu
-     * @param live      the live rings
-     * @param undoable  wraps a change into one undo step (the editor's history)
-     * @param picture   the partials as the picture shows them now, small (a snapshot's)
+     * @param[in,out] proc      the processor
+     * @param[in]     actions   the knobs' right-click menu
+     * @param[in,out] live      the live rings
+     * @param[in]     undoable  wraps a change into one undo step (the editor's history)
+     * @param[in]     picture   the partials as the picture shows them now, small (a snapshot's)
      */
     FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, UndoableT undoable,
               std::function<juce::Image()> picture);
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const;
     /** @brief The boxes from the top. */
     void resized() override;
-    /** @brief The boxes and their titles. */
+    /**
+     * @brief The boxes and their titles.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The page in words. @return the text */
     juce::String describe() const;
-    /** @brief A recording dragged over the page. @param files the files @return true for one WAV or FLAC */
+    /**
+     * @brief A recording dragged over the page.
+     * @param[in] files  the files
+     * @return true for one WAV or FLAC
+     */
     bool isInterestedInFileDrag(const juce::StringArray& files) override;
-    /** @brief A recording dropped: the presets like it. @param files the files @param x where @param y where */
+    /**
+     * @brief A recording dropped: the presets like it.
+     * @param[in] files  the files
+     * @param[in] x      where
+     * @param[in] y      where
+     */
     void filesDropped(const juce::StringArray& files, int x, int y) override;
 
 private:
     /** @brief The focus anew when what matters changed; the statuses. */
     void timerCallback() override;
-    /** @brief The focus box's knobs anew. @param ids the knobs */
+    /**
+     * @brief The focus box's knobs anew.
+     * @param[in] ids  the knobs
+     */
     void rebuildFocus(const std::vector<additiv::ParamIdE>& ids);
-    /** @brief Searches the presets like a recording. @param f the file */
+    /**
+     * @brief Searches the presets like a recording.
+     * @param[in] f  the file
+     */
     void find(const juce::File& f);
     /** @brief The search's results into their buttons. */
     void showFound();
-    /** @brief The boxes' rectangles at a width. @param w pixels @return nudge, snapshots, focus, variations, teach, find */
+    /**
+     * @brief The boxes' rectangles at a width.
+     * @param[in] w  pixels
+     * @return nudge, snapshots, focus, variations, teach, find
+     */
     std::array<juce::Rectangle<int>, 6> boxes(int w) const;
     /** @brief A snapshot's tile: its picture; a click recalls it, a right-click offers A, B, forget. */
     class SnapshotTile;

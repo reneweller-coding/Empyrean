@@ -1,6 +1,7 @@
 /**
  * @file PresetMap.cpp
  * @brief The preset map (PresetMap.h); the places themselves are generated (PresetMap.inc).
+ * @author Rene Weller
  */
 #include "additiv/PresetMap.h"
 

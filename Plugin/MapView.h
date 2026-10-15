@@ -4,6 +4,7 @@
  *        the cursor that blends the presets round it, and the routes over it -- waypoints with the
  *        time to travel to each (how long the sound takes to turn into the next) and to stay. The map zooms
  *        (the wheel, round the mouse) and moves (a right- or middle-drag), with an overview in its corner.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -17,25 +18,55 @@
 /** @brief The map itself (see the file comment). */
 class MapView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The map of @p proc's bank. @param proc the processor */
+    /**
+     * @brief The map of @p proc's bank.
+     * @param[in,out] proc  the processor
+     */
     explicit MapView(AdditivProcessor& proc);
-    /** @brief The points (cached), the axes, the route, the neighbours, the cursor, the overview, the name under the mouse. @param g where */
+    /**
+     * @brief The points (cached), the axes, the route, the neighbours, the cursor, the overview, the name under the
+     *        mouse.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The cached points and the overview are drawn again at the new size. */
     void resized() override;
-    /** @brief A click: on a preset the cursor goes there, elsewhere to that place; with Shift a waypoint is added. @param e the click */
+    /**
+     * @brief A click: on a preset the cursor goes there, elsewhere to that place; with Shift a waypoint is added.
+     * @param[in] e  the click
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief The cursor follows the mouse -- or the waypoint taken. @param e the drag */
+    /**
+     * @brief The cursor follows the mouse -- or the waypoint taken.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override;
-    /** @brief A waypoint let go. @param e the release */
+    /**
+     * @brief A waypoint let go.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
-    /** @brief The preset under the mouse, for its name. @param e the move */
+    /**
+     * @brief The preset under the mouse, for its name.
+     * @param[in] e  the move
+     */
     void mouseMove(const juce::MouseEvent& e) override;
-    /** @brief No name when the mouse has left. @param e the exit */
+    /**
+     * @brief No name when the mouse has left.
+     * @param[in] e  the exit
+     */
     void mouseExit(const juce::MouseEvent& e) override;
-    /** @brief The wheel zooms round the mouse; sideways it moves the view. @param e the event @param wheel how far */
+    /**
+     * @brief The wheel zooms round the mouse; sideways it moves the view.
+     * @param[in] e      the event
+     * @param[in] wheel  how far
+     */
     void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& wheel) override;
-    /** @brief A pinch zooms round the mouse. @param e the event @param scaleFactor how much nearer */
+    /**
+     * @brief A pinch zooms round the mouse.
+     * @param[in] e            the event
+     * @param[in] scaleFactor  how much nearer
+     */
     void mouseMagnify(const juce::MouseEvent& e, float scaleFactor) override;
 
 private:
@@ -47,27 +78,65 @@ private:
     bool zoomed() const;
     /** @brief What the view follows: the cursor with the map on (or no preset chosen), else the preset playing. @return its place on the map */
     juce::Point<float> focus() const;
-    /** @brief Whether a place on the map is in the view. @param x across @param y up @return true when it is */
+    /**
+     * @brief Whether a place on the map is in the view.
+     * @param[in] x  across
+     * @param[in] y  up
+     * @return true when it is
+     */
     bool inView(float x, float y) const;
-    /** @brief A view kept on the map, between the whole of it and the closest. @param v the view @return it, kept */
+    /**
+     * @brief A view kept on the map, between the whole of it and the closest.
+     * @param[in] v  the view
+     * @return it, kept
+     */
     static juce::Rectangle<float> clampView(juce::Rectangle<float> v);
-    /** @brief Shows a part of the map. @param v the part (x, y up, its size) @param stopGlide whether a glide after the cursor ends */
+    /**
+     * @brief Shows a part of the map.
+     * @param[in] v          the part (x, y up, its size)
+     * @param[in] stopGlide  whether a glide after the cursor ends
+     */
     void setView(juce::Rectangle<float> v, bool stopGlide = true);
-    /** @brief Zooms with the place under a screen point kept there. @param s the point @param factor nearer above 1 */
+    /**
+     * @brief Zooms with the place under a screen point kept there.
+     * @param[in] s       the point
+     * @param[in] factor  nearer above 1
+     */
     void zoomAt(juce::Point<float> s, float factor);
-    /** @brief The view centred on a place, its size kept. @param x across @param y up */
+    /**
+     * @brief The view centred on a place, its size kept.
+     * @param[in] x  across
+     * @param[in] y  up
+     */
     void centreOn(float x, float y);
-    /** @brief The points of the presets in the view drawn into the cache. @param names whether their names are written where there is room */
+    /**
+     * @brief The points of the presets in the view drawn into the cache.
+     * @param[in] names  whether their names are written where there is room
+     */
     void drawPoints(bool names);
     /** @brief The whole map, small, for the overview. */
     void drawOverview();
     /** @brief The plane's square in the component. @return it */
     juce::Rectangle<float> plane() const;
-    /** @brief A place on the map on the screen. @param x across @param y up @return the point */
+    /**
+     * @brief A place on the map on the screen.
+     * @param[in] x  across
+     * @param[in] y  up
+     * @return the point
+     */
     juce::Point<float> toScreen(float x, float y) const;
-    /** @brief The place under a screen point, clamped. @param p the point @return (x, y) on the map */
+    /**
+     * @brief The place under a screen point, clamped.
+     * @param[in] p  the point
+     * @return (x, y) on the map
+     */
     juce::Point<float> toMap(juce::Point<float> p) const;
-    /** @brief The preset whose point is within reach of a screen point. @param p the point @param reach pixels @return its index, -1 none */
+    /**
+     * @brief The preset whose point is within reach of a screen point.
+     * @param[in] p      the point
+     * @param[in] reach  pixels
+     * @return its index, -1 none
+     */
     int presetAt(juce::Point<float> p, float reach) const;
 
     AdditivProcessor& m_proc;            ///< whose bank and cursor
@@ -86,18 +155,28 @@ private:
     juce::TextButton m_whole{ "Whole map" };   ///< back to the whole map (shown while zoomed in)
     int m_hover = -1;                    ///< the preset under the mouse, -1 none
     int m_dragPoint = -1;                ///< the waypoint being moved, -1 none
-    /** @brief The waypoint at a point. @param p pixels @return its index, -1 none */
+    /**
+     * @brief The waypoint at a point.
+     * @param[in] p  pixels
+     * @return its index, -1 none
+     */
     int waypointAt(juce::Point<float> p) const;
 };
 
 /** @brief The route editor beside the map. */
 class RouteView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The routes of @p proc. @param proc the processor */
+    /**
+     * @brief The routes of @p proc.
+     * @param[in,out] proc  the processor
+     */
     explicit RouteView(AdditivProcessor& proc);
     /** @brief The rows. */
     void resized() override;
-    /** @brief The box and its headings. */
+    /**
+     * @brief The box and its headings.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The height it needs with its waypoints. @return pixels */
     int idealHeight() const;
@@ -119,7 +198,10 @@ private:
     void rebuild();
     /** @brief Fills the route box. */
     void refreshRoutes();
-    /** @brief A row's fields written into its waypoint. @param i the row */
+    /**
+     * @brief A row's fields written into its waypoint.
+     * @param[in] i  the row
+     */
     void commit(int i);
     /** @brief Asks for a name and writes the route into the routes folder. */
     void save();
@@ -152,12 +234,16 @@ class MapPage final : public juce::Component {
 public:
     /**
      * @brief Builds the page.
-     * @param proc     the processor
-     * @param actions  the controls' right-click menu
-     * @param live     the live rings
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the controls' right-click menu
+     * @param[in,out] live     the live rings
      */
     MapPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const;
     /** @brief The map left from the top, the knobs and the routes right. */
     void resized() override;

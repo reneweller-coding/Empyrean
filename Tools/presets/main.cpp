@@ -29,6 +29,7 @@
  *
  * Each preset plays the same chord (D3 A3 D4 F#4) with the conductor off, its attack shortened to
  * at most half a second and the master at 0 dB; the level is the RMS of its loudest second.
+ * @author Rene Weller
  */
 #include "additiv/Describe.h"
 #include "additiv/Engine.h"
@@ -71,12 +72,12 @@ fs::path repoRoot()
 
 /**
  * @brief One preset's level, and what it sounds like.
- * @param index    the preset
- * @param seconds  how long to play
- * @param error    receives the reason when the engine does not open
- * @param desc     receives the description of the last eight seconds, when not null
- * @param overrides  knobs set after the preset's (the sensitivity mode)
- * @return         dBFS RMS of the loudest second; NaN on failure
+ * @param[in]  index      the preset
+ * @param[in]  seconds    how long to play
+ * @param[out] error      receives the reason when the engine does not open
+ * @param[out] desc       receives the description of the last eight seconds, when not null
+ * @param[in]  overrides  knobs set after the preset's (the sensitivity mode)
+ * @return dBFS RMS of the loudest second; NaN on failure
  */
 double measure(int index, double seconds, std::string* error, Description* desc, const std::vector<std::pair<ParamIdE, float>>& overrides = {})
 {
@@ -140,10 +141,10 @@ const ParamIdE Sensed[] = {
  * @brief The sensitivity mode: per preset its measure, then each knob of Sensed moved by 0.15 of its
  *        travel (down when it stands high) and the preset measured again; per knob the change of the
  *        five measures (brightness, motion, width, noise, level) for a whole travel, one JSON line each.
- * @param which    the presets
- * @param seconds  how long each plays
- * @param out      the file
- * @return         0 on success
+ * @param[in] which    the presets
+ * @param[in] seconds  how long each plays
+ * @param[in] out      the file
+ * @return 0 on success
  */
 int sensitivity(const std::vector<int>& which, double seconds, const fs::path& out)
 {
@@ -183,9 +184,9 @@ int sensitivity(const std::vector<int>& which, double seconds, const fs::path& o
 /**
  * @brief The nudge check: around each preset every nudge (four measures, both ways, a quarter of a
  *        spread), the change the sensitivities predict against the change measured, and the level's.
- * @param which    the presets
- * @param seconds  how long each plays
- * @return         0 on success
+ * @param[in] which    the presets
+ * @param[in] seconds  how long each plays
+ * @return 0 on success
  */
 int nudgeCheck(const std::vector<int>& which, double seconds)
 {
@@ -217,11 +218,11 @@ int nudgeCheck(const std::vector<int>& which, double seconds)
 
 /**
  * @brief The register mode (see the file comment): one JSON line per preset.
- * @param which      the presets
- * @param seconds    how long each plays
- * @param out        the file
- * @param overrides  knobs set after the preset's
- * @return           0 on success
+ * @param[in] which      the presets
+ * @param[in] seconds    how long each plays
+ * @param[in] out        the file
+ * @param[in] overrides  knobs set after the preset's
+ * @return 0 on success
  */
 int registerMode(const std::vector<int>& which, double seconds, const fs::path& out, const std::vector<std::pair<ParamIdE, float>>& overrides)
 {
@@ -320,9 +321,9 @@ int registerMode(const std::vector<int>& which, double seconds, const fs::path& 
 
 /**
  * @brief Measures the presets asked for and writes their levels as JSON (name: dBFS).
- * @param argc  argument count
- * @param argv  arguments
- * @return      0 on success
+ * @param[in]     argc  argument count
+ * @param[in,out] argv  arguments
+ * @return 0 on success
  */
 int main(int argc, char** argv)
 {

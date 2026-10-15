@@ -1,6 +1,7 @@
 /**
  * @file TuningView.cpp
  * @brief The Tuning page and its picture (TuningView.h).
+ * @author Rene Weller
  */
 #include "TuningView.h"
 

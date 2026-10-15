@@ -1,6 +1,7 @@
 /**
  * @file CloudView.cpp
  * @brief The cloud picture (CloudView.h).
+ * @author Rene Weller
  */
 #include "CloudView.h"
 

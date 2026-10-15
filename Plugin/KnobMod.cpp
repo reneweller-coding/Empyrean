@@ -1,6 +1,7 @@
 /**
  * @file KnobMod.cpp
  * @brief Modulation at the knob (KnobMod.h).
+ * @author Rene Weller
  */
 #include "KnobMod.h"
 
@@ -42,7 +43,11 @@ constexpr Section Sections[] = {
     { "The reservoir", ModSourceE::RESERVOIR1, ModSourceE::RESERVOIR4 },
 };
 
-/** @brief A row's name: its source, and its via source when it has one. @param r the row @return the name */
+/**
+ * @brief A row's name: its source, and its via source when it has one.
+ * @param[in] r  the row
+ * @return the name
+ */
 juce::String rowName(const ModRow& r)
 {
     juce::String s(additiv::ModSourceNames[static_cast<int>(r.m_source)]);
@@ -53,7 +58,11 @@ juce::String rowName(const ModRow& r)
 /** @brief One row on the knob in its menu: its source, its depth to drag, a button that removes it. */
 class RowItem final : public juce::PopupMenu::CustomComponent {
 public:
-    /** @brief Row @p row of @p proc's matrix. @param proc the processor @param row 0 .. ModRows-1 */
+    /**
+     * @brief Row @p row of @p proc's matrix.
+     * @param[in,out] proc  the processor
+     * @param[in]     row   0 .. ModRows-1
+     */
     RowItem(AdditivProcessor& proc, int row) : juce::PopupMenu::CustomComponent(false), m_proc(proc), m_row(row)
     {
         const ModRow r = m_proc.engine().modRow(m_row);
@@ -81,7 +90,11 @@ public:
         for (juce::Component* c : { static_cast<juce::Component*>(&m_name), static_cast<juce::Component*>(&m_depth), static_cast<juce::Component*>(&m_remove) })
             addAndMakeVisible(c);
     }
-    /** @brief A row's size in the menu. @param w width @param h height */
+    /**
+     * @brief A row's size in the menu.
+     * @param[in,out] w  width
+     * @param[in,out] h  height
+     */
     void getIdealSize(int& w, int& h) override
     {
         w = 340;

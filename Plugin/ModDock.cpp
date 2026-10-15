@@ -1,6 +1,7 @@
 /**
  * @file ModDock.cpp
  * @brief The modulation dock and the source inspector (ModDock.h).
+ * @author Rene Weller
  */
 #include "ModDock.h"
 
@@ -22,7 +23,11 @@ constexpr ModSourceE Classic[] = { ModSourceE::LFO1,   ModSourceE::LFO2,   ModSo
                                    ModSourceE::MACRO1, ModSourceE::MACRO2, ModSourceE::MACRO3, ModSourceE::MACRO4,   ModSourceE::MOD_WHEEL, ModSourceE::PRESSURE,
                                    ModSourceE::VELOCITY, ModSourceE::RANDOM };
 
-/** @brief Whether a source always has a chip. @param s the source @return true then */
+/**
+ * @brief Whether a source always has a chip.
+ * @param[in] s  the source
+ * @return true then
+ */
 bool classic(ModSourceE s) { return std::find(std::begin(Classic), std::end(Classic), s) != std::end(Classic); }
 
 constexpr int ToggleW = 112;   ///< the dock's button
@@ -32,11 +37,11 @@ constexpr int ChipMax = 86;    ///< its greatest
 
 /**
  * @brief Draws a trace: bipolar about the middle, unipolar from the floor.
- * @param g      where
- * @param r      the area
- * @param dock   whose traces
- * @param s      the source
- * @param width  the line's width
+ * @param[in,out] g      where
+ * @param[in]     r      the area
+ * @param[in]     dock   whose traces
+ * @param[in]     s      the source
+ * @param[in]     width  the line's width
  */
 void drawTrace(juce::Graphics& g, juce::Rectangle<float> r, const ModDock& dock, ModSourceE s, float width)
 {

@@ -1,6 +1,7 @@
 /**
  * @file Theme.cpp
  * @brief The instrument's skin (Theme.h).
+ * @author Rene Weller
  */
 #include "Theme.h"
 

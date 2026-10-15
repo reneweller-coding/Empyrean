@@ -1,6 +1,7 @@
 /**
  * @file PluginEditor.cpp
  * @brief The panel (PluginEditor.h).
+ * @author Rene Weller
  */
 #include "PluginEditor.h"
 
@@ -22,12 +23,16 @@ using additiv::ParamIdE;
 
 namespace {
 
-constexpr const char* App = "Empyrean";   ///< the settings' name (application data/<name>)
+constexpr const char* App = "Empyrean";   ///< the settings' name (application data/\<name\>)
 
 /** @brief A page in a viewport: it scrolls only where the window is smaller than the page. */
 class ScrollPage final : public juce::Viewport {
 public:
-    /** @brief Holds @p page, which needs @p heightFor at a width. @param page the page (owned) @param heightFor its height at a width */
+    /**
+     * @brief Holds @p page, which needs @p heightFor at a width.
+     * @param[in,out] page       the page (owned)
+     * @param[in]     heightFor  its height at a width
+     */
     ScrollPage(juce::Component* page, std::function<int(int)> heightFor) : m_page(page), m_heightFor(std::move(heightFor))
     {
         setViewedComponent(page, true);
@@ -42,7 +47,11 @@ public:
     }
     /** @brief The height the page needs at the viewport's width. @return pixels */
     int pageHeight() const { return m_heightFor(getMaximumVisibleWidth()); }
-    /** @brief The height the page needs at width @p w. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at width @p w.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightAt(int w) const { return m_heightFor(w); }
 
 private:
@@ -57,16 +66,27 @@ private:
  */
 class MatrixPage final : public juce::Component {
 public:
-    /** @brief Builds the page. @param proc the processor @param choose a source clicked */
+    /**
+     * @brief Builds the page.
+     * @param[in,out] proc    the processor
+     * @param[in]     choose  a source clicked
+     */
     MatrixPage(AdditivProcessor& proc, std::function<void(additiv::ModSourceE)> choose) : m_proc(proc), m_sources(proc), m_matrix(proc)
     {
         m_sources.m_onChoose = std::move(choose);
         addAndMakeVisible(m_matrix);
         addAndMakeVisible(m_sources);
     }
-    /** @brief The source the inspector shows, marked among the traces. @param s the source */
+    /**
+     * @brief The source the inspector shows, marked among the traces.
+     * @param[in] s  the source
+     */
     void setChosen(additiv::ModSourceE s) { m_sources.setChosen(s); }
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const
     {
         if (beside(w)) return 10 + std::max(MatrixView::heightFor(1), SourcesView::heightFor(w - 30 - MatrixW)) + 10;
@@ -98,7 +118,11 @@ public:
 private:
     static constexpr int MatrixW = 600;   ///< the rows' column, beside the sources
     AdditivProcessor& m_proc;               ///< whose
-    /** @brief The sources fit beside the rows' column. @param w the page's width @return true then */
+    /**
+     * @brief The sources fit beside the rows' column.
+     * @param[in] w  the page's width
+     * @return true then
+     */
     static bool beside(int w) { return w - 30 - MatrixW >= 440; }
     SourcesView m_sources;  ///< every source, live
     MatrixView m_matrix;    ///< the rows
@@ -1080,7 +1104,11 @@ void AdditivEditor::setCanvas(bool on)
     resized();
 }
 
-/** @brief Every ParamPage under a component, depth first. @param c the component @param out receives them */
+/**
+ * @brief Every ParamPage under a component, depth first.
+ * @param[in,out] c    the component
+ * @param[out]    out  receives them
+ */
 static void findParamPages(juce::Component* c, std::vector<ParamPage*>& out)
 {
     if (c == nullptr) return;

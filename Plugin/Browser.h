@@ -5,6 +5,7 @@
  *        sound -- darker or brighter, stiller or more moving, narrower or wider, purer or airier -- and
  *        by who plays it (the conductor, or the hands). Hold a row's play mark to listen (the sound
  *        glides there and back), double-click or Enter to take it.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -18,7 +19,10 @@ class PresetBrowser final : public juce::Component, private juce::ListBoxModel, 
 public:
     /** @brief A preset taken from the browser: its factory index, or the player's (index into userPresets()). */
     std::function<void(int factory, int user)> m_onChoose;
-    /** @brief The browser of @p proc's presets. @param proc the processor */
+    /**
+     * @brief The browser of @p proc's presets.
+     * @param[in,out] proc  the processor
+     */
     explicit PresetBrowser(AdditivProcessor& proc);
     /** @brief Lets go of the lists. */
     ~PresetBrowser() override;
@@ -26,13 +30,23 @@ public:
     void open();
     /** @brief Closes it (a preset listened to is let go). */
     void close();
-    /** @brief The dimmed window and the panel. */
+    /**
+     * @brief The dimmed window and the panel.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The search, the categories, the traits, the list. */
     void resized() override;
-    /** @brief A click beside the panel closes it. @param e the click */
+    /**
+     * @brief A click beside the panel closes it.
+     * @param[in] e  the click
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief Esc closes, Enter takes the chosen one. @param key the key @return true when used */
+    /**
+     * @brief Esc closes, Enter takes the chosen one.
+     * @param[in] key  the key
+     * @return true when used
+     */
     bool keyPressed(const juce::KeyPress& key) override;
 
 private:
@@ -62,7 +76,10 @@ private:
 
     /** @brief The entries that pass every filter, in order. */
     void filter();
-    /** @brief Takes a shown entry. @param row its row */
+    /**
+     * @brief Takes a shown entry.
+     * @param[in] row  its row
+     */
     void choose(int row);
     /** @brief The panel's rectangle. @return pixels */
     juce::Rectangle<int> panel() const;
@@ -70,11 +87,23 @@ private:
     int getNumRows() override;
     /** @brief Unused: the rows are components (Row). */
     void paintListBoxItem(int, juce::Graphics&, int, int, bool) override {}
-    /** @brief A row's component. */
+    /**
+     * @brief A row's component.
+     * @param[in]     row       the row
+     * @param[in]     selected  true for the chosen row
+     * @param[in,out] existing  the component to reuse, or null
+     * @return the row's component
+     */
     juce::Component* refreshComponentForRow(int row, bool selected, juce::Component* existing) override;
-    /** @brief Double-click takes it. */
+    /**
+     * @brief Double-click takes it.
+     * @param[in] row  the row
+     */
     void listBoxItemDoubleClicked(int row, const juce::MouseEvent&) override { choose(row); }
-    /** @brief Return takes it. */
+    /**
+     * @brief Return takes it.
+     * @param[in] row  the chosen row
+     */
     void returnKeyPressed(int row) override { choose(row); }
     /** @brief Typing filters. */
     void textEditorTextChanged(juce::TextEditor&) override { filter(); }

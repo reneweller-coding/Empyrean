@@ -1,6 +1,7 @@
 /**
  * @file ParamPage.cpp
  * @brief A page of the panel (ParamPage.h).
+ * @author Rene Weller
  */
 #include "ParamPage.h"
 
@@ -29,11 +30,11 @@ class SpanControl final : public juce::Component, public juce::SettableTooltipCl
 public:
     /**
      * @brief The span of @p low and @p high.
-     * @param proc     the processor
-     * @param actions  the right-click menu
-     * @param low      the low end's parameter
-     * @param high     the high end's
-     * @param colour   its group's colour
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the right-click menu
+     * @param[in]     low      the low end's parameter
+     * @param[in]     high     the high end's
+     * @param[in]     colour   its group's colour
      */
     SpanControl(AdditivProcessor& proc, const frame::ControlActions& actions, int low, int high, juce::Colour colour)
         : m_proc(proc), m_actions(actions), m_id{ low, high }, m_colour(colour)
@@ -44,7 +45,10 @@ public:
         for (auto& a : m_attach)
             if (a != nullptr) a->sendInitialUpdate();
     }
-    /** @brief The track, the span lit, the two ends, their values. @param g where */
+    /**
+     * @brief The track, the span lit, the two ends, their values.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override
     {
         const frame::Skin& skin = additivui::skin();
@@ -65,7 +69,10 @@ public:
         g.setFont(juce::FontOptions(11.5f));
         g.drawText(text(0) + "  -  " + text(1), getLocalBounds().removeFromBottom(18), juce::Justification::centred);
     }
-    /** @brief The nearer end is taken (a right-click: its menu). @param e the press */
+    /**
+     * @brief The nearer end is taken (a right-click: its menu).
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override
     {
         const auto t = track();
@@ -79,7 +86,10 @@ public:
         if (m_attach[m_held] != nullptr) m_attach[m_held]->beginGesture();
         mouseDrag(e);
     }
-    /** @brief The end held follows, never past the other. @param e the drag */
+    /**
+     * @brief The end held follows, never past the other.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override
     {
         if (m_held < 0 || m_attach[m_held] == nullptr) return;
@@ -90,7 +100,9 @@ public:
         m_attach[m_held]->setValueAsPartOfGesture(p->convertFrom0to1(n));
         repaint();
     }
-    /** @brief Let go. @param e the release */
+    /**
+     * @brief Let go.
+     */
     void mouseUp(const juce::MouseEvent&) override
     {
         if (m_held >= 0 && m_attach[m_held] != nullptr) m_attach[m_held]->endGesture();
@@ -107,13 +119,21 @@ public:
 private:
     /** @brief The track's line. @return pixels */
     juce::Rectangle<float> track() const { return getLocalBounds().toFloat().reduced(10.0f, 0.0f).withTrimmedBottom(20.0f); }
-    /** @brief An end where it stands, 0 .. 1 along the track (its parameter's own skew). @param e 0 low, 1 high @return 0 .. 1 */
+    /**
+     * @brief An end where it stands, 0 .. 1 along the track (its parameter's own skew).
+     * @param[in] e  0 low, 1 high
+     * @return 0 .. 1
+     */
     float norm(int e) const
     {
         auto* p = m_proc.parameter(m_id[e]);
         return p != nullptr ? p->getValue() : 0.0f;
     }
-    /** @brief An end's value in words: a key's name for a note, else the value and its unit. @param e 0 low, 1 high @return the text */
+    /**
+     * @brief An end's value in words: a key's name for a note, else the value and its unit.
+     * @param[in] e  0 low, 1 high
+     * @return the text
+     */
     juce::String text(int e) const
     {
         const additiv::ParamDesc& d = additiv::paramDesc(static_cast<additiv::ParamIdE>(m_id[e]));
@@ -139,7 +159,12 @@ public:
         setClickingTogglesState(true);
         setTooltip("Link the two: turning one turns the other in proportion");
     }
-    /** @brief Two rings of a chain, lit when linked. @param g where @param over under the mouse @param down pressed */
+    /**
+     * @brief Two rings of a chain, lit when linked.
+     * @param[in,out] g     where
+     * @param[in]     over  under the mouse
+     * @param[in]     down  pressed
+     */
     void paintButton(juce::Graphics& g, bool over, bool down) override
     {
         (void)down;

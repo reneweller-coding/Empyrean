@@ -1,6 +1,7 @@
 /**
  * @file Motion.cpp
  * @brief The motions' lane settings (the scenes of Phase 0b, probe scenes).
+ * @author Rene Weller
  */
 #include "additiv/Motion.h"
 

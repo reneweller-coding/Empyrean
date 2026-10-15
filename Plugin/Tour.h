@@ -3,6 +3,7 @@
  * @brief The first steps: a short tour on the first start (and whenever asked for), one control at a
  *        time lit in a dimmed window with a sentence on it -- Play, the presets, the picture, Focus, the
  *        search, the info line, Save. Next goes on, Skip ends it.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -24,9 +25,15 @@ public:
     std::function<void()> m_onDone;
     /** @brief A tour, not yet shown. */
     Tour();
-    /** @brief Begins it. @param steps its steps */
+    /**
+     * @brief Begins it.
+     * @param[in] steps  its steps
+     */
     void start(std::vector<Step> steps);
-    /** @brief The dimmed window with the lit control and the bubble. */
+    /**
+     * @brief The dimmed window with the lit control and the bubble.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The bubble's buttons. */
     void resized() override;

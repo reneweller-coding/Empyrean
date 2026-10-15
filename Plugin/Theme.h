@@ -2,6 +2,7 @@
  * @file Theme.h
  * @brief The instrument's skin for the family's frame (Frame.h): an aurora at night -- deep blue,
  *        the green-teal of the light, violet at its edges -- and a logo made of a ring of partials.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -29,7 +30,11 @@ const juce::Colour Bad    { 0xffe06a5f };   ///< a meter over
 /** @brief The skin (built once). @return the skin */
 const frame::Skin& skin();
 
-/** @brief Draws the logo: a ring of partials of different sizes, brightest at the top. @param g where @param r the square */
+/**
+ * @brief Draws the logo: a ring of partials of different sizes, brightest at the top.
+ * @param[in,out] g  where
+ * @param[in]     r  the square
+ */
 void drawLogo(juce::Graphics& g, juce::Rectangle<float> r);
 
 } // namespace additivui

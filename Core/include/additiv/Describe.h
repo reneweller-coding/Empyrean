@@ -10,6 +10,7 @@
  *        The preset map is made of these (Tools/presets: additiv_presets --describe, make_map.py), the
  *        nudges are measured with them, and a recording the player brings is described the same way
  *        to find the presets that sound like it.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -28,9 +29,9 @@ struct Description {
 /**
  * @brief The description of a stretch of stereo sound: at least a second or so (four analysis
  *        frames of 4096 samples); a shorter one describes as all nought.
- * @param L   left
- * @param R   right
- * @param sr  the sample rate, Hz
+ * @param[in] L   left
+ * @param[in] R   right
+ * @param[in] sr  the sample rate, Hz
  * @return    it
  */
 Description describe(const std::vector<float>& L, const std::vector<float>& R, double sr);

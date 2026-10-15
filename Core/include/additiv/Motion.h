@@ -6,6 +6,7 @@
  * A motion only sets lanes; the shapes come from the factory bank (Shapes.h) and Aurora reads the
  * landscape the engine uploads. Rate and depth scale whatever the motion set, so one knob slows
  * every lane and one knob fades the motion out to the bare cloud.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -24,15 +25,19 @@ enum class MotionKindE : int {
     AURORA,      ///< the amplitude lane reads the landscape
 };
 
-/** @brief Whether a motion reads the landscape. @param kind the motion @return true for Aurora */
+/**
+ * @brief Whether a motion reads the landscape.
+ * @param[in] kind  the motion
+ * @return true for Aurora
+ */
 inline bool motionUsesLandscape(MotionKindE kind) { return kind == MotionKindE::AURORA; }
 
 /**
  * @brief Sets a voice's three lanes to a motion, scaled by rate and depth; the other fields stay.
- * @param kind   the motion
- * @param v      the voice
- * @param rate   times the motion's own speed (0.1 .. 4)
- * @param depth  times the motion's own depth (0 .. 1); 0 leaves the cloud bare
+ * @param[in]     kind   the motion
+ * @param[in,out] v      the voice
+ * @param[in]     rate   times the motion's own speed (0.1 .. 4)
+ * @param[in]     depth  times the motion's own depth (0 .. 1); 0 leaves the cloud bare
  */
 void applyMotion(MotionKindE kind, CloudVoice& v, float rate, float depth);
 

@@ -16,6 +16,7 @@
  *        As a canvas (the editor's Canvas mode) it is the whole window: the living landscape or the
  *        landscape faintly behind the partials, the four macros at the bottom, and a click in the
  *        spectrum plays the key under it (higher up, louder).
+ * @author Rene Weller
  */
 #pragma once
 
@@ -27,35 +28,67 @@
 /** @brief The cloud picture (see the file comment). */
 class CloudView final : public juce::Component {
 public:
-    /** @brief A picture of @p proc's voices. @param proc the processor */
+    /**
+     * @brief A picture of @p proc's voices.
+     * @param[in,out] proc  the processor
+     */
     explicit CloudView(AdditivProcessor& proc);
     /** @brief Lets go of a key it plays. */
     ~CloudView() override;
     /** @brief Reads the voices and the parameters it draws with and repaints (the editor's timer). */
     void refresh();
-    /** @brief The page in front, whose overlay it draws. @param page the tab's name */
+    /**
+     * @brief The page in front, whose overlay it draws.
+     * @param[in] page  the tab's name
+     */
     void setPage(const juce::String& page) { m_page = page; }
-    /** @brief The whole window, or the strip above the pages. @param on canvas */
+    /**
+     * @brief The whole window, or the strip above the pages.
+     * @param[in] on  canvas
+     */
     void setCanvas(bool on);
-    /** @brief The partials as the picture shows them now, small (a snapshot's picture). @param w width @param h height @return the image */
+    /**
+     * @brief The partials as the picture shows them now, small (a snapshot's picture).
+     * @param[in] w  width
+     * @param[in] h  height
+     * @return the image
+     */
     juce::Image thumbnail(int w, int h) const;
     /** @brief Whether it is the canvas. @return true then */
     bool canvas() const { return m_canvas; }
     /** @brief Called on a double click in the spectrum (the editor switches the canvas). */
     std::function<void()> m_onDoubleClick;
-    /** @brief Draws the clouds and the landscape, and the page's overlay. */
+    /**
+     * @brief Draws the clouds and the landscape, and the page's overlay.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The macros' faders in the canvas. */
     void resized() override;
-    /** @brief Takes an overlay's handle, or (canvas) plays the key under the mouse. @param e the click */
+    /**
+     * @brief Takes an overlay's handle, or (canvas) plays the key under the mouse.
+     * @param[in] e  the click
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief Moves the handle taken, or the key played. @param e the drag */
+    /**
+     * @brief Moves the handle taken, or the key played.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override;
-    /** @brief Lets go; a click on the landscape opens a picture or a recording as the player's own. @param e the click */
+    /**
+     * @brief Lets go; a click on the landscape opens a picture or a recording as the player's own.
+     * @param[in] e  the click
+     */
     void mouseUp(const juce::MouseEvent& e) override;
-    /** @brief The hand over a handle. @param e the move */
+    /**
+     * @brief The hand over a handle.
+     * @param[in] e  the move
+     */
     void mouseMove(const juce::MouseEvent& e) override;
-    /** @brief Switches the canvas (onDoubleClick). @param e the click */
+    /**
+     * @brief Switches the canvas (onDoubleClick).
+     * @param[in] e  the click
+     */
     void mouseDoubleClick(const juce::MouseEvent& e) override;
 
 private:
@@ -64,37 +97,82 @@ private:
 
     /** @brief Remakes the landscape's picture when the choice changed. */
     void refreshLandscape();
-    /** @brief Fades the trails and plots the newest snapshot into them. @param w width @param h height in pixels */
+    /**
+     * @brief Fades the trails and plots the newest snapshot into them.
+     * @param[in] w  width
+     * @param[in] h  height in pixels
+     */
     void plotDots(int w, int h);
-    /** @brief A frequency's place on the axis. @param hz the frequency @param area the axis' area @return x */
+    /**
+     * @brief A frequency's place on the axis.
+     * @param[in] hz    the frequency
+     * @param[in] area  the axis' area
+     * @return x
+     */
     static float xOf(float hz, juce::Rectangle<float> area);
-    /** @brief The frequency at a place on the axis. @param x pixels @param area the axis' area @return Hz */
+    /**
+     * @brief The frequency at a place on the axis.
+     * @param[in] x     pixels
+     * @param[in] area  the axis' area
+     * @return Hz
+     */
     static float hzAt(float x, juce::Rectangle<float> area);
     /**
      * @brief The keys under the spectrum, A0 to C8, each where its pitch lies on the axis: the notes
      *        that sound lit by whose they are (the partials' colours), dimmer the further they stand and
      *        the softer they are; the conductor's root marked; the sounding notes' names in the
      *        spectrum's corner, low to high.
-     * @param g     where
-     * @param keys  the strip
-     * @param spec  the spectrum's area (the axis, and the corner for the names)
+     * @param[in,out] g     where
+     * @param[in]     keys  the strip
+     * @param[in]     spec  the spectrum's area (the axis, and the corner for the names)
      */
     void paintKeys(juce::Graphics& g, juce::Rectangle<float> keys, juce::Rectangle<float> spec);
-    /** @brief The page's overlay, and where its handles are. @param g where @param spec the spectrum @param keys the keys' strip */
+    /**
+     * @brief The page's overlay, and where its handles are.
+     * @param[in,out] g     where
+     * @param[in]     spec  the spectrum
+     * @param[in]     keys  the keys' strip
+     */
     void paintOverlay(juce::Graphics& g, juce::Rectangle<float> spec, juce::Rectangle<float> keys);
-    /** @brief A handle as a ring, brighter while held or under the mouse. @param g where @param h which @param at where @param c its colour */
+    /**
+     * @brief A handle as a ring, brighter while held or under the mouse.
+     * @param[in,out] g   where
+     * @param[in]     h   which
+     * @param[in]     at  where
+     * @param[in]     c   its colour
+     */
     void paintHandle(juce::Graphics& g, HandleE h, juce::Point<float> at, juce::Colour c);
-    /** @brief The handle near a point, on the page in front. @param p the point @return it, or None */
+    /**
+     * @brief The handle near a point, on the page in front.
+     * @param[in] p  the point
+     * @return it, or None
+     */
     HandleE handleAt(juce::Point<float> p) const;
     /** @brief The fundamental the cloud page's overlay is drawn for: the lowest sounding voice's, or C3. @return Hz */
     float referenceHz() const;
-    /** @brief A parameter's value. @param id the parameter @return its value */
+    /**
+     * @brief A parameter's value.
+     * @param[in] id  the parameter
+     * @return its value
+     */
     float value(additiv::ParamIdE id) const { return m_proc.value(static_cast<int>(id)); }
-    /** @brief Sets a parameter (within its range). @param id the parameter @param v the value */
+    /**
+     * @brief Sets a parameter (within its range).
+     * @param[in] id  the parameter
+     * @param[in] v   the value
+     */
     void set(additiv::ParamIdE id, float v) { m_proc.setValue(static_cast<int>(id), v); }
-    /** @brief The parameters a handle moves. @param h the handle @return them (one or two) */
+    /**
+     * @brief The parameters a handle moves.
+     * @param[in] h  the handle
+     * @return them (one or two)
+     */
     static std::vector<additiv::ParamIdE> paramsOf(HandleE h);
-    /** @brief The key under a place in the spectrum. @param x pixels @return the MIDI note, 21 .. 108 */
+    /**
+     * @brief The key under a place in the spectrum.
+     * @param[in] x  pixels
+     * @return the MIDI note, 21 .. 108
+     */
     int keyAt(float x) const;
 
     AdditivProcessor& m_proc;                                            ///< whose voices

@@ -1,6 +1,7 @@
 /**
  * @file Focus.cpp
  * @brief Nudges, the focus, variations and taught macros (Focus.h).
+ * @author Rene Weller
  */
 #include "additiv/Focus.h"
 
@@ -70,7 +71,13 @@ const Table& table()
     return t;
 }
 
-/** @brief A knob's value moved by @p dn of its normalised travel, within it. @param id the knob @param v its value @param dn the move @return the new value */
+/**
+ * @brief A knob's value moved by @p dn of its normalised travel, within it.
+ * @param[in] id  the knob
+ * @param[in] v   its value
+ * @param[in] dn  the move
+ * @return the new value
+ */
 float moved(ParamIdE id, float v, float dn)
 {
     const ParamDesc& d = paramDesc(id);
@@ -83,9 +90,9 @@ float moved(ParamIdE id, float v, float dn)
  * @brief Whether a nudge or a variation may move a knob: heard, and not an amount at nothing -- what is
  *        off stays off. Turning a layer on (the air, the melt, the hall) is no small step: measured, a
  *        nudge that lifted Air from 0 to 0.07 made a choir 5.9 dB louder and livelier where it asked for calmer.
- * @param id      the knob
- * @param values  the sound's knobs
- * @return        true when it may move
+ * @param[in] id      the knob
+ * @param[in] values  the sound's knobs
+ * @return true when it may move
  */
 bool movable(ParamIdE id, const float* values)
 {

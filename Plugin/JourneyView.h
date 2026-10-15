@@ -2,6 +2,7 @@
  * @file JourneyView.h
  * @brief The Journey page: the glide between presets, the A/B morph and its two slots, and the
  *        journeys -- presets in a row, each glided into the next, for a whole night (Journey.h).
+ * @author Rene Weller
  */
 #pragma once
 
@@ -14,17 +15,27 @@
 /** @brief The slots and the journeys (below the page's knobs). */
 class JourneyView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The slots and journeys of @p proc. @param proc the processor */
+    /**
+     * @brief The slots and journeys of @p proc.
+     * @param[in,out] proc  the processor
+     */
     explicit JourneyView(AdditivProcessor& proc);
     /** @brief The rows. */
     void resized() override;
-    /** @brief The boxes and their headings. */
+    /**
+     * @brief The boxes and their headings.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The height it needs. @return pixels */
     static int idealHeight() { return 2 * 34 + 30 + 2 * 34 + 30 + 20; }
     /** @brief What it shows, in words, for the help. @return the text */
     juce::String describe() const;
-    /** @brief The journey chosen in the box, read (the timeline's preview). @param out receives it @return false when none is chosen */
+    /**
+     * @brief The journey chosen in the box, read (the timeline's preview).
+     * @param[out] out  receives it
+     * @return false when none is chosen
+     */
     bool chosen(additiv::Journey& out) const
     {
         const int id = m_journeys.getSelectedId();
@@ -42,7 +53,10 @@ private:
     void timerCallback() override;
     /** @brief Fills the journey box: the ones that come with the instrument, then the player's files. */
     void refreshJourneys();
-    /** @brief The bank as a menu; the chosen preset goes to a slot. @param slot 0 or 1 */
+    /**
+     * @brief The bank as a menu; the chosen preset goes to a slot.
+     * @param[in] slot  0 or 1
+     */
     void choosePreset(int slot);
     /** @brief Starts the journey chosen in the box. */
     void startChosen();
@@ -78,19 +92,38 @@ private:
  */
 class JourneyTimeline final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The timeline of @p proc's journeys. @param proc the processor @param view the box it previews */
+    /**
+     * @brief The timeline of @p proc's journeys.
+     * @param[in,out] proc  the processor
+     * @param[in]     view  the box it previews
+     */
     JourneyTimeline(AdditivProcessor& proc, const JourneyView& view);
-    /** @brief The bands, the steps, where the journey is. @param g where */
+    /**
+     * @brief The bands, the steps, where the journey is.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The copy button. */
     void resized() override;
-    /** @brief A step clicked (skip there), or a stroke on the one being written begins. @param e the press */
+    /**
+     * @brief A step clicked (skip there), or a stroke on the one being written begins.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief The edge, the ramp or the block follows. @param e the drag */
+    /**
+     * @brief The edge, the ramp or the block follows.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override;
-    /** @brief A moved block lands where it was let go. @param e the release */
+    /**
+     * @brief A moved block lands where it was let go.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
-    /** @brief The cursor says what a drag would do. @param e the move */
+    /**
+     * @brief The cursor says what a drag would do.
+     * @param[in] e  the move
+     */
     void mouseMove(const juce::MouseEvent& e) override;
 
 private:
@@ -104,15 +137,41 @@ private:
     enum class DragE { NONE, DWELL, GLIDE, MOVE };
     /** @brief Twice a second while it is seen (ten while a drag is on). */
     void timerCallback() override;
-    /** @brief The journey above: the one under way, else the one chosen. @param out receives it @return false when there is none */
+    /**
+     * @brief The journey above: the one under way, else the one chosen.
+     * @param[out] out  receives it
+     * @return false when there is none
+     */
     bool upper(additiv::Journey& out) const;
-    /** @brief A band's rectangle. @param which 0 the journey above, 1 the one being written @return pixels */
+    /**
+     * @brief A band's rectangle.
+     * @param[in] which  0 the journey above, 1 the one being written
+     * @return pixels
+     */
     juce::Rectangle<float> band(int which) const;
-    /** @brief The blocks of a journey in a band, on its own time scale. @param j the journey @param r the band @return them */
+    /**
+     * @brief The blocks of a journey in a band, on its own time scale.
+     * @param[in] j  the journey
+     * @param[in] r  the band
+     * @return them
+     */
     static std::vector<Block> blocks(const additiv::Journey& j, juce::Rectangle<float> r);
-    /** @brief Draws a journey in a band. @param g where @param j the journey @param r the band @param lit the step lit, -1 none @param done how far it has gone, 0 .. 1 @param faint drawn faint */
+    /**
+     * @brief Draws a journey in a band.
+     * @param[in,out] g      where
+     * @param[in]     j      the journey
+     * @param[in]     r      the band
+     * @param[in]     lit    the step lit, -1 none
+     * @param[in]     done   how far it has gone, 0 .. 1
+     * @param[in]     faint  drawn faint
+     */
     void drawBand(juce::Graphics& g, const additiv::Journey& j, juce::Rectangle<float> r, int lit, double done, bool faint) const;
-    /** @brief The block of the one being written under a point. @param p the point @param drag receives what a drag there does @return its index, -1 none */
+    /**
+     * @brief The block of the one being written under a point.
+     * @param[in]  p     the point
+     * @param[out] drag  receives what a drag there does
+     * @return its index, -1 none
+     */
     int draftAt(juce::Point<float> p, DragE& drag) const;
 
     AdditivProcessor& m_proc;            ///< whose journeys
@@ -131,12 +190,16 @@ class JourneyPage final : public juce::Component {
 public:
     /**
      * @brief Builds the page.
-     * @param proc     the processor
-     * @param actions  the controls' right-click menu
-     * @param live     the live rings
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the controls' right-click menu
+     * @param[in,out] live     the live rings
      */
     JourneyPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const { return m_params.heightFor(w) + JourneyView::idealHeight() + 10 + TimelineMin + 10; }
     /** @brief The knobs above, the rest below. */
     void resized() override;

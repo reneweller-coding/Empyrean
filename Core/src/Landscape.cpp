@@ -2,6 +2,7 @@
  * @file Landscape.cpp
  * @brief Landscapes: generated, read from pictures (Windows Imaging Component), analysed from
  *        recordings (WAV here, FLAC through dr_flac), and drawn as pictures.
+ * @author Rene Weller
  */
 #include "additiv/Landscape.h"
 
@@ -32,14 +33,24 @@ namespace {
 
 constexpr double Pi = 3.14159265358979323846;   ///< pi
 
-/** @brief Writes a reason into `error`. @param error the target (may be null) @param what the reason @return false */
+/**
+ * @brief Writes a reason into `error`.
+ * @param[in,out] error  the target (may be null)
+ * @param[in]     what   the reason
+ * @return false
+ */
 bool fail(std::string* error, const std::string& what)
 {
     if (error) *error = what;
     return false;
 }
 
-/** @brief A whole file into memory. @param path the file @param data receives its bytes @return true when read */
+/**
+ * @brief A whole file into memory.
+ * @param[in]  path  the file
+ * @param[out] data  receives its bytes
+ * @return true when read
+ */
 bool readFile(const fs::path& path, std::vector<unsigned char>& data)
 {
     std::ifstream f(path, std::ios::binary | std::ios::ate);
@@ -52,21 +63,29 @@ bool readFile(const fs::path& path, std::vector<unsigned char>& data)
     return static_cast<bool>(f);
 }
 
-/** @brief A little-endian 16-bit value. @param p its bytes @return the value */
+/**
+ * @brief A little-endian 16-bit value.
+ * @param[in] p  its bytes
+ * @return the value
+ */
 std::uint32_t le16(const unsigned char* p) { return static_cast<std::uint32_t>(p[0]) | (static_cast<std::uint32_t>(p[1]) << 8); }
 
-/** @brief A little-endian 32-bit value. @param p its bytes @return the value */
+/**
+ * @brief A little-endian 32-bit value.
+ * @param[in] p  its bytes
+ * @return the value
+ */
 std::uint32_t le32(const unsigned char* p) { return le16(p) | (le16(p + 2) << 16); }
 
 /**
  * @brief A WAV file (PCM 8/16/24/32 bit or 32-bit float, plain or extensible) as one mono channel.
- * @param d      the file's bytes
- * @param mono   receives the channels' average
- * @param rate   receives the sample rate
- * @param error  receives the reason when it fails
- * @param left   receives the first channel, when not null
- * @param right  receives the second (the first again for a mono file), when not null
- * @return       true when decoded
+ * @param[in]  d      the file's bytes
+ * @param[out] mono   receives the channels' average
+ * @param[out] rate   receives the sample rate
+ * @param[out] error  receives the reason when it fails
+ * @param[out] left   receives the first channel, when not null
+ * @param[out] right  receives the second (the first again for a mono file), when not null
+ * @return true when decoded
  */
 bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, double& rate, std::string* error,
                std::vector<float>* left = nullptr, std::vector<float>* right = nullptr)
@@ -123,11 +142,11 @@ bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, do
 
 /**
  * @brief A recording (WAV or FLAC, by its contents) as one mono channel.
- * @param path   the file
- * @param mono   receives the channels' average
- * @param rate   receives the sample rate
- * @param error  receives the reason when it fails
- * @return       true when read
+ * @param[in]  path   the file
+ * @param[out] mono   receives the channels' average
+ * @param[out] rate   receives the sample rate
+ * @param[out] error  receives the reason when it fails
+ * @return true when read
  */
 bool loadMono(const fs::path& path, std::vector<float>& mono, double& rate, std::string* error)
 {
@@ -153,12 +172,12 @@ bool loadMono(const fs::path& path, std::vector<float>& mono, double& rate, std:
 
 /**
  * @brief A recording as left and right (loadStereo's work, here beside the mono reader).
- * @param path   the file
- * @param left   receives the first channel
- * @param right  receives the second
- * @param rate   receives the sample rate
- * @param error  receives the reason when it fails
- * @return       true when read
+ * @param[in]  path   the file
+ * @param[out] left   receives the first channel
+ * @param[out] right  receives the second
+ * @param[out] rate   receives the sample rate
+ * @param[out] error  receives the reason when it fails
+ * @return true when read
  */
 bool readStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
 {
@@ -185,7 +204,7 @@ bool readStereo(const fs::path& path, std::vector<float>& left, std::vector<floa
 
 /**
  * @brief An in-place radix-2 FFT.
- * @param a  the signal, a power of two long; receives its spectrum
+ * @param[in,out] a  the signal, a power of two long; receives its spectrum
  */
 void fft(std::vector<std::complex<float>>& a)
 {
@@ -218,17 +237,21 @@ struct Com {
     Com() = default;                               ///< empty
     Com(const Com&) = delete;                      ///< owns a reference
     Com& operator=(const Com&) = delete;           ///< owns a reference
-    T* operator->() const { return m_p; }            ///< the interface's members
+    /**
+     * the interface's members
+     * @return the interface
+     */
+    T* operator->() const { return m_p; }
 };
 
 /**
  * @brief Decodes the first frame of a picture to 8-bit grey with the Windows Imaging Component.
- * @param path    the picture
- * @param grey    receives width * height brightness bytes, top row first
- * @param width   receives the width
- * @param height  receives the height
- * @param error   receives the reason when it fails
- * @return        true when decoded
+ * @param[in]  path    the picture
+ * @param[out] grey    receives width * height brightness bytes, top row first
+ * @param[out] width   receives the width
+ * @param[out] height  receives the height
+ * @param[out] error   receives the reason when it fails
+ * @return true when decoded
  */
 bool decodeGrey(const fs::path& path, std::vector<unsigned char>& grey, UINT& width, UINT& height, std::string* error)
 {
@@ -311,10 +334,10 @@ namespace {
 
 /**
  * @brief A generated landscape from a brightness function of loop time and log frequency.
- * @param loopSeconds  its length
- * @param rangeDb      the decibel range of the brightness
- * @param bright       b(t, y): t 0 .. 1 through the loop, y 0 .. 1 from 20 Hz to 20 kHz; 0 .. 1
- * @return             the landscape, 256 columns and 1024 rows
+ * @param[in] loopSeconds  its length
+ * @param[in] rangeDb      the decibel range of the brightness
+ * @param[in] bright       b(t, y): t 0 .. 1 through the loop, y 0 .. 1 from 20 Hz to 20 kHz; 0 .. 1
+ * @return the landscape, 256 columns and 1024 rows
  */
 template <class BrightT>
 Landscape generate(float loopSeconds, float rangeDb, BrightT&& bright)
@@ -334,17 +357,31 @@ Landscape generate(float loopSeconds, float rangeDb, BrightT&& bright)
     return l;
 }
 
-/** @brief A Gaussian bump. @param x where @param centre its centre @param width its standard deviation @return 0 .. 1 */
+/**
+ * @brief A Gaussian bump.
+ * @param[in] x       where
+ * @param[in] centre  its centre
+ * @param[in] width   its standard deviation
+ * @return 0 .. 1
+ */
 float bump(float x, float centre, float width)
 {
     const float d = (x - centre) / width;
     return std::exp(-0.5f * d * d);
 }
 
-/** @brief Log frequency as a landscape's y. @param hz the frequency @return 0 at 20 Hz .. 1 at 20 kHz */
+/**
+ * @brief Log frequency as a landscape's y.
+ * @param[in] hz  the frequency
+ * @return 0 at 20 Hz .. 1 at 20 kHz
+ */
 float yOf(float hz) { return std::log2(hz / LandLowHz) / std::log2(LandHighHz / LandLowHz); }
 
-/** @brief A deterministic number in [0, 1) for the k-th draw of a generated landscape. @param k the draw @return 0 .. 1 */
+/**
+ * @brief A deterministic number in [0, 1) for the k-th draw of a generated landscape.
+ * @param[in] k  the draw
+ * @return 0 .. 1
+ */
 float dice(std::uint32_t k)
 {
     k ^= k >> 16; k *= 0x7feb352dU; k ^= k >> 15; k *= 0x846ca68bU; k ^= k >> 16;
@@ -591,12 +628,12 @@ bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, fl
 
 /**
  * @brief A recording (WAV or FLAC) as left and right; a mono file is its own both (Landscape.h).
- * @param path   the file
- * @param left   receives the first channel
- * @param right  receives the second
- * @param rate   receives the sample rate
- * @param error  receives the reason when it fails (may be null)
- * @return       true when read
+ * @param[in]  path   the file
+ * @param[out] left   receives the first channel
+ * @param[out] right  receives the second
+ * @param[out] rate   receives the sample rate
+ * @param[out] error  receives the reason when it fails (may be null)
+ * @return true when read
  */
 bool loadStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
 {

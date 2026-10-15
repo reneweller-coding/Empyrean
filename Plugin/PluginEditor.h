@@ -8,6 +8,7 @@
  *        and its right-click menu on every control (MIDI learn, forget, default). The window starts as
  *        large as the screen allows (three quarters of its width), at least 1280 x 860, and comes back at
  *        the size it was left at.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -31,7 +32,10 @@
 /** @brief The instrument's name, drawn in the skin's title style. */
 class TitleComponent final : public juce::Component {
 public:
-    /** @brief Draws the name. */
+    /**
+     * @brief Draws the name.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override { frame::drawTitle(g, additivui::skin(), getLocalBounds().toFloat(), static_cast<float>(getHeight()) * 0.62f); }
 };
 
@@ -42,36 +46,67 @@ class AdditivEditor final : public juce::AudioProcessorEditor,
                             private juce::Timer,
                             private juce::AudioProcessorParameter::Listener {
 public:
-    /** @brief The panel of @p proc. @param proc the processor */
+    /**
+     * @brief The panel of @p proc.
+     * @param[in,out] proc  the processor
+     */
     explicit AdditivEditor(AdditivProcessor& proc);
     ~AdditivEditor() override;
 
-    /** @brief The window's background (the frame's backdrop). @param g where */
+    /**
+     * @brief The window's background (the frame's backdrop).
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief The conductor's countdown: a thin line under Step that runs down to the next exchange. @param g where */
+    /**
+     * @brief The conductor's countdown: a thin line under Step that runs down to the next exchange.
+     * @param[in,out] g  where
+     */
     void paintOverChildren(juce::Graphics& g) override;
     /** @brief The header, the picture, the pages, the help. */
     void resized() override;
-    /** @brief The family's keys. @param key the key @return true when it was one */
+    /**
+     * @brief The family's keys.
+     * @param[in] key  the key
+     * @return true when it was one
+     */
     bool keyPressed(const juce::KeyPress& key) override;
     /** @brief In the standalone, the window gets a maximise button beside the other two (Noctuary's, Totality's) and comes back where it was left. */
     void parentHierarchyChanged() override;
-    /** @brief The host's scale (a screen's density), the zoom on top of it. @param newScale the host's */
+    /**
+     * @brief The host's scale (a screen's density), the zoom on top of it.
+     * @param[in] newScale  the host's
+     */
     void setScaleFactor(float newScale) override;
 
 private:
     /** @brief The status line, the play button and the picture, fifteen times a second. */
     void timerCallback() override;
-    /** @brief Not used: values are read when a gesture ends. @param index ignored @param v ignored */
+    /**
+     * @brief Not used: values are read when a gesture ends.
+     * @param[in] index  ignored
+     * @param[in] v      ignored
+     */
     void parameterValueChanged(int index, float v) override { (void)index; (void)v; }
-    /** @brief A knob's gesture opens and closes an undo step. @param index the parameter @param starting begins or ends */
+    /**
+     * @brief A knob's gesture opens and closes an undo step.
+     * @param[in] index     the parameter
+     * @param[in] starting  begins or ends
+     */
     void parameterGestureChanged(int index, bool starting) override;
 
     /** @brief Every parameter's value in its unit, in ParamId order. @return the values */
     std::vector<float> values() const;
-    /** @brief Applies an undo step's values. @param step the step (null: nothing) @param after the after values (redo) or the before */
+    /**
+     * @brief Applies an undo step's values.
+     * @param[in] step   the step (null: nothing)
+     * @param[in] after  the after values (redo) or the before
+     */
     void apply(const frame::UndoStep* step, bool after);
-    /** @brief Opens or closes the help. @param on open */
+    /**
+     * @brief Opens or closes the help.
+     * @param[in] on  open
+     */
     void showHelp(bool on);
     /** @brief The settings menu under its button. */
     void showSettings();
@@ -79,11 +114,17 @@ private:
     bool standalone() const { return m_proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone; }
     /** @brief The standalone's full screen on or off. */
     void toggleFullScreen();
-    /** @brief The canvas on or off: the picture takes the whole window, the pages step aside. @param on canvas */
+    /**
+     * @brief The canvas on or off: the picture takes the whole window, the pages step aside.
+     * @param[in] on  canvas
+     */
     void setCanvas(bool on);
     /** @brief Opens the command palette (Ctrl+K). */
     void openPalette();
-    /** @brief The night mode on or off (kept in the player's settings). @param on night */
+    /**
+     * @brief The night mode on or off (kept in the player's settings).
+     * @param[in] on  night
+     */
     void setNight(bool on);
     /** @brief The first steps' tour, from its first step. */
     void startTour();
@@ -91,11 +132,15 @@ private:
     std::vector<CommandPalette::Command> paletteCommands();
     /**
      * @brief Shows a parameter's control: its page in front, scrolled to it, lighting up.
-     * @param id  the parameter
-     * @return    false when no page shows it
+     * @param[in] id  the parameter
+     * @return false when no page shows it
      */
     bool revealParam(int id);
-    /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
+    /**
+     * @brief A header chooser bound to a parameter.
+     * @param[in,out] box  the chooser
+     * @param[in]     id   the parameter
+     */
     void bindChoice(frame::Choice& box, additiv::ParamIdE id);
     /**
      * @brief The window's first size: the size it was left at, where that still fits a screen (any of them: it
@@ -105,25 +150,41 @@ private:
      * @return pixels
      */
     juce::Point<int> startSize();
-    /** @brief The standalone's window where it was left -- its place, its size, maximised or not -- and from then on its moves kept. @param window the window */
+    /**
+     * @brief The standalone's window where it was left -- its place, its size, maximised or not -- and from then on its
+     *        moves kept.
+     * @param[in,out] window  the window
+     */
     void restoreWindow(juce::ResizableWindow& window);
     /** @brief Keeps the standalone window's state (where, how large, maximised) in the player's settings whenever it moves. */
     struct WindowKeeper final : public juce::ComponentListener {
         AdditivEditor* m_owner = nullptr;                               ///< whose settings
         juce::Component::SafePointer<juce::ResizableWindow> m_window;   ///< the standalone's window (none in a host)
-        /** @brief The window moved or was resized: its state written. @param c the window @param moved ignored @param resized ignored */
+        /**
+         * @brief The window moved or was resized: its state written.
+         * @param[in,out] c        the window
+         * @param[in]     moved    ignored
+         * @param[in]     resized  ignored
+         */
         void componentMovedOrResized(juce::Component& c, bool moved, bool resized) override;
     };
     WindowKeeper m_windowKeeper;                                ///< the standalone window's state, kept
     /**
      * @brief A page's state for its strip: its groups on and off, the matrix's rows, a journey or route running.
-     * @param tab  the page
-     * @return     its state
+     * @param[in] tab  the page
+     * @return its state
      */
     PageStrip::Status pageStatus(int tab);
-    /** @brief A source chosen in the dock (or dropped on a knob): the inspector shows it, open. @param s the source @param toggle a second click on it shuts the inspector */
+    /**
+     * @brief A source chosen in the dock (or dropped on a knob): the inspector shows it, open.
+     * @param[in] s       the source
+     * @param[in] toggle  a second click on it shuts the inspector
+     */
     void chooseSource(additiv::ModSourceE s, bool toggle);
-    /** @brief The inspector open or shut (docked: remembered; over the pages: until shut). @param open open */
+    /**
+     * @brief The inspector open or shut (docked: remembered; over the pages: until shut).
+     * @param[in] open  open
+     */
     void setInspector(bool open);
 
     AdditivProcessor& m_proc;                                   ///< the instrument
@@ -148,7 +209,7 @@ private:
     void saveAs();
     /**
      * @brief Applies a preset as one undo step.
-     * @param index  the preset
+     * @param[in] index  the preset
      */
     void loadPreset(int index);
     frame::Choice m_mode{ &m_actions, static_cast<int>(additiv::ParamIdE::AUTO_MODE) };      ///< Free or Chords
@@ -182,18 +243,27 @@ private:
     /** @brief Notes every move of the mouse in the window (the night's canvas fades when left alone). */
     struct Activity final : public juce::MouseListener {
         double* m_last = nullptr;   ///< where the time goes
-        /** @brief A move. @param e ignored */
+        /**
+         * @brief A move.
+         */
         void mouseMove(const juce::MouseEvent&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
-        /** @brief A press. @param e ignored */
+        /**
+         * @brief A press.
+         */
         void mouseDown(const juce::MouseEvent&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
-        /** @brief A wheel. @param e ignored @param w ignored */
+        /**
+         * @brief A wheel.
+         */
         void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
     };
     Activity m_activity;                                        ///< the mouse's moves
     /** @brief The night's veil: over the window, under the palette, the browser and the tour; the mouse goes through it. */
     struct Veil final : public juce::Component {
         float m_alpha = 0.0f;   ///< how dark
-        /** @brief Dark and warm: little blue for eyes used to the dark. @param g where */
+        /**
+         * @brief Dark and warm: little blue for eyes used to the dark.
+         * @param[in,out] g  where
+         */
         void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xff0c0703).withAlpha(m_alpha)); }
     };
     Veil m_veil;                                                ///< the night's veil
@@ -206,16 +276,25 @@ private:
     frame::UndoHistory m_history;                               ///< undo and redo
     bool m_applying = false;                                    ///< an undo is being applied: record nothing
     int m_headerBottom = 0;                                     ///< where the header ends, for the backdrop
-    juce::String m_shotPrefix;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png (ADDITIV_PRESET first), then the standalone quits
+    juce::String m_shotPrefix;                                  ///< ADDITIV_SHOT: every page as \<prefix\>-\<n\>-\<page\>.png (ADDITIV_PRESET first), then the standalone quits
     int m_shotTick = 0;                                         ///< timer ticks since the screenshots were asked for
     juce::MemoryBlock m_shotSaved;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
     int m_logTick = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
     bool m_layoutChecked = false;                               ///< ADDITIV_LAYOUT: the pages were measured
     bool m_rememberSize = false;                                ///< the window's size is kept for the next start (not in the shot or layout modes)
     PageStrip m_strip;                                          ///< the pages' strip
-    /** @brief A source dropped on a knob: the inspector shows it (or all rows are taken). @param s the source @param id the parameter @param row the row, -1 none */
+    /**
+     * @brief A source dropped on a knob: the inspector shows it (or all rows are taken).
+     * @param[in] s    the source
+     * @param[in] id   the parameter
+     * @param[in] row  the row, -1 none
+     */
     void modDropped(additiv::ModSourceE s, int id, int row) override;
-    /** @brief The parameter pages on a page, as they are now. @param tab the page @return them */
+    /**
+     * @brief The parameter pages on a page, as they are now.
+     * @param[in] tab  the page
+     * @return them
+     */
     std::vector<ParamPage*> pagesOn(int tab);
     std::unique_ptr<ModDock> m_dock;                            ///< the sources along the bottom
     std::unique_ptr<SourceInspector> m_inspector;               ///< one source seen whole
@@ -225,7 +304,10 @@ private:
     bool m_inspectorDocked = false;                             ///< the window is tall enough to dock it
     float m_hostScale = 1.0f;                                   ///< the scale the host asked for
     float m_zoom = 1.0f;                                        ///< the player's zoom: the controls larger (player.settings "zoom")
-    /** @brief The zoom anew (kept in the player's settings). @param z 1 .. 1.5 */
+    /**
+     * @brief The zoom anew (kept in the player's settings).
+     * @param[in] z  1 .. 1.5
+     */
     void setZoom(float z);
     int m_altRow = -1;                                          ///< the matrix row an Alt-drag on a knob sets, -1 none
     float m_altDepth = 0.0f;                                    ///< its depth when the drag began
@@ -247,7 +329,7 @@ private:
     /**
      * @brief ADDITIV_LAYOUT (a file): every page's height against its room at a few window sizes, written there; the
      *        standalone then quits with the number of pages that would scroll at the window's usual size.
-     * @param out the report
+     * @param[in] out  the report
      */
     void layoutCheck(const juce::File& out);
 };

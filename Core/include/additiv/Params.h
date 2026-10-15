@@ -6,6 +6,7 @@
  * iterate this table (after Noctuary's Params.h: adding a parameter is one row here and one line
  * where the engine reads it). Also the choice names that have no home elsewhere: the scales,
  * the root names, the conductor's modes and the motions.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -287,23 +288,36 @@ struct ParamDesc {
 /** @brief The table, ordered by ParamId. @return NumParams rows */
 const std::array<ParamDesc, NumParams>& paramTable();
 
-/** @brief The row of one parameter. @param id the parameter @return its description */
+/**
+ * @brief The row of one parameter.
+ * @param[in] id  the parameter
+ * @return its description
+ */
 inline const ParamDesc& paramDesc(ParamIdE id) { return paramTable()[static_cast<size_t>(id)]; }
 
-/** @brief Looks a parameter up by its key. @param key the stable identifier @return the row, or nullptr */
+/**
+ * @brief Looks a parameter up by its key.
+ * @param[in] key  the stable identifier
+ * @return the row, or nullptr
+ */
 const ParamDesc* findParam(const char* key);
 
 /**
  * @brief A value in a parameter's normalised domain: 0 .. 1 across its range, the skew applied as
  *        the hosts apply it ((v - min) / (max - min))^skew -- where modulation depths are measured, so the
  *        same depth means the same on a cutoff in hertz and on a mix.
- * @param d  the row
- * @param v  the value in its unit
- * @return   0 .. 1
+ * @param[in] d  the row
+ * @param[in] v  the value in its unit
+ * @return 0 .. 1
  */
 float toNorm(const ParamDesc& d, float v);
 
-/** @brief Back from the normalised domain. @param d the row @param n 0 .. 1 @return the value in its unit */
+/**
+ * @brief Back from the normalised domain.
+ * @param[in] d  the row
+ * @param[in] n  0 .. 1
+ * @return the value in its unit
+ */
 float fromNorm(const ParamDesc& d, float n);
 
 constexpr int NumScaleChoices = 13;   ///< entries of ScaleNames: eleven tables, the user slot and the timbre scale

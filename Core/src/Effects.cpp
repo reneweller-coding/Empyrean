@@ -13,6 +13,7 @@
  * Everything but prepare() runs on the audio thread and allocates nothing.
  *
  * @note Copied from Noctuary `Core/src/Effects.cpp` at d263f54 (12.10.2026); namespace additiv, macros ADDITIV_.
+ * @author Rene Weller
  */
 #include "additiv/Effects.h"
 #include <cmath>
@@ -23,8 +24,8 @@ namespace additiv {
 namespace {
 /**
  * @brief The smallest power of two that is at least @p n: the ring sizes, so a mask can wrap them.
- * @param n  the number of samples a ring has to hold
- * @return   the first power of two >= n (1 for n <= 1)
+ * @param[in] n  the number of samples a ring has to hold
+ * @return the first power of two >= n (1 for n <= 1)
  */
 int pow2At(int n) { int p = 1; while (p < n) p <<= 1; return p; }
 }

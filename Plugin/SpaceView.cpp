@@ -1,6 +1,7 @@
 /**
  * @file SpaceView.cpp
  * @brief The Space page (SpaceView.h).
+ * @author Rene Weller
  */
 #include "SpaceView.h"
 
@@ -14,7 +15,11 @@ namespace {
 
 constexpr float Head = 0.1f;   ///< the head room round you, of the radius: the nearest plane stands outside it
 
-/** @brief A voice's place across: its pitch, C1 at the left to C8 at the right. @param hz its frequency @return 0 .. 1 */
+/**
+ * @brief A voice's place across: its pitch, C1 at the left to C8 at the right.
+ * @param[in] hz  its frequency
+ * @return 0 .. 1
+ */
 float across(float hz) { return juce::jlimit(0.0f, 1.0f, (12.0f * std::log2(std::max(hz, 1.0f) / 32.70f)) / 84.0f); }
 
 } // namespace

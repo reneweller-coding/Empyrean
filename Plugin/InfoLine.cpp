@@ -1,6 +1,7 @@
 /**
  * @file InfoLine.cpp
  * @brief The info line (InfoLine.h).
+ * @author Rene Weller
  */
 #include "InfoLine.h"
 

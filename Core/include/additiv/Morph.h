@@ -30,6 +30,7 @@
  * CloudVoice::filterCount): the filters' power curves over the octaves are read as masses, and the
  * blend is their Wasserstein barycentre, the average of their quantile functions -- a formant
  * travels to where the other filter's pass band is rather than fading out while that one fades in.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -68,19 +69,19 @@ struct MorphState {
 
     /**
      * @brief Takes parameters and plain rows as they stand: the filter at full share.
-     * @param v      NumParams values
-     * @param r      the rows (rows with no source, no target or no depth are left out)
-     * @param count  how many
+     * @param[in] v      NumParams values
+     * @param[in] r      the rows (rows with no source, no target or no depth are left out)
+     * @param[in] count  how many
      */
     void set(const float* v, const ModRow* r, int count);
 };
 
 /**
  * @brief The sound at a point between two: the rules of the file comment.
- * @param a    the sound at 0
- * @param b    the sound at 1
- * @param w    0 .. 1 (clamped)
- * @param out  receives the blend; must not be a or b
+ * @param[in]  a    the sound at 0
+ * @param[in]  b    the sound at 1
+ * @param[in]  w    0 .. 1 (clamped)
+ * @param[out] out  receives the blend; must not be a or b
  */
 void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& out);
 
@@ -90,17 +91,17 @@ void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& o
  *        uses them), the filter's share, the gates and the matrix likewise. A choice with an amount
  *        that differs first fades its amount and gate out at twice that pace, its companions held,
  *        and changes when nothing of it is heard; every other choice and switch is the target's at once.
- * @param cur     where the sound is
- * @param target  where it goes
- * @param coef    0 .. 1: the share of the way this step
- * @param out     receives the step; must not be cur or target
+ * @param[in]  cur     where the sound is
+ * @param[in]  target  where it goes
+ * @param[in]  coef    0 .. 1: the share of the way this step
+ * @param[out] out     receives the step; must not be cur or target
  */
 void approachMorph(const MorphState& cur, const MorphState& target, float coef, MorphState& out);
 
 /**
  * @brief The glide's shape over time: smoothstep, so a glide leaves and arrives gently.
- * @param t  0 .. 1 of the glide's time
- * @return   0 .. 1 of the way
+ * @param[in] t  0 .. 1 of the glide's time
+ * @return 0 .. 1 of the way
  */
 inline float morphCurve(float t)
 {

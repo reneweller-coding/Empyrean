@@ -2,6 +2,7 @@
  * @file Engine.cpp
  * @brief The instrument (Engine.h): voices, conductors, tuning, the GPU cloud, far reverb, master,
  *        and the worker that renders ahead of the audio callback.
+ * @author Rene Weller
  */
 #include "additiv/Engine.h"
 
@@ -78,7 +79,11 @@ struct ProAudioThread {
     ProAudioThread& operator=(const ProAudioThread&) = delete;   ///< one registration per thread
 };
 
-/** @brief The smallest power of two at least x. @param x a positive number @return the power */
+/**
+ * @brief The smallest power of two at least x.
+ * @param[in] x  a positive number
+ * @return the power
+ */
 std::int64_t nextPow2(std::int64_t x)
 {
     std::int64_t p = 1;

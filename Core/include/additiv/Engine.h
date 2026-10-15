@@ -21,6 +21,7 @@
  * Threads: setParam() from any thread; noteOn(), noteOff(), allNotesOff() and process() from the
  * audio thread; prepare(), release() and setRealtime() from one control thread while process() is
  * not running.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -85,9 +86,9 @@ public:
 
     /**
      * @brief Opens the GPU, builds everything and, in real-time mode, starts the worker.
-     * @param config  the layout
-     * @param error   receives the reason when it fails (may be null)
-     * @return        true when the engine can play
+     * @param[in]  config  the layout
+     * @param[out] error   receives the reason when it fails (may be null)
+     * @return true when the engine can play
      */
     bool prepare(const EngineConfig& config, std::string* error);
 
@@ -99,7 +100,7 @@ public:
 
     /**
      * @brief Real time (a worker renders ahead) or offline (process() renders what it needs itself).
-     * @param realtime  true for live playing, false for a bounce, the renderer and the tests
+     * @param[in] realtime  true for live playing, false for a bounce, the renderer and the tests
      */
     void setRealtime(bool realtime);
 
@@ -117,12 +118,16 @@ public:
 
     /**
      * @brief Sets a parameter, clamped to its range. Any thread.
-     * @param id     the parameter
-     * @param value  in its unit
+     * @param[in] id     the parameter
+     * @param[in] value  in its unit
      */
     void setParam(ParamIdE id, float value);
 
-    /** @brief A parameter's value. @param id the parameter @return in its unit */
+    /**
+     * @brief A parameter's value.
+     * @param[in] id  the parameter
+     * @return in its unit
+     */
     float param(ParamIdE id) const { return m_params[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
 
     /** @brief Every parameter to its default. */
@@ -130,44 +135,69 @@ public:
 
     /**
      * @brief A played note begins. Audio thread, before the process() it belongs to.
-     * @param note      MIDI note
-     * @param velocity  0 .. 1
-     * @param offset    samples into the coming process() block
-     * @param channel   MPE: the member channel (0 .. 15) whose bend, pressure and slide are this note's; -1 none
+     * @param[in] note      MIDI note
+     * @param[in] velocity  0 .. 1
+     * @param[in] offset    samples into the coming process() block
+     * @param[in] channel   MPE: the member channel (0 .. 15) whose bend, pressure and slide are this note's; -1 none
+     * @pre called on the audio thread
      */
     void noteOn(int note, float velocity, int offset, int channel = -1);
 
     /**
      * @brief A played note is let go. Audio thread.
-     * @param note     MIDI note
-     * @param offset   samples into the coming process() block
-     * @param channel  MPE: its member channel, -1 any
+     * @param[in] note     MIDI note
+     * @param[in] offset   samples into the coming process() block
+     * @param[in] channel  MPE: its member channel, -1 any
+     * @pre called on the audio thread
      */
     void noteOff(int note, int offset, int channel = -1);
 
-    /** @name MPE: what each member channel's note does after it has begun. Any thread. @{ */
-    /** @brief A channel's pitch bend. @param channel 0 .. 15, or -1 for the master (every played note) @param semitones the bend */
+    /** @name MPE: what each member channel's note does after it has begun. Any thread.
+     *  @{ */
+    /**
+     * @brief A channel's pitch bend.
+     * @param[in] channel    0 .. 15, or -1 for the master (every played note)
+     * @param[in] semitones  the bend
+     */
     void setChannelBend(int channel, float semitones) { m_chanBend[static_cast<size_t>(channel < 0 ? 16 : std::min(channel, 15))].store(semitones, std::memory_order_relaxed); }
-    /** @brief A channel's pressure. @param channel 0 .. 15 @param pressure 0 .. 1 */
+    /**
+     * @brief A channel's pressure.
+     * @param[in] channel   0 .. 15
+     * @param[in] pressure  0 .. 1
+     */
     void setChannelPressure(int channel, float pressure) { m_chanPress[static_cast<size_t>(std::clamp(channel, 0, 15))].store(pressure, std::memory_order_relaxed); }
-    /** @brief A channel's slide (CC 74). @param channel 0 .. 15 @param slide 0 .. 1 (0.5 at rest) */
+    /**
+     * @brief A channel's slide (CC 74).
+     * @param[in] channel  0 .. 15
+     * @param[in] slide    0 .. 1 (0.5 at rest)
+     */
     void setChannelSlide(int channel, float slide) { m_chanSlide[static_cast<size_t>(std::clamp(channel, 0, 15))].store(slide, std::memory_order_relaxed); }
     /** @} */
 
-    /** @brief Every played note is let go (the conductor's notes stay). Audio thread. */
+    /**
+     * @brief Every played note is let go (the conductor's notes stay). Audio thread.
+     * @pre called on the audio thread
+     */
     void allNotesOff();
 
     /**
      * @brief Sets one row of the modulation matrix. Any thread (a row is one atomic word).
-     * @param i    0 .. ModRows-1
-     * @param row  the row
+     * @param[in] i    0 .. ModRows-1
+     * @param[in] row  the row
      */
     void setModRow(int i, const ModRow& row);
-    /** @brief One row of the matrix. @param i 0 .. ModRows-1 @return the row */
+    /**
+     * @brief One row of the matrix.
+     * @param[in] i  0 .. ModRows-1
+     * @return the row
+     */
     ModRow modRow(int i) const;
     /** @brief The matrix as text (Modulation.h). @return the text */
     std::string modText() const;
-    /** @brief The matrix from text; rows it does not name are emptied. @param text the text */
+    /**
+     * @brief The matrix from text; rows it does not name are emptied.
+     * @param[in] text  the text
+     */
     void setModText(const std::string& text);
 
     /**
@@ -183,28 +213,38 @@ public:
      * @brief The player's own landscape, played when the Landscape choice is Your Own (until one is
      *        set, that choice plays Aurora). Message thread; the worker uploads it between blocks.
      *        Rows beyond the GPU's room are averaged down, the loop kept.
-     * @param l  the landscape (a picture's or a recording's, Landscape.h)
+     * @param[in] l  the landscape (a picture's or a recording's, Landscape.h)
+     * @pre called on the message thread
      */
     void setUserLandscape(const Landscape& l);
     /** @brief Whether the player's own landscape has been set. Any thread. @return true then */
     bool hasUserLandscape() const { return m_userLandVersion.load(std::memory_order_relaxed) > 0; }
-    /** @brief Glide from what plays now to what is set next. Any thread. @param seconds how long (at least 0.05) */
+    /**
+     * @brief Glide from what plays now to what is set next. Any thread.
+     * @param[in] seconds  how long (at least 0.05)
+     */
     void beginMorph(double seconds);
     /** @brief How far the glide has come. Any thread. @return 0 .. 1; 1 when none runs */
     float morphProgress() const { return m_morphProgress.load(std::memory_order_relaxed); }
     /**
      * @brief Chooses a slot of the A/B morph. Message thread.
-     * @param slot     0 for A, 1 for B
-     * @param values   NumParams values
-     * @param modText  its matrix (Modulation.h)
+     * @param[in] slot     0 for A, 1 for B
+     * @param[in] values   NumParams values
+     * @param[in] modText  its matrix (Modulation.h)
+     * @pre called on the message thread
      */
     void setMorphSlot(int slot, const float* values, const std::string& modText);
-    /** @brief Whether a slot has been chosen. Any thread. @param slot 0 or 1 @return true then */
+    /**
+     * @brief Whether a slot has been chosen. Any thread.
+     * @param[in] slot  0 or 1
+     * @return true then
+     */
     bool morphSlotSet(int slot) const { return m_slotSet[static_cast<size_t>(slot & 1)].load(std::memory_order_relaxed); }
     /**
      * @brief The sound at the map's cursor (PresetMap.h's MapBlender), played while Map is on: the
      *        sound follows it over Map Glide. Message thread (the host blends when the cursor moves).
-     * @param s  the blend
+     * @param[in] s  the blend
+     * @pre called on the message thread
      */
     void setMapTarget(const MorphState& s);
     /** @brief Whether the map has a target yet. Any thread. @return true then */
@@ -212,8 +252,8 @@ public:
     /**
      * @brief A parameter where the sound stands, before the matrix: the knob's, or the morph's or
      *        the glide's way between. Any thread.
-     * @param id  the parameter
-     * @return    its value in its own units
+     * @param[in] id  the parameter
+     * @return its value in its own units
      */
     float soundValue(ParamIdE id) const { return m_soundLive[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
     /** @brief The voice filter's share where the sound stands (Morph.h). Any thread. @return 0 .. 1 */
@@ -222,26 +262,32 @@ public:
      * @brief Loads a factory preset: every parameter but the listener's (keptByPresets) and the
      *        matrix, gliding into it when `glideSeconds` is above 0 (a host with its own parameters
      *        does this itself; the render tool and the tests use this).
-     * @param index         the preset
-     * @param glideSeconds  0: at once
+     * @param[in] index         the preset
+     * @param[in] glideSeconds  0: at once
      */
     void loadPreset(int index, double glideSeconds = 0.0);
     /** @} */
-    /** @brief The mod wheel (CC 1). Any thread. @param v 0 .. 1 */
+    /**
+     * @brief The mod wheel (CC 1). Any thread.
+     * @param[in] v  0 .. 1
+     */
     void setModWheel(float v) { m_wheel.store(v, std::memory_order_relaxed); }
-    /** @brief Channel pressure. Any thread. @param v 0 .. 1 */
+    /**
+     * @brief Channel pressure. Any thread.
+     * @param[in] v  0 .. 1
+     */
     void setPressure(float v) { m_pressure.store(v, std::memory_order_relaxed); }
     /**
      * @brief Where a parameter plays after the matrix, normalised, for the panel's live rings.
-     * @param id  the parameter
-     * @return    0 .. 1, NaN when nothing modulates it
+     * @param[in] id  the parameter
+     * @return 0 .. 1, NaN when nothing modulates it
      */
     float playedNorm(ParamIdE id) const { return m_played[static_cast<size_t>(id)].load(std::memory_order_relaxed); }
 
     /**
      * @brief A modulation source's value as the last block left it, for the panel. Any thread.
-     * @param s  the source
-     * @return   its value (-1 .. 1, or 0 .. 1 for a unipolar one)
+     * @param[in] s  the source
+     * @return its value (-1 .. 1, or 0 .. 1 for a unipolar one)
      */
     float sourceValue(ModSourceE s) const
     {
@@ -252,20 +298,20 @@ public:
     /**
      * @brief The panel shows the sources: what is computed only for a row that reads it (the
      *        reservoir) runs while they are watched. Any thread.
-     * @param on  watched
+     * @param[in] on  watched
      */
     void setSourcesWatched(bool on) { m_sourcesWatched.store(on, std::memory_order_relaxed); }
 
     /**
      * @brief The family jam, following: the leader's root, which the conductor's root is held on (its
      *        nearest note of that pitch class), as Noctuary follows. Any thread.
-     * @param pitchClass  0 .. 11, -1 when no leader is heard
+     * @param[in] pitchClass  0 .. 11, -1 when no leader is heard
      */
     void setJamRoot(int pitchClass) { m_jamRoot.store(pitchClass, std::memory_order_relaxed); }
     /**
      * @brief The family jam, following: the energy of the leader's section, which opens or closes the
      *        brightness and the filter (0.5 changes nothing). Any thread.
-     * @param energy  0 .. 1
+     * @param[in] energy  0 .. 1
      */
     void setJamEnergy(float energy) { m_jamEnergy.store(energy, std::memory_order_relaxed); }
 
@@ -280,16 +326,20 @@ public:
 
     /**
      * @brief The audio callback: n samples of the timeline.
-     * @param L  left output
-     * @param R  right output
-     * @param n  samples, at most config().maxHostBlock in real-time mode
+     * @param[in,out] L  left output
+     * @param[in,out] R  right output
+     * @param[in]     n  samples, at most config().maxHostBlock in real-time mode
      */
     void process(float* L, float* R, int n);
 
     /** @brief Voices sounding after the last rendered block. @return 0 .. voices */
     int soundingVoices() const { return m_sounding.load(std::memory_order_relaxed); }
 
-    /** @brief Voices sounding after the last rendered block, by whose notes they play. @param source 0 played, 1 the conductor, 2 the second conductor @return count */
+    /**
+     * @brief Voices sounding after the last rendered block, by whose notes they play.
+     * @param[in] source  0 played, 1 the conductor, 2 the second conductor
+     * @return count
+     */
     int soundingFrom(int source) const { return source >= 0 && source < 3 ? m_soundingBy[source].load(std::memory_order_relaxed) : 0; }
 
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
@@ -303,9 +353,9 @@ public:
     /**
      * @brief The scale's pitches folded into one octave over the root, in cents above the root's equal-tempered
      *        pitch, for the panel (the scale itself, before Purity blends it with equal temperament). Any thread.
-     * @param out  receives them, ascending
-     * @param max  room in out
-     * @return     how many
+     * @param[out] out  receives them, ascending
+     * @param[in]  max  room in out
+     * @return how many
      */
     int scaleCents(float* out, int max) const
     {
@@ -315,7 +365,12 @@ public:
     }
     /** @brief The root's equal-tempered pitch, the panel's zero for cents. Any thread. @return hertz */
     float rootHz() const { return m_viewRootHz.load(std::memory_order_relaxed); }
-    /** @brief A key's pitch as the scale, the root, A4 and Purity tune it now (before Tide and Self-Tune), for the panel. Any thread. @param note MIDI @return hertz */
+    /**
+     * @brief A key's pitch as the scale, the root, A4 and Purity tune it now (before Tide and Self-Tune), for the
+     *        panel. Any thread.
+     * @param[in] note  MIDI
+     * @return hertz
+     */
     float noteHz(int note) const { return note >= 0 && note < 128 ? m_viewNoteHz[static_cast<size_t>(note)].load(std::memory_order_relaxed) : 0.0f; }
 
     /** @brief Callbacks that found the ring short (real time only). @return count since prepare() */
@@ -327,8 +382,8 @@ public:
     /**
      * @brief A voice as the last rendered block left it, for pictures (any thread; the fields may come from two
      *        neighbouring blocks, which a picture does not mind).
-     * @param i  the voice, 0 .. config().voices-1
-     * @return   its view; hz 0 when it is silent
+     * @param[in] i  the voice, 0 .. config().voices-1
+     * @return its view; hz 0 when it is silent
      */
     VoiceView voiceView(int i) const
     {
@@ -350,43 +405,45 @@ public:
     /**
      * @brief The partials as the picture draws them: every SnapStride-th partial of every voice (and
      *        ghost), as (Hz, amplitude), brought from the GPU about thirty times a second. Message thread.
-     * @param dots      receives the points, voice after voice, perVoice each
-     * @param perVoice  receives how many points each voice has
-     * @return          true when there was a new snapshot since the last call
+     * @param[out] dots      receives the points, voice after voice, perVoice each
+     * @param[out] perVoice  receives how many points each voice has
+     * @return true when there was a new snapshot since the last call
+     * @pre called on the message thread
      */
     bool partialSnapshot(std::vector<float>& dots, int& perVoice);
     /**
      * @brief The living field as the last snapshot brought it (LifeW x LifeH cells, 0 .. 1). Message thread.
-     * @param cells  receives the cells, emptied when the field is off
+     * @param[out] cells  receives the cells, emptied when the field is off
+     * @pre called on the message thread
      */
     void lifeSnapshot(std::vector<float>& cells);
     /**
      * @brief The hall's memory (Hall > Grow): per band over the octaves (HallBins, 20 Hz .. 20 kHz) how
      *        much it has heard there against the average, as the last snapshot brought it down -- or as
      *        it was last set, until the next block has it. Any thread but the worker's.
-     * @param out  receives HallBins values, 1 the average (a new hall: all 1)
-     * @param age  receives the seconds it has learnt
-     * @return     true when it has learnt anything (age above nothing)
+     * @param[out] out  receives HallBins values, 1 the average (a new hall: all 1)
+     * @param[out] age  receives the seconds it has learnt
+     * @return true when it has learnt anything (age above nothing)
      */
     bool hallMemory(std::vector<float>& out, double& age);
     /**
      * @brief A hall's memory to hear in from the next block on (a hall loaded, a state restored, or a
      *        new hall). Any thread but the worker's.
-     * @param in   HallBins values; empty or the wrong size: a new hall, every band 1
-     * @param age  its seconds learnt
+     * @param[in] in   HallBins values; empty or the wrong size: a new hall, every band 1
+     * @param[in] age  its seconds learnt
      */
     void setHallMemory(const std::vector<float>& in, double age);
     /**
      * @brief The ripple's string as the last snapshot left it, for the picture (RippleCells cells, low to
      *        high; empty while the ripple rests). Any thread but the worker's.
-     * @param cells  receives the cells
+     * @param[out] cells  receives the cells
      */
     void rippleSnapshot(std::vector<float>& cells);
     /**
      * @brief A macro taught by example (Focus.h): from the next block it moves the knobs it learnt, at its
      *        macro's value. Any thread but the worker's.
-     * @param macro   0 .. 3
-     * @param lesson  the lesson (fewer than two places: none)
+     * @param[in] macro   0 .. 3
+     * @param[in] lesson  the lesson (fewer than two places: none)
      */
     void setMacroLesson(int macro, const MacroLesson& lesson);
     /** @brief Where the spectral comb's notches stand, in notches (SpectralComb::phase), for the picture. Any thread. @return 0 .. 1 */
@@ -394,7 +451,7 @@ public:
     /**
      * @brief The ripple's string as it stands after the last block, low to high (tests, diagnostics).
      *        The worker's thread, or offline.
-     * @param out  receives RippleCells values
+     * @param[out] out  receives RippleCells values
      */
     void rippleString(float* out) const
     {
@@ -406,9 +463,9 @@ public:
     /**
      * @brief The slowest of each part of a block since the last call, and starts over (diagnostics): the
      *        preparation before the GPU is launched, the wait for it, the effects after.
-     * @param prepMs    receives the slowest preparation, milliseconds
-     * @param gpuMs     receives the longest wait for the GPU
-     * @param effectsMs receives the slowest effects
+     * @param[out] prepMs     receives the slowest preparation, milliseconds
+     * @param[out] gpuMs      receives the longest wait for the GPU
+     * @param[out] effectsMs  receives the slowest effects
      */
     void takeWorstParts(float& prepMs, float& gpuMs, float& effectsMs)
     {
@@ -471,35 +528,39 @@ private:
     void stopWorker();                        ///< stops and joins it
     void renderBlock();                       ///< one GPU block of the timeline into the ring (renderer thread)
     void readParams();                        ///< the parameters the block uses, read once per block, the modulation applied
-    /** @brief A parameter's effective value this block (after the matrix). @param id the parameter @return the value */
+    /**
+     * @brief A parameter's effective value this block (after the matrix).
+     * @param[in] id  the parameter
+     * @return the value
+     */
     float cur(ParamIdE id) const { return m_cur[static_cast<size_t>(id)]; }
     void drainEvents();                       ///< moves the queued events into the pending list
     /**
      * @brief Starts a note on a free voice, or steals one (fading it over a block first).
-     * @param note       MIDI note
-     * @param velocity   0 .. 1
-     * @param distance   0 at the ear .. 1 far
-     * @param source     0 played, 1 the conductor, 2 the second conductor
-     * @param onset      sample of the block it begins at
-     * @param channel    MPE: the played note's member channel, -1 none
+     * @param[in] note      MIDI note
+     * @param[in] velocity  0 .. 1
+     * @param[in] distance  0 at the ear .. 1 far
+     * @param[in] source    0 played, 1 the conductor, 2 the second conductor
+     * @param[in] onset     sample of the block it begins at
+     * @param[in] channel   MPE: the played note's member channel, -1 none
      */
     void startNote(int note, float velocity, float distance, int source, int onset, int channel = -1);
     /**
      * @brief Begins a note on a voice now (the voice is free or has just faded).
-     * @param i          the voice
-     * @param note       MIDI note
-     * @param velocity   0 .. 1
-     * @param distance   0 .. 1
-     * @param source     0 played, 1 the conductor, 2 the second conductor
-     * @param onset      sample of the block it begins at
-     * @param channel    MPE: the played note's member channel, -1 none
+     * @param[in] i         the voice
+     * @param[in] note      MIDI note
+     * @param[in] velocity  0 .. 1
+     * @param[in] distance  0 .. 1
+     * @param[in] source    0 played, 1 the conductor, 2 the second conductor
+     * @param[in] onset     sample of the block it begins at
+     * @param[in] channel   MPE: the played note's member channel, -1 none
      */
     void beginOn(int i, int note, float velocity, float distance, int source, int onset, int channel = -1);
     /**
      * @brief Lets a note go.
-     * @param note    MIDI note
-     * @param source  whose note: 0 played, 1 the conductor, 2 the second conductor
-     * @param channel MPE: the played note's member channel, -1 any
+     * @param[in] note     MIDI note
+     * @param[in] source   whose note: 0 played, 1 the conductor, 2 the second conductor
+     * @param[in] channel  MPE: the played note's member channel, -1 any
      */
     void stopNote(int note, int source, int channel = -1);
     /** @brief Where a conductor's note stands: Noctuary's two planes, 40 % close and 60 % deep. @return 0 .. 1 */
@@ -508,7 +569,11 @@ private:
     void refreshLandscape();
     /** @brief Fills the conductors' spectrum from the voice's shape, and rebuilds the Timbre scale when it changed. */
     void refreshSpectrum();
-    /** @brief A note's frequency: the scale blended with 12-TET by Purity (Noctuary's frequencyOf). @param note MIDI note @return Hz */
+    /**
+     * @brief A note's frequency: the scale blended with 12-TET by Purity (Noctuary's frequencyOf).
+     * @param[in] note  MIDI note
+     * @return Hz
+     */
     double frequencyOf(int note) const;
     /** @brief Rebuilds the scale when its choice, root or key mapping changed. */
     void refreshScale();
@@ -522,8 +587,8 @@ private:
      * @brief Where an event from the host lands on the timeline: the latency ahead of what the
      *        callback has taken, and while the start reserve is not used up, its rest too (what is
      *        rendered already reaches that far; an event there would come late).
-     * @param offset  samples into the host's block
-     * @return        the event's sample on the timeline
+     * @param[in] offset  samples into the host's block
+     * @return the event's sample on the timeline
      */
     std::int64_t stampFor(int offset) const
     {
@@ -561,9 +626,9 @@ private:
     float m_foundationMatch = 0.0f;                     ///< half the chord voices' summed power (as an amplitude) over the foundation's sustain, followed over seconds: its level
     /**
      * @brief The foundation's note for a root: the root's pitch class in the octave from @p low up.
-     * @param root  the conductor's root (MIDI)
-     * @param low   the bottom of the register
-     * @return      the note
+     * @param[in] root  the conductor's root (MIDI)
+     * @param[in] low   the bottom of the register
+     * @return the note
      */
     static int foundationNote(int root, int low) { return low + (((root - low) % 12) + 12) % 12; }
     /** @brief The foundation follows the root, comes and goes with the conductor and Foundation, and comes back when its voice was taken. */
@@ -583,14 +648,18 @@ private:
      *        row reads any more takes the new settings on and runs on from where it is (a knob turned,
      *        a preset taken without a glide); else a new one starts where the strongest running one
      *        stands, so a sound joining a blend does not start its LFOs from nothing.
-     * @param dt  seconds of the block
+     * @param[in] dt  seconds of the block
      */
     void runOwnModulators(float dt);
     // The morph (Morph.h). The worker owns m_sound, m_from, m_target and m_slots; the editor hands
     // slots over through m_pendingSlots under m_slotLock, which the worker only tries.
     /** @brief What plays this block before the matrix: the knobs, the A/B morph, or a glide between. */
     void updateSound();
-    /** @brief A parameter where the sound stands this block (the worker's). @param id the parameter @return its value */
+    /**
+     * @brief A parameter where the sound stands this block (the worker's).
+     * @param[in] id  the parameter
+     * @return its value
+     */
     float base(ParamIdE id) const { return m_sound.m_values[static_cast<size_t>(id)]; }
     MorphState m_sound;                                 ///< what plays this block, before the matrix
     MorphState m_from;                                  ///< what played when the glide began
@@ -699,7 +768,7 @@ private:
      * @brief One block of the ripple's string: struck at the harmonics of every note that started this
      *        block (m_rippleStrikes, gathered by the voice loop, which clears the restart flags), then the damped wave equation stepped (leapfrog, reflecting ends, as many substeps
      *        as the speed needs to stay stable), and the make-up worked out.
-     * @param dt  the block's length, seconds
+     * @param[in] dt  the block's length, seconds
      */
     void stepRipple(float dt);
 
@@ -755,7 +824,10 @@ private:
     float m_jamCutoff = 1.0f;                           ///< the family jam's factor on the cutoff this block
     float m_lifeQuiet = 0.0f;                           ///< seconds since it was last seeded (it is not seeded again sooner than 2 s)
     float m_lifeMakeup = 1.0f;                          ///< the make-up as it glides (half a second), so a seeding does not jump
-    /** @brief A released voice's ghost into a free slot, or over the faintest. @param i the voice */
+    /**
+     * @brief A released voice's ghost into a free slot, or over the faintest.
+     * @param[in] i  the voice
+     */
     void captureGhost(int i);
 
     /** @brief The parameter values one block works with. */

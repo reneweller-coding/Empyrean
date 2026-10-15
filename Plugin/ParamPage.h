@@ -6,6 +6,7 @@
  *        menu (MIDI learn, forget, default). Two parameters that make a span (Lowest and Highest) are one
  *        bar with two ends; two knobs that go together (an echo's Time L and R) can be linked by a small
  *        chain between them, so that one turned turns the other in proportion.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -42,28 +43,49 @@ public:
 
     /**
      * @brief Builds the page.
-     * @param proc     the processor whose parameters the controls edit
-     * @param actions  what the controls' right-click menu does
-     * @param groups   the boxes, in order
-     * @param live     the live rings every knob joins (may be null)
+     * @param[in,out] proc     the processor whose parameters the controls edit
+     * @param[in]     actions  what the controls' right-click menu does
+     * @param[in]     groups   the boxes, in order
+     * @param[in,out] live     the live rings every knob joins (may be null)
      */
     ParamPage(AdditivProcessor& proc, const frame::ControlActions& actions, std::vector<Group> groups, frame::LiveRings* live = nullptr);
 
     /** @brief Flows the boxes and lays out their cells. */
     void resized() override;
-    /** @brief Draws the boxes and their titles, and a soft halo behind each group's main controls. */
+    /**
+     * @brief Draws the boxes and their titles, and a soft halo behind each group's main controls.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief The matrix rows on the knobs, as arcs round them (KnobMod.h). */
+    /**
+     * @brief The matrix rows on the knobs, as arcs round them (KnobMod.h).
+     * @param[in,out] g  the graphics context
+     */
     void paintOverChildren(juce::Graphics& g) override;
     /** @brief The page's parameters in words, for the help: name, range, unit, key. @return the text */
     juce::String describe() const;
-    /** @brief The height the page needs at a width. @param width pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] width  pixels
+     * @return pixels
+     */
     int heightFor(int width) const;
-    /** @brief A parameter's control on this page. @param id the parameter @return it, null when it is not here */
+    /**
+     * @brief A parameter's control on this page.
+     * @param[in] id  the parameter
+     * @return it, null when it is not here
+     */
     juce::Component* controlFor(int id) const;
-    /** @brief The title of the box a parameter is in. @param id the parameter @return it, "" when it is not here */
+    /**
+     * @brief The title of the box a parameter is in.
+     * @param[in] id  the parameter
+     * @return it, "" when it is not here
+     */
     juce::String groupOf(int id) const;
-    /** @brief Lets a parameter's control light up for a moment (the palette found it). @param id the parameter */
+    /**
+     * @brief Lets a parameter's control light up for a moment (the palette found it).
+     * @param[in] id  the parameter
+     */
     void flash(int id);
     /** @brief Every group's state now (also while the page is hidden). @return them, in order */
     std::vector<GroupState> groupStates() const;
@@ -73,22 +95,44 @@ public:
     /** @brief Who hears that a source was dropped on a knob: the editor, found up the page's parents (every page, also those made later). */
     struct DropListener {
         virtual ~DropListener() = default;
-        /** @brief A row was made (or not: row -1). @param s the source @param id the parameter @param row the row */
+        /**
+         * @brief A row was made (or not: row -1).
+         * @param[in] s    the source
+         * @param[in] id   the parameter
+         * @param[in] row  the row
+         */
         virtual void modDropped(additiv::ModSourceE s, int id, int row) = 0;
     };
-    /** @brief Only a source's chip (ModDock). @param d the drag @return true for one */
+    /**
+     * @brief Only a source's chip (ModDock).
+     * @param[in] d  the drag
+     * @return true for one
+     */
     bool isInterestedInDragSource(const SourceDetails& d) override;
-    /** @brief The knob under the source lights up. @param d the drag */
+    /**
+     * @brief The knob under the source lights up.
+     * @param[in] d  the drag
+     */
     void itemDragMove(const SourceDetails& d) override;
-    /** @brief Nothing lights up any more. @param d the drag */
+    /**
+     * @brief Nothing lights up any more.
+     * @param[in] d  the drag
+     */
     void itemDragExit(const SourceDetails& d) override;
-    /** @brief The source modulates the knob under it: a new row. @param d the drop */
+    /**
+     * @brief The source modulates the knob under it: a new row.
+     * @param[in] d  the drop
+     */
     void itemDropped(const SourceDetails& d) override;
 
 private:
     /** @brief Wakes or rests the groups as their gates say; repaints the knobs the matrix moves. */
     void timerCallback() override;
-    /** @brief The knob a source would modulate at a point. @param p the point @return its parameter, -1 none */
+    /**
+     * @brief The knob a source would modulate at a point.
+     * @param[in] p  the point
+     * @return its parameter, -1 none
+     */
     int targetAt(juce::Point<int> p) const;
 
     /** @brief One control in a box. */
@@ -111,15 +155,23 @@ private:
         int m_width = 0;                        ///< the width it needs
         bool m_resting = false;                 ///< every gate at nothing: its other controls dimmed
     };
-    /** @brief Whether a group has main controls. @param b the group @return true then */
+    /**
+     * @brief Whether a group has main controls.
+     * @param[in] b  the group
+     * @return true then
+     */
     static bool gated(const Box& b);
-    /** @brief Whether a group is awake: a main control up, or a row moving one. @param b the group @return true then */
+    /**
+     * @brief Whether a group is awake: a main control up, or a row moving one.
+     * @param[in] b  the group
+     * @return true then
+     */
     bool awake(const Box& b) const;
     /**
      * @brief Where every box goes at a width: in rows, in order -- or, where a later box taken up into an
      *        earlier row's gap saves a row, in the fewest rows.
-     * @param width  pixels
-     * @return       the boxes' rectangles, in the boxes' order
+     * @param[in] width  pixels
+     * @return the boxes' rectangles, in the boxes' order
      */
     std::vector<juce::Rectangle<int>> flow(int width) const;
 

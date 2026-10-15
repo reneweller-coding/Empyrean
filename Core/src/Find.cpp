@@ -1,6 +1,7 @@
 /**
  * @file Find.cpp
  * @brief Search by example (Find.h).
+ * @author Rene Weller
  */
 #include "additiv/Find.h"
 

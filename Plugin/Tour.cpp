@@ -1,6 +1,7 @@
 /**
  * @file Tour.cpp
  * @brief The first steps (Tour.h).
+ * @author Rene Weller
  */
 #include "Tour.h"
 

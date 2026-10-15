@@ -19,6 +19,7 @@
  * consonant.
  *
  * @note Copied from Noctuary `Core/src/Tuning.cpp` at d263f54 (12.10.2026); namespace additiv, macros ADDITIV_.
+ * @author Rene Weller
  */
 #include "additiv/Tuning.h"
 #include "additiv/Params.h"
@@ -58,11 +59,11 @@ const double Otonal[]     = { 1, 9.0/8, 5.0/4, 11.0/8, 3.0/2, 7.0/4 };          
 /**
  * @brief Builds a BuiltinDef from a ratio table, taking the degree count from the array's size so
  *        that it cannot be miscounted.
+ * @param[in] name    the display name, the same text as in ScaleNames
+ * @param[in] period  ratio of the repeating interval (2 = octave, 3 = tritave)
+ * @param[in] r       the ratio table, ratios[0] == 1, ascending, all below the period
+ * @return the definition Builtins holds
  * @tparam N      the number of ratios in the table, deduced
- * @param name    the display name, the same text as in ScaleNames
- * @param period  ratio of the repeating interval (2 = octave, 3 = tritave)
- * @param r       the ratio table, ratios[0] == 1, ascending, all below the period
- * @return        the definition Builtins holds
  */
 template <size_t N> constexpr BuiltinDef def(const char* name, double period, const double (&r)[N])
 { return { name, period, static_cast<int>(N), r }; }
@@ -89,8 +90,8 @@ static_assert(NumBuiltins == UserScaleIndex, "scale name table and built-in tabl
 
 /**
  * @brief Copies a name into the scale's fixed buffer, truncated to fit and always NUL-terminated.
- * @param s     the scale whose name is set
- * @param name  the text to copy; longer than FixedScale::name holds, it is cut
+ * @param[in,out] s     the scale whose name is set
+ * @param[in]     name  the text to copy; longer than FixedScale::name holds, it is cut
  */
 void copyName(FixedScale& s, const char* name)
 {

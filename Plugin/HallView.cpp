@@ -1,6 +1,7 @@
 /**
  * @file HallView.cpp
  * @brief The Hall page (see HallView.h).
+ * @author Rene Weller
  */
 #include "HallView.h"
 #include "Theme.h"
@@ -10,10 +11,18 @@
 
 using additiv::ParamIdE;
 
-/** @brief A band's effect on its modes' decay, octaves at Grow 1: the card's own curve (modalKernel). @param m the memory, 1 the average @return -0.5 .. 1.5 */
+/**
+ * @brief A band's effect on its modes' decay, octaves at Grow 1: the card's own curve (modalKernel).
+ * @param[in] m  the memory, 1 the average
+ * @return -0.5 .. 1.5
+ */
 static float grownOctaves(float m) { return std::clamp(std::log2(1.0f + std::max(m, 0.0f)) - 1.0f, -0.5f, 1.5f); }
 
-/** @brief Seconds as "3 h 12 min", "12 min", "40 s". @param s seconds @return the text */
+/**
+ * @brief Seconds as "3 h 12 min", "12 min", "40 s".
+ * @param[in] s  seconds
+ * @return the text
+ */
 static juce::String ageText(double s)
 {
     if (s < 60.0) return juce::String(static_cast<int>(s)) + " s";

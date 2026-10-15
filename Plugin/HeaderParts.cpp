@@ -1,6 +1,7 @@
 /**
  * @file HeaderParts.cpp
  * @brief The header's own glyph buttons and the meter (HeaderParts.h).
+ * @author Rene Weller
  */
 #include "HeaderParts.h"
 

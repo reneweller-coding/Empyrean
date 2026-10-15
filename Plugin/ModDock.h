@@ -10,6 +10,7 @@
  *
  *        The chips: the LFOs, envelopes and macros, the mod wheel, pressure, velocity and the random
  *        curve; then every other source a row of the matrix reads; then one chosen with "+".
+ * @author Rene Weller
  */
 #pragma once
 
@@ -29,38 +30,65 @@ public:
     static constexpr int History = 120;   ///< samples a trace holds: four seconds at 30 a second
     static constexpr int Height = 30;     ///< the dock's height
 
-    /** @brief The sources of @p proc's engine. @param proc the processor */
+    /**
+     * @brief The sources of @p proc's engine.
+     * @param[in,out] proc  the processor
+     */
     explicit ModDock(AdditivProcessor& proc);
 
     /** @brief A chip was clicked: its source. */
     std::function<void(additiv::ModSourceE)> m_onChoose;
     /** @brief The dock's button: the inspector open or shut. */
     std::function<void()> m_onToggle;
-    /** @brief The source the inspector shows (its chip is marked). @param s the source */
+    /**
+     * @brief The source the inspector shows (its chip is marked).
+     * @param[in] s  the source
+     */
     void setChosen(additiv::ModSourceE s);
-    /** @brief Whether the inspector is open (the button's arrow). @param open open */
+    /**
+     * @brief Whether the inspector is open (the button's arrow).
+     * @param[in] open  open
+     */
     void setOpen(bool open);
     /**
      * @brief A source's trace, oldest first.
-     * @param s  the source
-     * @param k  0 .. History-1
-     * @return   its value then
+     * @param[in] s  the source
+     * @param[in] k  0 .. History-1
+     * @return its value then
      */
     float traceAt(additiv::ModSourceE s, int k) const;
 
-    /** @brief The chips. @param g where */
+    /**
+     * @brief The chips.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The button at the left. */
     void resized() override;
-    /** @brief Remembers the chip pressed. @param e the press */
+    /**
+     * @brief Remembers the chip pressed.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief Drags the chip's source towards a knob. @param e the drag */
+    /**
+     * @brief Drags the chip's source towards a knob.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override;
-    /** @brief A click without a drag chooses the chip; "+" offers every source. @param e the release */
+    /**
+     * @brief A click without a drag chooses the chip; "+" offers every source.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
-    /** @brief The chip under the mouse lights up. @param e the move */
+    /**
+     * @brief The chip under the mouse lights up.
+     * @param[in] e  the move
+     */
     void mouseMove(const juce::MouseEvent& e) override;
-    /** @brief Nothing lights up. @param e the exit */
+    /**
+     * @brief Nothing lights up.
+     * @param[in] e  the exit
+     */
     void mouseExit(const juce::MouseEvent& e) override;
     /** @brief What the chip under the mouse is and does (the info line shows it). @return the text */
     juce::String getTooltip() override;
@@ -72,15 +100,28 @@ private:
     std::vector<additiv::ModSourceE> wanted() const;
     /** @brief The chips' area (between the button and "+"). @return pixels */
     juce::Rectangle<int> chipArea() const;
-    /** @brief A chip's rectangle. @param k its place @param n the chips @return pixels */
+    /**
+     * @brief A chip's rectangle.
+     * @param[in] k  its place
+     * @param[in] n  the chips
+     * @return pixels
+     */
     juce::Rectangle<int> chipBounds(size_t k, size_t n) const;
     /** @brief The "+" chip. @return pixels */
     juce::Rectangle<int> plusBounds() const;
-    /** @brief The chip at a point. @param p the point @return its place, -1 none, -2 the "+" */
+    /**
+     * @brief The chip at a point.
+     * @param[in] p  the point
+     * @return its place, -1 none, -2 the "+"
+     */
     int chipAt(juce::Point<int> p) const;
     /** @brief The menu of every source: the one chosen gets a chip. */
     void showMore();
-    /** @brief The rows that read a source. @param s the source @return how many */
+    /**
+     * @brief The rows that read a source.
+     * @param[in] s  the source
+     * @return how many
+     */
     int rowsOf(additiv::ModSourceE s) const;
 
     AdditivProcessor& m_proc;                                                         ///< whose engine
@@ -102,16 +143,22 @@ public:
 
     /**
      * @brief The inspector.
-     * @param proc     the processor
-     * @param actions  the knobs' right-click menu
-     * @param dock     the dock, whose traces it draws
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the knobs' right-click menu
+     * @param[in]     dock     the dock, whose traces it draws
      */
     SourceInspector(AdditivProcessor& proc, const frame::ControlActions& actions, const ModDock& dock);
-    /** @brief Shows a source. @param s the source */
+    /**
+     * @brief Shows a source.
+     * @param[in] s  the source
+     */
     void show(additiv::ModSourceE s);
     /** @brief The source shown. @return it */
     additiv::ModSourceE source() const { return m_source; }
-    /** @brief Over the pages (with a button that shuts it) or docked under them. @param on over the pages */
+    /**
+     * @brief Over the pages (with a button that shuts it) or docked under them.
+     * @param[in] on  over the pages
+     */
     void setOverlay(bool on);
     /** @brief The shut button was pressed (over the pages). */
     std::function<void()> m_onClose;
@@ -119,12 +166,23 @@ public:
     std::function<void(int)> m_onReveal;
     /** @brief The Matrix button: the matrix page. */
     std::function<void()> m_onMatrix;
-    /** @brief A source's own parameters (an LFO's shape and rate, a macro, the attractors' period ...). @param s the source @return them */
+    /**
+     * @brief A source's own parameters (an LFO's shape and rate, a macro, the attractors' period ...).
+     * @param[in] s  the source
+     * @return them
+     */
     static std::vector<additiv::ParamIdE> ownParams(additiv::ModSourceE s);
-    /** @brief The source whose own knob a parameter is (the first, for knobs shared by a family). @param id the parameter @return it, Off none */
+    /**
+     * @brief The source whose own knob a parameter is (the first, for knobs shared by a family).
+     * @param[in] id  the parameter
+     * @return it, Off none
+     */
     static additiv::ModSourceE sourceOf(int id);
 
-    /** @brief The box, the name, the trace. @param g where */
+    /**
+     * @brief The box, the name, the trace.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The knobs and the rows. */
     void resized() override;

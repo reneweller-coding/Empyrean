@@ -8,6 +8,7 @@
  * first (a preset sounds the same whatever was loaded before it) and replaces the whole matrix.
  * The four macros mean the same in every preset: 1 the motion, 2 the brightness, 3 the air,
  * 4 the space.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -36,15 +37,19 @@ extern const char* const PresetGroupNames[NumPresetGroups];      ///< "Sleep Con
 /** @brief How many presets there are. @return the count */
 int numPresets();
 
-/** @brief One preset. @param i 0 .. numPresets()-1 (clamped) @return the preset */
+/**
+ * @brief One preset.
+ * @param[in] i  0 .. numPresets()-1 (clamped)
+ * @return the preset
+ */
 const Preset& preset(int i);
 
 /**
  * @brief Every parameter's value under a preset: the defaults, then what the preset names.
- * @param i        the preset
- * @param values   receives NumParams values, in ParamId order
- * @param modText  receives its matrix (may be null)
- * @return         how many of the preset's entries named a known parameter
+ * @param[in]  i        the preset
+ * @param[out] values   receives NumParams values, in ParamId order
+ * @param[out] modText  receives its matrix (may be null)
+ * @return how many of the preset's entries named a known parameter
  */
 int presetValues(int i, float* values, std::string* modText);
 
@@ -52,18 +57,31 @@ int presetValues(int i, float* values, std::string* modText);
  * @brief Whether a parameter belongs to the listener rather than to the sound: loading a preset
  *        leaves it as it is (Binaural: headphones or speakers are the listener's, not the preset's;
  *        the morph and the preset glide are how the player moves between presets).
- * @param id  the parameter
- * @return    true when a preset does not set it
+ * @param[in] id  the parameter
+ * @return true when a preset does not set it
  */
 bool keptByPresets(ParamIdE id);
 
-/** @brief A preset's index within its group (for program change: bank = group, program = this). @param i the preset @return 0 .. */
+/**
+ * @brief A preset's index within its group (for program change: bank = group, program = this).
+ * @param[in] i  the preset
+ * @return 0 ..
+ */
 int presetIndexInGroup(int i);
 
-/** @brief A preset by its name. @param name as the bank spells it @return its index, -1 when there is none */
+/**
+ * @brief A preset by its name.
+ * @param[in] name  as the bank spells it
+ * @return its index, -1 when there is none
+ */
 int findPreset(const char* name);
 
-/** @brief The preset at a group and an index in it. @param group the group @param index the index @return the preset, -1 when there is none */
+/**
+ * @brief The preset at a group and an index in it.
+ * @param[in] group  the group
+ * @param[in] index  the index
+ * @return the preset, -1 when there is none
+ */
 int presetAt(int group, int index);
 
 } // namespace additiv

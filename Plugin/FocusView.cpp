@@ -1,6 +1,7 @@
 /**
  * @file FocusView.cpp
  * @brief The Focus page (FocusView.h).
+ * @author Rene Weller
  */
 #include "FocusView.h"
 
@@ -31,7 +32,11 @@ constexpr int SnapTwoH = 108;  ///< the snapshots' box in the right column: the 
 constexpr int VaryTwoH = 206;  ///< the variations' box there: the tiles in two rows of three
 constexpr int FindTwoH = 158;  ///< the search's box there: the presets found in three columns
 
-/** @brief The page is wide enough for two columns. @param w its width @return true for two */
+/**
+ * @brief The page is wide enough for two columns.
+ * @param[in] w  its width
+ * @return true for two
+ */
 bool twoColumns(int w) { return w - 2 * Gap >= LeftMin + Gap + RightMin; }
 const char* const Axis[additiv::NudgeAxes] = { "brightness", "motion", "width", "air" };   ///< what each pair moves
 
@@ -74,7 +79,11 @@ void VariationTile::mouseUp(const juce::MouseEvent&)
 /** @brief A snapshot's tile (see FocusPage). */
 class FocusPage::SnapshotTile final : public juce::Component, public juce::SettableTooltipClient {
 public:
-    /** @brief Tile @p k of @p page. @param page the page @param k 0 .. 7 */
+    /**
+     * @brief Tile @p k of @p page.
+     * @param[in,out] page  the page
+     * @param[in]     k     0 .. 7
+     */
     SnapshotTile(FocusPage& page, int k) : m_page(page), m_k(k)
     {
         setTooltip("A snapshot: click to come back to it (the sound glides there); right-click: into the morph's slot A or B, or forget it");
@@ -86,11 +95,18 @@ public:
         if (m_k == count) return "Keep the sound now -- every knob and the matrix, with its picture";
         return m_k < count ? juce::SettableTooltipClient::getTooltip() : juce::String();
     }
-    /** @brief The + lights up under the mouse. @param e ignored */
+    /**
+     * @brief The + lights up under the mouse.
+     */
     void mouseEnter(const juce::MouseEvent&) override { repaint(); }
-    /** @brief And goes dim again. @param e ignored */
+    /**
+     * @brief And goes dim again.
+     */
     void mouseExit(const juce::MouseEvent&) override { repaint(); }
-    /** @brief Its picture and number, or an empty frame. */
+    /**
+     * @brief Its picture and number, or an empty frame.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override
     {
         const frame::Skin& skin = additivui::skin();
@@ -126,7 +142,10 @@ public:
         g.setFont(juce::FontOptions(12.0f, juce::Font::bold));
         g.drawText(juce::String(m_k + 1), r.reduced(6.0f, 3.0f), juce::Justification::topLeft);
     }
-    /** @brief A click recalls it; a right-click offers the morph's slots and forgetting. @param e the click */
+    /**
+     * @brief A click recalls it; a right-click offers the morph's slots and forgetting.
+     * @param[in] e  the click
+     */
     void mouseUp(const juce::MouseEvent& e) override
     {
         const int count = static_cast<int>(m_page.m_proc.snapshots().size());

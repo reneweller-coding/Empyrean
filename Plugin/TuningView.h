@@ -5,6 +5,7 @@
  *        step (in cents), and the voices where they sound -- a light per voice, its octave up the picture, its
  *        colour its source's, a tail behind it as long as Self-Tune pulls it. So one sees where a just or a timbre
  *        scale departs from the keyboard, how far Purity takes it, and the chord being drawn into pure intervals.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -16,15 +17,28 @@
 /** @brief The tuning's picture (see the file comment). */
 class TuningView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The tuning of @p proc's engine. @param proc the processor */
+    /**
+     * @brief The tuning of @p proc's engine.
+     * @param[in,out] proc  the processor
+     */
     explicit TuningView(AdditivProcessor& proc);
-    /** @brief The ruler, the scale, the voices. @param g where */
+    /**
+     * @brief The ruler, the scale, the voices.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The picture in words, for the help. @return the text */
     juce::String describe() const;
-    /** @brief A click on a line of the scale plays it (in the octave clicked); with Shift it is held, with the others held. @param e the press */
+    /**
+     * @brief A click on a line of the scale plays it (in the octave clicked); with Shift it is held, with the others
+     *        held.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief The note let go -- unless held. @param e the release */
+    /**
+     * @brief The note let go -- unless held.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
     /** @brief Every held note let go when the page is left. */
     void visibilityChanged() override;
@@ -49,12 +63,16 @@ class TuningPage final : public juce::Component {
 public:
     /**
      * @brief Builds the page.
-     * @param proc     the processor
-     * @param actions  the controls' right-click menu
-     * @param live     the live rings
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the controls' right-click menu
+     * @param[in,out] live     the live rings
      */
     TuningPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const;
     /** @brief The knobs at the top, the picture below in the rest. */
     void resized() override;

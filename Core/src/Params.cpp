@@ -6,6 +6,7 @@
  * far reverb, master), with two deliberate differences: the conductor starts in Chords (the user's
  * Autoplay, 12.10.2026) rather than Free, and the motion starts at Breathe so the cloud moves from
  * the first note.
+ * @author Rene Weller
  */
 #include "additiv/Params.h"
 
@@ -56,16 +57,16 @@ using KT = ParamKindE;   ///< short for the rows below
 
 /**
  * @brief A continuous parameter's row.
- * @param id    the parameter
- * @param key   the stable identifier
- * @param name  the display name
- * @param sec   the section
- * @param mn    lowest value
- * @param mx    highest value
- * @param def   default
- * @param skew  1 linear, < 1 more resolution low
- * @param unit  unit shown after the value
- * @return      the row
+ * @param[in] id    the parameter
+ * @param[in] key   the stable identifier
+ * @param[in] name  the display name
+ * @param[in] sec   the section
+ * @param[in] mn    lowest value
+ * @param[in] mx    highest value
+ * @param[in] def   default
+ * @param[in] skew  1 linear, < 1 more resolution low
+ * @param[in] unit  unit shown after the value
+ * @return the row
  */
 constexpr ParamDesc F(ParamIdE id, const char* key, const char* name, const char* sec,
                       float mn, float mx, float def, float skew, const char* unit)
@@ -73,15 +74,15 @@ constexpr ParamDesc F(ParamIdE id, const char* key, const char* name, const char
 
 /**
  * @brief An integer parameter's row.
- * @param id    the parameter
- * @param key   the stable identifier
- * @param name  the display name
- * @param sec   the section
- * @param mn    lowest value
- * @param mx    highest value
- * @param def   default
- * @param unit  unit shown after the value
- * @return      the row
+ * @param[in] id    the parameter
+ * @param[in] key   the stable identifier
+ * @param[in] name  the display name
+ * @param[in] sec   the section
+ * @param[in] mn    lowest value
+ * @param[in] mx    highest value
+ * @param[in] def   default
+ * @param[in] unit  unit shown after the value
+ * @return the row
  */
 constexpr ParamDesc I(ParamIdE id, const char* key, const char* name, const char* sec,
                       float mn, float mx, float def, const char* unit = "")
@@ -89,26 +90,26 @@ constexpr ParamDesc I(ParamIdE id, const char* key, const char* name, const char
 
 /**
  * @brief A switch's row.
- * @param id    the parameter
- * @param key   the stable identifier
- * @param name  the display name
- * @param sec   the section
- * @param def   on or off
- * @return      the row
+ * @param[in] id    the parameter
+ * @param[in] key   the stable identifier
+ * @param[in] name  the display name
+ * @param[in] sec   the section
+ * @param[in] def   on or off
+ * @return the row
  */
 constexpr ParamDesc B(ParamIdE id, const char* key, const char* name, const char* sec, bool def)
 { return { id, key, name, sec, KT::BOOL, 0.0f, 1.0f, def ? 1.0f : 0.0f, 1.0f, "", nullptr, 0 }; }
 
 /**
  * @brief A choice's row.
- * @param id       the parameter
- * @param key      the stable identifier
- * @param name     the display name
- * @param sec      the section
- * @param choices  the names
- * @param n        how many
- * @param def      the default index
- * @return         the row
+ * @param[in] id       the parameter
+ * @param[in] key      the stable identifier
+ * @param[in] name     the display name
+ * @param[in] sec      the section
+ * @param[in] choices  the names
+ * @param[in] n        how many
+ * @param[in] def      the default index
+ * @return the row
  */
 constexpr ParamDesc C(ParamIdE id, const char* key, const char* name, const char* sec,
                       const char* const* choices, int n, int def)

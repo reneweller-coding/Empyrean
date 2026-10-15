@@ -1,6 +1,7 @@
 /**
  * @file MapView.cpp
  * @brief The Map page (MapView.h).
+ * @author Rene Weller
  */
 #include "MapView.h"
 
@@ -16,7 +17,12 @@ using additiv::ParamIdE;
 
 namespace {
 
-/** @brief A section's colour: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits. @param group the preset's group @return the colour */
+/**
+ * @brief A section's colour: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents,
+ *        the halls and orbits.
+ * @param[in] group  the preset's group
+ * @return the colour
+ */
 juce::Colour sectionColour(int group)
 {
     const frame::Skin& skin = additivui::skin();
@@ -724,10 +730,19 @@ MapPage::MapPage(AdditivProcessor& proc, const frame::ControlActions& actions, f
 /** @brief The smallest side the map is given before the page scrolls. */
 constexpr int MapMin = 360;
 
-/** @brief The map's largest side at a page width: a square, at most 600 pixels. @param w the page's width @return pixels */
+/**
+ * @brief The map's largest side at a page width: a square, at most 600 pixels.
+ * @param[in] w  the page's width
+ * @return pixels
+ */
 static int mapSide(int w) { return std::min(600, (w - 30) * 55 / 100); }
 
-/** @brief The right column's width beside a map. @param w the page's width @param side the map's side @return pixels */
+/**
+ * @brief The right column's width beside a map.
+ * @param[in] w     the page's width
+ * @param[in] side  the map's side
+ * @return pixels
+ */
 static int rightWidth(int w, int side) { return w - 20 - side; }
 
 int MapPage::heightFor(int w) const

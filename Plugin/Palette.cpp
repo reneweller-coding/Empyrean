@@ -1,6 +1,7 @@
 /**
  * @file Palette.cpp
  * @brief The command palette (Palette.h).
+ * @author Rene Weller
  */
 #include "Palette.h"
 
@@ -13,9 +14,9 @@ namespace {
 /**
  * @brief How well one word of the search fits a text: its start best, a word's start next, anywhere
  *        in it, then its letters in order (scattered).
- * @param text  the text, lower case
- * @param word  the word, lower case
- * @return      0 when it does not fit, else the higher the better
+ * @param[in] text  the text, lower case
+ * @param[in] word  the word, lower case
+ * @return 0 when it does not fit, else the higher the better
  */
 float fit(const juce::String& text, const juce::String& word)
 {

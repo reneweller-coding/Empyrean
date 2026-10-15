@@ -5,6 +5,7 @@
  *        group with main controls, lit in the group's colour while it is awake, faint while it rests;
  *        a count where a page counts something (the matrix's rows); the page's name dimmed while all
  *        of its groups rest. Hovering a page tells which groups are on and which are off.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -36,36 +37,63 @@ public:
         std::vector<int> m_pages;  ///< the pages
     };
 
-    /** @brief The pages and their sections. @param names every page's name, by index @param sections the sections, in order */
+    /**
+     * @brief The pages and their sections.
+     * @param[in] names     every page's name, by index
+     * @param[in] sections  the sections, in order
+     */
     void setPages(juce::StringArray names, std::vector<Section> sections);
     /** @brief A page's state, asked for on refresh(). */
     std::function<Status(int)> m_statusOf;
     /** @brief A page was clicked. */
     std::function<void(int)> m_onSelect;
-    /** @brief The page in front. @param page its index */
+    /**
+     * @brief The page in front.
+     * @param[in] page  its index
+     */
     void setCurrent(int page);
     /** @brief Asks every page's state anew; repaints when one changed. */
     void refresh();
     /** @brief The width the strip needs. @return pixels */
     int idealWidth() const;
 
-    /** @brief The headings, the pages, their marks. @param g where */
+    /**
+     * @brief The headings, the pages, their marks.
+     * @param[in,out] g  where
+     */
     void paint(juce::Graphics& g) override;
     /** @brief The pages' places. */
     void resized() override;
-    /** @brief Shows the page clicked. @param e the click */
+    /**
+     * @brief Shows the page clicked.
+     * @param[in] e  the click
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief The page under the mouse lights up. @param e the move */
+    /**
+     * @brief The page under the mouse lights up.
+     * @param[in] e  the move
+     */
     void mouseMove(const juce::MouseEvent& e) override;
-    /** @brief Nothing lights up. @param e the exit */
+    /**
+     * @brief Nothing lights up.
+     * @param[in] e  the exit
+     */
     void mouseExit(const juce::MouseEvent& e) override;
     /** @brief The page under the mouse: its groups on and off (the info line shows it). @return the text */
     juce::String getTooltip() override;
 
 private:
-    /** @brief A page's width: its name, its dots, its count. @param page its index @return pixels */
+    /**
+     * @brief A page's width: its name, its dots, its count.
+     * @param[in] page  its index
+     * @return pixels
+     */
     int widthOf(int page) const;
-    /** @brief The page at a point. @param p the point @return its index, -1 none */
+    /**
+     * @brief The page at a point.
+     * @param[in] p  the point
+     * @return its index, -1 none
+     */
     int pageAt(juce::Point<int> p) const;
 
     juce::StringArray m_names;                       ///< the pages' names

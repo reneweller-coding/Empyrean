@@ -1,6 +1,7 @@
 /**
  * @file Browser.cpp
  * @brief The preset browser (Browser.h).
+ * @author Rene Weller
  */
 #include "Browser.h"
 
@@ -24,9 +25,17 @@ const char* const TraitHigh[4] = { "brighter", "more moving", "wider", "airier" 
 /** @brief A row of the list (see PresetBrowser). */
 class PresetBrowser::Row final : public juce::Component {
 public:
-    /** @brief A row of @p owner. @param owner the browser */
+    /**
+     * @brief A row of @p owner.
+     * @param[in,out] owner  the browser
+     */
     explicit Row(PresetBrowser& owner) : m_owner(owner) {}
-    /** @brief Shows entry @p e at @p row. @param row the list's row @param e the entry, -1 none @param selected chosen */
+    /**
+     * @brief Shows entry @p e at @p row.
+     * @param[in] row       the list's row
+     * @param[in] e         the entry, -1 none
+     * @param[in] selected  chosen
+     */
     void show(int row, int e, bool selected)
     {
         m_row = row;
@@ -34,7 +43,10 @@ public:
         m_selected = selected;
         repaint();
     }
-    /** @brief The play mark, the star, the name, the group, the traits. */
+    /**
+     * @brief The play mark, the star, the name, the group, the traits.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override
     {
         if (m_entry < 0) return;
@@ -74,7 +86,10 @@ public:
                 g.fillRect(juce::Rectangle<float>(x + 8.0f, std::min(mid, mid - v), 10.0f, std::max(1.0f, std::abs(v))));
             }
     }
-    /** @brief Listens (the play mark), stars, or chooses the row. @param e the press */
+    /**
+     * @brief Listens (the play mark), stars, or chooses the row.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override
     {
         if (m_entry < 0) return;
@@ -91,7 +106,9 @@ public:
             if (m_owner.m_categories[static_cast<size_t>(m_owner.m_category)].m_kind == 1) m_owner.filter();
         }
     }
-    /** @brief Back to the sound before the listening. @param e the release */
+    /**
+     * @brief Back to the sound before the listening.
+     */
     void mouseUp(const juce::MouseEvent&) override
     {
         if (!m_listening) return;
@@ -99,7 +116,10 @@ public:
         m_owner.m_proc.endPreview();
         repaint();
     }
-    /** @brief Takes it. @param e the double click */
+    /**
+     * @brief Takes it.
+     * @param[in] e  the double click
+     */
     void mouseDoubleClick(const juce::MouseEvent& e) override
     {
         if (e.x >= 52) m_owner.choose(m_row);
@@ -121,7 +141,10 @@ public:
     float m_hi = 3.0f;                  ///< and its upper end
     /** @brief Whether it lets everything through. @return true when wide open */
     bool open() const { return m_lo <= -3.0f && m_hi >= 3.0f; }
-    /** @brief The track, the range lit, the two ends. */
+    /**
+     * @brief The track, the range lit, the two ends.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override
     {
         const frame::Skin& skin = additivui::skin();
@@ -134,13 +157,19 @@ public:
         g.fillRoundedRectangle(x0, y - 2.0f, x1 - x0, 4.0f, 2.0f);
         for (float x : { x0, x1 }) g.fillEllipse(x - 5.0f, y - 5.0f, 10.0f, 10.0f);
     }
-    /** @brief Takes the nearer end. @param e the press */
+    /**
+     * @brief Takes the nearer end.
+     * @param[in] e  the press
+     */
     void mouseDown(const juce::MouseEvent& e) override
     {
         m_held = std::abs(e.position.x - xOf(m_lo)) <= std::abs(e.position.x - xOf(m_hi)) ? 0 : 1;
         mouseDrag(e);
     }
-    /** @brief Moves it. @param e the drag */
+    /**
+     * @brief Moves it.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override
     {
         const float v = valueAt(e.position.x);
@@ -149,7 +178,9 @@ public:
         repaint();
         if (m_onChange) m_onChange();
     }
-    /** @brief Wide open again. @param e the double click */
+    /**
+     * @brief Wide open again.
+     */
     void mouseDoubleClick(const juce::MouseEvent&) override
     {
         m_lo = -3.0f;
@@ -159,9 +190,17 @@ public:
     }
 
 private:
-    /** @brief A value's place. @param v spreads @return x */
+    /**
+     * @brief A value's place.
+     * @param[in] v  spreads
+     * @return x
+     */
     float xOf(float v) const { return 6.0f + (v + 3.0f) / 6.0f * (static_cast<float>(getWidth()) - 12.0f); }
-    /** @brief The value at a place. @param x pixels @return spreads */
+    /**
+     * @brief The value at a place.
+     * @param[in] x  pixels
+     * @return spreads
+     */
     float valueAt(float x) const { return juce::jlimit(-3.0f, 3.0f, (x - 6.0f) / std::max(1.0f, static_cast<float>(getWidth()) - 12.0f) * 6.0f - 3.0f); }
     int m_held = 0;   ///< the end being dragged
 };
@@ -169,11 +208,21 @@ private:
 /** @brief The categories' list (see PresetBrowser). */
 class PresetBrowser::Categories final : public juce::ListBoxModel {
 public:
-    /** @brief The categories of @p owner. @param owner the browser */
+    /**
+     * @brief The categories of @p owner.
+     * @param[in,out] owner  the browser
+     */
     explicit Categories(PresetBrowser& owner) : m_owner(owner) {}
     /** @brief How many. @return rows */
     int getNumRows() override { return static_cast<int>(m_owner.m_categories.size()); }
-    /** @brief One: a heading for a section, indented for a group. */
+    /**
+     * @brief One: a heading for a section, indented for a group.
+     * @param[in]     row       the row
+     * @param[in,out] g         the graphics context
+     * @param[in]     width     the width in pixels
+     * @param[in]     height    the height in pixels
+     * @param[in]     selected  true for the chosen row
+     */
     void paintListBoxItem(int row, juce::Graphics& g, int width, int height, bool selected) override
     {
         if (row < 0 || row >= getNumRows()) return;
@@ -188,7 +237,10 @@ public:
         g.setFont(juce::FontOptions(heading ? 13.0f : 12.0f, heading ? juce::Font::bold : juce::Font::plain));
         g.drawText(c.m_title, c.m_kind == 5 ? 18 : 6, 0, width - 20, height, juce::Justification::centredLeft);
     }
-    /** @brief Chooses it. */
+    /**
+     * @brief Chooses it.
+     * @param[in] row  the row chosen
+     */
     void selectedRowsChanged(int row) override
     {
         if (row < 0) return;

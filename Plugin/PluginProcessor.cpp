@@ -1,6 +1,10 @@
 /**
  * @file PluginProcessor.cpp
  * @brief The JUCE shell around the engine (PluginProcessor.h).
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c ADDITIV_VERSION - the project's version (the top CMakeLists.txt), written into the saved state
  */
 #include "PluginProcessor.h"
 
@@ -25,8 +29,8 @@ namespace {
 
 /**
  * @brief The host's parameter for one row of the table.
- * @param d  the row
- * @return   a float, int, switch or choice parameter with the row's range, default and unit
+ * @param[in] d  the row
+ * @return a float, int, switch or choice parameter with the row's range, default and unit
  */
 std::unique_ptr<juce::RangedAudioParameter> makeParameter(const ParamDesc& d)
 {
@@ -205,8 +209,8 @@ void AdditivProcessor::applyPreset(int index, double glide)
 /**
  * @brief A matrix's text as the engine would write it back: each row through its packing (what the
  *        audio side holds), so that "changed" compares like with like.
- * @param text  the text form
- * @return      the engine's spelling of it
+ * @param[in] text  the text form
+ * @return the engine's spelling of it
  */
 static std::string modTextAsEngine(const std::string& text)
 {
@@ -564,14 +568,23 @@ void AdditivProcessor::mapTick()
     m_engine.setMapTarget(s);
 }
 
-/** @brief A hall's memory as text: its HallBins floats, base64. @param m the memory @return the text */
+/**
+ * @brief A hall's memory as text: its HallBins floats, base64.
+ * @param[in] m  the memory
+ * @return the text
+ */
 static juce::String hallText(const std::vector<float>& m)
 {
     const juce::MemoryBlock b(m.data(), m.size() * sizeof(float));
     return b.toBase64Encoding();
 }
 
-/** @brief A hall's memory from its text. @param s the text @param m receives the memory @return false when it is no memory */
+/**
+ * @brief A hall's memory from its text.
+ * @param[in]  s  the text
+ * @param[out] m  receives the memory
+ * @return false when it is no memory
+ */
 static bool hallFromText(const juce::String& s, std::vector<float>& m)
 {
     juce::MemoryBlock b;

@@ -21,6 +21,10 @@
  * the render kernel ramps between them.
  *
  * This header carries no CUDA types: the plugin and the tools include it from plain C++.
+ * @author Rene Weller
+ *
+ * @par Compile Flags:
+ *   @arg @c __CUDACC__ - set by nvcc: the helpers both sides use are compiled for the host and the GPU
  */
 #pragma once
 
@@ -371,7 +375,7 @@ enum class LifeModeE : std::int32_t {
     COUNT      ///< number of modes
 };
 
-/** @brief Whether a living landscape is one of the animated pictures (computed, not grown). @param m the mode @return true then */
+/** @brief Whether a living landscape is one of the animated pictures (computed, not grown). @param[in] m the mode @return true then */
 #if defined(__CUDACC__)
 __host__ __device__
 #endif
@@ -579,9 +583,9 @@ public:
 
     /**
      * @brief Picks the first CUDA device, allocates the tables and builds the graph.
-     * @param config  the layout
-     * @param error   receives the reason when it fails (may be null)
-     * @return        true when the engine can render
+     * @param[in]  config  the layout
+     * @param[out] error   receives the reason when it fails (may be null)
+     * @return true when the engine can render
      */
     bool open(const CloudConfig& config, std::string* error);
 
@@ -593,27 +597,27 @@ public:
 
     /**
      * @brief Replaces the bank of envelope shapes; waits for a block in flight first.
-     * @param shapes  the shapes
-     * @param count   how many, at most EnvShapes (more are dropped)
-     * @return        true when uploaded
+     * @param[in] shapes  the shapes
+     * @param[in] count   how many, at most EnvShapes (more are dropped)
+     * @return true when uploaded
      */
     bool setShapes(const EnvShape* shapes, int count);
 
     /**
      * @brief Replaces the landscape: rows of time, each `columns` amplitudes from LandLowHz to
      *        LandHighHz; it loops over all its rows. Waits for a block in flight first.
-     * @param amps        rows * columns amplitudes 0 .. 1, row by row
-     * @param columns     2 .. LandMaxColumns
-     * @param rows        1 .. LandMaxRows
-     * @param rowSeconds  how long one row lasts at rate 1
-     * @return            true when uploaded (false: outside the limits, nothing changed)
+     * @param[in] amps        rows * columns amplitudes 0 .. 1, row by row
+     * @param[in] columns     2 .. LandMaxColumns
+     * @param[in] rows        1 .. LandMaxRows
+     * @param[in] rowSeconds  how long one row lasts at rate 1
+     * @return true when uploaded (false: outside the limits, nothing changed)
      */
     bool setLandscape(const float* amps, int columns, int rows, float rowSeconds);
 
     /**
      * @brief The host's copy of a voice, edited freely between wait() and the next launch().
-     * @param i  0 .. voices-1
-     * @return   the voice
+     * @param[in] i  0 .. voices-1
+     * @return the voice
      */
     CloudVoice& voice(int i);
 
@@ -652,30 +656,36 @@ public:
     /**
      * @brief The hall's memory (ModalHall::grow): per band over the octaves, how much was heard there
      *        against the average (1), as the last snapshot brought it down.
-     * @param out  receives HallBins values
-     * @return     true when the memory has come down at least once
+     * @param[out] out  receives HallBins values
+     * @return true when the memory has come down at least once
      */
     bool hallMemory(float* out) const;
-    /** @brief Replaces the hall's memory at the next launch (a hall loaded, or a new one). @param in HallBins values (1: nothing learnt) */
+    /**
+     * @brief Replaces the hall's memory at the next launch (a hall loaded, or a new one).
+     * @param[in] in  HallBins values (1: nothing learnt)
+     */
     void setHallMemory(const float* in);
 
-    /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives ReservoirOutputs values */
+    /**
+     * @brief The reservoir's outputs after the last block, -1 .. 1.
+     * @param[out] out  receives ReservoirOutputs values
+     */
     void reservoirOut(float* out) const;
 
     /**
      * @brief The living field's mean and mean square (of what the partials read, 0 .. 1), measured by
      *        the GPU in the last block.
-     * @param mean    receives the mean
-     * @param meanSq  receives the mean of the squares
+     * @param[out] mean    receives the mean
+     * @param[out] meanSq  receives the mean of the squares
      */
     void lifeStats(float& mean, float& meanSq) const;
 
     /**
      * @brief What the instrument heard of its own voices in the last block (an FFT of the last 1024
      *        samples, near and far together): its level, where its energy stands, how much it changed.
-     * @param levelDb   receives the level, dB of full scale
-     * @param centroid  receives the energy's centre on the log axis, 0 at 20 Hz .. 1 at 20 kHz
-     * @param flux      receives the change: the rise of the spectrum's magnitudes over their sum, 0 .. 1
+     * @param[out] levelDb   receives the level, dB of full scale
+     * @param[out] centroid  receives the energy's centre on the log axis, 0 at 20 Hz .. 1 at 20 kHz
+     * @param[out] flux      receives the change: the rise of the spectrum's magnitudes over their sum, 0 .. 1
      */
     void heard(float& levelDb, float& centroid, float& flux) const;
 
@@ -691,9 +701,9 @@ public:
 
     /**
      * @brief The snapshot a launch brought down, once: after the wait() of a launch that copied it.
-     * @param dots      receives the points, per voice snapshotPerVoice() of (Hz, amplitude), voices in order
-     * @param perVoice  receives how many points each voice has
-     * @return          true when a new snapshot is there (then valid until the next launch())
+     * @param[in]  dots      receives the points, per voice snapshotPerVoice() of (Hz, amplitude), voices in order
+     * @param[out] perVoice  receives how many points each voice has
+     * @return true when a new snapshot is there (then valid until the next launch())
      */
     bool takeSnapshot(const float*& dots, int& perVoice);
 

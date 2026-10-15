@@ -2,6 +2,7 @@
  * @file Describe.cpp
  * @brief What a stretch of stereo sound sounds like (Describe.h); moved here from the measuring tool
  *        (14.10.2026) so that the instrument can describe a recording the same way.
+ * @author Rene Weller
  */
 #include "additiv/Describe.h"
 
@@ -18,7 +19,10 @@ constexpr int Fft = 4096;     ///< the analysis frame
 constexpr int Hop = 2048;     ///< frames start this far apart
 constexpr int Bands = 36;     ///< bands from 40 Hz to 16 kHz, a quarter of an octave each nearly
 
-/** @brief An in-place radix-2 FFT. @param x Fft values */
+/**
+ * @brief An in-place radix-2 FFT.
+ * @param[in,out] x  Fft values
+ */
 void fft(std::vector<std::complex<double>>& x)
 {
     const int n = static_cast<int>(x.size());
@@ -47,10 +51,6 @@ void fft(std::vector<std::complex<double>>& x)
 
 /**
  * @brief The description of a stretch of stereo sound (the file comment).
- * @param L   left
- * @param R   right
- * @param sr  the sample rate
- * @return    it
  */
 Description describe(const std::vector<float>& L, const std::vector<float>& R, double sr)
 {

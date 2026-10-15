@@ -10,6 +10,7 @@
  * rules (Morph.h) -- the numbers in their own domains, a choice with an amount faded through
  * nothing where its neighbours disagree, the filter by its share, the matrices weighted -- one
  * neighbour after another, so the weights come out as a weighted mean.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -21,9 +22,9 @@ namespace additiv {
 
 /**
  * @brief A factory preset's place on the map.
- * @param index  the preset (clamped)
- * @param x      receives across, 0 .. 1 (dark to bright)
- * @param y      receives up, 0 .. 1 (still to moving)
+ * @param[in]  index  the preset (clamped)
+ * @param[out] x      receives across, 0 .. 1 (dark to bright)
+ * @param[out] y      receives up, 0 .. 1 (still to moving)
  */
 void presetMapPosition(int index, float& x, float& y);
 
@@ -47,10 +48,10 @@ struct MapNeighbours {
  *        the sound jump: the weight the seventh nearest would have is taken off the six (a preset
  *        enters and leaves the six at nothing), and so are 2 % of the whole (a neighbour too faint
  *        to be heard enters at nothing rather than at 2 %).
- * @param x       across, 0 .. 1
- * @param y       up, 0 .. 1
- * @param radius  the Gaussian's width in the spacing of the presets there (MapRadius, 0.1 .. 4)
- * @return        the neighbours
+ * @param[in] x       across, 0 .. 1
+ * @param[in] y       up, 0 .. 1
+ * @param[in] radius  the Gaussian's width in the spacing of the presets there (MapRadius, 0.1 .. 4)
+ * @return the neighbours
  */
 MapNeighbours mapNeighbours(float x, float y, float radius);
 
@@ -63,14 +64,18 @@ class MapBlender {
 public:
     /**
      * @brief The sound at a place on the map.
-     * @param x       across
-     * @param y       up
-     * @param radius  the blend's width in the spacing of the presets there (0.1 .. 4)
-     * @param out     receives the blend
-     * @param around  receives the neighbours (may be null)
+     * @param[in]  x       across
+     * @param[in]  y       up
+     * @param[in]  radius  the blend's width in the spacing of the presets there (0.1 .. 4)
+     * @param[out] out     receives the blend
+     * @param[out] around  receives the neighbours (may be null)
      */
     void blend(float x, float y, float radius, MorphState& out, MapNeighbours* around = nullptr);
-    /** @brief One preset as a sound. @param index the preset @return its state (kept) */
+    /**
+     * @brief One preset as a sound.
+     * @param[in] index  the preset
+     * @return its state (kept)
+     */
     const MorphState& state(int index);
 
 private:

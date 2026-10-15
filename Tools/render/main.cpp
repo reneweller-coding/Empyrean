@@ -18,6 +18,7 @@
  * the presets round the cursor, followed over Map Glide. --fill lets the conductor's chord arrive within
  * seconds, as a preset chosen on the panel does, instead of entering one voice at a time. The WAV is written as it is rendered; beyond an hour
  * it is cut into files of an hour (render-01.wav, render-02.wav, ...).
+ * @author Rene Weller
  */
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
@@ -65,9 +66,9 @@ class WavStream {
 public:
     /**
      * @brief Opens the file and writes a header.
-     * @param path        the file
-     * @param sampleRate  Hz
-     * @return            true when it is open
+     * @param[in] path        the file
+     * @param[in] sampleRate  Hz
+     * @return true when it is open
      */
     bool open(const fs::path& path, int sampleRate)
     {
@@ -83,7 +84,12 @@ public:
         m_f.write(reinterpret_cast<const char*>(h), 44);
         return static_cast<bool>(m_f);
     }
-    /** @brief Appends frames. @param L left @param R right @param n frames */
+    /**
+     * @brief Appends frames.
+     * @param[in] L  left
+     * @param[in] R  right
+     * @param[in] n  frames
+     */
     void write(const float* L, const float* R, int n)
     {
         m_buf.resize(static_cast<size_t>(n) * 6);
@@ -124,9 +130,9 @@ private:
 
 /**
  * @brief Applies one --set key=value: a number, or for a choice also its name.
- * @param e    the engine
- * @param arg  "key=value"
- * @return     true when the key exists and the value was read
+ * @param[in,out] e    the engine
+ * @param[in]     arg  "key=value"
+ * @return true when the key exists and the value was read
  */
 bool applySet(Engine& e, const std::string& arg)
 {
@@ -148,8 +154,8 @@ bool applySet(Engine& e, const std::string& arg)
 
 /**
  * @brief A string as a JSON literal.
- * @param s  the text
- * @return   it quoted, with quotes and backslashes escaped
+ * @param[in] s  the text
+ * @return it quoted, with quotes and backslashes escaped
  */
 std::string jsonString(const char* s)
 {
@@ -180,9 +186,9 @@ void dumpParams()
 
 /**
  * @brief Loads a factory preset into the engine: every parameter and the matrix.
- * @param e     the engine
- * @param what  the preset's name, or its number
- * @return      the preset's index, -1 when there is none of that name or number
+ * @param[in,out] e     the engine
+ * @param[in]     what  the preset's name, or its number
+ * @return the preset's index, -1 when there is none of that name or number
  */
 int applyPreset(Engine& e, const std::string& what)
 {
@@ -195,9 +201,9 @@ int applyPreset(Engine& e, const std::string& what)
 
 /**
  * @brief A journey by name (one that comes with the instrument) or from a file.
- * @param what  the name or the path
- * @param j     receives it
- * @return      true when it was found and read
+ * @param[in]  what  the name or the path
+ * @param[out] j     receives it
+ * @return true when it was found and read
  */
 bool findJourney(const std::string& what, Journey& j)
 {
@@ -212,9 +218,9 @@ bool findJourney(const std::string& what, Journey& j)
 
 /**
  * @brief Reads the options, renders, writes the WAV.
- * @param argc  argument count
- * @param argv  arguments
- * @return      0 on success
+ * @param[in]     argc  argument count
+ * @param[in,out] argv  arguments
+ * @return 0 on success
  */
 int main(int argc, char** argv)
 {

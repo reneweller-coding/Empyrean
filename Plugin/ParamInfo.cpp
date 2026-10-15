@@ -1,6 +1,7 @@
 /**
  * @file ParamInfo.cpp
  * @brief The parameters' sentences (ParamInfo.h).
+ * @author Rene Weller
  */
 #include "ParamInfo.h"
 

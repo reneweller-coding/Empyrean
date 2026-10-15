@@ -12,6 +12,7 @@
  *   point;point;...   point = \<preset name\>|travel|hold[|radius]   or   x,y|travel|hold[|radius]
  * (in a file a line break separates points too). A preset name resolves to that preset's place
  * on the map (presetMapPosition), so routes survive a new layout of the map. Times in seconds.
+ * @author Rene Weller
  */
 #pragma once
 #include <cstddef>
@@ -37,8 +38,8 @@ struct RoutePreset {
 int numRoutePresets();
 /**
  * @brief One built-in route.
- * @param index  0 .. numRoutePresets()-1, clamped
- * @return       the route's name and text
+ * @param[in] index  0 .. numRoutePresets()-1, clamped
+ * @return the route's name and text
  */
 const RoutePreset& routePreset(int index);
 
@@ -56,21 +57,21 @@ public:
     int  count() const { return m_count; }
     /**
      * @brief One waypoint.
-     * @param i  0 .. count()-1, unchecked
-     * @return   the point
+     * @param[in] i  0 .. count()-1, unchecked
+     * @return the point
      */
     const Waypoint& point(int i) const { return m_points[i]; }
     /** @brief Removes every waypoint and stops the walk. */
     void clear() { m_count = 0; stop(); }
     /**
      * @brief Changes a waypoint in place (its time, hold or radius edited).
-     * @param i  0 .. count()-1 (ignored outside)
-     * @param w  the new point
+     * @param[in] i  0 .. count()-1 (ignored outside)
+     * @param[in] w  the new point
      */
     void set(int i, const Waypoint& w) { if (i >= 0 && i < m_count) m_points[i] = w; }
     /**
      * @brief Removes a waypoint; the walk stops.
-     * @param i  0 .. count()-1 (ignored outside)
+     * @param[in] i  0 .. count()-1 (ignored outside)
      */
     void remove(int i)
     {
@@ -81,8 +82,8 @@ public:
     }
     /**
      * @brief Appends a waypoint.
-     * @param w  the point
-     * @return   false when the route is full (MaxPoints)
+     * @param[in] w  the point
+     * @return false when the route is full (MaxPoints)
      */
     bool add(const Waypoint& w) { if (m_count >= MaxPoints) return false; m_points[m_count++] = w; return true; }
     /**
@@ -91,16 +92,15 @@ public:
      * Stops the walk. Preset names are looked up in the bank and resolved to their place on the map;
      * coordinates are clamped to 0 .. 1, times floored at 0, the optional radius clamped to
      * 0.01 .. 0.3. Nothing is changed unless the whole text parses.
-     *
-     * @param text  points separated by ';' or line breaks, fields by '|'; nullptr is refused
-     * @return      true when the whole text parsed and the route was replaced
+     * @param[in] text  points separated by ';' or line breaks, fields by '|'; nullptr is refused
+     * @return true when the whole text parsed and the route was replaced
      */
     bool parse(const char* text);
     /**
      * @brief Writes the text form: a point by preset name where it was given by one, else as x,y.
-     * @param buf  receives the NUL-terminated text
-     * @param cap  size of @p buf
-     * @return     text form, returns length (0 if it did not fit)
+     * @param[out] buf  receives the NUL-terminated text
+     * @param[in]  cap  size of @p buf
+     * @return text form, returns length (0 if it did not fit)
      */
     int  write(char* buf, size_t cap) const;
 
@@ -108,11 +108,10 @@ public:
      * @brief Start walking from the cursor's current position; the first point is reached after its travel time.
      *
      * Does nothing on an empty route.
-     *
-     * @param fromX       where the map cursor is now, 0 .. 1
-     * @param fromY       where the map cursor is now, 0 .. 1
-     * @param fromRadius  the blend radius now
-     * @param loop        whether to start over at the first point after the last one's hold
+     * @param[in] fromX       where the map cursor is now, 0 .. 1
+     * @param[in] fromY       where the map cursor is now, 0 .. 1
+     * @param[in] fromRadius  the blend radius now
+     * @param[in] loop        whether to start over at the first point after the last one's hold
      */
     void start(float fromX, float fromY, float fromRadius, bool loop);
     /** @brief Stops the walk; the cursor stays where it is. */
@@ -131,12 +130,11 @@ public:
      * Travel is a smoothstep from where the cursor was to the point (position and radius alike);
      * the hold then sits on the point. After the last point's hold the walk either loops or stops.
      * When not running the last cursor position is still written.
-     *
-     * @param dt      seconds since the last call, times the route speed; negative counts as 0
-     * @param x       receives the cursor's x (MapX)
-     * @param y       receives the cursor's y (MapY)
-     * @param radius  receives the blend radius (MapRadius)
-     * @return        whether the route is still running after this step
+     * @param[in]  dt      seconds since the last call, times the route speed; negative counts as 0
+     * @param[out] x       receives the cursor's x (MapX)
+     * @param[out] y       receives the cursor's y (MapY)
+     * @param[out] radius  receives the blend radius (MapRadius)
+     * @return whether the route is still running after this step
      */
     bool update(float dt, float& x, float& y, float& radius);
 

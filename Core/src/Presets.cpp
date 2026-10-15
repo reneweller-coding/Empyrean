@@ -1,6 +1,7 @@
 /**
  * @file Presets.cpp
  * @brief The factory presets (Presets.h); the table itself is generated (Presets.inc).
+ * @author Rene Weller
  */
 #include "additiv/Presets.h"
 

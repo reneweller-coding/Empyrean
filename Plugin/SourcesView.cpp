@@ -1,6 +1,7 @@
 /**
  * @file SourcesView.cpp
  * @brief The modulation sources, live (SourcesView.h).
+ * @author Rene Weller
  */
 #include "SourcesView.h"
 

@@ -1,6 +1,7 @@
 /**
  * @file Morph.cpp
  * @brief One sound becoming another (Morph.h).
+ * @author Rene Weller
  */
 #include "additiv/Morph.h"
 
@@ -36,7 +37,14 @@ void MorphState::set(const float* v, const ModRow* r, int count)
 
 namespace {
 
-/** @brief A parameter's value at a point between two, in its normalised (skewed) domain. @param d the parameter @param a at 0 @param b at 1 @param w 0 .. 1 @return the value */
+/**
+ * @brief A parameter's value at a point between two, in its normalised (skewed) domain.
+ * @param[in] d  the parameter
+ * @param[in] a  at 0
+ * @param[in] b  at 1
+ * @param[in] w  0 .. 1
+ * @return the value
+ */
 float lerpParam(const ParamDesc& d, float a, float b, float w)
 {
     if (a == b || w <= 0.0f) return a;   // the ends exactly: the skew's round trip is not
@@ -55,19 +63,19 @@ struct Side {
 
 /**
  * @brief Where a choice with an amount stands between two sounds (the file comment of Morph.h).
- * @param ca    the choice at 0
- * @param cb    the choice at 1
- * @param na    the amount at 0, normalised (taken as 0 where the choice is off)
- * @param nb    the amount at 1, normalised
- * @param ga    the gate at 0
- * @param gb    the gate at 1
- * @param off   the choice that means off, -1 when none does
- * @param same    the two count as the same (then the amount simply glides)
- * @param middle  change at the middle even from or to off (the landscape it reads changes there)
- * @param w     0 .. 1
- * @param a     the sound at 0
- * @param b     the sound at 1
- * @return      the side, the amount and the gate
+ * @param[in] ca      the choice at 0
+ * @param[in] cb      the choice at 1
+ * @param[in] na      the amount at 0, normalised (taken as 0 where the choice is off)
+ * @param[in] nb      the amount at 1, normalised
+ * @param[in] ga      the gate at 0
+ * @param[in] gb      the gate at 1
+ * @param[in] off     the choice that means off, -1 when none does
+ * @param[in] same    the two count as the same (then the amount simply glides)
+ * @param[in] middle  change at the middle even from or to off (the landscape it reads changes there)
+ * @param[in] w       0 .. 1
+ * @param[in] a       the sound at 0
+ * @param[in] b       the sound at 1
+ * @return the side, the amount and the gate
  */
 Side side(int ca, int cb, float na, float nb, float ga, float gb, int off, bool same, bool middle, float w, const MorphState& a, const MorphState& b)
 {
@@ -79,10 +87,20 @@ Side side(int ca, int cb, float na, float nb, float ga, float gb, int off, bool 
     return w < 0.5f ? Side{ &a, na * (1.0f - 2.0f * w), ga * (1.0f - 2.0f * w) } : Side{ &b, nb * (2.0f * w - 1.0f), gb * (2.0f * w - 1.0f) };
 }
 
-/** @brief A parameter's value as an index. @param s the sound @param id the parameter @return it rounded */
+/**
+ * @brief A parameter's value as an index.
+ * @param[in] s   the sound
+ * @param[in] id  the parameter
+ * @return it rounded
+ */
 int choiceOf(const MorphState& s, ParamIdE id) { return static_cast<int>(std::lround(s.m_values[static_cast<size_t>(id)])); }
 
-/** @brief A parameter normalised. @param s the sound @param id the parameter @return 0 .. 1 */
+/**
+ * @brief A parameter normalised.
+ * @param[in] s   the sound
+ * @param[in] id  the parameter
+ * @return 0 .. 1
+ */
 float normOf(const MorphState& s, ParamIdE id) { return toNorm(paramDesc(id), s.m_values[static_cast<size_t>(id)]); }
 
 /** @brief One of the choices with an amount: what it is made of. */
@@ -101,7 +119,12 @@ const Pair Pairs[] = {
     { ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, 2, { ParamIdE::FIELD_MODE, ParamIdE::FIELD_MODE }, 0 },
 };
 
-/** @brief Whether a pair's kind reads the landscape (Aurora, the animated pictures). @param p the pair @param kind its choice @return true then */
+/**
+ * @brief Whether a pair's kind reads the landscape (Aurora, the animated pictures).
+ * @param[in] p     the pair
+ * @param[in] kind  its choice
+ * @return true then
+ */
 bool readsLandscape(const Pair& p, int kind)
 {
     if (p.m_choice == ParamIdE::MOTION) return motionUsesLandscape(static_cast<MotionKindE>(kind));
@@ -109,26 +132,54 @@ bool readsLandscape(const Pair& p, int kind)
     return false;
 }
 
-/** @brief Whether the landscape changes between two sounds for a pair that reads it on either side. @param p the pair @param a one @param b the other @return true then */
+/**
+ * @brief Whether the landscape changes between two sounds for a pair that reads it on either side.
+ * @param[in] p  the pair
+ * @param[in] a  one
+ * @param[in] b  the other
+ * @return true then
+ */
 bool landChanges(const Pair& p, const MorphState& a, const MorphState& b)
 {
     return choiceOf(a, ParamIdE::LANDSCAPE) != choiceOf(b, ParamIdE::LANDSCAPE)
         && (readsLandscape(p, choiceOf(a, p.m_choice)) || readsLandscape(p, choiceOf(b, p.m_choice)));
 }
 
-/** @brief Whether two sounds have the same kind for a pair (and the same landscape, if it reads one). @param p the pair @param a one @param b the other @return true then */
+/**
+ * @brief Whether two sounds have the same kind for a pair (and the same landscape, if it reads one).
+ * @param[in] p  the pair
+ * @param[in] a  one
+ * @param[in] b  the other
+ * @return true then
+ */
 bool sameKind(const Pair& p, const MorphState& a, const MorphState& b)
 {
     return choiceOf(a, p.m_choice) == choiceOf(b, p.m_choice) && !landChanges(p, a, b);
 }
 
-/** @brief A pair's amount, normalised. @param p the pair @param s the sound @return 0 .. 1 */
+/**
+ * @brief A pair's amount, normalised.
+ * @param[in] p  the pair
+ * @param[in] s  the sound
+ * @return 0 .. 1
+ */
 float amountOf(const Pair& p, const MorphState& s) { return p.m_gate < 0 ? s.m_filterMix : normOf(s, p.m_amount); }
 
-/** @brief A pair's gate. @param p the pair @param s the sound @return 0 .. 1 */
+/**
+ * @brief A pair's gate.
+ * @param[in] p  the pair
+ * @param[in] s  the sound
+ * @return 0 .. 1
+ */
 float gateOf(const Pair& p, const MorphState& s) { return p.m_gate < 0 ? s.m_filterMix : s.m_gate[p.m_gate]; }
 
-/** @brief Sets a pair's amount (normalised) and gate. @param p the pair @param s the sound @param amount 0 .. 1 @param gate 0 .. 1 */
+/**
+ * @brief Sets a pair's amount (normalised) and gate.
+ * @param[in]     p       the pair
+ * @param[in,out] s       the sound
+ * @param[in]     amount  0 .. 1
+ * @param[in]     gate    0 .. 1
+ */
 void setAmount(const Pair& p, MorphState& s, float amount, float gate)
 {
     if (p.m_gate < 0) { s.m_filterMix = amount; return; }
@@ -136,7 +187,12 @@ void setAmount(const Pair& p, MorphState& s, float amount, float gate)
     s.m_gate[p.m_gate] = gate;
 }
 
-/** @brief Takes a pair's choice and companions from a sound. @param p the pair @param from where from @param out where to */
+/**
+ * @brief Takes a pair's choice and companions from a sound.
+ * @param[in]     p     the pair
+ * @param[in]     from  where from
+ * @param[in,out] out   where to
+ */
 void takeKind(const Pair& p, const MorphState& from, MorphState& out)
 {
     out.m_values[static_cast<size_t>(p.m_choice)] = from.m_values[static_cast<size_t>(p.m_choice)];
@@ -144,14 +200,18 @@ void takeKind(const Pair& p, const MorphState& from, MorphState& out)
         out.m_values[static_cast<size_t>(p.m_companions[k])] = from.m_values[static_cast<size_t>(p.m_companions[k])];
 }
 
-/** @brief Whether a row reads a sound's own modulators (its source or its via). @param r the row @return true then */
+/**
+ * @brief Whether a row reads a sound's own modulators (its source or its via).
+ * @param[in] r  the row
+ * @return true then
+ */
 bool readsOwn(const ModRow& r) { return isOwnSource(r.m_source) || isOwnSource(r.m_via); }
 
 /**
  * @brief A setup's place in a sound: the one that is equal, or a new one (the first when full).
- * @param out  the sound
- * @param s    the setup
- * @return     its index
+ * @param[in,out] out  the sound
+ * @param[in]     s    the setup
+ * @return its index
  */
 int addSetup(MorphState& out, const ModSetup& s)
 {
@@ -164,7 +224,13 @@ int addSetup(MorphState& out, const ModSetup& s)
     return 0;
 }
 
-/** @brief Whether two rows move the same thing the same way (their depths add): on the same modulators, if they read a sound's own. @param x one @param y the other @return true then */
+/**
+ * @brief Whether two rows move the same thing the same way (their depths add): on the same modulators, if they read a
+ *        sound's own.
+ * @param[in] x  one
+ * @param[in] y  the other
+ * @return true then
+ */
 bool sameRow(const ModRow& x, const ModRow& y)
 {
     return x.m_source == y.m_source && x.m_target == y.m_target && x.m_via == y.m_via && (!readsOwn(x) || x.m_setup == y.m_setup);
@@ -173,10 +239,10 @@ bool sameRow(const ModRow& x, const ModRow& y)
 /**
  * @brief Adds a row of a sound with its depth weighted, its setup carried over: merged with one that
  *        moves the same, or appended, or (when full) put in place of the weakest if it is stronger.
- * @param out   the sound being made
- * @param from  the sound the row is from
- * @param r     the row
- * @param k     its weight
+ * @param[in,out] out   the sound being made
+ * @param[in]     from  the sound the row is from
+ * @param[in]     r     the row
+ * @param[in]     k     its weight
  */
 void addRow(MorphState& out, const MorphState& from, const ModRow& r, float k)
 {
@@ -194,7 +260,10 @@ void addRow(MorphState& out, const MorphState& from, const ModRow& r, float k)
     if (std::fabs(depth) > std::fabs(out.m_rows[weakest].m_depth)) out.m_rows[weakest] = s;
 }
 
-/** @brief Drops the setups no row reads any more, the rows' indices following. @param s the sound */
+/**
+ * @brief Drops the setups no row reads any more, the rows' indices following.
+ * @param[in,out] s  the sound
+ */
 void compactSetups(MorphState& s)
 {
     int map[MorphSetups];
@@ -214,9 +283,9 @@ void compactSetups(MorphState& s)
 /**
  * @brief Adds a sound's filter with its weight scaled: merged with the entry of its model (cutoff
  *        and resonance as the weighted mean, the cutoff in its knob's domain), or appended.
- * @param out  the sound being made
- * @param f    the filter
- * @param k    its weight's scale
+ * @param[in,out] out  the sound being made
+ * @param[in]     f    the filter
+ * @param[in]     k    its weight's scale
  */
 void addFilter(MorphState& out, const MorphFilter& f, float k)
 {
@@ -242,7 +311,7 @@ void addFilter(MorphState& out, const MorphFilter& f, float k)
 /**
  * @brief The filter list made whole: the faint ones dropped, the weights brought to 1, the share
  *        that is not Off, and the knobs on the heaviest that is not Off (Off when there is none).
- * @param s  the sound
+ * @param[in,out] s  the sound
  */
 void finishFilters(MorphState& s)
 {
@@ -272,7 +341,14 @@ void finishFilters(MorphState& s)
     }
 }
 
-/** @brief A number a share of the way, unrounded, arriving exactly when close. @param d the parameter @param a from @param b to @param k the share @return the value */
+/**
+ * @brief A number a share of the way, unrounded, arriving exactly when close.
+ * @param[in] d  the parameter
+ * @param[in] a  from
+ * @param[in] b  to
+ * @param[in] k  the share
+ * @return the value
+ */
 float follow(const ParamDesc& d, float a, float b, float k)
 {
     if (a == b) return a;

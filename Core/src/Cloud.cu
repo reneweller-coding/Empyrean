@@ -15,6 +15,7 @@
  *     renders bit for bit the same every time.
  * Phases are 32-bit fixed point: they wrap exactly, so a note may hold for hours without the
  * drift a float phase would gather.
+ * @author Rene Weller
  */
 #include "additiv/Cloud.h"
 #include "additiv/Spectrum.h"
@@ -88,8 +89,8 @@ static_assert(sizeof(EnvShape) % 16 == 0, "EnvShape is uploaded as an array");
 
 /**
  * @brief An integer hash with good avalanche (lowbias32, C. Wellons); the dice of the cloud.
- * @param x  any value
- * @return   its hash
+ * @param[in] x  any value
+ * @return its hash
  */
 __host__ __device__ __forceinline__ std::uint32_t hash32(std::uint32_t x)
 {
@@ -101,10 +102,10 @@ __host__ __device__ __forceinline__ std::uint32_t hash32(std::uint32_t x)
 
 /**
  * @brief A uniform number in [0, 1) for one partial of one note.
- * @param seed  the note's seed
- * @param p     the partial within the voice
- * @param salt  which of the partial's dice (offset, drift rates, phases, pan, envelopes, ...)
- * @return      0 .. 1
+ * @param[in] seed  the note's seed
+ * @param[in] p     the partial within the voice
+ * @param[in] salt  which of the partial's dice (offset, drift rates, phases, pan, envelopes, ...)
+ * @return 0 .. 1
  */
 __device__ __forceinline__ float hash01(std::uint32_t seed, std::uint32_t p, std::uint32_t salt)
 {
@@ -114,10 +115,10 @@ __device__ __forceinline__ float hash01(std::uint32_t seed, std::uint32_t p, std
 /**
  * @brief A sine of a slow oscillator at `rate` Hz and phase offset `phase` (cycles) at time `t`,
  *        reduced to one cycle first so the fast __sinf stays accurate after hours.
- * @param rate   Hz
- * @param t      seconds
- * @param phase  0 .. 1
- * @return       -1 .. 1
+ * @param[in] rate   Hz
+ * @param[in] t      seconds
+ * @param[in] phase  0 .. 1
+ * @return -1 .. 1
  */
 __device__ __forceinline__ float slowSine(float rate, float t, float phase)
 {
@@ -128,9 +129,9 @@ __device__ __forceinline__ float slowSine(float rate, float t, float phase)
 
 /**
  * @brief The bend of an envelope segment.
- * @param x  0 .. 1 through the segment
- * @param c  -1 .. 1: 0 straight, positive starts slowly, negative starts fast
- * @return   0 .. 1
+ * @param[in] x  0 .. 1 through the segment
+ * @param[in] c  -1 .. 1: 0 straight, positive starts slowly, negative starts fast
+ * @return 0 .. 1
  */
 __device__ __forceinline__ float bend(float x, float c)
 {
@@ -141,10 +142,10 @@ __device__ __forceinline__ float bend(float x, float c)
 
 /**
  * @brief A shape's held course (its start, then its loop forever) at shape time `tau`.
- * @param s      the shape
- * @param tau    seconds of shape time (already scaled by the partial's rate)
- * @param phase  loop cycles added inside the loop
- * @return       the level
+ * @param[in] s      the shape
+ * @param[in] tau    seconds of shape time (already scaled by the partial's rate)
+ * @param[in] phase  loop cycles added inside the loop
+ * @return the level
  */
 __device__ float shapeHeld(const EnvShape& s, float tau, float phase)
 {
@@ -172,11 +173,11 @@ __device__ float shapeHeld(const EnvShape& s, float tau, float phase)
 
 /**
  * @brief A shape's level: its held course, or after the release its tail from wherever the loop was.
- * @param s       the shape
- * @param tau     shape time now
- * @param tauOff  shape time of the release, negative while held
- * @param phase   loop cycles added inside the loop
- * @return        the level
+ * @param[in] s       the shape
+ * @param[in] tau     shape time now
+ * @param[in] tauOff  shape time of the release, negative while held
+ * @param[in] phase   loop cycles added inside the loop
+ * @return the level
  */
 __device__ float shapeValue(const EnvShape& s, float tau, float tauOff, float phase)
 {
@@ -217,10 +218,10 @@ struct LaneContext {
 
 /**
  * @brief The landscape at one column and time, interpolated both ways; it loops over its rows.
- * @param c      the context (landscape and column)
- * @param tau    lane time, seconds
- * @param phase  loop cycles added
- * @return       0 .. 1
+ * @param[in] c      the context (landscape and column)
+ * @param[in] tau    lane time, seconds
+ * @param[in] phase  loop cycles added
+ * @return 0 .. 1
  */
 __device__ float landValue(const LaneContext& c, float tau, float phase)
 {
@@ -242,12 +243,12 @@ __device__ float landValue(const LaneContext& c, float tau, float phase)
 
 /**
  * @brief One lane's value for one partial: which shape, how fast, where in its loop, how late.
- * @param L        the lane
- * @param c        the partial's context
- * @param salt     the lane's dice (each lane its own)
- * @param bipolar  pitch and pan read the landscape as -1 .. 1
- * @param depth    receives the partial's depth (amount, tilted by its source)
- * @return         the envelope's level
+ * @param[in]  L        the lane
+ * @param[in]  c        the partial's context
+ * @param[in]  salt     the lane's dice (each lane its own)
+ * @param[in]  bipolar  pitch and pan read the landscape as -1 .. 1
+ * @param[out] depth    receives the partial's depth (amount, tilted by its source)
+ * @return the envelope's level
  */
 __device__ float laneValue(const EnvLane& L, const LaneContext& c, std::uint32_t salt, bool bipolar, float& depth)
 {
@@ -281,12 +282,12 @@ __device__ float laneValue(const EnvLane& L, const LaneContext& c, std::uint32_t
 /**
  * @brief The voice filter's response at one partial: the analogue prototype's magnitude (Spectrum.h's
  *        filterResponse, the same the picture draws).
- * @param model   FilterModel
- * @param f       the partial, Hz
- * @param cutoff  Hz
- * @param q       resonance as a Q (Peak: the bell's gain; Formant: the formants' Q)
- * @param vowel   Formant: 0 .. 4, u o a e i
- * @return        the gain
+ * @param[in] model   FilterModel
+ * @param[in] f       the partial, Hz
+ * @param[in] cutoff  Hz
+ * @param[in] q       resonance as a Q (Peak: the bell's gain; Formant: the formants' Q)
+ * @param[in] vowel   Formant: 0 .. 4, u o a e i
+ * @return the gain
  */
 __device__ float filterGain(int model, float f, float cutoff, float q, float vowel)
 {
@@ -295,15 +296,14 @@ __device__ float filterGain(int model, float f, float cutoff, float q, float vow
 
 /**
  * @brief One block of the field for one partial: its offset moved towards what pulls it and drawn back home.
- * @param F       the field
- * @param logHz   log2 of where the partial is now (its own place plus the offset)
- * @param off     the offset, cents
- * @param dt      the block's length, seconds
- * @param keep    log2 offset the partial keeps from what pulls it: its place in its cloud's bell,
- *                narrowed to 2 cents a unit -- partials gathered onto one pitch would add up to one
- *                sine of a frozen random level (measured: 3 dB down, the shimmer gone), a narrow
- *                cloud still beats and keeps its power
- * @return        the new offset, cents (at most an octave)
+ * @param[in] F      the field
+ * @param[in] logHz  log2 of where the partial is now (its own place plus the offset)
+ * @param[in] off    the offset, cents
+ * @param[in] dt     the block's length, seconds
+ * @param[in] keep   log2 offset the partial keeps from what pulls it: its place in its cloud's bell, narrowed to 2
+ *                   cents a unit -- partials gathered onto one pitch would add up to one sine of a frozen random level
+ *                   (measured: 3 dB down, the shimmer gone), a narrow cloud still beats and keeps its power
+ * @return the new offset, cents (at most an octave)
  */
 __device__ float fieldStep(const SpectralField& F, float logHz, float off, float dt, float keep)
 {
@@ -335,7 +335,11 @@ __device__ float fieldStep(const SpectralField& F, float logHz, float off, float
     return fminf(fmaxf((off + step) * __expf(-F.m_spring * dt), -1200.0f), 1200.0f);
 }
 
-/** @brief A frequency's band on the hall's log axis (HallBins over 20 Hz .. 20 kHz). @param f Hz @return the band */
+/**
+ * @brief A frequency's band on the hall's log axis (HallBins over 20 Hz .. 20 kHz).
+ * @param[in] f  Hz
+ * @return the band
+ */
 __device__ __forceinline__ int hallBin(float f)
 {
     return min(max(static_cast<int>(log2f(fmaxf(f, 20.0f) * (1.0f / 20.0f)) * (static_cast<float>(HallBins) / 9.96578428f)), 0), HallBins - 1);
@@ -348,20 +352,20 @@ __device__ __forceinline__ int hallBin(float f)
  *        energy), the well's pull and the damping, and a kick of white noise, so that the orbits keep
  *        about half the radius (a damped oscillator's mean square, sigma^2 / (2 g k)). Fast small
  *        circles ride a slow circling of the well.
- * @param F        the field (orbitWell, orbitField, orbitDamp; radius: cents to a full side)
- * @param prev     the last block's (offset, side, their velocities) per partial, cents and cents a second
- * @param next     this block's
- * @param me       the partial's index in the tables
- * @param logHome  log2 of the partial's own place
- * @param keep     log2 offset kept from the well (its place in its cloud's bell)
- * @param now      the offset it has now (taken over when the orbit is fresh)
- * @param seed     the note's dice
- * @param up       the partial
- * @param block    the block's index (the kicks' dice)
- * @param restart  a new note: at home, at rest
- * @param dt       the block's length, seconds
- * @param side     receives its shift across the field, -0.6 .. 0.6
- * @return         the new offset, cents
+ * @param[in]     F        the field (orbitWell, orbitField, orbitDamp; radius: cents to a full side)
+ * @param[in]     prev     the last block's (offset, side, their velocities) per partial, cents and cents a second
+ * @param[in,out] next     this block's
+ * @param[in]     me       the partial's index in the tables
+ * @param[in]     logHome  log2 of the partial's own place
+ * @param[in]     keep     log2 offset kept from the well (its place in its cloud's bell)
+ * @param[in]     now      the offset it has now (taken over when the orbit is fresh)
+ * @param[in]     seed     the note's dice
+ * @param[in]     up       the partial
+ * @param[in]     block    the block's index (the kicks' dice)
+ * @param[in]     restart  a new note: at home, at rest
+ * @param[in]     dt       the block's length, seconds
+ * @param[out]    side     receives its shift across the field, -0.6 .. 0.6
+ * @return the new offset, cents
  */
 __device__ float orbitStep(const SpectralField& F, const float4* prev, float4* next, size_t me, float logHome, float keep, float now,
                            std::uint32_t seed, std::uint32_t up, std::uint32_t block, bool restart, float dt, float& side)
@@ -401,10 +405,10 @@ __device__ float orbitStep(const SpectralField& F, const float4* prev, float4* n
  *        density followed over a third of a second (the partials' own clocks read it); and, while
  *        anything sounds and Grow is not nothing, the hall's memory a step of Memory towards it.
  *        Summed in a fixed order.
- * @param hdr      the header
- * @param hist     per band the amplitude gathered this block (fixed point, 1e-12)
- * @param memory   per band the hall's memory, 1 the average
- * @param density  per band the spectrum's density, 1 the average
+ * @param[in]     hdr      the header
+ * @param[in,out] hist     per band the amplitude gathered this block (fixed point, 1e-12)
+ * @param[in,out] memory   per band the hall's memory, 1 the average
+ * @param[in,out] density  per band the spectrum's density, 1 the average
  */
 __global__ void __launch_bounds__(HallBins) hallKernel(const BlockHeader* hdr, unsigned long long* hist, float* memory, float* density)
 {
@@ -432,12 +436,12 @@ __global__ void __launch_bounds__(HallBins) hallKernel(const BlockHeader* hdr, u
 /**
  * @brief One partial's complex gain at each ear: the head's shadow, the pinna and the time round
  *        the head (Brown and Duda 1998; Woodworth), the pair normalised to the pan law's power.
- * @param B      the binaural settings
- * @param place  the partial's place, -1 .. 1 (its azimuth over the span, plus the orbit)
- * @param u      its own die, 0 .. 1 (its elevation)
- * @param f      its frequency, Hz
- * @param gl     receives the left ear's gain (real, imaginary)
- * @param gr     receives the right ear's gain
+ * @param[in]  B      the binaural settings
+ * @param[in]  place  the partial's place, -1 .. 1 (its azimuth over the span, plus the orbit)
+ * @param[in]  u      its own die, 0 .. 1 (its elevation)
+ * @param[in]  f      its frequency, Hz
+ * @param[out] gl     receives the left ear's gain (real, imaginary)
+ * @param[out] gr     receives the right ear's gain
  */
 __device__ void earGains(const Binaural& B, float place, float u, float f, float* gl, float* gr)
 {
@@ -487,9 +491,9 @@ __device__ void earGains(const Binaural& B, float place, float u, float f, float
 /**
  * @brief What a partial reads from a cell of the living field, 0 .. 1: Lenia's value, or the
  *        Turing field's second chemical (V, which lives under 0.4) scaled up.
- * @param mode  the field's mode
- * @param c     the cell (Lenia: x; Turing: U, V)
- * @return      0 .. 1
+ * @param[in] mode  the field's mode
+ * @param[in] c     the cell (Lenia: x; Turing: U, V)
+ * @return 0 .. 1
  */
 __device__ __forceinline__ float lifeValue(LifeModeE mode, float2 c)
 {
@@ -500,7 +504,12 @@ __device__ __forceinline__ float lifeValue(LifeModeE mode, float2 c)
 
 // ---- Animated pictures (KaleidoscopeEnhanced's Scene2D/Chain*.frag, its continuous transforms) ----
 
-/** @brief Smooth value noise, 0 .. 1 (corners hashed). @param x across @param y along @return the noise */
+/**
+ * @brief Smooth value noise, 0 .. 1 (corners hashed).
+ * @param[in] x  across
+ * @param[in] y  along
+ * @return the noise
+ */
 __device__ float pictureNoise(float x, float y)
 {
     const float ix = floorf(x), iy = floorf(y), fx = x - ix, fy = y - iy;
@@ -513,7 +522,12 @@ __device__ float pictureNoise(float x, float y)
     return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
 }
 
-/** @brief Three octaves of noise, 0 .. 1 (the shaders' fbm3). @param x across @param y along @return the noise */
+/**
+ * @brief Three octaves of noise, 0 .. 1 (the shaders' fbm3).
+ * @param[in] x  across
+ * @param[in] y  along
+ * @return the noise
+ */
 __device__ float pictureFbm(float x, float y)
 {
     float v = 0.0f, a = 0.5f;
@@ -527,7 +541,11 @@ __device__ float pictureFbm(float x, float y)
     return v / 0.875f;
 }
 
-/** @brief The shaders' mirror repeat: identity on [0, 1], mirrored beyond, so every fold is seamless. @param u a coordinate @return 0 .. 1 */
+/**
+ * @brief The shaders' mirror repeat: identity on [0, 1], mirrored beyond, so every fold is seamless.
+ * @param[in] u  a coordinate
+ * @return 0 .. 1
+ */
 __device__ __forceinline__ float pictureMirror(float u)
 {
     const float f = u * 0.5f - floorf(u * 0.5f);
@@ -537,11 +555,11 @@ __device__ __forceinline__ float pictureMirror(float u)
 /**
  * @brief The landscape as a picture at (u, v), mirror-repeated: u its time (left to right), v its
  *        frequency (low at the bottom); its brightness on the landscapes' 40 dB scale.
- * @param hdr   the header (the landscape's size)
- * @param land  the landscape
- * @param u     across
- * @param v     up
- * @return      0 .. 1
+ * @param[in] hdr   the header (the landscape's size)
+ * @param[in] land  the landscape
+ * @param[in] u     across
+ * @param[in] v     up
+ * @return 0 .. 1
  */
 __device__ float pictureAt(const BlockHeader* hdr, const float* land, float u, float v)
 {
@@ -560,12 +578,12 @@ __device__ float pictureAt(const BlockHeader* hdr, const float* land, float u, f
  * @brief One cell of an animated picture. The field is the screen (twice as wide as high); the
  *        transforms are the shaders' (tKaleido, tTunnel, tSpiral, tWarp), the feedback and the
  *        rain read the field before this step.
- * @param hdr   the header (its life: time, angle, sides, character)
- * @param land  the landscape
- * @param src   the field before this step
- * @param x     the cell across
- * @param y     the cell along
- * @return      the cell (x: the value, or Rain's height; y: Rain's height before)
+ * @param[in] hdr   the header (its life: time, angle, sides, character)
+ * @param[in] land  the landscape
+ * @param[in] src   the field before this step
+ * @param[in] x     the cell across
+ * @param[in] y     the cell along
+ * @return the cell (x: the value, or Rain's height; y: Rain's height before)
  */
 __device__ float2 pictureCell(const BlockHeader* hdr, const float* land, const float2* src, int x, int y)
 {
@@ -670,7 +688,13 @@ __device__ float2 pictureCell(const BlockHeader* hdr, const float* land, const f
     }
 }
 
-/** @brief The field buffer that holds the field after this block's steps. @param hdr the header @param a buffer A @param b buffer B @return the current one */
+/**
+ * @brief The field buffer that holds the field after this block's steps.
+ * @param[in] hdr  the header
+ * @param[in] a    buffer A
+ * @param[in] b    buffer B
+ * @return the current one
+ */
 __device__ __forceinline__ const float2* lifeCurrent(const BlockHeader* hdr, const float2* a, const float2* b)
 {
     return ((hdr->m_lifeParity + hdr->m_life.m_steps) & 1) ? b : a;
@@ -679,9 +703,9 @@ __device__ __forceinline__ const float2* lifeCurrent(const BlockHeader* hdr, con
 /**
  * @brief Seeds the living field when asked (hdr->life.reseed): Lenia a few patches of noise, the
  *        Turing field U = 1, V = 0 with a few squares of V -- from a hash of the cell and the salt.
- * @param hdr  the header
- * @param a    buffer A
- * @param b    buffer B (the one before the steps is seeded)
+ * @param[in]     hdr  the header
+ * @param[in,out] a    buffer A
+ * @param[in,out] b    buffer B (the one before the steps is seeded)
  */
 __global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
 {
@@ -720,11 +744,11 @@ __global__ void lifeSeedKernel(const BlockHeader* hdr, float2* a, float2* b)
  * 2 exp(-(u - mu)^2 / 2 sigma^2) - 1, a tenth of it added. Gray-Scott (Pearson 1993):
  * dU = Du lap U - U V^2 + F (1 - U), dV = Dv lap V + U V^2 - (F + k) V, Du 0.2097, Dv 0.105, one
  * unit of time a step, the five-point Laplacian.
- * @param hdr   the header
- * @param node  this step's number in the block, 0 or 1
- * @param a     buffer A
- * @param b     buffer B
- * @param land  the landscape (the animated pictures read it)
+ * @param[in]     hdr   the header
+ * @param[in]     node  this step's number in the block, 0 or 1
+ * @param[in,out] a     buffer A
+ * @param[in,out] b     buffer B
+ * @param[in]     land  the landscape (the animated pictures read it)
  */
 __global__ void lifeStepKernel(const BlockHeader* hdr, int node, float2* a, float2* b, const float* land)
 {
@@ -769,14 +793,26 @@ __constant__ int cLbmY[9] = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };                   
 __constant__ float cLbmW[9] = { 4.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f, 1.0f / 9.0f,
                                 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f };   ///< their weights
 
-/** @brief One direction's equilibrium. @param k the direction @param rho the density @param ux the velocity across @param uy along @return f_eq */
+/**
+ * @brief One direction's equilibrium.
+ * @param[in] k    the direction
+ * @param[in] rho  the density
+ * @param[in] ux   the velocity across
+ * @param[in] uy   along
+ * @return f_eq
+ */
 __device__ __forceinline__ float lbmEq(int k, float rho, float ux, float uy)
 {
     const float eu = static_cast<float>(cLbmX[k]) * ux + static_cast<float>(cLbmY[k]) * uy;
     return cLbmW[k] * rho * (1.0f + 3.0f * eu + 4.5f * eu * eu - 1.5f * (ux * ux + uy * uy));
 }
 
-/** @brief The shortest way round the torus. @param d a difference @param n the size @return it within -n/2 .. n/2 */
+/**
+ * @brief The shortest way round the torus.
+ * @param[in] d  a difference
+ * @param[in] n  the size
+ * @return it within -n/2 .. n/2
+ */
 __device__ __forceinline__ float torusDelta(float d, float n)
 {
     return d - n * rintf(d / n);
@@ -784,9 +820,9 @@ __device__ __forceinline__ float torusDelta(float d, float n)
 
 /**
  * @brief Seeds the Fluid when asked: at rest but for six eddies of either turn (from the salt).
- * @param hdr  the header
- * @param fa   the lattice, buffer A
- * @param fb   buffer B
+ * @param[in]     hdr  the header
+ * @param[in,out] fa   the lattice, buffer A
+ * @param[in,out] fb   buffer B
  */
 __global__ void fluidSeedKernel(const BlockHeader* hdr, float* fa, float* fb)
 {
@@ -816,12 +852,12 @@ __global__ void fluidSeedKernel(const BlockHeader* hdr, float* fa, float* fb)
  *        pushed by the jets (the velocity shifted by tau F / rho), relaxed to its equilibrium; the
  *        ink carried back along the flow, the jets' ink added, a little of it fading. Reads one
  *        buffer, writes the other, as the field's steps do.
- * @param hdr    the header
- * @param node   this step's number in the block, 0 or 1
- * @param fa     the lattice, buffer A
- * @param fb     buffer B
- * @param lifeA  the field (the ink), buffer A
- * @param lifeB  buffer B
+ * @param[in]     hdr    the header
+ * @param[in]     node   this step's number in the block, 0 or 1
+ * @param[in,out] fa     the lattice, buffer A
+ * @param[in,out] fb     buffer B
+ * @param[in,out] lifeA  the field (the ink), buffer A
+ * @param[in,out] lifeB  buffer B
  */
 __global__ void fluidStepKernel(const BlockHeader* hdr, int node, float* fa, float* fb, float2* lifeA, float2* lifeB)
 {
@@ -887,10 +923,10 @@ __global__ void fluidStepKernel(const BlockHeader* hdr, int node, float* fa, flo
  *        grain of noise so it never quite freezes), then the field drawn from it: each of its cells
  *        read bilinearly, drifted across, as 0.5 + 0.5 tanh(2.5 c). Seeded with a little noise about
  *        the mean when asked.
- * @param hdr    the header
- * @param isles  the grid, kept between blocks
- * @param lifeA  the field, buffer A
- * @param lifeB  buffer B
+ * @param[in]     hdr    the header
+ * @param[in,out] isles  the grid, kept between blocks
+ * @param[in,out] lifeA  the field, buffer A
+ * @param[in,out] lifeB  buffer B
  */
 __global__ void __launch_bounds__(1024) islandsKernel(const BlockHeader* hdr, float* isles, float2* lifeA, float2* lifeB)
 {
@@ -942,10 +978,10 @@ __global__ void __launch_bounds__(1024) islandsKernel(const BlockHeader* hdr, fl
 /**
  * @brief The living field's mean and mean square of what the partials read, in one CUDA block, in
  *        a fixed order (bit-identical runs).
- * @param hdr    the header
- * @param a      buffer A
- * @param b      buffer B
- * @param stats  receives mean, mean square
+ * @param[in]  hdr    the header
+ * @param[in]  a      buffer A
+ * @param[in]  b      buffer B
+ * @param[out] stats  receives mean, mean square
  */
 __global__ void lifeStatsKernel(const BlockHeader* hdr, const float2* a, const float2* b, float* stats)
 {
@@ -973,11 +1009,11 @@ __global__ void lifeStatsKernel(const BlockHeader* hdr, const float2* a, const f
 
 /**
  * @brief The living field at a place, read bilinearly on the torus.
- * @param hdr  the header
- * @param cur  the current buffer
- * @param fx   across, cells (wraps)
- * @param fy   along, cells (wraps)
- * @return     what the partial reads, 0 .. 1
+ * @param[in] hdr  the header
+ * @param[in] cur  the current buffer
+ * @param[in] fx   across, cells (wraps)
+ * @param[in] fy   along, cells (wraps)
+ * @return what the partial reads, 0 .. 1
  */
 __device__ float lifeAt(const BlockHeader* hdr, const float2* cur, float fx, float fy)
 {
@@ -995,13 +1031,13 @@ __device__ float lifeAt(const BlockHeader* hdr, const float2* cur, float fx, flo
  *        more group) the means of its members' phasors from the last block, summed in member order.
  *        Global: e^(iθ). Chimera: e^(iθ), e^(i(θ - x)), e^(i(θ + x)) with x the member's place round
  *        the ring. Swarm: e^(i(x + θ)), e^(i(x - θ)) with x its place on its circle.
- * @param hdr    the header
- * @param voices the voices
- * @param pcap   partials per voice in the tables
- * @param theta  per partial its phase
- * @param sx     per partial its place on its circle (Swarm)
- * @param order  per voice and group the mean phasors, three planes `plane` apart
- * @param plane  the planes' distance (all the partials)
+ * @param[in]     hdr     the header
+ * @param[in]     voices  the voices
+ * @param[in]     pcap    partials per voice in the tables
+ * @param[in]     theta   per partial its phase
+ * @param[in]     sx      per partial its place on its circle (Swarm)
+ * @param[in,out] order   per voice and group the mean phasors, three planes `plane` apart
+ * @param[in]     plane   the planes' distance (all the partials)
  */
 __global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const float* theta, const float* sx, float2* order,
                                 size_t plane)
@@ -1051,12 +1087,12 @@ __global__ void syncOrderKernel(const BlockHeader* hdr, const CloudVoice* voices
 /**
  * @brief A member's place in its cloud in cents (its slice of the bell, jittered as the update
  *        kernel places it).
- * @param seed     the note's dice
- * @param first    the cloud's first partial in the voice
- * @param j        the member
- * @param count    the cloud's members
- * @param sigma    the cloud's width, cents per unit of the bell
- * @return         cents from the cloud's centre
+ * @param[in] seed   the note's dice
+ * @param[in] first  the cloud's first partial in the voice
+ * @param[in] j      the member
+ * @param[in] count  the cloud's members
+ * @param[in] sigma  the cloud's width, cents per unit of the bell
+ * @return cents from the cloud's centre
  */
 __device__ __forceinline__ float memberCents(std::uint32_t seed, int first, int j, int count, float sigma)
 {
@@ -1073,20 +1109,20 @@ __device__ __forceinline__ float memberCents(std::uint32_t seed, int first, int 
  *        six cents blew a cloud of 7 cents up to 20, its members lie a cent apart) -- plus its cloud's
  *        wind, a spring home and drag.
  *        Read from the last block's state, written into the other buffer: bit-identical.
- * @param F        the field (spring; strength: the wind)
- * @param prev     the last block's (offset, velocity) per partial
- * @param next     this block's
- * @param vbase    the voice's first partial in the tables
- * @param first    the cloud's first partial in the voice
- * @param count    its members
- * @param k        this partial's member
- * @param seed     the note's dice
- * @param sigma    the cloud's width, cents per unit of the bell
- * @param wind     its cloud's wind, cents per second squared
- * @param now      the offset it has now (taken over when the flock is fresh)
- * @param restart  a new note: offset and velocity 0
- * @param dt       the block's length, seconds
- * @return         the new offset, cents
+ * @param[in]     F        the field (spring; strength: the wind)
+ * @param[in]     prev     the last block's (offset, velocity) per partial
+ * @param[in,out] next     this block's
+ * @param[in]     vbase    the voice's first partial in the tables
+ * @param[in]     first    the cloud's first partial in the voice
+ * @param[in]     count    its members
+ * @param[in]     k        this partial's member
+ * @param[in]     seed     the note's dice
+ * @param[in]     sigma    the cloud's width, cents per unit of the bell
+ * @param[in]     wind     its cloud's wind, cents per second squared
+ * @param[in]     now      the offset it has now (taken over when the flock is fresh)
+ * @param[in]     restart  a new note: offset and velocity 0
+ * @param[in]     dt       the block's length, seconds
+ * @return the new offset, cents
  */
 __device__ float flockStep(const SpectralField& F, const float2* prev, float2* next, size_t vbase, int first, int count, int k,
                            std::uint32_t seed, float sigma, float wind, float now, bool restart, float dt)
@@ -1123,9 +1159,9 @@ __device__ float flockStep(const SpectralField& F, const float2* prev, float2* n
  * @brief The ring of the voices' levels: this block's level of every voice written where the
  *        block's index points, a voice's whole ring cleared when it starts a note (so a delayed
  *        partial of the new note never hears the old one's level).
- * @param hdr     the block header
- * @param voices  the voices
- * @param ring    per voice GainRing levels
+ * @param[in]     hdr     the block header
+ * @param[in]     voices  the voices
+ * @param[in,out] ring    per voice GainRing levels
  */
 __global__ void gainRingKernel(const BlockHeader* hdr, const CloudVoice* voices, float* ring)
 {
@@ -1141,10 +1177,10 @@ __global__ void gainRingKernel(const BlockHeader* hdr, const CloudVoice* voices,
 
 /**
  * @brief A voice's level `blocks` blocks ago, read from the ring and interpolated.
- * @param row     the voice's ring
- * @param index   this block's index
- * @param blocks  how far back, in blocks (fractional)
- * @return        the level; 0 beyond the ring
+ * @param[in] row     the voice's ring
+ * @param[in] index   this block's index
+ * @param[in] blocks  how far back, in blocks (fractional)
+ * @return the level; 0 beyond the ring
  */
 __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
 {
@@ -1164,9 +1200,9 @@ __device__ float gainAgo(const float* row, std::uint32_t index, float blocks)
  *        barycentre's quantile function the weighted mean of theirs (in one dimension the barycentre
  *        is exactly that); its distribution function at the bands' edges found back in it; a band's
  *        power the mean mass times its share, its gain the root. A single filter comes out as itself.
- * @param hdr    the header
- * @param voices the voices
- * @param table  per voice FilterBins gains
+ * @param[in]     hdr     the header
+ * @param[in]     voices  the voices
+ * @param[in,out] table   per voice FilterBins gains
  */
 __global__ void __launch_bounds__(256) filterTransportKernel(const BlockHeader* hdr, const CloudVoice* voices, float* table)
 {
@@ -1240,11 +1276,11 @@ __global__ void __launch_bounds__(256) filterTransportKernel(const BlockHeader* 
  *        settle / (1 + h / 8) seconds. Kept as the power against the spectrum's at rest, q = p / p0,
  *        read by the update kernel as sqrt(q) on the harmonic's amplitude. Reads one buffer, writes
  *        the other (by the block's parity); a new note starts at rest.
- * @param hdr     the header
- * @param voices  the voices
- * @param pcap    partials per voice in the tables (room for every harmonic)
- * @param qa      per voice and harmonic its q, buffer A
- * @param qb      buffer B
+ * @param[in]     hdr     the header
+ * @param[in]     voices  the voices
+ * @param[in]     pcap    partials per voice in the tables (room for every harmonic)
+ * @param[in,out] qa      per voice and harmonic its q, buffer A
+ * @param[in,out] qb      buffer B
  */
 __global__ void cascadeKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, float* qa, float* qb)
 {
@@ -1277,34 +1313,36 @@ __global__ void cascadeKernel(const BlockHeader* hdr, const CloudVoice* voices, 
 
 /**
  * @brief The update kernel: every partial's frequency glide, amplitude ramps and start phase for this block.
- * @param hdr     the block header (device copy)
- * @param voices  the voices (device copy)
- * @param pcap    partials per voice in the tables (a multiple of Chunk)
- * @param shapes  the envelope bank
- * @param land    the landscape
- * @param run     per partial: start phase, phase step, its change per sample, the field's offset in cents (as bits)
- * @param amp     per partial: the near left, near right, far left and far right amplitudes the last block ended on
- * @param gains   per partial three entries: near (left start, left step, right start, right step), far, and
- *                the near plane's cosine parts (binaural: the ears' phases)
- * @param ring    per voice GainRing levels (gainRingKernel), for the dispersion
- * @param ampQ    per partial the near plane's cosine parts the last block ended on
- * @param snap    every SnapStride-th partial's frequency and amplitude, for the picture
- * @param lifeA   the living field, buffer A
- * @param lifeB   buffer B
- * @param theta   per partial the sync's phase
- * @param sx      per partial its place on its circle (Swarm)
- * @param order   per voice and group the sync's mean phasors (syncOrderKernel), three planes `plane` apart
- * @param plane   the planes' distance
- * @param flockA  the flock's state, buffer A (even blocks read it)
- * @param flockB  buffer B
- * @param qa      the energy cascade, buffer A (cascadeKernel)
- * @param qb      buffer B
- * @param filterTable  per voice the transported filter (filterTransportKernel)
- * @param hallHist     per band the amplitude gathered this block, for the hall's ear (hallKernel)
- * @param density      per band the spectrum's density the block before (hallKernel)
- * @param tau          per partial its own clock (Time Bend)
- * @param orbitA       the Orbit field's state, buffer A (even blocks read it)
- * @param orbitB       buffer B
+ * @param[in]     hdr          the block header (device copy)
+ * @param[in]     voices       the voices (device copy)
+ * @param[in]     pcap         partials per voice in the tables (a multiple of Chunk)
+ * @param[in]     shapes       the envelope bank
+ * @param[in]     land         the landscape
+ * @param[in,out] run          per partial: start phase, phase step, its change per sample, the field's offset in cents
+ *                             (as bits)
+ * @param[in,out] amp          per partial: the near left, near right, far left and far right amplitudes the last block
+ *                             ended on
+ * @param[in,out] gains        per partial three entries: near (left start, left step, right start, right step), far,
+ *                             and the near plane's cosine parts (binaural: the ears' phases)
+ * @param[in]     ring         per voice GainRing levels (gainRingKernel), for the dispersion
+ * @param[in,out] ampQ         per partial the near plane's cosine parts the last block ended on
+ * @param[in,out] snap         every SnapStride-th partial's frequency and amplitude, for the picture
+ * @param[in]     lifeA        the living field, buffer A
+ * @param[in]     lifeB        buffer B
+ * @param[in,out] theta        per partial the sync's phase
+ * @param[in,out] sx           per partial its place on its circle (Swarm)
+ * @param[in]     order        per voice and group the sync's mean phasors (syncOrderKernel), three planes `plane` apart
+ * @param[in]     plane        the planes' distance
+ * @param[in,out] flockA       the flock's state, buffer A (even blocks read it)
+ * @param[in,out] flockB       buffer B
+ * @param[in]     qa           the energy cascade, buffer A (cascadeKernel)
+ * @param[in]     qb           buffer B
+ * @param[in]     filterTable  per voice the transported filter (filterTransportKernel)
+ * @param[in,out] hallHist     per band the amplitude gathered this block, for the hall's ear (hallKernel)
+ * @param[in]     density      per band the spectrum's density the block before (hallKernel)
+ * @param[in,out] tau          per partial its own clock (Time Bend)
+ * @param[in,out] orbitA       the Orbit field's state, buffer A (even blocks read it)
+ * @param[in,out] orbitB       buffer B
  */
 __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap, const EnvShape* shapes,
                              const float* land, uint4* run, float4* amp, float4* gains, const float* ring, float2* ampQ,
@@ -1646,13 +1684,14 @@ __global__ void updateKernel(const BlockHeader* hdr, const CloudVoice* voices, i
 
 /**
  * @brief The render kernel: one chunk of partials summed into its own four-channel block of scratch.
- * @param hdr      the block header
- * @param voices   the voices
- * @param pcap     partials per voice in the tables
- * @param run      per partial: start phase, phase step, its change per sample
- * @param gains    per partial three entries: near (left start, left step, right start, right step), far, near cosine parts
- * @param scratch  per chunk: maxN samples of near left, near right, far left, far right
- * @param maxN     the engine's block size (the scratch stride)
+ * @param[in]     hdr      the block header
+ * @param[in]     voices   the voices
+ * @param[in]     pcap     partials per voice in the tables
+ * @param[in]     run      per partial: start phase, phase step, its change per sample
+ * @param[in]     gains    per partial three entries: near (left start, left step, right start, right step), far, near
+ *                         cosine parts
+ * @param[in,out] scratch  per chunk: maxN samples of near left, near right, far left, far right
+ * @param[in]     maxN     the engine's block size (the scratch stride)
  */
 __global__ void __launch_bounds__(Threads)
 renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
@@ -1752,11 +1791,11 @@ renderKernel(const BlockHeader* hdr, const CloudVoice* voices, int pcap,
 /**
  * @brief The reduce kernel: the chunks' sums added sample by sample into the first CloudChannels
  *        (near L, near R, far L, far R) of interleaved frames of CloudOutChannels.
- * @param hdr      the block header
- * @param scratch  the render kernel's per-chunk blocks
- * @param chunks   how many chunks
- * @param maxN     the scratch stride
- * @param out      n frames of CloudOutChannels
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  the render kernel's per-chunk blocks
+ * @param[in]     chunks   how many chunks
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels
  */
 __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int chunks, int maxN, float* out)
 {
@@ -1779,9 +1818,9 @@ __global__ void reduceKernel(const BlockHeader* hdr, const float* scratch, int c
 
 /**
  * @brief A uniform number in [0, 1) for one mode of the modal hall.
- * @param mode  the mode
- * @param salt  which of its numbers
- * @return      the number
+ * @param[in] mode  the mode
+ * @param[in] salt  which of its numbers
+ * @return the number
  */
 __device__ __forceinline__ float modalUni(int mode, std::uint32_t salt)
 {
@@ -1797,12 +1836,13 @@ __device__ __forceinline__ float modalUni(int mode, std::uint32_t salt)
  * change of key, decay or tuning reaches it at the next block, and a ringing mode retunes without
  * a click (its state is kept; only the rotation changes). The input is the near and the far plane
  * together: the hall is a space both stand in.
- * @param hdr      the block header (its `modal` settings)
- * @param in       the block's frames, CloudOutChannels each; the four voice channels are read
- * @param state    per mode its complex state, carried from block to block
- * @param scratch  per CUDA block two channels of maxN sums
- * @param maxN     the scratch stride
- * @param land     the landscape (the painted hall reads it)
+ * @param[in]     hdr      the block header (its `modal` settings)
+ * @param[in]     in       the block's frames, CloudOutChannels each; the four voice channels are read
+ * @param[in,out] state    per mode its complex state, carried from block to block
+ * @param[in,out] scratch  per CUDA block two channels of maxN sums
+ * @param[in]     maxN     the scratch stride
+ * @param[in]     land     the landscape (the painted hall reads it)
+ * @param[in]     memory   per band the hall's memory, 1 the average (Grow reads it)
  */
 __global__ void __launch_bounds__(ModalThreads)
 modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scratch, int maxN, const float* land, const float* memory)
@@ -1929,10 +1969,10 @@ modalKernel(const BlockHeader* hdr, const float* in, float2* state, float* scrat
 /**
  * @brief The modal hall's reduce: the CUDA blocks' sums added sample by sample, in a fixed order,
  *        into the frames' last two channels.
- * @param hdr      the block header
- * @param scratch  the modal kernel's per-block sums
- * @param maxN     the scratch stride
- * @param out      n frames of CloudOutChannels; channels 4 and 5 are written
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  the modal kernel's per-block sums
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels; channels 4 and 5 are written
  */
 __global__ void modalReduceKernel(const BlockHeader* hdr, const float* scratch, int maxN, float* out)
 {
@@ -1956,8 +1996,8 @@ __global__ void modalReduceKernel(const BlockHeader* hdr, const float* scratch, 
 /**
  * @brief A 1024-point complex FFT in shared memory, by every thread of a EchoThreads block:
  *        bit-reversed order, then ten stages of one butterfly per thread (unnormalised).
- * @param a        the 1024 values, transformed in place
- * @param inverse  true: the inverse transform (times 1024)
+ * @param[in,out] a        the 1024 values, transformed in place
+ * @param[in]     inverse  true: the inverse transform (times 1024)
  */
 __device__ void fft1024(float2* a, bool inverse)
 {
@@ -1987,12 +2027,12 @@ __device__ void fft1024(float2* a, bool inverse)
  *        through its own delay line with feedback, back through the inverse FFT, overlapped into
  *        the output; the oldest block of the overlap is finished and written to the frames' last
  *        two channels.
- * @param hdr   the block header (its `echo`)
- * @param io    the block's frames, CloudOutChannels each: the voices read, channels 6 and 7 written
- * @param hist  the input history, two rings of EchoN
- * @param acc   the overlap, two rings of EchoN on the history's indices
- * @param ring  per ear and band EchoSlots spectra: the delay lines
- * @param st    the history's write index and the frame count
+ * @param[in]     hdr   the block header (its `echo`)
+ * @param[in,out] io    the block's frames, CloudOutChannels each: the voices read, channels 6 and 7 written
+ * @param[in,out] hist  the input history, two rings of EchoN
+ * @param[in,out] acc   the overlap, two rings of EchoN on the history's indices
+ * @param[in,out] ring  per ear and band EchoSlots spectra: the delay lines
+ * @param[in,out] st    the history's write index and the frame count
  */
 __global__ void __launch_bounds__(EchoThreads)
 spectralEchoKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, float2* ring, int* st)
@@ -2080,8 +2120,8 @@ spectralEchoKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, f
 /**
  * @brief A 4096-point complex FFT in shared memory, by every thread of a MeltThreads block:
  *        bit-reversed order, then twelve stages of two butterflies per thread (unnormalised).
- * @param a        the 4096 values, transformed in place
- * @param inverse  true: the inverse transform (times 4096)
+ * @param[in,out] a        the 4096 values, transformed in place
+ * @param[in]     inverse  true: the inverse transform (times 4096)
  */
 __device__ void fft4096(float2* a, bool inverse)
 {
@@ -2109,9 +2149,9 @@ __device__ void fft4096(float2* a, bool inverse)
 /**
  * @brief A sum of two double-floats (a value as an unevaluated sum hi + lo of two floats, about 48
  *        bits): Knuth's two-sum, then renormalised. Only additions -- nothing to contract or reorder.
- * @param a  one (x the high part, y the low)
- * @param b  the other
- * @return   a + b
+ * @param[in] a  one (x the high part, y the low)
+ * @param[in] b  the other
+ * @return a + b
  */
 __device__ float2 dfAdd(float2 a, float2 b)
 {
@@ -2122,15 +2162,20 @@ __device__ float2 dfAdd(float2 a, float2 b)
     return make_float2(hi, e - (hi - s));
 }
 
-/** @brief The difference of two double-floats. @param a  one @param b  the other @return a - b */
+/**
+ * @brief The difference of two double-floats.
+ * @param[in] a  one
+ * @param[in] b  the other
+ * @return a - b
+ */
 __device__ float2 dfSub(float2 a, float2 b) { return dfAdd(a, make_float2(-b.x, -b.y)); }
 
 /**
  * @brief A cumulative sum below a point on the band axis, band b covering [b, b + 1): the
  *        inclusive sums at whole bands, linear within one.
- * @param c  the inclusive sums as double-floats, MeltBands (c[b] = the sum over bands 0 .. b)
- * @param x  the point, 0 .. MeltBands
- * @return   the sum below it
+ * @param[in] c  the inclusive sums as double-floats, MeltBands (c[b] = the sum over bands 0 .. b)
+ * @param[in] x  the point, 0 .. MeltBands
+ * @return the sum below it
  */
 __device__ float2 meltBelow(const float2* c, float x)
 {
@@ -2149,15 +2194,15 @@ __device__ float2 meltBelow(const float2* c, float x)
  *        so nothing is gained or lost), sung again
  *        at the tracked frequencies, inverse FFT, overlapped into the output; the oldest block of the
  *        overlap finished and written to channels 8 and 9.
- * @param hdr     the header (its `melt`)
- * @param io      the block's frames: the voices read, channels 8 and 9 written
- * @param hist    the input history, two rings of MeltN
- * @param acc     the overlap, two rings of MeltN on the history's indices
- * @param energy  the held energy per band, left then right
- * @param omega   each band's sung frequency, radians a sample
- * @param phase   each band's sung phase, left then right
- * @param heard   each band's last heard phase, left then right
- * @param st      the history's write index, the samples since the last frame
+ * @param[in]     hdr     the header (its `melt`)
+ * @param[in,out] io      the block's frames: the voices read, channels 8 and 9 written
+ * @param[in,out] hist    the input history, two rings of MeltN
+ * @param[in,out] acc     the overlap, two rings of MeltN on the history's indices
+ * @param[in,out] energy  the held energy per band, left then right
+ * @param[in,out] omega   each band's sung frequency, radians a sample
+ * @param[in,out] phase   each band's sung phase, left then right
+ * @param[in,out] heard   each band's last heard phase, left then right
+ * @param[in,out] st      the history's write index, the samples since the last frame
  */
 __global__ void __launch_bounds__(MeltThreads)
 meltKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, float* energy, float* omega, float* phase, float* heard, int* st)
@@ -2333,12 +2378,12 @@ meltKernel(const BlockHeader* hdr, float* io, float* hist, float* acc, float* en
  *        Hann-windowed frame through the FFT, and three numbers -- the level, the energy's centre
  *        on the log axis, the change (the magnitudes' rise against the last frame over their sum).
  *        Summed in a fixed order.
- * @param hdr    the header
- * @param io     the block's frames (the voices' four channels are read)
- * @param hist   the history, two rings of EchoN
- * @param prev   the last frame's magnitudes, EchoBins
- * @param st     the history's write index
- * @param stats  receives level (energy), centroid, flux at [2], [3], [4]
+ * @param[in]     hdr    the header
+ * @param[in]     io     the block's frames (the voices' four channels are read)
+ * @param[in,out] hist   the history, two rings of EchoN
+ * @param[in,out] prev   the last frame's magnitudes, EchoBins
+ * @param[in,out] st     the history's write index
+ * @param[out]    stats  receives level (energy), centroid, flux at [2], [3], [4]
  */
 __global__ void __launch_bounds__(EchoThreads)
 listenKernel(const BlockHeader* hdr, const float* io, float* hist, float* prev, int* st, float* stats)
@@ -2412,10 +2457,10 @@ listenKernel(const BlockHeader* hdr, const float* io, float* hist, float* prev, 
 /**
  * @brief Fills the reservoir once: the coupling uniform in +-sqrt(3/N) (unit spectral radius, scaled
  *        by `chaos` when it runs), the inputs' and the readouts' weights in +-1, a small start.
- * @param w      the coupling, N x N
- * @param win    the input weights, N x ReservoirInputs
- * @param rout   the readouts, ReservoirOutputs x N
- * @param x      the state, both buffers
+ * @param[in,out] w     the coupling, N x N
+ * @param[in,out] win   the input weights, N x ReservoirInputs
+ * @param[in,out] rout  the readouts, ReservoirOutputs x N
+ * @param[in,out] x     the state, both buffers
  */
 __global__ void reservoirInitKernel(float* w, float* win, float* rout, float* x)
 {
@@ -2432,10 +2477,10 @@ __global__ void reservoirInitKernel(float* w, float* win, float* rout, float* x)
  * @brief One block of the reservoir: a warp per neuron sums its row of the coupling against the last
  *        state (lanes strided, then shuffled in a fixed order), adds its inputs, and leaks towards
  *        tanh of it. Reads one buffer, writes the other (by the block's parity).
- * @param hdr   the header
- * @param w     the coupling
- * @param win   the input weights
- * @param x     the state, two buffers of N
+ * @param[in]     hdr  the header
+ * @param[in]     w    the coupling
+ * @param[in]     win  the input weights
+ * @param[in,out] x    the state, two buffers of N
  */
 __global__ void reservoirStepKernel(const BlockHeader* hdr, const float* w, const float* win, float* x)
 {
@@ -2459,11 +2504,12 @@ __global__ void reservoirStepKernel(const BlockHeader* hdr, const float* w, cons
 }
 
 /**
- * @brief The reservoir's readouts, one CUDA block: tanh of each fixed projection of the new state, summed in a fixed order.
- * @param hdr    the header
- * @param rout   the readouts
- * @param x      the state, two buffers
- * @param stats  receives the outputs at [5] .. [8]
+ * @brief The reservoir's readouts, one CUDA block: tanh of each fixed projection of the new state, summed in a fixed
+ *        order.
+ * @param[in]  hdr    the header
+ * @param[in]  rout   the readouts
+ * @param[in]  x      the state, two buffers
+ * @param[out] stats  receives the outputs at [5] .. [8]
  */
 __global__ void reservoirReadKernel(const BlockHeader* hdr, const float* rout, const float* x, float* stats)
 {
@@ -2489,10 +2535,10 @@ __global__ void reservoirReadKernel(const BlockHeader* hdr, const float* rout, c
 
 /**
  * @brief Writes a failed CUDA call into `error`.
- * @param e      the call's result
- * @param what   the call, for the message
- * @param error  receives the message (may be null)
- * @return       true when the call succeeded
+ * @param[in]  e      the call's result
+ * @param[in]  what   the call, for the message
+ * @param[out] error  receives the message (may be null)
+ * @return true when the call succeeded
  */
 bool ok(cudaError_t e, const char* what, std::string* error)
 {
@@ -2522,7 +2568,11 @@ struct CloudEngine::Impl {
         float m_lowCut = 0.0f;       ///< pad low cut
         float m_stretch = 1.0f;      ///< the harmonics' stretch exponent
         float m_shift = 0.0f;        ///< the partials' shift, Hz
-        /** @brief Equal in every field. @param o the other key @return true when the sum can be reused */
+        /**
+         * @brief Equal in every field.
+         * @param[in] o  the other key
+         * @return true when the sum can be reused
+         */
         bool operator==(const ShapeKey& o) const
         {
             return m_hz == o.m_hz && m_harmonics == o.m_harmonics && m_tilt == o.m_tilt && m_oddEven == o.m_oddEven && m_brightness == o.m_brightness
@@ -2688,8 +2738,8 @@ struct CloudEngine::Impl {
      *        per harmonic, and the scales that make the voice's RMS its level -- normalised after the
      *        whole spectral shape, as Noctuary does, so brightness, odd/even, presence and the low cut
      *        colour the voice without changing its level (the filter, the distance and the motions do).
-     * @param i  the voice
-     * @param v  its upload copy, completed here
+     * @param[in]     i  the voice
+     * @param[in,out] v  its upload copy, completed here
      */
     void derive(int i, CloudVoice& v)
     {

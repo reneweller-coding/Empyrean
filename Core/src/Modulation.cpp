@@ -1,6 +1,7 @@
 /**
  * @file Modulation.cpp
  * @brief The modulation system (Modulation.h).
+ * @author Rene Weller
  */
 #include "additiv/Modulation.h"
 
@@ -34,9 +35,9 @@ namespace {
 /**
  * @brief A factory shape's held course at time tau (the host's twin of the GPU's shapeHeld): its
  *        start, then its loop for ever, or its last level.
- * @param s    the shape
- * @param tau  seconds of shape time
- * @return     the level
+ * @param[in] s    the shape
+ * @param[in] tau  seconds of shape time
+ * @return the level
  */
 float shapeAt(const EnvShape& s, double tau)
 {

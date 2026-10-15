@@ -20,6 +20,7 @@
  *          --scene NAME (none)  --landscape FILE (picture or WAV/FLAC)  --loop S (30, a picture's length)
  *          --range DB (40)  --whiten X (0.7)  --seamless X (0.1)  --smooth S (0.15)
  *          --reservoir  (the reservoir stepped every block too)  --melt  (the melt running too)
+ * @author Rene Weller
  */
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -83,8 +84,8 @@ struct Options {
  * @brief Sets this process's GPU scheduling priority class, which decides how the GPU's scheduler
  *        weighs our work against other processes' (D3DKMTSetProcessSchedulingPriorityClass, from
  *        gdi32 at run time so nothing links against the kernel-mode thunks).
- * @param cls  0 idle, 1 below normal, 2 normal, 3 above normal, 4 high, 5 realtime
- * @return     the NTSTATUS, 0 when it took
+ * @param[in] cls  0 idle, 1 below normal, 2 normal, 3 above normal, 4 high, 5 realtime
+ * @return the NTSTATUS, 0 when it took
  */
 long setGpuPriority(int cls)
 {
@@ -110,14 +111,21 @@ std::int64_t qpc()
     return q.QuadPart;
 }
 
-/** @brief Ticks to microseconds. @param ticks QueryPerformanceCounter ticks @return microseconds */
+/**
+ * @brief Ticks to microseconds.
+ * @param[in] ticks  QueryPerformanceCounter ticks
+ * @return microseconds
+ */
 double toUs(std::int64_t ticks) { return static_cast<double>(ticks) * 1.0e6 / qpcFreq(); }
 
 /** @brief Registers the calling thread with MMCSS as "Pro Audio", as a real audio thread is, while it lives. */
 struct ProAudio {
     HANDLE m_task = nullptr;   ///< the MMCSS registration, null when it failed
 
-    /** @brief Registers the thread. @param priority the MMCSS priority within Pro Audio */
+    /**
+     * @brief Registers the thread.
+     * @param[in] priority  the MMCSS priority within Pro Audio
+     */
     explicit ProAudio(AVRT_PRIORITY priority)
     {
         DWORD index = 0;
@@ -137,7 +145,10 @@ public:
     Pacer(const Pacer&) = delete;              ///< owns the timer
     Pacer& operator=(const Pacer&) = delete;   ///< owns the timer
 
-    /** @brief Returns at `target` (or at once when it has passed). @param target QueryPerformanceCounter ticks */
+    /**
+     * @brief Returns at `target` (or at once when it has passed).
+     * @param[in] target  QueryPerformanceCounter ticks
+     */
     void until(std::int64_t target)
     {
         const std::int64_t spinTicks = static_cast<std::int64_t>(qpcFreq() * 300.0e-6);
@@ -169,7 +180,11 @@ struct Summary {
     double m_max = 0.0;    ///< the worst
 };
 
-/** @brief Summarises a series. @param v the values (copied, then sorted) @return the summary */
+/**
+ * @brief Summarises a series.
+ * @param[in] v  the values (copied, then sorted)
+ * @return the summary
+ */
 Summary summarize(std::vector<double> v)
 {
     Summary s;
@@ -186,14 +201,22 @@ Summary summarize(std::vector<double> v)
     return s;
 }
 
-/** @brief Prints one summary line in microseconds. @param label what was measured @param s the summary */
+/**
+ * @brief Prints one summary line in microseconds.
+ * @param[in] label  what was measured
+ * @param[in] s      the summary
+ */
 void printSummary(const char* label, const Summary& s)
 {
     std::printf("  %-12s mean %8.1f   p50 %8.1f   p99 %8.1f   p99.9 %8.1f   max %9.1f  us\n",
                 label, s.m_mean, s.m_p50, s.m_p99, s.m_p999, s.m_max);
 }
 
-/** @brief Prints how many values exceed each threshold. @param v microseconds @param label what they are */
+/**
+ * @brief Prints how many values exceed each threshold.
+ * @param[in] v      microseconds
+ * @param[in] label  what they are
+ */
 void printOver(const std::vector<double>& v, const char* label)
 {
     static const double Ms[] = { 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0 };
@@ -218,14 +241,18 @@ fs::path repoRoot()
     return fs::current_path();
 }
 
-/** @brief MIDI note to Hz. @param note MIDI note number @return Hz */
+/**
+ * @brief MIDI note to Hz.
+ * @param[in] note  MIDI note number
+ * @return Hz
+ */
 float noteHz(int note) { return 440.0f * std::exp2((static_cast<float>(note) - 69.0f) / 12.0f); }
 
 /**
  * @brief The GPU's four channels (near L, near R, far L, far R) as stereo: near and far added.
- * @param q   n frames of CloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
- * @param n   frames
- * @param lr  receives n interleaved stereo frames
+ * @param[in]  q   n frames of CloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
+ * @param[in]  n   frames
+ * @param[out] lr  receives n interleaved stereo frames
  */
 void mixToStereo(const float* q, int n, float* lr)
 {
@@ -237,9 +264,9 @@ void mixToStereo(const float* q, int n, float* lr)
 
 /**
  * @brief Appends a GPU block to an interleaved stereo buffer, near and far added.
- * @param lr  the buffer
- * @param q   n frames of CloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
- * @param n   frames
+ * @param[in,out] lr  the buffer
+ * @param[in]     q   n frames of CloudOutChannels (the modal hall's two are left out: the probe keeps it resting)
+ * @param[in]     n   frames
  */
 void appendStereo(std::vector<float>& lr, const float* q, int n)
 {
@@ -271,7 +298,11 @@ const Scene Scenes[] = {
     { "recording", "the amplitude lane reads a recording's spectrum (sea)", 2, MotionKindE::AURORA },
 };
 
-/** @brief A scene by name. @param name the --scene name @return the scene, null when unknown */
+/**
+ * @brief A scene by name.
+ * @param[in] name  the --scene name
+ * @return the scene, null when unknown
+ */
 const Scene* findScene(const std::string& name)
 {
     for (const Scene& s : Scenes)
@@ -294,9 +325,9 @@ fs::path defaultRecording()
 /**
  * @brief Gives an engine the factory shapes and, when the scene reads one, its landscape; draws the
  *        landscape into work/landscapes so it can be looked at (and painted over).
- * @param e  the engine
- * @param o  the options (scene, landscape file, loop, range, whiten, seamless)
- * @return   true when the engine is ready for the scene
+ * @param[in,out] e  the engine
+ * @param[in]     o  the options (scene, landscape file, loop, range, whiten, seamless)
+ * @return true when the engine is ready for the scene
  */
 bool prepareEngine(CloudEngine& e, const Options& o)
 {
@@ -335,12 +366,13 @@ bool prepareEngine(CloudEngine& e, const Options& o)
 }
 
 /**
- * @brief One voice set up as a note: the cloud parameters from the options, the scene's lanes, full gain, a fresh start.
- * @param v         the voice
- * @param hz        its pitch
- * @param partials  partials per voice
- * @param seed      the note's dice
- * @param o         the options (width, slope, drift, shimmer, scene)
+ * @brief One voice set up as a note: the cloud parameters from the options, the scene's lanes, full gain, a fresh
+ *        start.
+ * @param[in,out] v         the voice
+ * @param[in]     hz        its pitch
+ * @param[in]     partials  partials per voice
+ * @param[in]     seed      the note's dice
+ * @param[in]     o         the options (width, slope, drift, shimmer, scene)
  */
 void setNote(CloudVoice& v, float hz, int partials, std::uint32_t seed, const Options& o)
 {
@@ -361,9 +393,9 @@ void setNote(CloudVoice& v, float hz, int partials, std::uint32_t seed, const Op
 
 /**
  * @brief The load of the timing probes: every voice sounding, spread over four octaves from A1.
- * @param e         the engine
- * @param partials  partials per voice
- * @param o         the options
+ * @param[in,out] e         the engine
+ * @param[in]     partials  partials per voice
+ * @param[in]     o         the options
  */
 void setLoad(CloudEngine& e, int partials, const Options& o)
 {
@@ -376,9 +408,9 @@ void setLoad(CloudEngine& e, int partials, const Options& o)
 
 /**
  * @brief Opens an engine or says why not.
- * @param e  the engine
- * @param c  the layout
- * @return   true when it is open
+ * @param[in,out] e  the engine
+ * @param[in]     c  the layout
+ * @return true when it is open
  */
 bool openEngine(CloudEngine& e, const CloudConfig& c)
 {
@@ -388,7 +420,12 @@ bool openEngine(CloudEngine& e, const CloudConfig& c)
     return false;
 }
 
-/** @brief The layout the options describe. @param o the options @param partials partials per voice @return the layout */
+/**
+ * @brief The layout the options describe.
+ * @param[in] o         the options
+ * @param[in] partials  partials per voice
+ * @return the layout
+ */
 CloudConfig layout(const Options& o, int partials)
 {
     CloudConfig c;
@@ -400,7 +437,11 @@ CloudConfig layout(const Options& o, int partials)
     return c;
 }
 
-/** @brief probe info. @param o the options @return the exit code */
+/**
+ * @brief probe info.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdInfo(const Options& o)
 {
     CloudEngine e;
@@ -409,7 +450,11 @@ int cmdInfo(const Options& o)
     return 0;
 }
 
-/** @brief probe bench: blocks back to back. @param o the options @return the exit code */
+/**
+ * @brief probe bench: blocks back to back.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdBench(const Options& o)
 {
     const int blocks = o.m_seconds > 0.0 ? static_cast<int>(o.m_seconds * SampleRate / o.m_block) : 3000;
@@ -438,7 +483,11 @@ int cmdBench(const Options& o)
     return 0;
 }
 
-/** @brief probe latency: paced blocks, each waited for at once. @param o the options @return the exit code */
+/**
+ * @brief probe latency: paced blocks, each waited for at once.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdLatency(const Options& o)
 {
     const int partials = o.m_partials[0];
@@ -513,7 +562,11 @@ int cmdLatency(const Options& o)
     return 0;
 }
 
-/** @brief probe ahead: a worker renders ahead into a ring, a paced consumer takes from it. @param o the options @return the exit code */
+/**
+ * @brief probe ahead: a worker renders ahead into a ring, a paced consumer takes from it.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdAhead(const Options& o)
 {
     const int partials = o.m_partials[0];
@@ -603,11 +656,11 @@ int cmdAhead(const Options& o)
 
 /**
  * @brief Writes interleaved stereo as a 24-bit WAV.
- * @param path        the file
- * @param lr          interleaved stereo samples
- * @param sampleRate  Hz
- * @param gain        applied before quantising
- * @return            true when written
+ * @param[in] path        the file
+ * @param[in] lr          interleaved stereo samples
+ * @param[in] sampleRate  Hz
+ * @param[in] gain        applied before quantising
+ * @return true when written
  */
 bool writeWav24(const fs::path& path, const std::vector<float>& lr, int sampleRate, float gain)
 {
@@ -639,12 +692,12 @@ constexpr int ChordVoices = static_cast<int>(sizeof(Chord) / sizeof(Chord[0])); 
  * @brief Renders the chord on an engine with ChordVoices voices: the scene's lanes, a raised-cosine
  *        attack, the release (note-off for the lanes, a fade for the voices) over the last stretch,
  *        normalised to -20 dBFS RMS (peaks kept below -1 dBFS), as a WAV.
- * @param e         the engine, prepared for the scene
- * @param partials  partials per voice
- * @param o         the options (cloud parameters, scene)
- * @param seconds   length
- * @param file      the WAV
- * @return          true when written
+ * @param[in,out] e         the engine, prepared for the scene
+ * @param[in]     partials  partials per voice
+ * @param[in]     o         the options (cloud parameters, scene)
+ * @param[in]     seconds   length
+ * @param[in]     file      the WAV
+ * @return true when written
  */
 bool renderChord(CloudEngine& e, int partials, const Options& o, double seconds, const fs::path& file)
 {
@@ -682,7 +735,11 @@ bool renderChord(CloudEngine& e, int partials, const Options& o, double seconds,
     return true;
 }
 
-/** @brief The chord's engine: ChordVoices voices, 256-sample blocks. @param partials the most partials per voice @return the layout */
+/**
+ * @brief The chord's engine: ChordVoices voices, 256-sample blocks.
+ * @param[in] partials  the most partials per voice
+ * @return the layout
+ */
 CloudConfig chordLayout(int partials)
 {
     CloudConfig c;
@@ -693,7 +750,11 @@ CloudConfig chordLayout(int partials)
     return c;
 }
 
-/** @brief probe render: the chord at every partial count of --partials, in the --scene, each a WAV. @param o the options @return the exit code */
+/**
+ * @brief probe render: the chord at every partial count of --partials, in the --scene, each a WAV.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdRender(const Options& o)
 {
     const double seconds = o.m_seconds > 0.0 ? o.m_seconds : 30.0;
@@ -715,7 +776,11 @@ int cmdRender(const Options& o)
     return 0;
 }
 
-/** @brief probe scenes: every scene on the chord with the first --partials, each a WAV. @param o the options @return the exit code */
+/**
+ * @brief probe scenes: every scene on the chord with the first --partials, each a WAV.
+ * @param[in] o  the options
+ * @return the exit code
+ */
 int cmdScenes(const Options& o)
 {
     const double seconds = o.m_seconds > 0.0 ? o.m_seconds : 40.0;
@@ -736,9 +801,9 @@ int cmdScenes(const Options& o)
 
 /**
  * @brief Renders `blocks` blocks of an engine's voices into one interleaved buffer.
- * @param e       the engine
- * @param blocks  how many
- * @return        the samples
+ * @param[in,out] e       the engine
+ * @param[in]     blocks  how many
+ * @return the samples
  */
 std::vector<float> renderBlocks(CloudEngine& e, int blocks)
 {
@@ -756,11 +821,11 @@ std::vector<float> renderBlocks(CloudEngine& e, int blocks)
 /**
  * @brief One partial at 1500 Hz -- four whole cycles per 128-sample block, so a block's RMS is
  *        exact -- centred, without drift or shimmer, at level 0.1 (amplitude 0.1 per channel).
- * @param bank    the shapes to upload
- * @param land    a landscape to upload (may be null)
- * @param blocks  how many blocks
- * @param setup   sets the voice's lanes (and release)
- * @return        the samples, interleaved stereo
+ * @param[in] bank    the shapes to upload
+ * @param[in] land    a landscape to upload (may be null)
+ * @param[in] blocks  how many blocks
+ * @param[in] setup   sets the voice's lanes (and release)
+ * @return the samples, interleaved stereo
  */
 template <class SetupT>
 std::vector<float> onePartial(const std::vector<EnvShape>& bank, const Landscape* land, int blocks, SetupT&& setup)
@@ -793,11 +858,11 @@ std::vector<float> onePartial(const std::vector<EnvShape>& bank, const Landscape
 /**
  * @brief A few partials, one per harmonic (no cloud: width 0), centred, without drift or shimmer,
  *        at level 0.1 -- for the spectral shape's checks.
- * @param partials  harmonics, and the engine's capacity
- * @param hz        the fundamental
- * @param blocks    how many 128-sample blocks
- * @param setup     sets the shape
- * @return          the samples, interleaved stereo
+ * @param[in] partials  harmonics, and the engine's capacity
+ * @param[in] hz        the fundamental
+ * @param[in] blocks    how many 128-sample blocks
+ * @param[in] setup     sets the shape
+ * @return the samples, interleaved stereo
  */
 template <class SetupT>
 std::vector<float> fewPartials(int partials, float hz, int blocks, SetupT&& setup)
@@ -829,10 +894,10 @@ std::vector<float> fewPartials(int partials, float hz, int blocks, SetupT&& setu
 /**
  * @brief The amplitude of one sine in the left channel, by projection on the very phase step the
  *        GPU computes for that frequency (float, as the kernel does).
- * @param lr    interleaved stereo
- * @param from  first frame
- * @param f     the sine's frequency, Hz
- * @return      its amplitude
+ * @param[in] lr    interleaved stereo
+ * @param[in] from  first frame
+ * @param[in] f     the sine's frequency, Hz
+ * @return its amplitude
  */
 double toneAmp(const std::vector<float>& lr, size_t from, float f)
 {
@@ -847,7 +912,13 @@ double toneAmp(const std::vector<float>& lr, size_t from, float f)
     return 2.0 * std::sqrt(re * re + im * im) / static_cast<double>(std::max<size_t>(frames - from, 1));
 }
 
-/** @brief A block's amplitude in one channel: sqrt(2 * mean square). @param lr interleaved stereo @param b the block (128 frames) @param ch 0 left, 1 right @return the amplitude */
+/**
+ * @brief A block's amplitude in one channel: sqrt(2 * mean square).
+ * @param[in] lr  interleaved stereo
+ * @param[in] b   the block (128 frames)
+ * @param[in] ch  0 left, 1 right
+ * @return the amplitude
+ */
 double blockAmp(const std::vector<float>& lr, size_t b, int ch)
 {
     double sq = 0.0;
@@ -857,11 +928,11 @@ double blockAmp(const std::vector<float>& lr, size_t b, int ch)
 
 /**
  * @brief Fits a sine of a known phase step to a stretch of one channel and returns the worst residual.
- * @param lr     interleaved stereo
- * @param from   first frame of the stretch
- * @param step   the phase step per sample, as a fraction of 2^32
- * @param amp    receives the fitted amplitude
- * @return       the worst absolute difference between the channel and the fitted sine
+ * @param[in]  lr    interleaved stereo
+ * @param[in]  from  first frame of the stretch
+ * @param[in]  step  the phase step per sample, as a fraction of 2^32
+ * @param[out] amp   receives the fitted amplitude
+ * @return the worst absolute difference between the channel and the fitted sine
  */
 double fitSine(const std::vector<float>& lr, size_t from, std::uint32_t step, double& amp)
 {
@@ -880,7 +951,11 @@ double fitSine(const std::vector<float>& lr, size_t from, std::uint32_t step, do
     return worst;
 }
 
-/** @brief probe selftest. @param o the options @return the exit code: 0 when every check passed */
+/**
+ * @brief probe selftest.
+ * @param[in] o  the options
+ * @return the exit code: 0 when every check passed
+ */
 int cmdSelftest(const Options& o)
 {
     Options base = o;
@@ -1119,7 +1194,11 @@ int cmdSelftest(const Options& o)
     return failures == 0 ? 0 : 1;
 }
 
-/** @brief Splits "200,2000,20000" into numbers. @param s the list @return the numbers (empty on a bad entry) */
+/**
+ * @brief Splits "200,2000,20000" into numbers.
+ * @param[in] s  the list
+ * @return the numbers (empty on a bad entry)
+ */
 std::vector<int> parseList(const std::string& s)
 {
     std::vector<int> out;
@@ -1154,9 +1233,9 @@ void usage()
 
 /**
  * @brief Reads the subcommand and its options and runs it.
- * @param argc  argument count
- * @param argv  arguments
- * @return      0 when the run succeeded (ahead: 2 when it underran)
+ * @param[in]     argc  argument count
+ * @param[in,out] argv  arguments
+ * @return 0 when the run succeeded (ahead: 2 when it underran)
  */
 int main(int argc, char** argv)
 {

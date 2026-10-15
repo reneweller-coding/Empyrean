@@ -18,6 +18,7 @@
  * (Morph.h), each row keeps running on the modulators of the sound it came from -- a slow sine on
  * the brightness stays a slow sine while it fades, though the sound it fades into uses LFO 1 for
  * quick steps on the width. The other sources are the instrument's, one of each.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -94,7 +95,11 @@ struct ModRow {
     int m_setup = 0;                       ///< whose LFOs and envelopes it reads: an index into its sound's setups (MorphState); 0 in a plain matrix
 };
 
-/** @brief Whether a source is one of a sound's own modulators (the four LFOs, the two envelopes). @param s the source @return true then */
+/**
+ * @brief Whether a source is one of a sound's own modulators (the four LFOs, the two envelopes).
+ * @param[in] s  the source
+ * @return true then
+ */
 inline bool isOwnSource(ModSourceE s) { return s >= ModSourceE::LFO1 && s <= ModSourceE::ENV2; }
 
 /** @brief The settings of a sound's own modulators: its LFOs' and envelopes' shapes and rates. */
@@ -103,13 +108,25 @@ struct ModSetup {
     float m_lfoRate[4] = { 0.05f, 0.08f, 0.13f, 0.21f };   ///< each LFO's rate, Hz
     int m_envShape[2] = { 2, 0 };                           ///< each envelope's factory shape
     float m_envRate[2] = { 0.25f, 0.1f };                   ///< each envelope's speed
-    /** @brief The same settings. @param o the other @return true when every one is equal */
+    /**
+     * @brief The same settings.
+     * @param[in] o  the other
+     * @return true when every one is equal
+     */
     bool operator==(const ModSetup& o) const;
-    /** @brief Different settings. @param o the other @return true when any one differs */
+    /**
+     * @brief Different settings.
+     * @param[in] o  the other
+     * @return true when any one differs
+     */
     bool operator!=(const ModSetup& o) const { return !(*this == o); }
 };
 
-/** @brief A sound's own modulators as its parameters set them. @param values NumParams values @return the setup */
+/**
+ * @brief A sound's own modulators as its parameters set them.
+ * @param[in] values  NumParams values
+ * @return the setup
+ */
 ModSetup modSetupFrom(const float* values);
 
 /**
@@ -119,20 +136,32 @@ ModSetup modSetupFrom(const float* values);
  */
 class OwnModulators {
 public:
-    /** @brief Back to the start. @param seed the dice of the random shapes */
+    /**
+     * @brief Back to the start.
+     * @param[in] seed  the dice of the random shapes
+     */
     void reset(std::uint64_t seed);
     /**
      * @brief Advances by a block.
-     * @param dt       seconds
-     * @param envTime  seconds since the phrase began (the envelopes' clock, the instrument's)
-     * @param s        the settings
+     * @param[in] dt       seconds
+     * @param[in] envTime  seconds since the phrase began (the envelopes' clock, the instrument's)
+     * @param[in] s        the settings
      */
     void advance(float dt, double envTime, const ModSetup& s);
-    /** @brief An LFO's or envelope's value after the last advance. @param s the source @return its value, 0 for any other */
+    /**
+     * @brief An LFO's or envelope's value after the last advance.
+     * @param[in] s  the source
+     * @return its value, 0 for any other
+     */
     float value(ModSourceE s) const;
 
 private:
-    /** @brief One LFO's value at its phase. @param i the LFO @param shape LfoShapeNames @return -1 .. 1 */
+    /**
+     * @brief One LFO's value at its phase.
+     * @param[in] i      the LFO
+     * @param[in] shape  LfoShapeNames
+     * @return -1 .. 1
+     */
     float lfoValue(int i, int shape) const;
 
     double m_phase[4] = { 0.0, 0.0, 0.0, 0.0 };      ///< each LFO's phase, 0 .. 1
@@ -147,42 +176,59 @@ private:
  * @brief Whether a source runs 0 .. 1 (envelopes, macros, the hands, Lenia, Cascade, Root Age, Note,
  *        Distance) rather than -1 .. 1. A via source is read as an amount: a 0 .. 1 one as it is, a
  *        -1 .. 1 one as (v + 1) / 2 (Noctuary's rule).
- * @param s  the source
- * @return   true when it runs 0 .. 1
+ * @param[in] s  the source
+ * @return true when it runs 0 .. 1
  */
 bool isUnipolarSource(ModSourceE s);
 
-/** @brief A source's value as a via amount, 0 .. 1. @param s the source @param v its value @return the amount */
+/**
+ * @brief A source's value as a via amount, 0 .. 1.
+ * @param[in] s  the source
+ * @param[in] v  its value
+ * @return the amount
+ */
 inline float viaAmount(ModSourceE s, float v)
 {
     const float a = isUnipolarSource(s) ? v : 0.5f * (v + 1.0f);
     return a < 0.0f ? 0.0f : (a > 1.0f ? 1.0f : a);
 }
 
-/** @brief Whether a parameter can be a target: the continuous and whole-number ones. @param id the parameter @return true when it can */
+/**
+ * @brief Whether a parameter can be a target: the continuous and whole-number ones.
+ * @param[in] id  the parameter
+ * @return true when it can
+ */
 bool isModTarget(ParamIdE id);
 
-/** @brief A row in 64 bits, so the audio side reads it atomically. @param r the row @return the bits */
+/**
+ * @brief A row in 64 bits, so the audio side reads it atomically.
+ * @param[in] r  the row
+ * @return the bits
+ */
 std::uint64_t packModRow(const ModRow& r);
-/** @brief A row back from its bits. @param bits from packModRow @return the row */
+/**
+ * @brief A row back from its bits.
+ * @param[in] bits  from packModRow
+ * @return the row
+ */
 ModRow unpackModRow(std::uint64_t bits);
 
 /**
  * @brief The rows as text: "lfo1>cutoff:0.35;macro1>motion_depth:-0.5:lenia2" (empty rows left out;
  *        a via source as a fourth field).
- * @param rows  the rows
- * @param n     how many
- * @return      the text
+ * @param[in] rows  the rows
+ * @param[in] n     how many
+ * @return the text
  */
 std::string modRowsToText(const ModRow* rows, int n);
 
 /**
  * @brief Rows from their text; rows the text does not fill are emptied. Unknown sources or targets
  *        are skipped.
- * @param text  the text
- * @param rows  receives the rows
- * @param n     how many there are room for
- * @return      how many rows were read
+ * @param[in]  text  the text
+ * @param[out] rows  receives the rows
+ * @param[in]  n     how many there are room for
+ * @return how many rows were read
  */
 int modRowsFromText(const std::string& text, ModRow* rows, int n);
 
@@ -218,15 +264,22 @@ struct ModInputs {
 /** @brief The sources, advanced once per block on the renderer's thread. */
 class Modulators {
 public:
-    /** @brief Back to the start, with a seed for the random shapes. @param seed the dice */
+    /**
+     * @brief Back to the start, with a seed for the random shapes.
+     * @param[in] seed  the dice
+     */
     void reset(std::uint64_t seed);
     /**
      * @brief Advances every source by a block.
-     * @param dt  seconds
-     * @param in  the settings and the performer's controllers
+     * @param[in] dt  seconds
+     * @param[in] in  the settings and the performer's controllers
      */
     void advance(float dt, const ModInputs& in);
-    /** @brief A source's value after the last advance. @param s the source @return its value */
+    /**
+     * @brief A source's value after the last advance.
+     * @param[in] s  the source
+     * @return its value
+     */
     float value(ModSourceE s) const { const int i = static_cast<int>(s); return i > 0 && i < NumModSources ? m_values[i] : 0.0f; }
     /** @brief The LFOs and envelopes as the parameters set them (a sound's own copies start from these). @return them */
     const OwnModulators& own() const { return m_own; }
@@ -234,11 +287,20 @@ public:
     double envTime() const { return m_envTime; }
 
 private:
-    /** @brief One block of the Lenia field (Noctuary's: rows stepped at the rate, a dead or full field seeded again). @param dt seconds @param rate fields per second @param mu growth centre */
+    /**
+     * @brief One block of the Lenia field (Noctuary's: rows stepped at the rate, a dead or full field seeded again).
+     * @param[in] dt    seconds
+     * @param[in] rate  fields per second
+     * @param[in] mu    growth centre
+     */
     void stepLenia(float dt, float rate, float mu);
     /** @brief A few soft blobs on an empty torus, from the field's own dice. */
     void seedLenia();
-    /** @brief One block of the two attractors (fourth-order Runge-Kutta in their own time). @param dt seconds @param period the chaos period */
+    /**
+     * @brief One block of the two attractors (fourth-order Runge-Kutta in their own time).
+     * @param[in] dt      seconds
+     * @param[in] period  the chaos period
+     */
     void stepChaos(float dt, float period);
 
     OwnModulators m_own;                              ///< the LFOs and envelopes on the parameters (the panel's, and where a sound's own begin)

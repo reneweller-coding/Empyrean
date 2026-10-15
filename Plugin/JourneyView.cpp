@@ -1,6 +1,7 @@
 /**
  * @file JourneyView.cpp
  * @brief The Journey page (JourneyView.h).
+ * @author Rene Weller
  */
 #include "JourneyView.h"
 

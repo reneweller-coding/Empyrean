@@ -4,6 +4,7 @@
  *        that begin on their sample, silence, determinism, the conductor's Autoplay, stealing,
  *        release, the real-time path without underruns, the echoes and the modal hall. Needs the
  *        GPU; the cloud's own measurements are probe's selftest.
+ * @author Rene Weller
  */
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
@@ -41,9 +42,9 @@ int g_failures = 0;   ///< checks that failed
 
 /**
  * @brief Prints one check's result and counts a failure.
- * @param good    whether it passed
- * @param what    what was checked
- * @param detail  the measured values
+ * @param[in] good    whether it passed
+ * @param[in] what    what was checked
+ * @param[in] detail  the measured values
  */
 void check(bool good, const char* what, const std::string& detail)
 {
@@ -53,9 +54,9 @@ void check(bool good, const char* what, const std::string& detail)
 
 /**
  * @brief A string from a printf format.
- * @param fmt   the format
- * @param ...   its values
- * @return      the text
+ * @param[in] fmt  the format
+ * @return the text
+ * @param[in] ...   its values
  */
 std::string fmt(const char* fmt, ...)
 {
@@ -69,10 +70,10 @@ std::string fmt(const char* fmt, ...)
 
 /**
  * @brief An offline engine at 48 kHz with 256-sample host blocks.
- * @param e      the engine
- * @param brain  whether the conductor plays
- * @param seed   the dice
- * @return       true when it is prepared
+ * @param[in,out] e      the engine
+ * @param[in]     brain  whether the conductor plays
+ * @param[in]     seed   the dice
+ * @return true when it is prepared
  */
 bool openOffline(Engine& e, bool brain, std::uint64_t seed = 0x5EEDu)
 {
@@ -91,9 +92,9 @@ bool openOffline(Engine& e, bool brain, std::uint64_t seed = 0x5EEDu)
 
 /**
  * @brief Renders seconds of an engine into interleaved stereo.
- * @param e        the engine
- * @param seconds  how long
- * @return         the samples
+ * @param[in,out] e        the engine
+ * @param[in]     seconds  how long
+ * @return the samples
  */
 std::vector<float> render(Engine& e, double seconds)
 {
@@ -109,7 +110,13 @@ std::vector<float> render(Engine& e, double seconds)
     return lr;
 }
 
-/** @brief RMS of a stretch of interleaved stereo, in dBFS. @param lr samples @param from first frame @param to end frame @return dBFS */
+/**
+ * @brief RMS of a stretch of interleaved stereo, in dBFS.
+ * @param[in] lr    samples
+ * @param[in] from  first frame
+ * @param[in] to    end frame
+ * @return dBFS
+ */
 double rmsDb(const std::vector<float>& lr, size_t from, size_t to)
 {
     double sq = 0.0;
@@ -121,7 +128,7 @@ double rmsDb(const std::vector<float>& lr, size_t from, size_t to)
 
 /**
  * @brief Every effect off: what is heard is the voices alone.
- * @param e  the engine (before or after prepare)
+ * @param[in,out] e  the engine (before or after prepare)
  */
 void noEffects(Engine& e)
 {
@@ -132,7 +139,7 @@ void noEffects(Engine& e)
 
 /**
  * @brief Every effect off, and a short envelope: what is heard is the voice and then only what a test opens.
- * @param e  the engine (before or after prepare)
+ * @param[in,out] e  the engine (before or after prepare)
  */
 void quietEffects(Engine& e)
 {
@@ -144,11 +151,11 @@ void quietEffects(Engine& e)
 
 /**
  * @brief The level of one frequency in a stretch of the mono sum (a Goertzel filter under a Hann window).
- * @param lr    interleaved stereo
- * @param from  first frame
- * @param to    one past the last frame
- * @param hz    the frequency
- * @return      its level in dB (relative; only differences mean anything)
+ * @param[in] lr    interleaved stereo
+ * @param[in] from  first frame
+ * @param[in] to    one past the last frame
+ * @param[in] hz    the frequency
+ * @return its level in dB (relative; only differences mean anything)
  */
 double toneDb(const std::vector<float>& lr, size_t from, size_t to, double hz)
 {
@@ -167,12 +174,12 @@ double toneDb(const std::vector<float>& lr, size_t from, size_t to, double hz)
 
 /**
  * @brief One frequency in one channel of a stretch, as a complex value (Goertzel under a Hann window).
- * @param lr       interleaved stereo
- * @param from     first frame
- * @param to       one past the last frame
- * @param hz       the frequency
- * @param channel  0 left, 1 right
- * @return         its complex amplitude (relative; the phase and the ratio between channels mean something)
+ * @param[in] lr       interleaved stereo
+ * @param[in] from     first frame
+ * @param[in] to       one past the last frame
+ * @param[in] hz       the frequency
+ * @param[in] channel  0 left, 1 right
+ * @return its complex amplitude (relative; the phase and the ratio between channels mean something)
  */
 std::complex<double> toneAt(const std::vector<float>& lr, size_t from, size_t to, double hz, int channel)
 {
@@ -188,8 +195,8 @@ std::complex<double> toneAt(const std::vector<float>& lr, size_t from, size_t to
 
 /**
  * @brief The frequencies of the sounding voices, lowest first.
- * @param e  the engine
- * @return   Hz of each voice that sounds
+ * @param[in] e  the engine
+ * @return Hz of each voice that sounds
  */
 std::vector<double> soundingAll(const Engine& e)
 {
@@ -202,8 +209,8 @@ std::vector<double> soundingAll(const Engine& e)
 
 /**
  * @brief The frequency of the first sounding voice.
- * @param e  the engine
- * @return   Hz, 0 when none sounds
+ * @param[in] e  the engine
+ * @return Hz, 0 when none sounds
  */
 double soundingHz(const Engine& e)
 {

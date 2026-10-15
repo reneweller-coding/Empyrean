@@ -1,6 +1,7 @@
 /**
  * @file Shapes.h
  * @brief The factory bank of envelope shapes: what the lanes of a CloudVoice share among their partials.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -26,17 +27,21 @@ enum FactoryShapeE : int {
 
 /**
  * @brief A shape from its points.
- * @param points     the breakpoints (at most EnvPoints are taken)
- * @param loopStart  first point of the loop, -1 = none
- * @param loopEnd    last point of the loop
- * @return           the shape
+ * @param[in] points     the breakpoints (at most EnvPoints are taken)
+ * @param[in] loopStart  first point of the loop, -1 = none
+ * @param[in] loopEnd    last point of the loop
+ * @return the shape
  */
 EnvShape makeShape(std::initializer_list<EnvPoint> points, int loopStart, int loopEnd);
 
 /** @brief The factory bank, in FactoryShape order. @return FACTORY_SHAPE_COUNT shapes */
 std::vector<EnvShape> factoryShapes();
 
-/** @brief A factory shape's name. @param i its FactoryShape @return the name ("?" outside the bank) */
+/**
+ * @brief A factory shape's name.
+ * @param[in] i  its FactoryShape
+ * @return the name ("?" outside the bank)
+ */
 const char* factoryShapeName(int i);
 
 } // namespace additiv

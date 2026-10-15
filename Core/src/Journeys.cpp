@@ -1,6 +1,7 @@
 /**
  * @file Journeys.cpp
  * @brief The journeys the instrument comes with (Journey.h); the table itself is generated (Journeys.inc).
+ * @author Rene Weller
  */
 #include "additiv/Journey.h"
 

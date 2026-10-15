@@ -1,6 +1,7 @@
 /**
  * @file MatrixView.cpp
  * @brief The modulation matrix on the panel (MatrixView.h).
+ * @author Rene Weller
  */
 #include "MatrixView.h"
 

@@ -5,6 +5,7 @@
  *        light at its plane (as Breath lets it wander, leaving a trail), across from its pitch (low
  *        notes to the left, high to the right), as large as it is loud, in the colour of whose note it
  *        is. The conductor's depth and the played notes' depth are rings to drag.
+ * @author Rene Weller
  */
 #pragma once
 
@@ -17,15 +18,30 @@
 /** @brief The space from above (see the file comment). */
 class SpaceView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The voices of @p proc. @param proc the processor */
+    /**
+     * @brief The voices of @p proc.
+     * @param[in,out] proc  the processor
+     */
     explicit SpaceView(AdditivProcessor& proc);
-    /** @brief The half disc, the planes, the voices and their trails, the two depths. */
+    /**
+     * @brief The half disc, the planes, the voices and their trails, the two depths.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief Takes a depth's ring. @param e the click */
+    /**
+     * @brief Takes a depth's ring.
+     * @param[in] e  the click
+     */
     void mouseDown(const juce::MouseEvent& e) override;
-    /** @brief Moves the ring taken. @param e the drag */
+    /**
+     * @brief Moves the ring taken.
+     * @param[in] e  the drag
+     */
     void mouseDrag(const juce::MouseEvent& e) override;
-    /** @brief Lets go of it. @param e the release */
+    /**
+     * @brief Lets go of it.
+     * @param[in] e  the release
+     */
     void mouseUp(const juce::MouseEvent& e) override;
     /** @brief What it shows, in words. @return the text */
     juce::String describe() const;
@@ -37,9 +53,17 @@ private:
     juce::Point<float> ear() const;
     /** @brief The half disc's radius. @return pixels */
     float radius() const;
-    /** @brief A plane's radius from you: the ear's head room, then the planes out to the rim. @param depth 0 .. 1 @return pixels */
+    /**
+     * @brief A plane's radius from you: the ear's head room, then the planes out to the rim.
+     * @param[in] depth  0 .. 1
+     * @return pixels
+     */
     float planeRadius(float depth) const;
-    /** @brief The depth at a distance from you. @param r pixels @return 0 .. 1 */
+    /**
+     * @brief The depth at a distance from you.
+     * @param[in] r  pixels
+     * @return 0 .. 1
+     */
     float depthAt(float r) const;
 
     static constexpr int Trail = 24;   ///< positions a voice's trail keeps (about three seconds)
@@ -57,12 +81,16 @@ class SpacePage final : public juce::Component {
 public:
     /**
      * @brief Builds the page.
-     * @param proc     the processor
-     * @param actions  the controls' right-click menu
-     * @param live     the live rings
+     * @param[in,out] proc     the processor
+     * @param[in]     actions  the controls' right-click menu
+     * @param[in,out] live     the live rings
      */
     SpacePage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live);
-    /** @brief The height the page needs at a width. @param w pixels @return pixels */
+    /**
+     * @brief The height the page needs at a width.
+     * @param[in] w  pixels
+     * @return pixels
+     */
     int heightFor(int w) const;
     /** @brief The knobs at the top, the space below. */
     void resized() override;

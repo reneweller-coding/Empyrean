@@ -1,6 +1,7 @@
 /**
  * @file PageStrip.cpp
  * @brief The pages' strip (PageStrip.h).
+ * @author Rene Weller
  */
 #include "PageStrip.h"
 

@@ -1,6 +1,7 @@
 /**
  * @file Shapes.cpp
  * @brief The factory bank of envelope shapes.
+ * @author Rene Weller
  */
 #include "additiv/Shapes.h"
 

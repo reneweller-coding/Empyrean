@@ -2,6 +2,7 @@
  * @file MatrixView.h
  * @brief The modulation matrix on the panel: sixteen rows of source, target and depth, written
  *        straight into the engine (the rows are data, not host parameters -- Modulation.h).
+ * @author Rene Weller
  */
 #pragma once
 
@@ -13,13 +14,23 @@
 /** @brief The matrix's rows (see the file comment). */
 class MatrixView final : public juce::Component, private juce::Timer {
 public:
-    /** @brief The rows of @p proc's engine. @param proc the processor */
+    /**
+     * @brief The rows of @p proc's engine.
+     * @param[in,out] proc  the processor
+     */
     explicit MatrixView(AdditivProcessor& proc);
     /** @brief One column of sixteen rows where it is high enough (heightFor(1)), else two of eight. */
     void resized() override;
-    /** @brief The rows' numbers and the column heads. */
+    /**
+     * @brief The rows' numbers and the column heads.
+     * @param[in,out] g  the graphics context
+     */
     void paint(juce::Graphics& g) override;
-    /** @brief The height the rows need in one or two columns. @param columns 1 or 2 @return pixels */
+    /**
+     * @brief The height the rows need in one or two columns.
+     * @param[in] columns  1 or 2
+     * @return pixels
+     */
     static int heightFor(int columns) { return columns == 1 ? 28 + additiv::ModRows * 28 + 4 : 28 + additiv::ModRows / 2 * 30; }
     /** @brief The rows in words, for the help. @return the text */
     juce::String describe() const;
@@ -36,7 +47,10 @@ private:
     };
     /** @brief Reads the engine's rows into the controls (a preset or a state may have changed them). */
     void timerCallback() override;
-    /** @brief Writes one row's controls into the engine. @param i the row */
+    /**
+     * @brief Writes one row's controls into the engine.
+     * @param[in] i  the row
+     */
     void push(int i);
 
     AdditivProcessor& m_proc;                       ///< whose engine
