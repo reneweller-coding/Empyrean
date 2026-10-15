@@ -12,10 +12,12 @@
 
 #include "additiv/Cloud.h"
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief The motions, in the order of MotionNames (Params.h). */
-enum class MotionKindE : int {
+enum class MotionKindE : int
+{
     NONE = 0,    ///< the cloud alone
     RANDOM,      ///< every partial for itself: random shape, rate and phase (it averages out: a fine glitter)
     WAVE,        ///< a wave climbing through the spectrum; the attack sweeps upwards
@@ -30,7 +32,10 @@ enum class MotionKindE : int {
  * @param[in] kind  the motion
  * @return true for Aurora
  */
-inline bool motionUsesLandscape(MotionKindE kind) { return kind == MotionKindE::AURORA; }
+inline bool motionUsesLandscape( MotionKindE kind )
+{
+    return kind == MotionKindE::AURORA;
+}
 
 /**
  * @brief Sets a voice's three lanes to a motion, scaled by rate and depth; the other fields stay.
@@ -39,6 +44,6 @@ inline bool motionUsesLandscape(MotionKindE kind) { return kind == MotionKindE::
  * @param[in]     rate   times the motion's own speed (0.1 .. 4)
  * @param[in]     depth  times the motion's own depth (0 .. 1); 0 leaves the cloud bare
  */
-void applyMotion(MotionKindE kind, CloudVoice& v, float rate, float depth);
+void applyMotion( MotionKindE kind, CloudVoice &v, float rate, float depth );
 
-} // namespace additiv
+}   // namespace additiv

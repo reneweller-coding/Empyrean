@@ -28,10 +28,12 @@
 #include <array>
 #include <cstdint>
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief The measures a nudge moves (and the level, which it holds). */
-enum class MeasureE : int {
+enum class MeasureE : int
+{
     BRIGHTNESS = 0,   ///< the spectral centroid, octaves
     MOTION,           ///< how much the spectrum changes
     WIDTH,            ///< 1 - the correlation of left and right
@@ -39,17 +41,17 @@ enum class MeasureE : int {
     LEVEL,            ///< dBFS of the loudest second
     COUNT             ///< number of measures
 };
-constexpr int NumMeasures = static_cast<int>(MeasureE::COUNT);   ///< entries of Measure
-constexpr int NudgeAxes = 4;                                    ///< the measures a nudge moves (all but the level)
-extern const char* const NudgeLow[NudgeAxes];                  ///< "Darker", "Calmer", "Narrower", "Purer"
-extern const char* const NudgeHigh[NudgeAxes];                 ///< "Brighter", "Livelier", "Wider", "Airier"
+constexpr int            NumMeasures = static_cast<int>( MeasureE::COUNT );   ///< entries of Measure
+constexpr int            NudgeAxes = 4;          ///< the measures a nudge moves (all but the level)
+extern const char *const NudgeLow[NudgeAxes];    ///< "Darker", "Calmer", "Narrower", "Purer"
+extern const char *const NudgeHigh[NudgeAxes];   ///< "Brighter", "Livelier", "Wider", "Airier"
 
 /**
  * @brief The knobs that shape the sound: those measured, those a variation moves.
  * @param[out] count  receives how many
  * @return them
  */
-const ParamIdE* shapingParams(int& count);
+const ParamIdE *shapingParams( int &count );
 
 /**
  * @brief Whether a knob is heard in a sound: its group's gate is open (the air's level for the air's
@@ -59,7 +61,7 @@ const ParamIdE* shapingParams(int& count);
  * @param[in] values  the sound's knobs, NumParams values
  * @return true when moving it can be heard
  */
-bool paramHeard(ParamIdE id, const float* values);
+bool paramHeard( ParamIdE id, const float *values );
 
 /**
  * @brief A knob's measured sensitivity: per measure the change for its whole travel (Measure order),
@@ -68,14 +70,14 @@ bool paramHeard(ParamIdE id, const float* values);
  * @param[out] out  receives NumMeasures values; all nought for a knob not measured
  * @return false for a knob not measured
  */
-bool sensitivity(ParamIdE id, float* out);
+bool sensitivity( ParamIdE id, float *out );
 
 /**
  * @brief A measure's spread over the bank (one standard deviation): how much is "much".
  * @param[in] m  the measure
  * @return it
  */
-float measureSpread(MeasureE m);
+float measureSpread( MeasureE m );
 
 /**
  * @brief A nudge: the few heard knobs that move the measure most specifically, a little (see the file comment).
@@ -86,7 +88,7 @@ float measureSpread(MeasureE m);
  * @param[out] out     receives the knobs after it (NumParams values; untouched knobs as they were)
  * @return the predicted change of the measure, in spreads (less than asked when knobs hit their ends)
  */
-float nudge(const float* values, int axis, float sign, float size, float* out);
+float nudge( const float *values, int axis, float sign, float size, float *out );
 
 /**
  * @brief The focus: the heard knobs that do the most for this sound, most first -- by their summed
@@ -96,7 +98,7 @@ float nudge(const float* values, int axis, float sign, float size, float* out);
  * @param[in]  n       how many at most
  * @return how many it wrote
  */
-int focusParams(const float* values, ParamIdE* out, int n);
+int focusParams( const float *values, ParamIdE *out, int n );
 
 /**
  * @brief A variation: a few heard shaping knobs (four to eight; none that is an amount at nothing) moved at random, the larger moves on
@@ -106,7 +108,7 @@ int focusParams(const float* values, ParamIdE* out, int n);
  * @param[in]  seed    the dice
  * @param[out] out     receives the knobs after it
  */
-void vary(const float* values, float far, std::uint64_t seed, float* out);
+void vary( const float *values, float far, std::uint64_t seed, float *out );
 
 constexpr int LessonPlaces = 4;   ///< places a taught macro may hold
 
@@ -117,23 +119,25 @@ constexpr int LessonPlaces = 4;   ///< places a taught macro may hold
  *        like a matrix row (Engine::setMacroLesson) -- relative, so a lesson carries over to the next
  *        preset as a gesture: "this much brighter and slower".
  */
-struct MacroLesson {
-    int m_count = 0;                                            ///< places, 0 .. LessonPlaces (fewer than two: it does nothing)
-    float m_pos[LessonPlaces] = {};                            ///< the macro's value at each place, ascending
-    std::array<float, NumParams> m_delta[LessonPlaces] = {};  ///< per place, per knob the offset in its normalised travel
+struct MacroLesson
+{
+    int   m_count = 0;                ///< places, 0 .. LessonPlaces (fewer than two: it does nothing)
+    float m_pos[LessonPlaces] = {};   ///< the macro's value at each place, ascending
+    std::array<float, NumParams>
+        m_delta[LessonPlaces] = {};   ///< per place, per knob the offset in its normalised travel
     /**
      * @brief The offsets at a macro value, added.
      * @param[in]     at       the macro's value
      * @param[in,out] offset   NumParams offsets, added to
      * @param[in,out] touched  NumParams flags, set where it adds (may be null)
      */
-    void apply(float at, float* offset, bool* touched) const;
+    void apply( float at, float *offset, bool *touched ) const;
     /**
      * @brief A place set (one within 0.02 of it replaced; with all places taken, the nearest).
      * @param[in] at     the macro's value
      * @param[in] delta  NumParams offsets
      */
-    void set(float at, const float* delta);
+    void set( float at, const float *delta );
     /** @brief The knobs it moves anywhere. @return how many */
     int knobs() const;
 };
@@ -144,6 +148,6 @@ struct MacroLesson {
  * @param[in] id  the knob
  * @return true then
  */
-bool teachable(ParamIdE id);
+bool teachable( ParamIdE id );
 
-} // namespace additiv
+}   // namespace additiv

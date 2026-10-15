@@ -12,7 +12,8 @@
 #include <filesystem>
 #include <string>
 
-namespace additiv {
+namespace additiv
+{
 
 /**
  * @brief The presets nearest a description, nearest first.
@@ -22,7 +23,7 @@ namespace additiv {
  * @param[out] distance  receives each one's distance (in spreads), when not null
  * @return how many it wrote
  */
-int findLike(const Description& d, int* out, int n, float* distance = nullptr);
+int findLike( const Description &d, int *out, int n, float *distance = nullptr );
 
 /**
  * @brief A preset's measured traits, as the search compares them: brightness, motion, width and noise,
@@ -31,7 +32,7 @@ int findLike(const Description& d, int* out, int n, float* distance = nullptr);
  * @param[out] out    receives four values
  * @return false for an index the table does not hold
  */
-bool presetFeatures(int index, float* out);
+bool presetFeatures( int index, float *out );
 
 /**
  * @brief A recording (WAV or FLAC) described: at most two minutes from its middle, left and right
@@ -42,6 +43,6 @@ bool presetFeatures(int index, float* out);
  * @param[out] error    receives the reason when it fails
  * @return true when read and long enough (a second at least)
  */
-bool describeFile(const std::filesystem::path& path, Description& out, double* seconds, std::string* error);
+bool describeFile( const std::filesystem::path &path, Description &out, double *seconds, std::string *error );
 
-} // namespace additiv
+}   // namespace additiv

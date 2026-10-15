@@ -16,23 +16,27 @@
 
 #include <string>
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief One factory preset. */
-struct Preset {
-    const char* m_name;      ///< its name
-    int m_group;             ///< its group, 0 .. NumPresetGroups-1
-    const char* m_params;    ///< what it changes: "key=value key=value ..."
-    const char* m_mod;       ///< its matrix (Modulation.h text form)
+struct Preset
+{
+    const char *m_name;     ///< its name
+    int         m_group;    ///< its group, 0 .. NumPresetGroups-1
+    const char *m_params;   ///< what it changes: "key=value key=value ..."
+    const char *m_mod;      ///< its matrix (Modulation.h text form)
 };
 
-constexpr int NumPresetGroups = 96;                              ///< groups of the bank
-constexpr int NumSoundGroups = 16;                               ///< the first groups, the sounds
-constexpr int FirstSleepGroup = 32;                              ///< the first of the sleep concerts (the living systems lie between)
-constexpr int FirstVisionGroup = 48;                             ///< the first of the visions (animated pictures, comb, stretch, shift)
-constexpr int FirstSwarmGroup = 64;                              ///< the first of the swarms and currents (Phase 16: swarms, chimeras, Fluid, Islands, turbulence, MPE)
-constexpr int FirstHallGroup = 80;                               ///< the first of the halls and orbits (Phase 17: the growing hall, the partials' own time, the ripple's bend, Orbit)
-extern const char* const PresetGroupNames[NumPresetGroups];      ///< "Sleep Concert", "Choirs", ...
+constexpr int NumPresetGroups = 96;    ///< groups of the bank
+constexpr int NumSoundGroups = 16;     ///< the first groups, the sounds
+constexpr int FirstSleepGroup = 32;    ///< the first of the sleep concerts (the living systems lie between)
+constexpr int FirstVisionGroup = 48;   ///< the first of the visions (animated pictures, comb, stretch, shift)
+constexpr int FirstSwarmGroup =
+    64;   ///< the first of the swarms and currents (Phase 16: swarms, chimeras, Fluid, Islands, turbulence, MPE)
+constexpr int FirstHallGroup =
+    80;   ///< the first of the halls and orbits (Phase 17: the growing hall, the partials' own time, the ripple's bend, Orbit)
+extern const char *const PresetGroupNames[NumPresetGroups];   ///< "Sleep Concert", "Choirs", ...
 
 /** @brief How many presets there are. @return the count */
 int numPresets();
@@ -42,7 +46,7 @@ int numPresets();
  * @param[in] i  0 .. numPresets()-1 (clamped)
  * @return the preset
  */
-const Preset& preset(int i);
+const Preset &preset( int i );
 
 /**
  * @brief Every parameter's value under a preset: the defaults, then what the preset names.
@@ -51,7 +55,7 @@ const Preset& preset(int i);
  * @param[out] modText  receives its matrix (may be null)
  * @return how many of the preset's entries named a known parameter
  */
-int presetValues(int i, float* values, std::string* modText);
+int presetValues( int i, float *values, std::string *modText );
 
 /**
  * @brief Whether a parameter belongs to the listener rather than to the sound: loading a preset
@@ -60,21 +64,21 @@ int presetValues(int i, float* values, std::string* modText);
  * @param[in] id  the parameter
  * @return true when a preset does not set it
  */
-bool keptByPresets(ParamIdE id);
+bool keptByPresets( ParamIdE id );
 
 /**
  * @brief A preset's index within its group (for program change: bank = group, program = this).
  * @param[in] i  the preset
  * @return 0 ..
  */
-int presetIndexInGroup(int i);
+int presetIndexInGroup( int i );
 
 /**
  * @brief A preset by its name.
  * @param[in] name  as the bank spells it
  * @return its index, -1 when there is none
  */
-int findPreset(const char* name);
+int findPreset( const char *name );
 
 /**
  * @brief The preset at a group and an index in it.
@@ -82,6 +86,6 @@ int findPreset(const char* name);
  * @param[in] index  the index
  * @return the preset, -1 when there is none
  */
-int presetAt(int group, int index);
+int presetAt( int group, int index );
 
-} // namespace additiv
+}   // namespace additiv

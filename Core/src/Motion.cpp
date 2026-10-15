@@ -7,16 +7,17 @@
 
 #include "additiv/Shapes.h"
 
-namespace additiv {
+namespace additiv
+{
 
-void applyMotion(MotionKindE kind, CloudVoice& v, float rate, float depth)
+void applyMotion( MotionKindE kind, CloudVoice &v, float rate, float depth )
 {
     v.m_amp = EnvLane{};
     v.m_pitch = EnvLane{};
     v.m_pan = EnvLane{};
-    switch (kind) {
-    case MotionKindE::NONE:
-        break;
+    switch ( kind )
+    {
+    case MotionKindE::NONE: break;
     case MotionKindE::RANDOM:
         v.m_amp.m_amount = 1.0f;
         v.m_amp.m_shape = SWELL;
@@ -75,10 +76,11 @@ void applyMotion(MotionKindE kind, CloudVoice& v, float rate, float depth)
         v.m_amp.m_landscape = 1;
         break;
     }
-    for (EnvLane* lane : { &v.m_amp, &v.m_pitch, &v.m_pan }) {
+    for ( EnvLane *lane : { &v.m_amp, &v.m_pitch, &v.m_pan } )
+    {
         lane->m_rate *= rate;
         lane->m_amount *= depth;
     }
 }
 
-} // namespace additiv
+}   // namespace additiv

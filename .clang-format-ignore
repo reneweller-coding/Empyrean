@@ -1,0 +1,12 @@
+# Files clang-format leaves alone: the generated ones (their layout is their generator's, Tools/...).
+# Third-party code is not formatted either (ThirdParty/, Tests/neonshim).
+Core/src/Find.inc
+Core/src/HarmonicEntropy.inc
+Core/src/Journeys.inc
+Core/src/Nudges.inc
+Core/src/PresetMap.inc
+Core/src/Presets.inc
+Core/src/Routes.inc
+ThirdParty/**
+Tests/neonshim/**
+Tests/neonbench/**

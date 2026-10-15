@@ -18,15 +18,18 @@
 #pragma once
 #include <cstddef>
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief Fixed-size scale so it can be swapped into the audio thread without allocation. */
-struct FixedScale {
-    static constexpr int Max = 64;   ///< the most degrees a scale may hold (Scala files with more are refused)
-    int    m_count  = 12;        ///< degrees per period (octave), excluding the period itself
-    double m_period = 2.0;       ///< ratio of the repeating interval (2 = octave, 3 = tritave)
-    double m_ratios[Max] = {};  ///< ratios[0] == 1.0, ascending, all < period
-    char   m_name[64] = "";      ///< display name, NUL-terminated: the built-in table's, or the Scala file's description line
+struct FixedScale
+{
+    static constexpr int Max = 64;         ///< the most degrees a scale may hold (Scala files with more are refused)
+    int                  m_count = 12;     ///< degrees per period (octave), excluding the period itself
+    double               m_period = 2.0;   ///< ratio of the repeating interval (2 = octave, 3 = tritave)
+    double               m_ratios[Max] = {};   ///< ratios[0] == 1.0, ascending, all < period
+    char                 m_name[64] =
+        "";   ///< display name, NUL-terminated: the built-in table's, or the Scala file's description line
 };
 
 /**
@@ -40,7 +43,7 @@ struct FixedScale {
  * @return true when @p out was filled
  * @pre called on the message thread
  */
-bool makeBuiltinScale(int index, FixedScale& out);
+bool makeBuiltinScale( int index, FixedScale &out );
 
 /**
  * @brief Parse the text of a Scala .scl file. Returns false on malformed input.
@@ -54,7 +57,7 @@ bool makeBuiltinScale(int index, FixedScale& out);
  * @param[out] out   receives the scale (name "Scala" when the description line is empty)
  * @return true when @p out holds a valid scale with 1 .. Max degrees and a period above 1
  */
-bool parseScala(const char* text, FixedScale& out);
+bool parseScala( const char *text, FixedScale &out );
 
 /**
  * @brief Frequency of a MIDI note. `rootNote` (MIDI number) sounds ratios[0] at the
@@ -75,7 +78,7 @@ bool parseScala(const char* text, FixedScale& out);
  * @param[in] snapToKeys  the key mapping, see above
  * @return the frequency in Hz
  */
-double scaleFrequency(const FixedScale& s, int midiNote, int rootNote, double refA4, bool snapToKeys = true);
+double scaleFrequency( const FixedScale &s, int midiNote, int rootNote, double refA4, bool snapToKeys = true );
 
 /**
  * @brief Interval consonance in [0,1]: 1 for a unison/octave, falling with how ambiguous the
@@ -90,6 +93,6 @@ double scaleFrequency(const FixedScale& s, int midiNote, int rootNote, double re
  * @param[in] ratio  frequency ratio of the two tones, any positive value (0 or less gives 0)
  * @return the consonance, 0.05 .. 1
  */
-double intervalConsonance(double ratio);
+double intervalConsonance( double ratio );
 
-} // namespace additiv
+}   // namespace additiv

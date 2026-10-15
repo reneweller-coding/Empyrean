@@ -37,35 +37,45 @@
 #include "additiv/Modulation.h"
 #include "additiv/Params.h"
 
-namespace additiv {
+namespace additiv
+{
 
-constexpr int MorphRows = 64;     ///< weighted matrix rows a sound can hold (a blend of blends merges and, past this, drops the weakest)
-constexpr int MorphSetups = 16;   ///< sounds' own modulators a blend can hold (a seventh sound's rows share the first's)
-constexpr int MorphGates = 3;     ///< the choices with an amount that have a gate: the motion, the living landscape, the field
+constexpr int MorphRows =
+    64;   ///< weighted matrix rows a sound can hold (a blend of blends merges and, past this, drops the weakest)
+constexpr int MorphSetups =
+    16;   ///< sounds' own modulators a blend can hold (a seventh sound's rows share the first's)
+constexpr int MorphGates =
+    3;   ///< the choices with an amount that have a gate: the motion, the living landscape, the field
 constexpr int MorphFilters = 9;   ///< the voice filters a sound can hold: one a model, Off included
 
 /** @brief One of a sound's voice filters, and its weight in the sound. */
-struct MorphFilter {
-    int m_model = 0;            ///< FilterModel
+struct MorphFilter
+{
+    int   m_model = 0;          ///< FilterModel
     float m_cutoff = 1000.0f;   ///< Hz: of the blended ones of this model, the weighted mean in the knob's domain
     float m_resonance = 0.0f;   ///< 0 .. 1, likewise
     float m_weight = 0.0f;      ///< 0 .. 1: its share of the sound (the shares add up to 1)
 };
 
 /** @brief The amounts the gates multiply, in gate order (the filter's is filterMix). */
-constexpr ParamIdE GatedAmounts[MorphGates] = { ParamIdE::MOTION_DEPTH, ParamIdE::LIFE_DEPTH, ParamIdE::FIELD_STRENGTH };
+constexpr ParamIdE GatedAmounts[MorphGates] = { ParamIdE::MOTION_DEPTH, ParamIdE::LIFE_DEPTH,
+                                                ParamIdE::FIELD_STRENGTH };
 
 /** @brief A sound as the engine plays it before the matrix: every parameter, the filter's share and the weighted rows. */
-struct MorphState {
-    float m_values[NumParams] = {};   ///< every parameter, in its own units
-    float m_filterMix = 1.0f;          ///< 0 .. 1: the share of the filters that are not Off (for the panel)
-    int m_filterCount = 0;             ///< voice filters in the list
-    MorphFilter m_filters[MorphFilters];   ///< the voice filters with their weights (the knobs show the heaviest that is not Off)
-    float m_gate[MorphGates] = { 1.0f, 1.0f, 1.0f };   ///< 0 .. 1: each gated amount, the matrix's push included, is multiplied by this (0 where its kind changes)
-    int m_setupCount = 0;              ///< setups in use
+struct MorphState
+{
+    float       m_values[NumParams] = {};   ///< every parameter, in its own units
+    float       m_filterMix = 1.0f;         ///< 0 .. 1: the share of the filters that are not Off (for the panel)
+    int         m_filterCount = 0;          ///< voice filters in the list
+    MorphFilter m_filters
+        [MorphFilters];   ///< the voice filters with their weights (the knobs show the heaviest that is not Off)
+    float m_gate[MorphGates] = {
+        1.0f, 1.0f, 1.0f
+    };   ///< 0 .. 1: each gated amount, the matrix's push included, is multiplied by this (0 where its kind changes)
+    int      m_setupCount = 0;        ///< setups in use
     ModSetup m_setups[MorphSetups];   ///< the LFOs and envelopes of the sounds in it
-    int m_rowCount = 0;                ///< rows in use
-    ModRow m_rows[MorphRows];         ///< the matrix, each depth already weighted, each with its setup
+    int      m_rowCount = 0;          ///< rows in use
+    ModRow   m_rows[MorphRows];       ///< the matrix, each depth already weighted, each with its setup
 
     /**
      * @brief Takes parameters and plain rows as they stand: the filter at full share.
@@ -73,7 +83,7 @@ struct MorphState {
      * @param[in] r      the rows (rows with no source, no target or no depth are left out)
      * @param[in] count  how many
      */
-    void set(const float* v, const ModRow* r, int count);
+    void set( const float *v, const ModRow *r, int count );
 };
 
 /**
@@ -83,7 +93,7 @@ struct MorphState {
  * @param[in]  w    0 .. 1 (clamped)
  * @param[out] out  receives the blend; must not be a or b
  */
-void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& out);
+void blendMorph( const MorphState &a, const MorphState &b, float w, MorphState &out );
 
 /**
  * @brief One step of following a sound that moves (the map's cursor): every number a share `coef`
@@ -96,17 +106,17 @@ void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& o
  * @param[in]  coef    0 .. 1: the share of the way this step
  * @param[out] out     receives the step; must not be cur or target
  */
-void approachMorph(const MorphState& cur, const MorphState& target, float coef, MorphState& out);
+void approachMorph( const MorphState &cur, const MorphState &target, float coef, MorphState &out );
 
 /**
  * @brief The glide's shape over time: smoothstep, so a glide leaves and arrives gently.
  * @param[in] t  0 .. 1 of the glide's time
  * @return 0 .. 1 of the way
  */
-inline float morphCurve(float t)
+inline float morphCurve( float t )
 {
-    const float x = t < 0.0f ? 0.0f : (t > 1.0f ? 1.0f : t);
-    return x * x * (3.0f - 2.0f * x);
+    const float x = t < 0.0f ? 0.0f : ( t > 1.0f ? 1.0f : t );
+    return x * x * ( 3.0f - 2.0f * x );
 }
 
-} // namespace additiv
+}   // namespace additiv

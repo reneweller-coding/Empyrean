@@ -7,23 +7,28 @@
 
 #include <cstring>
 
-namespace {
+namespace
+{
 
 /** @brief A parameter's key and its sentence. */
-struct Info {
-    const char* m_key;    ///< the key
-    const char* m_text;   ///< the sentence
+struct Info
+{
+    const char *m_key;    ///< the key
+    const char *m_text;   ///< the sentence
 };
 
 /** @brief Every parameter's sentence, in the table's order. */
 const Info InfoTable[] = {
-    { "master_gain", "The instrument's level after everything; a preset sets it so that the bank sounds equally loud." },
+    { "master_gain",
+      "The instrument's level after everything; a preset sets it so that the bank sounds equally loud." },
     { "partials", "How many sine waves make each voice: its harmonics' clouds share them (20000 is the full cloud)." },
     { "tilt", "How fast the upper harmonics fall away: higher is darker and rounder, lower brighter and thinner." },
     { "brightness", "A window over the harmonics: lower closes it from the top, leaving the lower ones." },
-    { "odd_even", "Thins the even harmonics (positive, hollow like a clarinet) or the odd ones above the first (negative)." },
+    { "odd_even",
+      "Thins the even harmonics (positive, hollow like a clarinet) or the odd ones above the first (negative)." },
     { "inharmonic", "Stretches the harmonics apart as a stiff string or a bell does: from pure to metallic." },
-    { "cloud_width", "How wide each harmonic's cloud of detuned sines is, in cents: from a pure tone to a chorus of thousands." },
+    { "cloud_width",
+      "How wide each harmonic's cloud of detuned sines is, in cents: from a pure tone to a chorus of thousands." },
     { "width_slope", "How much wider the clouds of the upper harmonics are than those of the lower." },
     { "drift", "How far every partial wanders in pitch, slowly, each on its own." },
     { "drift_rate", "How fast the partials wander in pitch." },
@@ -34,13 +39,15 @@ const Info InfoTable[] = {
     { "air_center", "Where the air's band stands, in multiples of the fundamental." },
     { "air_width", "How wide the air's band is, in cents." },
     { "air_jitter", "How fast the air's partials quiver: fast enough, and they are heard as noise." },
-    { "filter_model", "The filter, read at every partial: low pass, high pass, band pass, notch, peak or vowel formant." },
+    { "filter_model",
+      "The filter, read at every partial: low pass, high pass, band pass, notch, peak or vowel formant." },
     { "cutoff", "Where the filter cuts (or the vowel, for Formant)." },
     { "resonance", "How much the filter rings at its cutoff (Peak: the bell's height)." },
     { "filter_env", "How far each note's envelope moves the cutoff, in octaves, up or down." },
     { "keytrack", "How much the cutoff follows the note: 1 moves it with every semitone." },
     { "filter_drift", "Lets the cutoff wander on its own, slowly." },
-    { "motion", "How every partial's own envelopes move: random glitter, a wave, a pendulum, breathing, glissandi, or the landscape (Aurora)." },
+    { "motion",
+      "How every partial's own envelopes move: random glitter, a wave, a pendulum, breathing, glissandi, or the landscape (Aurora)." },
     { "motion_rate", "How fast the motion moves." },
     { "motion_depth", "How far the motion moves the partials: 0 leaves the bare cloud." },
     { "landscape", "The picture of time against frequency the Aurora motion reads: each partial its column." },
@@ -48,11 +55,13 @@ const Info InfoTable[] = {
     { "decay", "How long it takes to fall to its sustain." },
     { "sustain", "The level a held note keeps." },
     { "release", "How long a note takes to fade once let go." },
-    { "scale", "The tuning: equal temperament, just scales, the harmonic series, slendro, Bohlen-Pierce, or the one the spectrum asks for (Timbre)." },
+    { "scale",
+      "The tuning: equal temperament, just scales, the harmonic series, slendro, Bohlen-Pierce, or the one the spectrum asks for (Timbre)." },
     { "root", "The scale's tonic." },
     { "keymap", "How the keyboard maps: twelve keys an octave, or one key per degree of the scale." },
     { "ref_pitch", "The pitch of A4, in hertz." },
-    { "purity", "Between equal temperament (0) and the pure scale (1); higher also narrows the clouds so that pure intervals lock." },
+    { "purity",
+      "Between equal temperament (0) and the pure scale (1); higher also narrows the clouds so that pure intervals lock." },
     { "tide", "Leans the whole instrument's pitch by a few cents on a slow curve." },
     { "tide_period", "How long the tide takes, in minutes." },
     { "brain_on", "The conductor plays by itself (Space in the standalone)." },
@@ -64,7 +73,8 @@ const Info InfoTable[] = {
     { "brain_hold_max", "The longest a note is held." },
     { "brain_low", "The conductor's lowest note (drag the bracket over the keys on this page)." },
     { "brain_high", "The conductor's highest note." },
-    { "brain_foundation", "A voice on the conductor's root in the octave from C2 up, held while the root stands, the chord over it; its level (0: none)." },
+    { "brain_foundation",
+      "A voice on the conductor's root in the octave from C2 up, held while the root stands, the chord over it; its level (0: none)." },
     { "brain_consonance", "How consonant the conductor's choices are: 0 anything goes, 1 strictly sweet." },
     { "brain_wander", "How far the conductor's register wanders." },
     { "auto_lead", "How far, in semitones, a voice may move when it is exchanged." },
@@ -77,7 +87,8 @@ const Info InfoTable[] = {
     { "brain2_density", "How many notes the second conductor keeps." },
     { "brain2_rate", "How often the second conductor changes a note." },
     { "brain2_depth", "How far back in the space the second conductor's notes stand." },
-    { "depth", "Where the conductor puts its notes between the ear (0) and the far background (1) -- the dashed ring below." },
+    { "depth",
+      "Where the conductor puts its notes between the ear (0) and the far background (1) -- the dashed ring below." },
     { "keys_depth", "Where your played notes stand between the ear and the far background." },
     { "far_level", "How loud the far plane's reverb is." },
     { "far_size", "The far reverb's size." },
@@ -142,14 +153,16 @@ const Info InfoTable[] = {
     { "modal_low", "The hall's lowest mode: below it, nothing rings (drag it in the picture on the Hall page)." },
     { "modal_freeze", "Holds the hall as it is: a chord left hanging in the air." },
     { "modal_breath", "Lets every resonance's decay wander, so the hall's colour moves while it rings." },
-    { "field_mode", "What pulls the partials' pitches: the scale, wandering attractors, a scattering, a flock, or orbits." },
+    { "field_mode",
+      "What pulls the partials' pitches: the scale, wandering attractors, a scattering, a flock, or orbits." },
     { "field_strength", "How strongly the field pulls (Orbit: how deep its wells are)." },
     { "field_radius", "How far the field reaches, in cents (Orbit: the orbits' size)." },
     { "field_spring", "How strongly the partials are drawn back to their own places (Orbit: the damping)." },
     { "field_rate", "How fast the attractors wander (Orbit: the magnetic field, how fast they circle)." },
     { "field_count", "How many attractors the Swarm and Scatter fields have." },
     { "dispersion", "Makes each partial's clock late by its pitch: an attack falls (positive) or rises as a cascade." },
-    { "binaural", "For headphones: every partial at a point of its own round the head. The listener's: presets never switch it." },
+    { "binaural",
+      "For headphones: every partial at a point of its own round the head. The listener's: presets never switch it." },
     { "binaural_span", "From the front half to all round the head." },
     { "binaural_height", "How far the partials rise and fall." },
     { "binaural_orbit", "Turns the whole cloud round the listener." },
@@ -161,7 +174,8 @@ const Info InfoTable[] = {
     { "tune_gravity", "Self-Tune: voices whose harmonics nearly meet pull together until they no longer beat." },
     { "tune_reach", "How near, in cents, two harmonics must be to pull." },
     { "tune_anchor", "Draws every voice back to its pitch in the scale." },
-    { "modal_paint", "Lets the hall be heard through the landscape: its resonances light up where the landscape is bright." },
+    { "modal_paint",
+      "Lets the hall be heard through the landscape: its resonances light up where the landscape is bright." },
     { "spec_mix", "The spectral echo: five hundred bands, each with a delay of its own." },
     { "spec_time", "The spectral echo's time." },
     { "spec_tilt", "Brings the high bands back later than the low ones (or earlier)." },
@@ -175,13 +189,16 @@ const Info InfoTable[] = {
     { "lenia_growth", "The Lenia field's growth: where its creatures thrive." },
     { "chaos_period", "How long the Lorenz and Roessler attractors (modulation sources) take for a turn." },
     { "brain_cascade", "Lets an event of the conductor breed more events (a Hawkes process): bursts and calms." },
-    { "life_mode", "The living landscape: Lenia, Turing, the animated pictures, the Fluid or the Islands -- read by every partial." },
+    { "life_mode",
+      "The living landscape: Lenia, Turing, the animated pictures, the Fluid or the Islands -- read by every partial." },
     { "life_depth", "How far the partials follow the living landscape." },
     { "life_rate", "How fast it lives." },
-    { "life_character", "Its character: Lenia's growth, the Turing field from spots to mazes, the Fluid from syrup to turbulence ..." },
+    { "life_character",
+      "Its character: Lenia's growth, the Turing field from spots to mazes, the Fluid from syrup to turbulence ..." },
     { "life_zoom", "How much of its width the spectrum spans." },
     { "sync_depth", "Every partial a slow oscillator moving its level; this is how far." },
-    { "sync_coupling", "How strongly the partials fall into step: past a point, a harmonic's whole cloud pulses as one." },
+    { "sync_coupling",
+      "How strongly the partials fall into step: past a point, a harmonic's whole cloud pulses as one." },
     { "sync_rate", "How fast the partials' oscillators run." },
     { "sync_spread", "How far their rates scatter." },
     { "ripple_depth", "A string along the spectrum, struck by every note: the partials ride its waves." },
@@ -197,8 +214,10 @@ const Info InfoTable[] = {
     { "morph_active", "The sound is the blend of the morph's slots A and B." },
     { "morph_pos", "Where between slot A and slot B." },
     { "preset_glide", "A preset chosen glides out of the sound before it over this time (0: at once)." },
-    { "stretch", "Spreads every octave of the harmonics to this many cents: with the Timbre scale, a harmony from another world." },
-    { "shift", "Moves every partial by the same number of hertz, as a frequency shifter: metallic, bell-like, beating." },
+    { "stretch",
+      "Spreads every octave of the harmonics to this many cents: with the Timbre scale, a harmony from another world." },
+    { "shift",
+      "Moves every partial by the same number of hertz, as a frequency shifter: metallic, bell-like, beating." },
     { "life_sides", "The animated pictures' mirror wedges, spiral arms or lines." },
     { "life_turn", "How fast the animated pictures turn, in turns a minute." },
     { "comb_depth", "The spectral comb: notches cut into the spectrum, evenly per octave." },
@@ -211,7 +230,8 @@ const Info InfoTable[] = {
     { "map_radius", "How far round the cursor the presets blend, in the spacing of the presets there." },
     { "map_glide", "How fast the sound follows the cursor." },
     { "route_speed", "How fast a route is walked." },
-    { "sync_mode", "How the partials' oscillators couple: all together, as a chimera (order beside disorder), or as a swarm." },
+    { "sync_mode",
+      "How the partials' oscillators couple: all together, as a chimera (order beside disorder), or as a swarm." },
     { "sync_swarm", "Swarm: like phases gather (positive) or part (negative)." },
     { "sync_reach", "Swarm: the circle in pitch and place the partials move on, in cents." },
     { "sync_lag", "Chimera: the lag in the coupling that lets order and disorder live side by side." },
@@ -230,11 +250,11 @@ const Info InfoTable[] = {
     { "brain_light", "The conductors choose notes whose harmonics fall where the landscape is bright." },
 };
 
-} // namespace
+}   // namespace
 
-juce::String paramInfo(const char* key)
+juce::String paramInfo( const char *key )
 {
-    for (const Info& i : InfoTable)
-        if (std::strcmp(i.m_key, key) == 0) return juce::String(i.m_text);
+    for ( const Info &i : InfoTable )
+        if ( std::strcmp( i.m_key, key ) == 0 ) return juce::String( i.m_text );
     return {};
 }

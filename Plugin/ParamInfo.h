@@ -12,4 +12,4 @@
  * @param[in] key  its key (ParamDesc::key)
  * @return the sentence, "" for a key it does not know
  */
-juce::String paramInfo(const char* key);
+juce::String paramInfo( const char *key );

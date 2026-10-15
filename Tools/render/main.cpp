@@ -46,23 +46,26 @@
 namespace fs = std::filesystem;
 using namespace additiv;
 
-namespace {
+namespace
+{
 
 /** @brief The repository root: the first folder above the program that holds CMakeLists.txt and Core. @return the root (the working directory as a fallback) */
 fs::path repoRoot()
 {
     wchar_t buf[MAX_PATH] = {};
-    GetModuleFileNameW(nullptr, buf, MAX_PATH);
-    fs::path p = fs::path(buf).parent_path();
-    for (int up = 0; up < 5 && !p.empty(); ++up) {
-        if (fs::exists(p / "CMakeLists.txt") && fs::exists(p / "Core")) return p;
+    GetModuleFileNameW( nullptr, buf, MAX_PATH );
+    fs::path p = fs::path( buf ).parent_path();
+    for ( int up = 0; up < 5 && !p.empty(); ++up )
+    {
+        if ( fs::exists( p / "CMakeLists.txt" ) && fs::exists( p / "Core" ) ) return p;
         p = p.parent_path();
     }
     return fs::current_path();
 }
 
 /** @brief A 24-bit stereo WAV written as it comes: the header first with no length, the length set at close(). */
-class WavStream {
+class WavStream
+{
 public:
     /**
      * @brief Opens the file and writes a header.
@@ -70,19 +73,35 @@ public:
      * @param[in] sampleRate  Hz
      * @return true when it is open
      */
-    bool open(const fs::path& path, int sampleRate)
+    bool open( const fs::path &path, int sampleRate )
     {
-        m_f.open(path, std::ios::binary | std::ios::trunc);
+        m_f.open( path, std::ios::binary | std::ios::trunc );
         m_frames = 0;
-        const std::uint32_t sr = static_cast<std::uint32_t>(sampleRate);
-        unsigned char h[44] = {};
-        auto put = [&](int at, const char* s) { std::memcpy(h + at, s, 4); };
-        auto u32 = [&](int at, std::uint32_t x) { for (int i = 0; i < 4; ++i) h[at + i] = static_cast<unsigned char>(x >> (8 * i)); };
-        auto u16 = [&](int at, std::uint16_t x) { h[at] = static_cast<unsigned char>(x); h[at + 1] = static_cast<unsigned char>(x >> 8); };
-        put(0, "RIFF"); put(8, "WAVE"); put(12, "fmt "); u32(16, 16); u16(20, 1); u16(22, 2); u32(24, sr); u32(28, sr * 6); u16(32, 6); u16(34, 24);
-        put(36, "data");
-        m_f.write(reinterpret_cast<const char*>(h), 44);
-        return static_cast<bool>(m_f);
+        const std::uint32_t sr = static_cast<std::uint32_t>( sampleRate );
+        unsigned char       h[44] = {};
+        auto                put = [&]( int at, const char *s ) { std::memcpy( h + at, s, 4 ); };
+        auto                u32 = [&]( int at, std::uint32_t x )
+        {
+            for ( int i = 0; i < 4; ++i ) h[at + i] = static_cast<unsigned char>( x >> ( 8 * i ) );
+        };
+        auto u16 = [&]( int at, std::uint16_t x )
+        {
+            h[at] = static_cast<unsigned char>( x );
+            h[at + 1] = static_cast<unsigned char>( x >> 8 );
+        };
+        put( 0, "RIFF" );
+        put( 8, "WAVE" );
+        put( 12, "fmt " );
+        u32( 16, 16 );
+        u16( 20, 1 );
+        u16( 22, 2 );
+        u32( 24, sr );
+        u32( 28, sr * 6 );
+        u16( 32, 6 );
+        u16( 34, 24 );
+        put( 36, "data" );
+        m_f.write( reinterpret_cast<const char *>( h ), 44 );
+        return static_cast<bool>( m_f );
     }
     /**
      * @brief Appends frames.
@@ -90,32 +109,37 @@ public:
      * @param[in] R  right
      * @param[in] n  frames
      */
-    void write(const float* L, const float* R, int n)
+    void write( const float *L, const float *R, int n )
     {
-        m_buf.resize(static_cast<size_t>(n) * 6);
-        for (int i = 0; i < n; ++i)
-            for (int c = 0; c < 2; ++c) {
-                const float x = c == 0 ? L[i] : R[i];
-                const std::int32_t q = static_cast<std::int32_t>(std::lround(std::clamp(x, -1.0f, 1.0f) * 8388607.0f));
-                unsigned char* o = &m_buf[static_cast<size_t>(i) * 6 + static_cast<size_t>(c) * 3];
-                o[0] = static_cast<unsigned char>(q); o[1] = static_cast<unsigned char>(q >> 8); o[2] = static_cast<unsigned char>(q >> 16);
+        m_buf.resize( static_cast<size_t>( n ) * 6 );
+        for ( int i = 0; i < n; ++i )
+            for ( int c = 0; c < 2; ++c )
+            {
+                const float        x = c == 0 ? L[i] : R[i];
+                const std::int32_t q =
+                    static_cast<std::int32_t>( std::lround( std::clamp( x, -1.0f, 1.0f ) * 8388607.0f ) );
+                unsigned char *o = &m_buf[static_cast<size_t>( i ) * 6 + static_cast<size_t>( c ) * 3];
+                o[0] = static_cast<unsigned char>( q );
+                o[1] = static_cast<unsigned char>( q >> 8 );
+                o[2] = static_cast<unsigned char>( q >> 16 );
             }
-        m_f.write(reinterpret_cast<const char*>(m_buf.data()), static_cast<std::streamsize>(m_buf.size()));
+        m_f.write( reinterpret_cast<const char *>( m_buf.data() ), static_cast<std::streamsize>( m_buf.size() ) );
         m_frames += n;
     }
     /** @brief Sets the lengths in the header and closes. @return true when everything was written */
     bool close()
     {
-        const std::uint32_t data = static_cast<std::uint32_t>(m_frames * 6);
-        auto u32 = [&](std::streamoff at, std::uint32_t x) {
+        const std::uint32_t data = static_cast<std::uint32_t>( m_frames * 6 );
+        auto                u32 = [&]( std::streamoff at, std::uint32_t x )
+        {
             unsigned char b[4];
-            for (int i = 0; i < 4; ++i) b[i] = static_cast<unsigned char>(x >> (8 * i));
-            m_f.seekp(at);
-            m_f.write(reinterpret_cast<const char*>(b), 4);
+            for ( int i = 0; i < 4; ++i ) b[i] = static_cast<unsigned char>( x >> ( 8 * i ) );
+            m_f.seekp( at );
+            m_f.write( reinterpret_cast<const char *>( b ), 4 );
         };
-        u32(4, 36 + data);
-        u32(40, data);
-        const bool ok = static_cast<bool>(m_f);
+        u32( 4, 36 + data );
+        u32( 40, data );
+        const bool ok = static_cast<bool>( m_f );
         m_f.close();
         return ok;
     }
@@ -123,9 +147,9 @@ public:
     std::int64_t frames() const { return m_frames; }
 
 private:
-    std::ofstream m_f;                       ///< the file
-    std::int64_t m_frames = 0;               ///< frames written
-    std::vector<unsigned char> m_buf;        ///< a block's bytes
+    std::ofstream              m_f;            ///< the file
+    std::int64_t               m_frames = 0;   ///< frames written
+    std::vector<unsigned char> m_buf;          ///< a block's bytes
 };
 
 /**
@@ -134,21 +158,29 @@ private:
  * @param[in]     arg  "key=value"
  * @return true when the key exists and the value was read
  */
-bool applySet(Engine& e, const std::string& arg)
+bool applySet( Engine &e, const std::string &arg )
 {
-    const size_t eq = arg.find('=');
-    if (eq == std::string::npos) return false;
-    const std::string key = arg.substr(0, eq), val = arg.substr(eq + 1);
-    const ParamDesc* d = findParam(key.c_str());
-    if (!d) return false;
-    if (d->m_kind == ParamKindE::CHOICE)
-        for (int i = 0; i < d->m_numChoices; ++i)
-            if (val == d->m_choices[i]) { e.setParam(d->m_id, static_cast<float>(i)); return true; }
-    if (d->m_kind == ParamKindE::BOOL && (val == "on" || val == "off")) { e.setParam(d->m_id, val == "on" ? 1.0f : 0.0f); return true; }
-    char* end = nullptr;
-    const float x = std::strtof(val.c_str(), &end);
-    if (end == val.c_str()) return false;
-    e.setParam(d->m_id, x);
+    const size_t eq = arg.find( '=' );
+    if ( eq == std::string::npos ) return false;
+    const std::string key = arg.substr( 0, eq ), val = arg.substr( eq + 1 );
+    const ParamDesc  *d = findParam( key.c_str() );
+    if ( !d ) return false;
+    if ( d->m_kind == ParamKindE::CHOICE )
+        for ( int i = 0; i < d->m_numChoices; ++i )
+            if ( val == d->m_choices[i] )
+            {
+                e.setParam( d->m_id, static_cast<float>( i ) );
+                return true;
+            }
+    if ( d->m_kind == ParamKindE::BOOL && ( val == "on" || val == "off" ) )
+    {
+        e.setParam( d->m_id, val == "on" ? 1.0f : 0.0f );
+        return true;
+    }
+    char       *end = nullptr;
+    const float x = std::strtof( val.c_str(), &end );
+    if ( end == val.c_str() ) return false;
+    e.setParam( d->m_id, x );
     return true;
 }
 
@@ -157,11 +189,12 @@ bool applySet(Engine& e, const std::string& arg)
  * @param[in] s  the text
  * @return it quoted, with quotes and backslashes escaped
  */
-std::string jsonString(const char* s)
+std::string jsonString( const char *s )
 {
     std::string r = "\"";
-    for (const char* c = s ? s : ""; *c; ++c) {
-        if (*c == '"' || *c == '\\') r += '\\';
+    for ( const char *c = s ? s : ""; *c; ++c )
+    {
+        if ( *c == '"' || *c == '\\' ) r += '\\';
         r += *c;
     }
     return r + "\"";
@@ -170,18 +203,22 @@ std::string jsonString(const char* s)
 /** @brief Writes every row of the parameter table as JSON to stdout (key, name, section, kind, range, default, skew, unit, choices). */
 void dumpParams()
 {
-    static const char* const Kinds[] = { "float", "int", "bool", "choice" };
-    std::printf("[\n");
-    const auto& table = paramTable();
-    for (size_t i = 0; i < table.size(); ++i) {
-        const ParamDesc& d = table[i];
-        std::printf("  {\"key\": %s, \"name\": %s, \"section\": %s, \"kind\": \"%s\", \"min\": %g, \"max\": %g, \"default\": %g, \"skew\": %g, \"unit\": %s, \"choices\": [",
-                    jsonString(d.m_key).c_str(), jsonString(d.m_name).c_str(), jsonString(d.m_section).c_str(), Kinds[static_cast<int>(d.m_kind)],
-                    static_cast<double>(d.m_min), static_cast<double>(d.m_max), static_cast<double>(d.m_def), static_cast<double>(d.m_skew), jsonString(d.m_unit).c_str());
-        for (int c = 0; c < d.m_numChoices; ++c) std::printf("%s%s", c ? ", " : "", jsonString(d.m_choices[c]).c_str());
-        std::printf("]}%s\n", i + 1 < table.size() ? "," : "");
+    static const char *const Kinds[] = { "float", "int", "bool", "choice" };
+    std::printf( "[\n" );
+    const auto &table = paramTable();
+    for ( size_t i = 0; i < table.size(); ++i )
+    {
+        const ParamDesc &d = table[i];
+        std::printf(
+            "  {\"key\": %s, \"name\": %s, \"section\": %s, \"kind\": \"%s\", \"min\": %g, \"max\": %g, \"default\": %g, \"skew\": %g, \"unit\": %s, \"choices\": [",
+            jsonString( d.m_key ).c_str(), jsonString( d.m_name ).c_str(), jsonString( d.m_section ).c_str(),
+            Kinds[static_cast<int>( d.m_kind )], static_cast<double>( d.m_min ), static_cast<double>( d.m_max ),
+            static_cast<double>( d.m_def ), static_cast<double>( d.m_skew ), jsonString( d.m_unit ).c_str() );
+        for ( int c = 0; c < d.m_numChoices; ++c )
+            std::printf( "%s%s", c ? ", " : "", jsonString( d.m_choices[c] ).c_str() );
+        std::printf( "]}%s\n", i + 1 < table.size() ? "," : "" );
     }
-    std::printf("]\n");
+    std::printf( "]\n" );
 }
 
 /**
@@ -190,12 +227,13 @@ void dumpParams()
  * @param[in]     what  the preset's name, or its number
  * @return the preset's index, -1 when there is none of that name or number
  */
-int applyPreset(Engine& e, const std::string& what)
+int applyPreset( Engine &e, const std::string &what )
 {
-    int index = findPreset(what.c_str());
-    if (index < 0 && !what.empty() && what.find_first_not_of("0123456789") == std::string::npos) index = std::atoi(what.c_str());
-    if (index < 0 || index >= numPresets()) return -1;
-    e.loadPreset(index);
+    int index = findPreset( what.c_str() );
+    if ( index < 0 && !what.empty() && what.find_first_not_of( "0123456789" ) == std::string::npos )
+        index = std::atoi( what.c_str() );
+    if ( index < 0 || index >= numPresets() ) return -1;
+    e.loadPreset( index );
     return index;
 }
 
@@ -205,16 +243,21 @@ int applyPreset(Engine& e, const std::string& what)
  * @param[out] j     receives it
  * @return true when it was found and read
  */
-bool findJourney(const std::string& what, Journey& j)
+bool findJourney( const std::string &what, Journey &j )
 {
-    for (int i = 0; i < numBuiltinJourneys(); ++i) {
+    for ( int i = 0; i < numBuiltinJourneys(); ++i )
+    {
         Journey b;
-        if (b.parse(builtinJourneyText(i)) && b.m_name == what) { j = b; return true; }
+        if ( b.parse( builtinJourneyText( i ) ) && b.m_name == what )
+        {
+            j = b;
+            return true;
+        }
     }
-    return j.load(what.c_str()) && !j.m_steps.empty();
+    return j.load( what.c_str() ) && !j.m_steps.empty();
 }
 
-} // namespace
+}   // namespace
 
 /**
  * @brief Reads the options, renders, writes the WAV.
@@ -222,185 +265,269 @@ bool findJourney(const std::string& what, Journey& j)
  * @param[in,out] argv  arguments
  * @return 0 on success
  */
-int main(int argc, char** argv)
+int main( int argc, char **argv )
 {
-    double seconds = 120.0, hold = -1.0;
-    fs::path out = repoRoot() / "work" / "renders" / "render.wav";
-    std::uint64_t seed = 0x5EEDu;
+    double                   seconds = 120.0, hold = -1.0;
+    fs::path                 out = repoRoot() / "work" / "renders" / "render.wav";
+    std::uint64_t            seed = 0x5EEDu;
     std::vector<std::string> sets;
-    std::string modRows;   // --mod
-    std::vector<int> chord;
-    std::string presetName, journeyName, routeName;
-    double routeSpeed = 1.0;
-    std::uint64_t journeySeed = 1;
-    bool brain = true, fill = false;
-    for (int i = 1; i < argc; ++i) {
+    std::string              modRows;   // --mod
+    std::vector<int>         chord;
+    std::string              presetName, journeyName, routeName;
+    double                   routeSpeed = 1.0;
+    std::uint64_t            journeySeed = 1;
+    bool                     brain = true, fill = false;
+    for ( int i = 1; i < argc; ++i )
+    {
         const std::string a = argv[i];
-        const bool has = i + 1 < argc;
-        if (a == "--seconds" && has) seconds = std::atof(argv[++i]);
-        else if (a == "--out" && has) out = argv[++i];
-        else if (a == "--seed" && has) seed = std::strtoull(argv[++i], nullptr, 10);
-        else if (a == "--set" && has) sets.push_back(argv[++i]);
-        else if (a == "--mod" && has) modRows = argv[++i];   // matrix rows in the text form, after the preset's (Modulation.h)
-        else if (a == "--hold" && has) hold = std::atof(argv[++i]);
-        else if (a == "--no-brain") brain = false;
-        else if (a == "--fill") fill = true;
-        else if (a == "--preset" && has) presetName = argv[++i];
-        else if (a == "--journey" && has) journeyName = argv[++i];
-        else if (a == "--journey-seed" && has) journeySeed = std::strtoull(argv[++i], nullptr, 10);
-        else if (a == "--route" && has) routeName = argv[++i];
-        else if (a == "--route-speed" && has) routeSpeed = std::atof(argv[++i]);
-        else if (a == "--dump-params") { dumpParams(); return 0; }
-        else if (a == "--chord" && has) {
+        const bool        has = i + 1 < argc;
+        if ( a == "--seconds" && has )
+            seconds = std::atof( argv[++i] );
+        else if ( a == "--out" && has )
+            out = argv[++i];
+        else if ( a == "--seed" && has )
+            seed = std::strtoull( argv[++i], nullptr, 10 );
+        else if ( a == "--set" && has )
+            sets.push_back( argv[++i] );
+        else if ( a == "--mod" && has )
+            modRows = argv[++i];   // matrix rows in the text form, after the preset's (Modulation.h)
+        else if ( a == "--hold" && has )
+            hold = std::atof( argv[++i] );
+        else if ( a == "--no-brain" )
+            brain = false;
+        else if ( a == "--fill" )
+            fill = true;
+        else if ( a == "--preset" && has )
+            presetName = argv[++i];
+        else if ( a == "--journey" && has )
+            journeyName = argv[++i];
+        else if ( a == "--journey-seed" && has )
+            journeySeed = std::strtoull( argv[++i], nullptr, 10 );
+        else if ( a == "--route" && has )
+            routeName = argv[++i];
+        else if ( a == "--route-speed" && has )
+            routeSpeed = std::atof( argv[++i] );
+        else if ( a == "--dump-params" )
+        {
+            dumpParams();
+            return 0;
+        }
+        else if ( a == "--chord" && has )
+        {
             std::string s = argv[++i];
-            for (size_t p = 0; p <= s.size();) {
-                const size_t c = s.find(',', p);
-                chord.push_back(std::atoi(s.substr(p, c == std::string::npos ? std::string::npos : c - p).c_str()));
-                if (c == std::string::npos) break;
+            for ( size_t p = 0; p <= s.size(); )
+            {
+                const size_t c = s.find( ',', p );
+                chord.push_back(
+                    std::atoi( s.substr( p, c == std::string::npos ? std::string::npos : c - p ).c_str() ) );
+                if ( c == std::string::npos ) break;
                 p = c + 1;
             }
-        } else {
-            std::fprintf(stderr, "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
-                                 "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
-                                 "empy_render --dump-params\n");
+        }
+        else
+        {
+            std::fprintf(
+                stderr,
+                "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
+                "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
+                "empy_render --dump-params\n" );
             return 1;
         }
     }
 
     Engine e;
-    e.setRealtime(false);
-    if (!presetName.empty()) {
-        const int index = applyPreset(e, presetName);
-        if (index < 0) { std::fprintf(stderr, "empy_render: no preset %s\n", presetName.c_str()); return 1; }
-        std::printf("preset %d: %s (%s)\n", index, preset(index).m_name, PresetGroupNames[preset(index).m_group]);
-    }
-    Journey journey;
-    JourneyPlayer player;
-    if (!journeyName.empty()) {
-        if (!findJourney(journeyName, journey)) { std::fprintf(stderr, "empy_render: no journey %s\n", journeyName.c_str()); return 1; }
-        player.start(journey, journeySeed);
-        JourneyStep st;
-        double glide = 0.0;
-        if (player.advance(0.0, st, glide) && findPreset(st.m_preset.c_str()) >= 0) {   // the first at once
-            e.loadPreset(findPreset(st.m_preset.c_str()));
-            e.setParam(ParamIdE::BRAIN_ON, 1.0f);   // a journey keeps the conductor playing (as the instrument does)
+    e.setRealtime( false );
+    if ( !presetName.empty() )
+    {
+        const int index = applyPreset( e, presetName );
+        if ( index < 0 )
+        {
+            std::fprintf( stderr, "empy_render: no preset %s\n", presetName.c_str() );
+            return 1;
         }
-        std::printf("journey %s: %zu steps, a pass about %s\n", journey.m_name.c_str(), journey.m_steps.size(), Journey::timeText(journey.meanLength()).c_str());
+        std::printf( "preset %d: %s (%s)\n", index, preset( index ).m_name, PresetGroupNames[preset( index ).m_group] );
     }
-    Route route;
+    Journey       journey;
+    JourneyPlayer player;
+    if ( !journeyName.empty() )
+    {
+        if ( !findJourney( journeyName, journey ) )
+        {
+            std::fprintf( stderr, "empy_render: no journey %s\n", journeyName.c_str() );
+            return 1;
+        }
+        player.start( journey, journeySeed );
+        JourneyStep st;
+        double      glide = 0.0;
+        if ( player.advance( 0.0, st, glide ) && findPreset( st.m_preset.c_str() ) >= 0 )
+        {   // the first at once
+            e.loadPreset( findPreset( st.m_preset.c_str() ) );
+            e.setParam( ParamIdE::BRAIN_ON, 1.0f );   // a journey keeps the conductor playing (as the instrument does)
+        }
+        std::printf( "journey %s: %zu steps, a pass about %s\n", journey.m_name.c_str(), journey.m_steps.size(),
+                     Journey::timeText( journey.meanLength() ).c_str() );
+    }
+    Route      route;
     MapBlender blender;
-    float mapX = -1.0f, mapY = -1.0f, mapR = -1.0f;
-    if (!routeName.empty()) {
+    float      mapX = -1.0f, mapY = -1.0f, mapR = -1.0f;
+    if ( !routeName.empty() )
+    {
         std::string text;
-        for (int i = 0; i < numRoutePresets() && text.empty(); ++i)
-            if (routeName == routePreset(i).m_name) text = routePreset(i).m_points;
-        if (text.empty()) {
-            std::ifstream f(routeName, std::ios::binary);
+        for ( int i = 0; i < numRoutePresets() && text.empty(); ++i )
+            if ( routeName == routePreset( i ).m_name ) text = routePreset( i ).m_points;
+        if ( text.empty() )
+        {
+            std::ifstream     f( routeName, std::ios::binary );
             std::stringstream ss;
             ss << f.rdbuf();
             text = ss.str();
         }
-        if (!route.parse(text.c_str())) { std::fprintf(stderr, "empy_render: no route %s\n", routeName.c_str()); return 1; }
+        if ( !route.parse( text.c_str() ) )
+        {
+            std::fprintf( stderr, "empy_render: no route %s\n", routeName.c_str() );
+            return 1;
+        }
         // Starting on the first waypoint's preset, the map on.
-        const Waypoint& w = route.point(0);
-        if (w.m_preset >= 0) e.loadPreset(w.m_preset);
-        e.setParam(ParamIdE::BRAIN_ON, 1.0f);   // a route keeps the conductor playing (as the instrument does)
-        route.start(w.m_x, w.m_y, w.m_radius, true);
-        e.setParam(ParamIdE::MAP_ACTIVE, 1.0f);
-        std::printf("route %s: %d waypoints\n", routeName.c_str(), route.count());
+        const Waypoint &w = route.point( 0 );
+        if ( w.m_preset >= 0 ) e.loadPreset( w.m_preset );
+        e.setParam( ParamIdE::BRAIN_ON, 1.0f );   // a route keeps the conductor playing (as the instrument does)
+        route.start( w.m_x, w.m_y, w.m_radius, true );
+        e.setParam( ParamIdE::MAP_ACTIVE, 1.0f );
+        std::printf( "route %s: %d waypoints\n", routeName.c_str(), route.count() );
     }
-    for (const std::string& s : sets)
-        if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
-    if (!modRows.empty()) e.setModText(modRows);   // replaces the preset's matrix
-    if (!brain) e.setParam(ParamIdE::BRAIN_ON, 0.0f);
+    for ( const std::string &s : sets )
+        if ( !applySet( e, s ) )
+        {
+            std::fprintf( stderr, "empy_render: cannot apply --set %s\n", s.c_str() );
+            return 1;
+        }
+    if ( !modRows.empty() ) e.setModText( modRows );   // replaces the preset's matrix
+    if ( !brain ) e.setParam( ParamIdE::BRAIN_ON, 0.0f );
     EngineConfig c;
     c.m_sampleRate = 48000.0;
     c.m_maxHostBlock = 512;
     c.m_realtimeGpuClass = false;
     c.m_seed = seed;
     std::string error;
-    if (!e.prepare(c, &error)) { std::fprintf(stderr, "empy_render: %s\n", error.c_str()); return 1; }
-    if (fill) e.requestFill();
-    std::printf("%s, latency %d samples, scale %s, motion %s, autoplay %s, %.0f s\n", e.deviceName().c_str(), e.latencySamples(),
-                ScaleNames[static_cast<int>(e.param(ParamIdE::SCALE))], MotionNames[static_cast<int>(e.param(ParamIdE::MOTION))],
-                e.param(ParamIdE::BRAIN_ON) >= 0.5f ? BrainModeNames[static_cast<int>(e.param(ParamIdE::AUTO_MODE))] : "off", seconds);
-    for (int note : chord) e.noteOn(note, 0.8f, 0);
+    if ( !e.prepare( c, &error ) )
+    {
+        std::fprintf( stderr, "empy_render: %s\n", error.c_str() );
+        return 1;
+    }
+    if ( fill ) e.requestFill();
+    std::printf( "%s, latency %d samples, scale %s, motion %s, autoplay %s, %.0f s\n", e.deviceName().c_str(),
+                 e.latencySamples(), ScaleNames[static_cast<int>( e.param( ParamIdE::SCALE ) )],
+                 MotionNames[static_cast<int>( e.param( ParamIdE::MOTION ) )],
+                 e.param( ParamIdE::BRAIN_ON ) >= 0.5f
+                     ? BrainModeNames[static_cast<int>( e.param( ParamIdE::AUTO_MODE ) )]
+                     : "off",
+                 seconds );
+    for ( int note : chord ) e.noteOn( note, 0.8f, 0 );
 
-    const int n = 512;
-    const std::int64_t total = static_cast<std::int64_t>(seconds * c.m_sampleRate);
+    const int          n = 512;
+    const std::int64_t total = static_cast<std::int64_t>( seconds * c.m_sampleRate );
     // Beyond an hour, a file an hour: name-01.wav, name-02.wav, ...
-    const std::int64_t perFile = static_cast<std::int64_t>(3600.0 * c.m_sampleRate);
-    const bool parts = total > perFile;
-    fs::create_directories(out.parent_path());
-    auto partPath = [&](int k) {
-        if (!parts) return out;
+    const std::int64_t perFile = static_cast<std::int64_t>( 3600.0 * c.m_sampleRate );
+    const bool         parts = total > perFile;
+    fs::create_directories( out.parent_path() );
+    auto partPath = [&]( int k )
+    {
+        if ( !parts ) return out;
         char suffix[16];
-        std::snprintf(suffix, sizeof(suffix), "-%02d", k);
-        return out.parent_path() / (out.stem().string() + suffix + out.extension().string());
+        std::snprintf( suffix, sizeof( suffix ), "-%02d", k );
+        return out.parent_path() / ( out.stem().string() + suffix + out.extension().string() );
     };
     WavStream wav;
-    int part = 1;
-    if (!wav.open(partPath(part), static_cast<int>(c.m_sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
-    std::vector<float> L(n), R(n);
-    double sq = 0.0, peak = 0.0, gpu = 0.0;
-    int blocks = 0;
-    bool released = chord.empty();
-    const auto t0 = std::chrono::steady_clock::now();
-    for (std::int64_t done = 0; done < total; done += n) {
-        if (!released && hold >= 0.0 && done >= static_cast<std::int64_t>(hold * c.m_sampleRate)) {
-            for (int note : chord) e.noteOff(note, 0);
+    int       part = 1;
+    if ( !wav.open( partPath( part ), static_cast<int>( c.m_sampleRate ) ) )
+    {
+        std::fprintf( stderr, "empy_render: cannot write %s\n", partPath( part ).string().c_str() );
+        return 1;
+    }
+    std::vector<float> L( n ), R( n );
+    double             sq = 0.0, peak = 0.0, gpu = 0.0;
+    int                blocks = 0;
+    bool               released = chord.empty();
+    const auto         t0 = std::chrono::steady_clock::now();
+    for ( std::int64_t done = 0; done < total; done += n )
+    {
+        if ( !released && hold >= 0.0 && done >= static_cast<std::int64_t>( hold * c.m_sampleRate ) )
+        {
+            for ( int note : chord ) e.noteOff( note, 0 );
             released = true;
         }
-        if (route.running()) {   // the route moves the cursor; a moved cursor is blended anew
+        if ( route.running() )
+        {   // the route moves the cursor; a moved cursor is blended anew
             const int seg = route.segment();
-            float x = 0.0f, y = 0.0f, r = 0.0f;
-            route.update(static_cast<float>(n / c.m_sampleRate * routeSpeed), x, y, r);
-            if (x != mapX || y != mapY || r != mapR) {
+            float     x = 0.0f, y = 0.0f, r = 0.0f;
+            route.update( static_cast<float>( n / c.m_sampleRate * routeSpeed ), x, y, r );
+            if ( x != mapX || y != mapY || r != mapR )
+            {
                 MorphState s;
-                blender.blend(x, y, r, s);
-                e.setMapTarget(s);
+                blender.blend( x, y, r, s );
+                e.setMapTarget( s );
                 mapX = x;
                 mapY = y;
                 mapR = r;
             }
-            if (route.segment() != seg) {
-                const Waypoint& w = route.point(route.segment());
-                std::printf("  %5.0f s: towards %d, %s\n", done / c.m_sampleRate, route.segment() + 1, w.m_preset >= 0 ? preset(w.m_preset).m_name : "a place");
+            if ( route.segment() != seg )
+            {
+                const Waypoint &w = route.point( route.segment() );
+                std::printf( "  %5.0f s: towards %d, %s\n", done / c.m_sampleRate, route.segment() + 1,
+                             w.m_preset >= 0 ? preset( w.m_preset ).m_name : "a place" );
             }
         }
-        if (player.running()) {   // the journey: a step glides into its preset
+        if ( player.running() )
+        {   // the journey: a step glides into its preset
             JourneyStep st;
-            double glide = 0.0;
-            if (player.advance(n / c.m_sampleRate, st, glide)) {
-                const int index = findPreset(st.m_preset.c_str());
-                if (index >= 0) { e.loadPreset(index, std::max(glide, 0.5)); e.setParam(ParamIdE::BRAIN_ON, 1.0f); }
-                std::printf("  %5.0f s: step %d, %s, glide %.0f s\n", done / c.m_sampleRate, player.step() + 1, st.m_preset.c_str(), glide);
+            double      glide = 0.0;
+            if ( player.advance( n / c.m_sampleRate, st, glide ) )
+            {
+                const int index = findPreset( st.m_preset.c_str() );
+                if ( index >= 0 )
+                {
+                    e.loadPreset( index, std::max( glide, 0.5 ) );
+                    e.setParam( ParamIdE::BRAIN_ON, 1.0f );
+                }
+                std::printf( "  %5.0f s: step %d, %s, glide %.0f s\n", done / c.m_sampleRate, player.step() + 1,
+                             st.m_preset.c_str(), glide );
             }
         }
-        e.process(L.data(), R.data(), n);
-        if (wav.frames() >= perFile) {
+        e.process( L.data(), R.data(), n );
+        if ( wav.frames() >= perFile )
+        {
             wav.close();
-            wav.open(partPath(++part), static_cast<int>(c.m_sampleRate));
+            wav.open( partPath( ++part ), static_cast<int>( c.m_sampleRate ) );
         }
-        wav.write(L.data(), R.data(), n);
-        for (int i = 0; i < n; ++i) {
-            sq += 0.5 * (static_cast<double>(L[i]) * L[i] + static_cast<double>(R[i]) * R[i]);
-            peak = std::max(peak, static_cast<double>(std::max(std::fabs(L[i]), std::fabs(R[i]))));
+        wav.write( L.data(), R.data(), n );
+        for ( int i = 0; i < n; ++i )
+        {
+            sq += 0.5 * ( static_cast<double>( L[i] ) * L[i] + static_cast<double>( R[i] ) * R[i] );
+            peak = std::max( peak, static_cast<double>( std::max( std::fabs( L[i] ), std::fabs( R[i] ) ) ) );
         }
         gpu += e.lastGpuMs();
         ++blocks;
         const std::int64_t now = done + n;
-        if (now % (static_cast<std::int64_t>(c.m_sampleRate) * 10) < n) {
-            const double rms = std::sqrt(sq / (blocks * static_cast<double>(n)));
-            std::printf("  %5.0f s: %6.1f dBFS RMS, peak %6.1f dBFS, %2d voices, root %3d, GPU %.3f ms/block\n",
-                        now / c.m_sampleRate, 20.0 * std::log10(std::max(rms, 1e-9)), 20.0 * std::log10(std::max(peak, 1e-9)),
-                        e.soundingVoices(), e.brainRoot(), gpu / blocks);
-            sq = 0.0; peak = 0.0; gpu = 0.0; blocks = 0;
+        if ( now % ( static_cast<std::int64_t>( c.m_sampleRate ) * 10 ) < n )
+        {
+            const double rms = std::sqrt( sq / ( blocks * static_cast<double>( n ) ) );
+            std::printf( "  %5.0f s: %6.1f dBFS RMS, peak %6.1f dBFS, %2d voices, root %3d, GPU %.3f ms/block\n",
+                         now / c.m_sampleRate, 20.0 * std::log10( std::max( rms, 1e-9 ) ),
+                         20.0 * std::log10( std::max( peak, 1e-9 ) ), e.soundingVoices(), e.brainRoot(), gpu / blocks );
+            sq = 0.0;
+            peak = 0.0;
+            gpu = 0.0;
+            blocks = 0;
         }
     }
-    const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-    if (!wav.close()) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
-    std::printf("%.0f s in %.1f s (%.0fx real time), late notes %llu -> %s%s\n", seconds, took, seconds / std::max(took, 1e-9),
-                static_cast<unsigned long long>(e.lateEvents()), out.string().c_str(), parts ? " (in parts of an hour)" : "");
+    const double took = std::chrono::duration<double>( std::chrono::steady_clock::now() - t0 ).count();
+    if ( !wav.close() )
+    {
+        std::fprintf( stderr, "empy_render: cannot write %s\n", partPath( part ).string().c_str() );
+        return 1;
+    }
+    std::printf( "%.0f s in %.1f s (%.0fx real time), late notes %llu -> %s%s\n", seconds, took,
+                 seconds / std::max( took, 1e-9 ), static_cast<unsigned long long>( e.lateEvents() ),
+                 out.string().c_str(), parts ? " (in parts of an hour)" : "" );
     return 0;
 }

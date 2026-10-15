@@ -18,7 +18,8 @@
 
 #include <unordered_map>
 
-namespace additiv {
+namespace additiv
+{
 
 /**
  * @brief A factory preset's place on the map.
@@ -26,15 +27,16 @@ namespace additiv {
  * @param[out] x      receives across, 0 .. 1 (dark to bright)
  * @param[out] y      receives up, 0 .. 1 (still to moving)
  */
-void presetMapPosition(int index, float& x, float& y);
+void presetMapPosition( int index, float &x, float &y );
 
 /** @brief The presets around a place and their weights. */
-struct MapNeighbours {
-    static constexpr int Max = 6;   ///< the closest presets that take part
-    int m_count = 0;                   ///< how many are valid
-    int m_index[Max] = {};            ///< presets, closest first
-    float m_weight[Max] = {};         ///< normalised weights, the closest heaviest
-    float m_sigma = 0.0f;              ///< the Gaussian's width there, in map units (the radius times the spacing)
+struct MapNeighbours
+{
+    static constexpr int Max = 6;              ///< the closest presets that take part
+    int                  m_count = 0;          ///< how many are valid
+    int                  m_index[Max] = {};    ///< presets, closest first
+    float                m_weight[Max] = {};   ///< normalised weights, the closest heaviest
+    float                m_sigma = 0.0f;   ///< the Gaussian's width there, in map units (the radius times the spacing)
 };
 
 /**
@@ -53,14 +55,15 @@ struct MapNeighbours {
  * @param[in] radius  the Gaussian's width in the spacing of the presets there (MapRadius, 0.1 .. 4)
  * @return the neighbours
  */
-MapNeighbours mapNeighbours(float x, float y, float radius);
+MapNeighbours mapNeighbours( float x, float y, float radius );
 
 /**
  * @brief Blends the presets around a place into one sound (MorphState). Keeps every preset it has
  *        read (as a sound: its values and matrix), so moving the cursor costs only the blend.
  *        Not for the audio thread: reading a preset allocates.
  */
-class MapBlender {
+class MapBlender
+{
 public:
     /**
      * @brief The sound at a place on the map.
@@ -70,16 +73,16 @@ public:
      * @param[out] out     receives the blend
      * @param[out] around  receives the neighbours (may be null)
      */
-    void blend(float x, float y, float radius, MorphState& out, MapNeighbours* around = nullptr);
+    void blend( float x, float y, float radius, MorphState &out, MapNeighbours *around = nullptr );
     /**
      * @brief One preset as a sound.
      * @param[in] index  the preset
      * @return its state (kept)
      */
-    const MorphState& state(int index);
+    const MorphState &state( int index );
 
 private:
     std::unordered_map<int, MorphState> m_cache;   ///< the presets read so far
 };
 
-} // namespace additiv
+}   // namespace additiv

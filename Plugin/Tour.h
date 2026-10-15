@@ -13,13 +13,15 @@
 #include <vector>
 
 /** @brief The tour (see the file comment). */
-class Tour final : public juce::Component {
+class Tour final : public juce::Component
+{
 public:
     /** @brief One step: what is lit, and what is said about it. */
-    struct Step {
+    struct Step
+    {
         juce::Component::SafePointer<juce::Component> m_target;   ///< the control lit
-        juce::String m_title;                                       ///< its name
-        juce::String m_text;                                        ///< what it does
+        juce::String                                  m_title;    ///< its name
+        juce::String                                  m_text;     ///< what it does
     };
     /** @brief Called when the tour ends (done or skipped). */
     std::function<void()> m_onDone;
@@ -29,12 +31,12 @@ public:
      * @brief Begins it.
      * @param[in] steps  its steps
      */
-    void start(std::vector<Step> steps);
+    void start( std::vector<Step> steps );
     /**
      * @brief The dimmed window with the lit control and the bubble.
      * @param[in,out] g  the graphics context
      */
-    void paint(juce::Graphics& g) override;
+    void paint( juce::Graphics &g ) override;
     /** @brief The bubble's buttons. */
     void resized() override;
 
@@ -48,8 +50,8 @@ private:
     /** @brief Ends it. */
     void finish();
 
-    std::vector<Step> m_steps;                 ///< the steps
-    size_t m_at = 0;                           ///< the one shown
-    juce::TextButton m_next{ "Next" };         ///< on
-    juce::TextButton m_skip{ "Skip" };         ///< ends it
+    std::vector<Step> m_steps;            ///< the steps
+    size_t            m_at = 0;           ///< the one shown
+    juce::TextButton  m_next{ "Next" };   ///< on
+    juce::TextButton  m_skip{ "Skip" };   ///< ends it
 };

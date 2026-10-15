@@ -15,14 +15,16 @@
 #include <string>
 #include <vector>
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief A landscape on the host: rows of time, each `columns` amplitudes from LandLowHz to LandHighHz. */
-struct Landscape {
-    int m_columns = 0;            ///< frequency columns, logarithmically spaced
-    int m_rows = 0;               ///< time rows; the landscape loops over all of them
-    float m_rowSeconds = 0.1f;    ///< how long one row lasts at rate 1
-    std::vector<float> m_amps;    ///< rows * columns amplitudes 0 .. 1, row by row
+struct Landscape
+{
+    int                m_columns = 0;         ///< frequency columns, logarithmically spaced
+    int                m_rows = 0;            ///< time rows; the landscape loops over all of them
+    float              m_rowSeconds = 0.1f;   ///< how long one row lasts at rate 1
+    std::vector<float> m_amps;                ///< rows * columns amplitudes 0 .. 1, row by row
 };
 
 /**
@@ -31,7 +33,7 @@ struct Landscape {
  * @param[in] columns  how many
  * @return Hz
  */
-float landscapeColumnHz(int column, int columns);
+float landscapeColumnHz( int column, int columns );
 
 /**
  * @brief Brightness to amplitude on the decibel scale.
@@ -39,7 +41,7 @@ float landscapeColumnHz(int column, int columns);
  * @param[in] rangeDb  the range grey spans
  * @return 0 .. 1
  */
-float brightnessToAmp(float b, float rangeDb);
+float brightnessToAmp( float b, float rangeDb );
 
 /**
  * @brief Amplitude to brightness on the decibel scale.
@@ -47,7 +49,7 @@ float brightnessToAmp(float b, float rangeDb);
  * @param[in] rangeDb  the range grey spans
  * @return 0 .. 1
  */
-float ampToBrightness(float a, float rangeDb);
+float ampToBrightness( float a, float rangeDb );
 
 /**
  * @brief A generated landscape: slowly swaying bands, one band that climbs through the spectrum
@@ -58,13 +60,14 @@ float ampToBrightness(float a, float rangeDb);
  * @param[in] rows         time rows
  * @return the landscape
  */
-Landscape landscapeAurora(float loopSeconds, float rangeDb = 40.0f, int columns = 256, int rows = 1024);
+Landscape landscapeAurora( float loopSeconds, float rangeDb = 40.0f, int columns = 256, int rows = 1024 );
 
-constexpr int NumFactoryLandscapes = 5;                         ///< entries of LandscapeNames
-extern const char* const LandscapeNames[NumFactoryLandscapes];  ///< Aurora, Shepard, Tides, Rain, Choir
-constexpr int UserLandscape = NumFactoryLandscapes;             ///< the Landscape choice that is the player's own (Engine::setUserLandscape)
-constexpr int NumLandscapeChoices = NumFactoryLandscapes + 1;   ///< entries of LandscapeChoiceNames
-extern const char* const LandscapeChoiceNames[NumLandscapeChoices];   ///< the factory's, then "Your Own"
+constexpr int            NumFactoryLandscapes = 5;               ///< entries of LandscapeNames
+extern const char *const LandscapeNames[NumFactoryLandscapes];   ///< Aurora, Shepard, Tides, Rain, Choir
+constexpr int            UserLandscape =
+    NumFactoryLandscapes;   ///< the Landscape choice that is the player's own (Engine::setUserLandscape)
+constexpr int            NumLandscapeChoices = NumFactoryLandscapes + 1;   ///< entries of LandscapeChoiceNames
+extern const char *const LandscapeChoiceNames[NumLandscapeChoices];        ///< the factory's, then "Your Own"
 
 /**
  * @brief One of the generated landscapes, each looping seamlessly over a floor (motion on a carrying
@@ -78,14 +81,14 @@ extern const char* const LandscapeChoiceNames[NumLandscapeChoices];   ///< the f
  * @param[in] rangeDb  the decibel range of the brightness
  * @return the landscape (Aurora for an unknown index)
  */
-Landscape factoryLandscape(int index, float rangeDb = 40.0f);
+Landscape factoryLandscape( int index, float rangeDb = 40.0f );
 
 /**
  * @brief The RMS of a landscape's amplitudes: how much quieter a voice gets that reads it fully.
  * @param[in] l  the landscape
  * @return sqrt of the mean squared amplitude (1 for an empty one)
  */
-float landscapeRms(const Landscape& l);
+float landscapeRms( const Landscape &l );
 
 /**
  * @brief A landscape from a picture (PNG, JPEG, BMP, TIFF, GIF -- whatever Windows can decode):
@@ -98,7 +101,8 @@ float landscapeRms(const Landscape& l);
  * @param[out] error        receives the reason when it fails (may be null)
  * @return true when read
  */
-bool landscapeFromImage(const std::filesystem::path& path, float loopSeconds, float rangeDb, Landscape& out, std::string* error);
+bool landscapeFromImage( const std::filesystem::path &path, float loopSeconds, float rangeDb, Landscape &out,
+                         std::string *error );
 
 /**
  * @brief A landscape from a recording (WAV or FLAC): a short-time spectrum every 21 ms or so,
@@ -115,8 +119,8 @@ bool landscapeFromImage(const std::filesystem::path& path, float loopSeconds, fl
  * @param[out] error     receives the reason when it fails (may be null)
  * @return true when read
  */
-bool landscapeFromAudio(const std::filesystem::path& path, float rangeDb, float whiten, float seamless, float smooth,
-                        Landscape& out, std::string* error);
+bool landscapeFromAudio( const std::filesystem::path &path, float rangeDb, float whiten, float seamless, float smooth,
+                         Landscape &out, std::string *error );
 
 /**
  * @brief A recording (WAV or FLAC, by its contents) as left and right; a mono file is its own both.
@@ -127,14 +131,15 @@ bool landscapeFromAudio(const std::filesystem::path& path, float rangeDb, float 
  * @param[out] error  receives the reason when it fails (may be null)
  * @return true when read
  */
-bool loadStereo(const std::filesystem::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error);
+bool loadStereo( const std::filesystem::path &path, std::vector<float> &left, std::vector<float> &right, double &rate,
+                 std::string *error );
 
 /**
  * @brief Crossfades the end of a landscape into its beginning and drops the end, so it loops without a jump.
  * @param[in,out] l         the landscape
  * @param[in]     fraction  0 .. 0.5: the share of rows crossfaded
  */
-void makeSeamless(Landscape& l, float fraction);
+void makeSeamless( Landscape &l, float fraction );
 
 /**
  * @brief A picture of a landscape as a grey 24-bit BMP: time left to right, low frequencies at the
@@ -145,6 +150,6 @@ void makeSeamless(Landscape& l, float fraction);
  * @param[out] error    receives the reason when it fails (may be null)
  * @return true when written
  */
-bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, float rangeDb, std::string* error);
+bool writeLandscapeBmp( const Landscape &l, const std::filesystem::path &path, float rangeDb, std::string *error );
 
-} // namespace additiv
+}   // namespace additiv

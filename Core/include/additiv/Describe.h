@@ -16,10 +16,12 @@
 
 #include <vector>
 
-namespace additiv {
+namespace additiv
+{
 
 /** @brief What a sound sounds like (see the file comment). */
-struct Description {
+struct Description
+{
     double m_brightness = 0.0;   ///< the spectral centroid, octaves above 40 Hz
     double m_motion = 0.0;       ///< the spectrum's change as a share of itself, over three lags
     double m_width = 0.0;        ///< 1 - the correlation of left and right
@@ -34,6 +36,6 @@ struct Description {
  * @param[in] sr  the sample rate, Hz
  * @return    it
  */
-Description describe(const std::vector<float>& L, const std::vector<float>& R, double sr);
+Description describe( const std::vector<float> &L, const std::vector<float> &R, double sr );
 
-} // namespace additiv
+}   // namespace additiv

@@ -15,9 +15,9 @@
 
 #define DR_FLAC_IMPLEMENTATION
 #define DR_FLAC_NO_STDIO
-#pragma warning(push, 0)   // a vendored decoder, not held to this project's /W4
+#pragma warning( push, 0 )   // a vendored decoder, not held to this project's /W4
 #include "dr_flac.h"
-#pragma warning(pop)
+#pragma warning( pop )
 
 #include <algorithm>
 #include <cmath>
@@ -28,8 +28,10 @@
 
 namespace fs = std::filesystem;
 
-namespace additiv {
-namespace {
+namespace additiv
+{
+namespace
+{
 
 constexpr double Pi = 3.14159265358979323846;   ///< pi
 
@@ -39,9 +41,9 @@ constexpr double Pi = 3.14159265358979323846;   ///< pi
  * @param[in]     what   the reason
  * @return false
  */
-bool fail(std::string* error, const std::string& what)
+bool fail( std::string *error, const std::string &what )
 {
-    if (error) *error = what;
+    if ( error ) *error = what;
     return false;
 }
 
@@ -51,16 +53,16 @@ bool fail(std::string* error, const std::string& what)
  * @param[out] data  receives its bytes
  * @return true when read
  */
-bool readFile(const fs::path& path, std::vector<unsigned char>& data)
+bool readFile( const fs::path &path, std::vector<unsigned char> &data )
 {
-    std::ifstream f(path, std::ios::binary | std::ios::ate);
-    if (!f) return false;
+    std::ifstream f( path, std::ios::binary | std::ios::ate );
+    if ( !f ) return false;
     const std::streamsize size = f.tellg();
-    if (size <= 0) return false;
-    data.resize(static_cast<size_t>(size));
-    f.seekg(0);
-    f.read(reinterpret_cast<char*>(data.data()), size);
-    return static_cast<bool>(f);
+    if ( size <= 0 ) return false;
+    data.resize( static_cast<size_t>( size ) );
+    f.seekg( 0 );
+    f.read( reinterpret_cast<char *>( data.data() ), size );
+    return static_cast<bool>( f );
 }
 
 /**
@@ -68,14 +70,20 @@ bool readFile(const fs::path& path, std::vector<unsigned char>& data)
  * @param[in] p  its bytes
  * @return the value
  */
-std::uint32_t le16(const unsigned char* p) { return static_cast<std::uint32_t>(p[0]) | (static_cast<std::uint32_t>(p[1]) << 8); }
+std::uint32_t le16( const unsigned char *p )
+{
+    return static_cast<std::uint32_t>( p[0] ) | ( static_cast<std::uint32_t>( p[1] ) << 8 );
+}
 
 /**
  * @brief A little-endian 32-bit value.
  * @param[in] p  its bytes
  * @return the value
  */
-std::uint32_t le32(const unsigned char* p) { return le16(p) | (le16(p + 2) << 16); }
+std::uint32_t le32( const unsigned char *p )
+{
+    return le16( p ) | ( le16( p + 2 ) << 16 );
+}
 
 /**
  * @brief A WAV file (PCM 8/16/24/32 bit or 32-bit float, plain or extensible) as one mono channel.
@@ -87,54 +95,72 @@ std::uint32_t le32(const unsigned char* p) { return le16(p) | (le16(p + 2) << 16
  * @param[out] right  receives the second (the first again for a mono file), when not null
  * @return true when decoded
  */
-bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, double& rate, std::string* error,
-               std::vector<float>* left = nullptr, std::vector<float>* right = nullptr)
+bool decodeWav( const std::vector<unsigned char> &d, std::vector<float> &mono, double &rate, std::string *error,
+                std::vector<float> *left = nullptr, std::vector<float> *right = nullptr )
 {
-    if (d.size() < 12 || std::memcmp(d.data(), "RIFF", 4) != 0 || std::memcmp(d.data() + 8, "WAVE", 4) != 0)
-        return fail(error, "not a RIFF/WAVE file");
-    std::uint32_t format = 0, channels = 0, sampleRate = 0, bits = 0;
-    const unsigned char* data = nullptr;
-    size_t dataBytes = 0;
-    size_t pos = 12;
-    while (pos + 8 <= d.size()) {
-        const unsigned char* id = d.data() + pos;
-        const size_t size = le32(id + 4);
-        const size_t body = pos + 8;
-        if (std::memcmp(id, "fmt ", 4) == 0 && size >= 16 && body + 16 <= d.size()) {
-            format = le16(d.data() + body);
-            channels = le16(d.data() + body + 2);
-            sampleRate = le32(d.data() + body + 4);
-            bits = le16(d.data() + body + 14);
-            if (format == 0xFFFE && size >= 26 && body + 26 <= d.size()) format = le16(d.data() + body + 24);
-        } else if (std::memcmp(id, "data", 4) == 0) {
-            data = d.data() + std::min(body, d.size());
-            dataBytes = std::min(size, d.size() - std::min(body, d.size()));
+    if ( d.size() < 12 || std::memcmp( d.data(), "RIFF", 4 ) != 0 || std::memcmp( d.data() + 8, "WAVE", 4 ) != 0 )
+        return fail( error, "not a RIFF/WAVE file" );
+    std::uint32_t        format = 0, channels = 0, sampleRate = 0, bits = 0;
+    const unsigned char *data = nullptr;
+    size_t               dataBytes = 0;
+    size_t               pos = 12;
+    while ( pos + 8 <= d.size() )
+    {
+        const unsigned char *id = d.data() + pos;
+        const size_t         size = le32( id + 4 );
+        const size_t         body = pos + 8;
+        if ( std::memcmp( id, "fmt ", 4 ) == 0 && size >= 16 && body + 16 <= d.size() )
+        {
+            format = le16( d.data() + body );
+            channels = le16( d.data() + body + 2 );
+            sampleRate = le32( d.data() + body + 4 );
+            bits = le16( d.data() + body + 14 );
+            if ( format == 0xFFFE && size >= 26 && body + 26 <= d.size() ) format = le16( d.data() + body + 24 );
         }
-        pos = body + size + (size & 1);
+        else if ( std::memcmp( id, "data", 4 ) == 0 )
+        {
+            data = d.data() + std::min( body, d.size() );
+            dataBytes = std::min( size, d.size() - std::min( body, d.size() ) );
+        }
+        pos = body + size + ( size & 1 );
     }
-    const bool pcm = format == 1 && (bits == 8 || bits == 16 || bits == 24 || bits == 32);
+    const bool pcm = format == 1 && ( bits == 8 || bits == 16 || bits == 24 || bits == 32 );
     const bool flt = format == 3 && bits == 32;
-    if (!data || channels == 0 || sampleRate == 0 || !(pcm || flt)) return fail(error, "unsupported WAV format (PCM 8/16/24/32 or float 32 only)");
+    if ( !data || channels == 0 || sampleRate == 0 || !( pcm || flt ) )
+        return fail( error, "unsupported WAV format (PCM 8/16/24/32 or float 32 only)" );
     const size_t bytes = bits / 8;
-    const size_t frames = dataBytes / (bytes * channels);
-    mono.assign(frames, 0.0f);
-    if (left != nullptr) left->assign(frames, 0.0f);
-    if (right != nullptr) right->assign(frames, 0.0f);
-    for (size_t f = 0; f < frames; ++f) {
+    const size_t frames = dataBytes / ( bytes * channels );
+    mono.assign( frames, 0.0f );
+    if ( left != nullptr ) left->assign( frames, 0.0f );
+    if ( right != nullptr ) right->assign( frames, 0.0f );
+    for ( size_t f = 0; f < frames; ++f )
+    {
         float sum = 0.0f;
-        for (std::uint32_t c = 0; c < channels; ++c) {
-            const unsigned char* s = data + (f * channels + c) * bytes;
-            float x = 0.0f;
-            if (flt) { std::memcpy(&x, s, 4); }
-            else if (bits == 8) x = (static_cast<float>(s[0]) - 128.0f) / 128.0f;
-            else if (bits == 16) x = static_cast<float>(static_cast<std::int16_t>(le16(s))) / 32768.0f;
-            else if (bits == 24) x = static_cast<float>(static_cast<std::int32_t>((static_cast<std::uint32_t>(s[0]) << 8) | (static_cast<std::uint32_t>(s[1]) << 16) | (static_cast<std::uint32_t>(s[2]) << 24)) >> 8) / 8388608.0f;
-            else x = static_cast<float>(static_cast<std::int32_t>(le32(s))) / 2147483648.0f;
+        for ( std::uint32_t c = 0; c < channels; ++c )
+        {
+            const unsigned char *s = data + ( f * channels + c ) * bytes;
+            float                x = 0.0f;
+            if ( flt )
+            {
+                std::memcpy( &x, s, 4 );
+            }
+            else if ( bits == 8 )
+                x = ( static_cast<float>( s[0] ) - 128.0f ) / 128.0f;
+            else if ( bits == 16 )
+                x = static_cast<float>( static_cast<std::int16_t>( le16( s ) ) ) / 32768.0f;
+            else if ( bits == 24 )
+                x = static_cast<float>( static_cast<std::int32_t>( ( static_cast<std::uint32_t>( s[0] ) << 8 ) |
+                                                                   ( static_cast<std::uint32_t>( s[1] ) << 16 ) |
+                                                                   ( static_cast<std::uint32_t>( s[2] ) << 24 ) ) >>
+                                        8 ) /
+                    8388608.0f;
+            else
+                x = static_cast<float>( static_cast<std::int32_t>( le32( s ) ) ) / 2147483648.0f;
             sum += x;
-            if (left != nullptr && c == 0) (*left)[f] = x;
-            if (right != nullptr && (c == 1 || (c == 0 && channels == 1))) (*right)[f] = x;
+            if ( left != nullptr && c == 0 ) ( *left )[f] = x;
+            if ( right != nullptr && ( c == 1 || ( c == 0 && channels == 1 ) ) ) ( *right )[f] = x;
         }
-        mono[f] = sum / static_cast<float>(channels);
+        mono[f] = sum / static_cast<float>( channels );
     }
     rate = sampleRate;
     return true;
@@ -148,26 +174,33 @@ bool decodeWav(const std::vector<unsigned char>& d, std::vector<float>& mono, do
  * @param[out] error  receives the reason when it fails
  * @return true when read
  */
-bool loadMono(const fs::path& path, std::vector<float>& mono, double& rate, std::string* error)
+bool loadMono( const fs::path &path, std::vector<float> &mono, double &rate, std::string *error )
 {
     std::vector<unsigned char> bytes;
-    if (!readFile(path, bytes)) return fail(error, "cannot read " + path.string());
-    if (bytes.size() >= 4 && std::memcmp(bytes.data(), "fLaC", 4) == 0) {
-        unsigned int channels = 0, sampleRate = 0;
+    if ( !readFile( path, bytes ) ) return fail( error, "cannot read " + path.string() );
+    if ( bytes.size() >= 4 && std::memcmp( bytes.data(), "fLaC", 4 ) == 0 )
+    {
+        unsigned int  channels = 0, sampleRate = 0;
         drflac_uint64 frames = 0;
-        float* pcm = drflac_open_memory_and_read_pcm_frames_f32(bytes.data(), bytes.size(), &channels, &sampleRate, &frames, nullptr);
-        if (!pcm || channels == 0) { if (pcm) drflac_free(pcm, nullptr); return fail(error, "cannot decode the FLAC file " + path.string()); }
-        mono.assign(static_cast<size_t>(frames), 0.0f);
-        for (size_t f = 0; f < mono.size(); ++f) {
-            float sum = 0.0f;
-            for (unsigned int c = 0; c < channels; ++c) sum += pcm[f * channels + c];
-            mono[f] = sum / static_cast<float>(channels);
+        float *pcm = drflac_open_memory_and_read_pcm_frames_f32( bytes.data(), bytes.size(), &channels, &sampleRate,
+                                                                 &frames, nullptr );
+        if ( !pcm || channels == 0 )
+        {
+            if ( pcm ) drflac_free( pcm, nullptr );
+            return fail( error, "cannot decode the FLAC file " + path.string() );
         }
-        drflac_free(pcm, nullptr);
+        mono.assign( static_cast<size_t>( frames ), 0.0f );
+        for ( size_t f = 0; f < mono.size(); ++f )
+        {
+            float sum = 0.0f;
+            for ( unsigned int c = 0; c < channels; ++c ) sum += pcm[f * channels + c];
+            mono[f] = sum / static_cast<float>( channels );
+        }
+        drflac_free( pcm, nullptr );
         rate = sampleRate;
         return true;
     }
-    return decodeWav(bytes, mono, rate, error);
+    return decodeWav( bytes, mono, rate, error );
 }
 
 /**
@@ -179,47 +212,60 @@ bool loadMono(const fs::path& path, std::vector<float>& mono, double& rate, std:
  * @param[out] error  receives the reason when it fails
  * @return true when read
  */
-bool readStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
+bool readStereo( const fs::path &path, std::vector<float> &left, std::vector<float> &right, double &rate,
+                 std::string *error )
 {
     std::vector<unsigned char> bytes;
-    if (!readFile(path, bytes)) return fail(error, "cannot read " + path.string());
-    if (bytes.size() >= 4 && std::memcmp(bytes.data(), "fLaC", 4) == 0) {
-        unsigned int channels = 0, sampleRate = 0;
+    if ( !readFile( path, bytes ) ) return fail( error, "cannot read " + path.string() );
+    if ( bytes.size() >= 4 && std::memcmp( bytes.data(), "fLaC", 4 ) == 0 )
+    {
+        unsigned int  channels = 0, sampleRate = 0;
         drflac_uint64 frames = 0;
-        float* pcm = drflac_open_memory_and_read_pcm_frames_f32(bytes.data(), bytes.size(), &channels, &sampleRate, &frames, nullptr);
-        if (!pcm || channels == 0) { if (pcm) drflac_free(pcm, nullptr); return fail(error, "cannot decode the FLAC file " + path.string()); }
-        left.assign(static_cast<size_t>(frames), 0.0f);
-        right.assign(static_cast<size_t>(frames), 0.0f);
-        for (size_t f = 0; f < left.size(); ++f) {
-            left[f] = pcm[f * channels];
-            right[f] = pcm[f * channels + (channels > 1 ? 1 : 0)];
+        float *pcm = drflac_open_memory_and_read_pcm_frames_f32( bytes.data(), bytes.size(), &channels, &sampleRate,
+                                                                 &frames, nullptr );
+        if ( !pcm || channels == 0 )
+        {
+            if ( pcm ) drflac_free( pcm, nullptr );
+            return fail( error, "cannot decode the FLAC file " + path.string() );
         }
-        drflac_free(pcm, nullptr);
+        left.assign( static_cast<size_t>( frames ), 0.0f );
+        right.assign( static_cast<size_t>( frames ), 0.0f );
+        for ( size_t f = 0; f < left.size(); ++f )
+        {
+            left[f] = pcm[f * channels];
+            right[f] = pcm[f * channels + ( channels > 1 ? 1 : 0 )];
+        }
+        drflac_free( pcm, nullptr );
         rate = sampleRate;
         return true;
     }
     std::vector<float> mono;
-    return decodeWav(bytes, mono, rate, error, &left, &right);
+    return decodeWav( bytes, mono, rate, error, &left, &right );
 }
 
 /**
  * @brief An in-place radix-2 FFT.
  * @param[in,out] a  the signal, a power of two long; receives its spectrum
  */
-void fft(std::vector<std::complex<float>>& a)
+void fft( std::vector<std::complex<float>> &a )
 {
     const size_t n = a.size();
-    for (size_t i = 1, j = 0; i < n; ++i) {
+    for ( size_t i = 1, j = 0; i < n; ++i )
+    {
         size_t bit = n >> 1;
-        for (; j & bit; bit >>= 1) j ^= bit;
+        for ( ; j & bit; bit >>= 1 ) j ^= bit;
         j ^= bit;
-        if (i < j) std::swap(a[i], a[j]);
+        if ( i < j ) std::swap( a[i], a[j] );
     }
-    for (size_t len = 2; len <= n; len <<= 1) {
-        const double ang = -2.0 * Pi / static_cast<double>(len);
-        for (size_t k = 0; k < len / 2; ++k) {
-            const std::complex<float> w(static_cast<float>(std::cos(ang * static_cast<double>(k))), static_cast<float>(std::sin(ang * static_cast<double>(k))));
-            for (size_t i = 0; i < n; i += len) {
+    for ( size_t len = 2; len <= n; len <<= 1 )
+    {
+        const double ang = -2.0 * Pi / static_cast<double>( len );
+        for ( size_t k = 0; k < len / 2; ++k )
+        {
+            const std::complex<float> w( static_cast<float>( std::cos( ang * static_cast<double>( k ) ) ),
+                                         static_cast<float>( std::sin( ang * static_cast<double>( k ) ) ) );
+            for ( size_t i = 0; i < n; i += len )
+            {
                 const std::complex<float> u = a[i + k];
                 const std::complex<float> v = a[i + k + len / 2] * w;
                 a[i + k] = u + v;
@@ -231,17 +277,21 @@ void fft(std::vector<std::complex<float>>& a)
 
 /** @brief Releases a COM interface when it goes out of scope. */
 template <class T>
-struct Com {
-    T* m_p = nullptr;                                ///< the interface, null until created
-    ~Com() { if (m_p) m_p->Release(); }
-    Com() = default;                               ///< empty
-    Com(const Com&) = delete;                      ///< owns a reference
-    Com& operator=(const Com&) = delete;           ///< owns a reference
+struct Com
+{
+    T *m_p = nullptr;   ///< the interface, null until created
+    ~Com()
+    {
+        if ( m_p ) m_p->Release();
+    }
+    Com() = default;                          ///< empty
+    Com( const Com & ) = delete;              ///< owns a reference
+    Com &operator=( const Com & ) = delete;   ///< owns a reference
     /**
      * the interface's members
      * @return the interface
      */
-    T* operator->() const { return m_p; }
+    T *operator->() const { return m_p; }
 };
 
 /**
@@ -253,84 +303,97 @@ struct Com {
  * @param[out] error   receives the reason when it fails
  * @return true when decoded
  */
-bool decodeGrey(const fs::path& path, std::vector<unsigned char>& grey, UINT& width, UINT& height, std::string* error)
+bool decodeGrey( const fs::path &path, std::vector<unsigned char> &grey, UINT &width, UINT &height, std::string *error )
 {
     Com<IWICImagingFactory> factory;
-    if (FAILED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory.m_p))))
-        return fail(error, "the Windows Imaging Component is not available");
+    if ( FAILED( CoCreateInstance( CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS( &factory.m_p ) ) ) )
+        return fail( error, "the Windows Imaging Component is not available" );
     Com<IWICBitmapDecoder> decoder;
-    if (FAILED(factory->CreateDecoderFromFilename(path.wstring().c_str(), nullptr, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &decoder.m_p)))
-        return fail(error, "cannot decode the picture " + path.string());
+    if ( FAILED( factory->CreateDecoderFromFilename( path.wstring().c_str(), nullptr, GENERIC_READ,
+                                                     WICDecodeMetadataCacheOnDemand, &decoder.m_p ) ) )
+        return fail( error, "cannot decode the picture " + path.string() );
     Com<IWICBitmapFrameDecode> frame;
-    if (FAILED(decoder->GetFrame(0, &frame.m_p))) return fail(error, "the picture has no frame");
+    if ( FAILED( decoder->GetFrame( 0, &frame.m_p ) ) ) return fail( error, "the picture has no frame" );
     Com<IWICFormatConverter> converter;
-    if (FAILED(factory->CreateFormatConverter(&converter.m_p))
-        || FAILED(converter->Initialize(frame.m_p, GUID_WICPixelFormat8bppGray, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom)))
-        return fail(error, "cannot convert the picture to grey");
-    if (FAILED(converter->GetSize(&width, &height)) || width == 0 || height == 0) return fail(error, "the picture is empty");
-    grey.resize(static_cast<size_t>(width) * height);
-    if (FAILED(converter->CopyPixels(nullptr, width, static_cast<UINT>(grey.size()), grey.data()))) return fail(error, "cannot read the picture's pixels");
+    if ( FAILED( factory->CreateFormatConverter( &converter.m_p ) ) ||
+         FAILED( converter->Initialize( frame.m_p, GUID_WICPixelFormat8bppGray, WICBitmapDitherTypeNone, nullptr, 0.0,
+                                        WICBitmapPaletteTypeCustom ) ) )
+        return fail( error, "cannot convert the picture to grey" );
+    if ( FAILED( converter->GetSize( &width, &height ) ) || width == 0 || height == 0 )
+        return fail( error, "the picture is empty" );
+    grey.resize( static_cast<size_t>( width ) * height );
+    if ( FAILED( converter->CopyPixels( nullptr, width, static_cast<UINT>( grey.size() ), grey.data() ) ) )
+        return fail( error, "cannot read the picture's pixels" );
     return true;
 }
 
-} // namespace
+}   // namespace
 
-float landscapeColumnHz(int column, int columns)
+float landscapeColumnHz( int column, int columns )
 {
-    const float x = columns > 1 ? static_cast<float>(column) / static_cast<float>(columns - 1) : 0.0f;
-    return LandLowHz * std::pow(LandHighHz / LandLowHz, x);
+    const float x = columns > 1 ? static_cast<float>( column ) / static_cast<float>( columns - 1 ) : 0.0f;
+    return LandLowHz * std::pow( LandHighHz / LandLowHz, x );
 }
 
-float brightnessToAmp(float b, float rangeDb)
+float brightnessToAmp( float b, float rangeDb )
 {
-    if (b <= 0.0f) return 0.0f;
-    return std::pow(10.0f, (std::min(b, 1.0f) - 1.0f) * rangeDb / 20.0f);
+    if ( b <= 0.0f ) return 0.0f;
+    return std::pow( 10.0f, ( std::min( b, 1.0f ) - 1.0f ) * rangeDb / 20.0f );
 }
 
-float ampToBrightness(float a, float rangeDb)
+float ampToBrightness( float a, float rangeDb )
 {
-    if (a <= 0.0f) return 0.0f;
-    return std::clamp(1.0f + 20.0f * std::log10(a) / rangeDb, 0.0f, 1.0f);
+    if ( a <= 0.0f ) return 0.0f;
+    return std::clamp( 1.0f + 20.0f * std::log10( a ) / rangeDb, 0.0f, 1.0f );
 }
 
-Landscape landscapeAurora(float loopSeconds, float rangeDb, int columns, int rows)
+Landscape landscapeAurora( float loopSeconds, float rangeDb, int columns, int rows )
 {
     Landscape l;
-    l.m_columns = std::clamp(columns, 2, LandMaxColumns);
-    l.m_rows = std::clamp(rows, 1, LandMaxRows);
-    l.m_rowSeconds = loopSeconds / static_cast<float>(l.m_rows);
-    l.m_amps.resize(static_cast<size_t>(l.m_columns) * l.m_rows);
-    auto band = [](float y, float centre, float width) { const float d = (y - centre) / width; return std::exp(-0.5f * d * d); };
-    const float tau = 2.0f * static_cast<float>(Pi);
-    for (int r = 0; r < l.m_rows; ++r) {
+    l.m_columns = std::clamp( columns, 2, LandMaxColumns );
+    l.m_rows = std::clamp( rows, 1, LandMaxRows );
+    l.m_rowSeconds = loopSeconds / static_cast<float>( l.m_rows );
+    l.m_amps.resize( static_cast<size_t>( l.m_columns ) * l.m_rows );
+    auto band = []( float y, float centre, float width )
+    {
+        const float d = ( y - centre ) / width;
+        return std::exp( -0.5f * d * d );
+    };
+    const float tau = 2.0f * static_cast<float>( Pi );
+    for ( int r = 0; r < l.m_rows; ++r )
+    {
         // Every motion turns a whole number of times per loop, so the loop has no seam.
-        const float t = static_cast<float>(r) / static_cast<float>(l.m_rows);
-        const float y1 = 0.35f + 0.15f * std::sin(tau * (t + 0.1f));
-        const float s1 = 0.9f * (0.6f + 0.4f * std::sin(tau * 2.0f * t));
-        const float y2 = 0.6f + 0.12f * std::sin(tau * (2.0f * t + 0.4f));
-        const float s2 = 0.8f * (0.5f + 0.5f * std::sin(tau * (t + 0.6f)));
-        float climb = 2.0f * t + 0.2f;
-        climb -= std::floor(climb);
+        const float t = static_cast<float>( r ) / static_cast<float>( l.m_rows );
+        const float y1 = 0.35f + 0.15f * std::sin( tau * ( t + 0.1f ) );
+        const float s1 = 0.9f * ( 0.6f + 0.4f * std::sin( tau * 2.0f * t ) );
+        const float y2 = 0.6f + 0.12f * std::sin( tau * ( 2.0f * t + 0.4f ) );
+        const float s2 = 0.8f * ( 0.5f + 0.5f * std::sin( tau * ( t + 0.6f ) ) );
+        float       climb = 2.0f * t + 0.2f;
+        climb -= std::floor( climb );
         const float y3 = 0.1f + 0.85f * climb;
-        const float s3 = std::sin(static_cast<float>(Pi) * climb);   // fades in at the bottom and out at the top
-        const float s4 = 0.5f * (0.5f + 0.5f * std::sin(tau * 6.0f * t));
-        for (int c = 0; c < l.m_columns; ++c) {
-            const float y = static_cast<float>(c) / static_cast<float>(l.m_columns - 1);
-            float b = 0.25f;
-            b = std::max(b, s1 * band(y, y1, 0.04f));
-            b = std::max(b, s2 * band(y, y2, 0.03f));
-            b = std::max(b, s3 * band(y, y3, 0.025f));
-            b = std::max(b, s4 * band(y, 0.82f, 0.05f));
-            l.m_amps[static_cast<size_t>(r) * l.m_columns + c] = brightnessToAmp(b, rangeDb);
+        const float s3 = std::sin( static_cast<float>( Pi ) * climb );   // fades in at the bottom and out at the top
+        const float s4 = 0.5f * ( 0.5f + 0.5f * std::sin( tau * 6.0f * t ) );
+        for ( int c = 0; c < l.m_columns; ++c )
+        {
+            const float y = static_cast<float>( c ) / static_cast<float>( l.m_columns - 1 );
+            float       b = 0.25f;
+            b = std::max( b, s1 * band( y, y1, 0.04f ) );
+            b = std::max( b, s2 * band( y, y2, 0.03f ) );
+            b = std::max( b, s3 * band( y, y3, 0.025f ) );
+            b = std::max( b, s4 * band( y, 0.82f, 0.05f ) );
+            l.m_amps[static_cast<size_t>( r ) * l.m_columns + c] = brightnessToAmp( b, rangeDb );
         }
     }
     return l;
 }
 
-const char* const LandscapeNames[NumFactoryLandscapes] = { "Aurora", "Shepard", "Tides", "Rain", "Choir" };
-const char* const LandscapeChoiceNames[NumLandscapeChoices] = { "Aurora", "Shepard", "Tides", "Rain", "Choir", "Your Own" };
+const char *const LandscapeNames[NumFactoryLandscapes] = { "Aurora", "Shepard", "Tides", "Rain", "Choir" };
+const char *const LandscapeChoiceNames[NumLandscapeChoices] = { "Aurora", "Shepard", "Tides",
+                                                                "Rain",   "Choir",   "Your Own" };
 
-namespace {
+namespace
+{
 
 /**
  * @brief A generated landscape from a brightness function of loop time and log frequency.
@@ -340,18 +403,21 @@ namespace {
  * @return the landscape, 256 columns and 1024 rows
  */
 template <class BrightT>
-Landscape generate(float loopSeconds, float rangeDb, BrightT&& bright)
+Landscape generate( float loopSeconds, float rangeDb, BrightT &&bright )
 {
     Landscape l;
     l.m_columns = 256;
     l.m_rows = 1024;
-    l.m_rowSeconds = loopSeconds / static_cast<float>(l.m_rows);
-    l.m_amps.resize(static_cast<size_t>(l.m_columns) * l.m_rows);
-    for (int r = 0; r < l.m_rows; ++r) {
-        const float t = static_cast<float>(r) / static_cast<float>(l.m_rows);
-        for (int c = 0; c < l.m_columns; ++c) {
-            const float y = static_cast<float>(c) / static_cast<float>(l.m_columns - 1);
-            l.m_amps[static_cast<size_t>(r) * l.m_columns + c] = brightnessToAmp(std::clamp(bright(t, y), 0.0f, 1.0f), rangeDb);
+    l.m_rowSeconds = loopSeconds / static_cast<float>( l.m_rows );
+    l.m_amps.resize( static_cast<size_t>( l.m_columns ) * l.m_rows );
+    for ( int r = 0; r < l.m_rows; ++r )
+    {
+        const float t = static_cast<float>( r ) / static_cast<float>( l.m_rows );
+        for ( int c = 0; c < l.m_columns; ++c )
+        {
+            const float y = static_cast<float>( c ) / static_cast<float>( l.m_columns - 1 );
+            l.m_amps[static_cast<size_t>( r ) * l.m_columns + c] =
+                brightnessToAmp( std::clamp( bright( t, y ), 0.0f, 1.0f ), rangeDb );
         }
     }
     return l;
@@ -364,10 +430,10 @@ Landscape generate(float loopSeconds, float rangeDb, BrightT&& bright)
  * @param[in] width   its standard deviation
  * @return 0 .. 1
  */
-float bump(float x, float centre, float width)
+float bump( float x, float centre, float width )
 {
-    const float d = (x - centre) / width;
-    return std::exp(-0.5f * d * d);
+    const float d = ( x - centre ) / width;
+    return std::exp( -0.5f * d * d );
 }
 
 /**
@@ -375,254 +441,325 @@ float bump(float x, float centre, float width)
  * @param[in] hz  the frequency
  * @return 0 at 20 Hz .. 1 at 20 kHz
  */
-float yOf(float hz) { return std::log2(hz / LandLowHz) / std::log2(LandHighHz / LandLowHz); }
+float yOf( float hz )
+{
+    return std::log2( hz / LandLowHz ) / std::log2( LandHighHz / LandLowHz );
+}
 
 /**
  * @brief A deterministic number in [0, 1) for the k-th draw of a generated landscape.
  * @param[in] k  the draw
  * @return 0 .. 1
  */
-float dice(std::uint32_t k)
+float dice( std::uint32_t k )
 {
-    k ^= k >> 16; k *= 0x7feb352dU; k ^= k >> 15; k *= 0x846ca68bU; k ^= k >> 16;
-    return static_cast<float>(k >> 8) * (1.0f / 16777216.0f);
+    k ^= k >> 16;
+    k *= 0x7feb352dU;
+    k ^= k >> 15;
+    k *= 0x846ca68bU;
+    k ^= k >> 16;
+    return static_cast<float>( k >> 8 ) * ( 1.0f / 16777216.0f );
 }
 
-} // namespace
+}   // namespace
 
-Landscape factoryLandscape(int index, float rangeDb)
+Landscape factoryLandscape( int index, float rangeDb )
 {
-    const float tau = 2.0f * static_cast<float>(Pi);
-    switch (index) {
+    const float tau = 2.0f * static_cast<float>( Pi );
+    switch ( index )
+    {
     case 1:   // Shepard: four bands climbing for ever
-        return generate(40.0f, rangeDb, [&](float t, float y) {
-            float b = 0.3f;
-            for (int k = 0; k < 4; ++k) {
-                float u = t + 0.25f * static_cast<float>(k);
-                u -= std::floor(u);
-                b = std::max(b, std::sin(static_cast<float>(Pi) * u) * bump(y, 0.15f + 0.75f * u, 0.03f));
-            }
-            return b;
-        });
+        return generate( 40.0f, rangeDb,
+                         [&]( float t, float y )
+                         {
+                             float b = 0.3f;
+                             for ( int k = 0; k < 4; ++k )
+                             {
+                                 float u = t + 0.25f * static_cast<float>( k );
+                                 u -= std::floor( u );
+                                 b = std::max( b, std::sin( static_cast<float>( Pi ) * u ) *
+                                                      bump( y, 0.15f + 0.75f * u, 0.03f ) );
+                             }
+                             return b;
+                         } );
     case 2:   // Tides: broad swells rolling upwards
-        return generate(60.0f, rangeDb, [&](float t, float y) {
-            const float swell = 0.5f + 0.5f * std::sin(tau * (2.0f * t - 1.5f * y));
-            return 0.35f + 0.6f * swell * bump(y, 0.5f, 0.3f);
-        });
+        return generate( 60.0f, rangeDb,
+                         [&]( float t, float y )
+                         {
+                             const float swell = 0.5f + 0.5f * std::sin( tau * ( 2.0f * t - 1.5f * y ) );
+                             return 0.35f + 0.6f * swell * bump( y, 0.5f, 0.3f );
+                         } );
     case 3:   // Rain: sixty short glints at chance places
-        return generate(30.0f, rangeDb, [&](float t, float y) {
-            float b = 0.35f;
-            for (std::uint32_t k = 0; k < 60; ++k) {
-                float dt = t - dice(2 * k);
-                dt -= std::floor(dt);                     // time since the glint, around the loop
-                const float decay = std::exp(-dt * 30.0f);   // about a second
-                if (decay > 0.01f) b = std::max(b, 0.9f * decay * bump(y, 0.25f + 0.6f * dice(2 * k + 1), 0.015f));
-            }
-            return b;
-        });
-    case 4: {   // Choir: the formants of u-o-a-e-i, the vowel turning slowly
-        static const float F[5][3] = { { 350, 600, 2400 }, { 450, 800, 2830 }, { 800, 1150, 2900 }, { 400, 2000, 2550 }, { 270, 2140, 2950 } };
-        return generate(48.0f, rangeDb, [&](float t, float y) {
-            // Through u o a e i and back: 0 .. 4 .. 0 over the loop.
-            const float v = 4.0f * (1.0f - std::fabs(2.0f * t - 1.0f));
-            const int i0 = std::min(static_cast<int>(v), 3);
-            const float fr = v - static_cast<float>(i0);
-            float b = 0.3f;
-            const float w[3] = { 0.95f, 0.8f, 0.6f };
-            for (int k = 0; k < 3; ++k) {
-                const float fk = F[i0][k] * std::pow(F[i0 + 1][k] / F[i0][k], fr);
-                b = std::max(b, w[k] * bump(y, yOf(fk), 0.02f));
-            }
-            return b;
-        });
+        return generate( 30.0f, rangeDb,
+                         [&]( float t, float y )
+                         {
+                             float b = 0.35f;
+                             for ( std::uint32_t k = 0; k < 60; ++k )
+                             {
+                                 float dt = t - dice( 2 * k );
+                                 dt -= std::floor( dt );                        // time since the glint, around the loop
+                                 const float decay = std::exp( -dt * 30.0f );   // about a second
+                                 if ( decay > 0.01f )
+                                     b = std::max( b,
+                                                   0.9f * decay * bump( y, 0.25f + 0.6f * dice( 2 * k + 1 ), 0.015f ) );
+                             }
+                             return b;
+                         } );
+    case 4:
+    {   // Choir: the formants of u-o-a-e-i, the vowel turning slowly
+        static const float F[5][3] = {
+            { 350, 600, 2400 }, { 450, 800, 2830 }, { 800, 1150, 2900 }, { 400, 2000, 2550 }, { 270, 2140, 2950 }
+        };
+        return generate( 48.0f, rangeDb,
+                         [&]( float t, float y )
+                         {
+                             // Through u o a e i and back: 0 .. 4 .. 0 over the loop.
+                             const float v = 4.0f * ( 1.0f - std::fabs( 2.0f * t - 1.0f ) );
+                             const int   i0 = std::min( static_cast<int>( v ), 3 );
+                             const float fr = v - static_cast<float>( i0 );
+                             float       b = 0.3f;
+                             const float w[3] = { 0.95f, 0.8f, 0.6f };
+                             for ( int k = 0; k < 3; ++k )
+                             {
+                                 const float fk = F[i0][k] * std::pow( F[i0 + 1][k] / F[i0][k], fr );
+                                 b = std::max( b, w[k] * bump( y, yOf( fk ), 0.02f ) );
+                             }
+                             return b;
+                         } );
     }
-    default:
-        return landscapeAurora(30.0f, rangeDb);
+    default: return landscapeAurora( 30.0f, rangeDb );
     }
 }
 
-float landscapeRms(const Landscape& l)
+float landscapeRms( const Landscape &l )
 {
-    if (l.m_amps.empty()) return 1.0f;
+    if ( l.m_amps.empty() ) return 1.0f;
     double sq = 0.0;
-    for (float a : l.m_amps) sq += static_cast<double>(a) * a;
-    return static_cast<float>(std::sqrt(sq / static_cast<double>(l.m_amps.size())));
+    for ( float a : l.m_amps ) sq += static_cast<double>( a ) * a;
+    return static_cast<float>( std::sqrt( sq / static_cast<double>( l.m_amps.size() ) ) );
 }
 
-bool landscapeFromImage(const std::filesystem::path& path, float loopSeconds, float rangeDb, Landscape& out, std::string* error)
+bool landscapeFromImage( const std::filesystem::path &path, float loopSeconds, float rangeDb, Landscape &out,
+                         std::string *error )
 {
-    const HRESULT init = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    const HRESULT              init = CoInitializeEx( nullptr, COINIT_MULTITHREADED );
     std::vector<unsigned char> grey;
-    UINT w = 0, h = 0;
-    const bool decoded = decodeGrey(path, grey, w, h, error);
-    if (SUCCEEDED(init)) CoUninitialize();
-    if (!decoded) return false;
+    UINT                       w = 0, h = 0;
+    const bool                 decoded = decodeGrey( path, grey, w, h, error );
+    if ( SUCCEEDED( init ) ) CoUninitialize();
+    if ( !decoded ) return false;
 
     Landscape l;
-    l.m_columns = std::clamp(static_cast<int>(h), 2, LandMaxColumns);
-    l.m_rows = std::clamp(static_cast<int>(w), 1, LandMaxRows);
-    l.m_rowSeconds = std::max(loopSeconds, 0.01f) / static_cast<float>(l.m_rows);
-    l.m_amps.resize(static_cast<size_t>(l.m_columns) * l.m_rows);
-    auto pixel = [&](int x, int y) { return static_cast<float>(grey[static_cast<size_t>(std::clamp(y, 0, static_cast<int>(h) - 1)) * w + std::clamp(x, 0, static_cast<int>(w) - 1)]) / 255.0f; };
-    for (int r = 0; r < l.m_rows; ++r) {
-        const float x = (static_cast<float>(r) + 0.5f) * static_cast<float>(w) / static_cast<float>(l.m_rows) - 0.5f;
-        const int x0 = static_cast<int>(std::floor(x));
-        const float fx = x - static_cast<float>(x0);
-        for (int c = 0; c < l.m_columns; ++c) {
+    l.m_columns = std::clamp( static_cast<int>( h ), 2, LandMaxColumns );
+    l.m_rows = std::clamp( static_cast<int>( w ), 1, LandMaxRows );
+    l.m_rowSeconds = std::max( loopSeconds, 0.01f ) / static_cast<float>( l.m_rows );
+    l.m_amps.resize( static_cast<size_t>( l.m_columns ) * l.m_rows );
+    auto pixel = [&]( int x, int y )
+    {
+        return static_cast<float>( grey[static_cast<size_t>( std::clamp( y, 0, static_cast<int>( h ) - 1 ) ) * w +
+                                        std::clamp( x, 0, static_cast<int>( w ) - 1 )] ) /
+               255.0f;
+    };
+    for ( int r = 0; r < l.m_rows; ++r )
+    {
+        const float x =
+            ( static_cast<float>( r ) + 0.5f ) * static_cast<float>( w ) / static_cast<float>( l.m_rows ) - 0.5f;
+        const int   x0 = static_cast<int>( std::floor( x ) );
+        const float fx = x - static_cast<float>( x0 );
+        for ( int c = 0; c < l.m_columns; ++c )
+        {
             // The top of the picture is the top of the spectrum.
-            const float y = static_cast<float>(h) - 0.5f - (static_cast<float>(c) + 0.5f) * static_cast<float>(h) / static_cast<float>(l.m_columns);
-            const int y0 = static_cast<int>(std::floor(y));
-            const float fy = y - static_cast<float>(y0);
-            const float top = pixel(x0, y0) + (pixel(x0 + 1, y0) - pixel(x0, y0)) * fx;
-            const float bottom = pixel(x0, y0 + 1) + (pixel(x0 + 1, y0 + 1) - pixel(x0, y0 + 1)) * fx;
-            l.m_amps[static_cast<size_t>(r) * l.m_columns + c] = brightnessToAmp(top + (bottom - top) * fy, rangeDb);
+            const float y =
+                static_cast<float>( h ) - 0.5f -
+                ( static_cast<float>( c ) + 0.5f ) * static_cast<float>( h ) / static_cast<float>( l.m_columns );
+            const int   y0 = static_cast<int>( std::floor( y ) );
+            const float fy = y - static_cast<float>( y0 );
+            const float top = pixel( x0, y0 ) + ( pixel( x0 + 1, y0 ) - pixel( x0, y0 ) ) * fx;
+            const float bottom = pixel( x0, y0 + 1 ) + ( pixel( x0 + 1, y0 + 1 ) - pixel( x0, y0 + 1 ) ) * fx;
+            l.m_amps[static_cast<size_t>( r ) * l.m_columns + c] =
+                brightnessToAmp( top + ( bottom - top ) * fy, rangeDb );
         }
     }
-    out = std::move(l);
+    out = std::move( l );
     return true;
 }
 
-bool landscapeFromAudio(const std::filesystem::path& path, float rangeDb, float whiten, float seamless, float smooth,
-                        Landscape& out, std::string* error)
+bool landscapeFromAudio( const std::filesystem::path &path, float rangeDb, float whiten, float seamless, float smooth,
+                         Landscape &out, std::string *error )
 {
     std::vector<float> mono;
-    double rate = 48000.0;
-    if (!loadMono(path, mono, rate, error)) return false;
+    double             rate = 48000.0;
+    if ( !loadMono( path, mono, rate, error ) ) return false;
     constexpr int N = 4096;
-    if (mono.size() < static_cast<size_t>(N)) mono.resize(N, 0.0f);
-    const size_t span = mono.size() - N;
-    const size_t hop = std::max<size_t>(1024, (span + LandMaxRows - 2) / (LandMaxRows - 1));
-    const int frames = static_cast<int>(1 + span / hop);
+    if ( mono.size() < static_cast<size_t>( N ) ) mono.resize( N, 0.0f );
+    const size_t  span = mono.size() - N;
+    const size_t  hop = std::max<size_t>( 1024, ( span + LandMaxRows - 2 ) / ( LandMaxRows - 1 ) );
+    const int     frames = static_cast<int>( 1 + span / hop );
     constexpr int Columns = 256;
 
     // Each column's band in FFT bins: half a column either side of its centre.
-    const double halfStep = std::sqrt(std::pow(static_cast<double>(LandHighHz / LandLowHz), 1.0 / (Columns - 1)));
+    const double halfStep =
+        std::sqrt( std::pow( static_cast<double>( LandHighHz / LandLowHz ), 1.0 / ( Columns - 1 ) ) );
     double kc[Columns], klo[Columns], khi[Columns];
-    for (int c = 0; c < Columns; ++c) {
-        kc[c] = landscapeColumnHz(c, Columns) * N / rate;
+    for ( int c = 0; c < Columns; ++c )
+    {
+        kc[c] = landscapeColumnHz( c, Columns ) * N / rate;
         klo[c] = kc[c] / halfStep;
         khi[c] = kc[c] * halfStep;
     }
-    std::vector<float> window(N);
-    for (int i = 0; i < N; ++i) window[i] = static_cast<float>(0.5 - 0.5 * std::cos(2.0 * Pi * i / N));
+    std::vector<float> window( N );
+    for ( int i = 0; i < N; ++i ) window[i] = static_cast<float>( 0.5 - 0.5 * std::cos( 2.0 * Pi * i / N ) );
 
     Landscape l;
     l.m_columns = Columns;
     l.m_rows = frames;
-    l.m_rowSeconds = static_cast<float>(static_cast<double>(hop) / rate);
-    l.m_amps.assign(static_cast<size_t>(Columns) * frames, 0.0f);
-    std::vector<std::complex<float>> buf(N);
-    std::vector<float> power(N / 2 + 1);
-    for (int f = 0; f < frames; ++f) {
-        const float* x = mono.data() + static_cast<size_t>(f) * hop;
-        for (int i = 0; i < N; ++i) buf[i] = std::complex<float>(x[i] * window[i], 0.0f);
-        fft(buf);
-        for (int k = 0; k <= N / 2; ++k) power[k] = std::norm(buf[k]);
-        float* row = l.m_amps.data() + static_cast<size_t>(f) * Columns;
-        for (int c = 0; c < Columns; ++c) {
-            if (kc[c] >= N / 2) continue;   // above the recording's Nyquist
-            const int a = static_cast<int>(std::ceil(klo[c]));
-            const int b = std::min(static_cast<int>(std::floor(khi[c])), N / 2);
-            double p = 0.0;
-            if (b >= a) {
-                for (int k = a; k <= b; ++k) p += power[k];
-                p /= (b - a + 1);
-            } else {
-                const int k0 = static_cast<int>(kc[c]);
-                const double fr = kc[c] - k0;
-                p = power[k0] + (power[std::min(k0 + 1, N / 2)] - power[k0]) * fr;
+    l.m_rowSeconds = static_cast<float>( static_cast<double>( hop ) / rate );
+    l.m_amps.assign( static_cast<size_t>( Columns ) * frames, 0.0f );
+    std::vector<std::complex<float>> buf( N );
+    std::vector<float>               power( N / 2 + 1 );
+    for ( int f = 0; f < frames; ++f )
+    {
+        const float *x = mono.data() + static_cast<size_t>( f ) * hop;
+        for ( int i = 0; i < N; ++i ) buf[i] = std::complex<float>( x[i] * window[i], 0.0f );
+        fft( buf );
+        for ( int k = 0; k <= N / 2; ++k ) power[k] = std::norm( buf[k] );
+        float *row = l.m_amps.data() + static_cast<size_t>( f ) * Columns;
+        for ( int c = 0; c < Columns; ++c )
+        {
+            if ( kc[c] >= N / 2 ) continue;   // above the recording's Nyquist
+            const int a = static_cast<int>( std::ceil( klo[c] ) );
+            const int b = std::min( static_cast<int>( std::floor( khi[c] ) ), N / 2 );
+            double    p = 0.0;
+            if ( b >= a )
+            {
+                for ( int k = a; k <= b; ++k ) p += power[k];
+                p /= ( b - a + 1 );
             }
-            row[c] = static_cast<float>(std::sqrt(p));
+            else
+            {
+                const int    k0 = static_cast<int>( kc[c] );
+                const double fr = kc[c] - k0;
+                p = power[k0] + ( power[std::min( k0 + 1, N / 2 )] - power[k0] ) * fr;
+            }
+            row[c] = static_cast<float>( std::sqrt( p ) );
         }
     }
 
     // Whitening: each column divided by a power of its own average, so a loud low end does not
     // decide the landscape; then the loudest point is 1 and what lies `rangeDb` below it is 0.
-    if (whiten > 0.0f) {
-        for (int c = 0; c < Columns; ++c) {
+    if ( whiten > 0.0f )
+    {
+        for ( int c = 0; c < Columns; ++c )
+        {
             double mean = 0.0;
-            for (int f = 0; f < frames; ++f) mean += l.m_amps[static_cast<size_t>(f) * Columns + c];
+            for ( int f = 0; f < frames; ++f ) mean += l.m_amps[static_cast<size_t>( f ) * Columns + c];
             mean /= frames;
-            if (mean < 1.0e-12) continue;
-            const float div = static_cast<float>(std::pow(mean, static_cast<double>(std::clamp(whiten, 0.0f, 1.0f))));
-            for (int f = 0; f < frames; ++f) l.m_amps[static_cast<size_t>(f) * Columns + c] /= div;
+            if ( mean < 1.0e-12 ) continue;
+            const float div =
+                static_cast<float>( std::pow( mean, static_cast<double>( std::clamp( whiten, 0.0f, 1.0f ) ) ) );
+            for ( int f = 0; f < frames; ++f ) l.m_amps[static_cast<size_t>( f ) * Columns + c] /= div;
         }
     }
     // The loop first, then the smoothing around it: two passes of a circular box per column, a
     // triangle of `smooth` seconds in all.
-    makeSeamless(l, seamless);
-    const int half = static_cast<int>(std::lround(0.5 * smooth / l.m_rowSeconds));
-    if (half >= 1 && l.m_rows > 2 * half + 1) {
-        const int rowsN = l.m_rows;
-        std::vector<double> col(rowsN), acc(rowsN);
-        for (int c = 0; c < Columns; ++c) {
-            for (int f = 0; f < rowsN; ++f) col[f] = l.m_amps[static_cast<size_t>(f) * Columns + c];
-            for (int pass = 0; pass < 2; ++pass) {
+    makeSeamless( l, seamless );
+    const int half = static_cast<int>( std::lround( 0.5 * smooth / l.m_rowSeconds ) );
+    if ( half >= 1 && l.m_rows > 2 * half + 1 )
+    {
+        const int           rowsN = l.m_rows;
+        std::vector<double> col( rowsN ), acc( rowsN );
+        for ( int c = 0; c < Columns; ++c )
+        {
+            for ( int f = 0; f < rowsN; ++f ) col[f] = l.m_amps[static_cast<size_t>( f ) * Columns + c];
+            for ( int pass = 0; pass < 2; ++pass )
+            {
                 double sum = 0.0;
-                for (int k = -half; k <= half; ++k) sum += col[(k + rowsN) % rowsN];
-                for (int f = 0; f < rowsN; ++f) {
-                    acc[f] = sum / (2 * half + 1);
-                    sum += col[(f + half + 1) % rowsN] - col[(f - half + rowsN) % rowsN];
+                for ( int k = -half; k <= half; ++k ) sum += col[( k + rowsN ) % rowsN];
+                for ( int f = 0; f < rowsN; ++f )
+                {
+                    acc[f] = sum / ( 2 * half + 1 );
+                    sum += col[( f + half + 1 ) % rowsN] - col[( f - half + rowsN ) % rowsN];
                 }
-                col.swap(acc);
+                col.swap( acc );
             }
-            for (int f = 0; f < rowsN; ++f) l.m_amps[static_cast<size_t>(f) * Columns + c] = static_cast<float>(col[f]);
+            for ( int f = 0; f < rowsN; ++f )
+                l.m_amps[static_cast<size_t>( f ) * Columns + c] = static_cast<float>( col[f] );
         }
     }
 
     // Normalised to the 99.5th percentile rather than the maximum: a few breaking waves would
     // otherwise push everything else down (the first sea came out 28 dB below its peaks).
-    std::vector<float> sorted(l.m_amps);
-    const size_t at = std::min(sorted.size() - 1, static_cast<size_t>(0.995 * static_cast<double>(sorted.size())));
-    std::nth_element(sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>(at), sorted.end());
+    std::vector<float> sorted( l.m_amps );
+    const size_t       at =
+        std::min( sorted.size() - 1, static_cast<size_t>( 0.995 * static_cast<double>( sorted.size() ) ) );
+    std::nth_element( sorted.begin(), sorted.begin() + static_cast<std::ptrdiff_t>( at ), sorted.end() );
     const float peak = sorted[at];
-    if (peak <= 0.0f) return fail(error, "the recording is silent");
-    const float floorAmp = std::pow(10.0f, -rangeDb / 20.0f);
-    for (float& a : l.m_amps) a = std::clamp((a / peak - floorAmp) / (1.0f - floorAmp), 0.0f, 1.0f);
-    out = std::move(l);
+    if ( peak <= 0.0f ) return fail( error, "the recording is silent" );
+    const float floorAmp = std::pow( 10.0f, -rangeDb / 20.0f );
+    for ( float &a : l.m_amps ) a = std::clamp( ( a / peak - floorAmp ) / ( 1.0f - floorAmp ), 0.0f, 1.0f );
+    out = std::move( l );
     return true;
 }
 
-void makeSeamless(Landscape& l, float fraction)
+void makeSeamless( Landscape &l, float fraction )
 {
-    const int x = static_cast<int>(std::lround(std::clamp(fraction, 0.0f, 0.5f) * static_cast<float>(l.m_rows)));
-    if (x < 1 || l.m_rows - x < 2) return;
+    const int x =
+        static_cast<int>( std::lround( std::clamp( fraction, 0.0f, 0.5f ) * static_cast<float>( l.m_rows ) ) );
+    if ( x < 1 || l.m_rows - x < 2 ) return;
     const int keep = l.m_rows - x;
-    for (int i = 0; i < x; ++i) {
+    for ( int i = 0; i < x; ++i )
+    {
         // Row i of the new loop leans from the old end (just before the wrap) to the old beginning.
-        const float w = (static_cast<float>(i) + 0.5f) / static_cast<float>(x);
-        float* head = l.m_amps.data() + static_cast<size_t>(i) * l.m_columns;
-        const float* tail = l.m_amps.data() + static_cast<size_t>(keep + i) * l.m_columns;
-        for (int c = 0; c < l.m_columns; ++c) head[c] = tail[c] * (1.0f - w) + head[c] * w;
+        const float  w = ( static_cast<float>( i ) + 0.5f ) / static_cast<float>( x );
+        float       *head = l.m_amps.data() + static_cast<size_t>( i ) * l.m_columns;
+        const float *tail = l.m_amps.data() + static_cast<size_t>( keep + i ) * l.m_columns;
+        for ( int c = 0; c < l.m_columns; ++c ) head[c] = tail[c] * ( 1.0f - w ) + head[c] * w;
     }
     l.m_rows = keep;
-    l.m_amps.resize(static_cast<size_t>(keep) * l.m_columns);
+    l.m_amps.resize( static_cast<size_t>( keep ) * l.m_columns );
 }
 
-bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, float rangeDb, std::string* error)
+bool writeLandscapeBmp( const Landscape &l, const std::filesystem::path &path, float rangeDb, std::string *error )
 {
-    if (l.m_columns < 1 || l.m_rows < 1) return fail(error, "empty landscape");
-    const std::uint32_t width = static_cast<std::uint32_t>(l.m_rows), height = static_cast<std::uint32_t>(l.m_columns);
-    const std::uint32_t stride = (width * 3 + 3) & ~3u;
-    const std::uint32_t pixelBytes = stride * height;
-    std::vector<unsigned char> bmp(54 + pixelBytes, 0);
-    auto put32 = [&](size_t at, std::uint32_t v) { for (int i = 0; i < 4; ++i) bmp[at + i] = static_cast<unsigned char>(v >> (8 * i)); };
-    auto put16 = [&](size_t at, std::uint32_t v) { bmp[at] = static_cast<unsigned char>(v); bmp[at + 1] = static_cast<unsigned char>(v >> 8); };
-    bmp[0] = 'B'; bmp[1] = 'M';
-    put32(2, static_cast<std::uint32_t>(bmp.size())); put32(10, 54);
-    put32(14, 40); put32(18, width); put32(22, height); put16(26, 1); put16(28, 24); put32(34, pixelBytes);
-    put32(38, 2835); put32(42, 2835);
+    if ( l.m_columns < 1 || l.m_rows < 1 ) return fail( error, "empty landscape" );
+    const std::uint32_t        width = static_cast<std::uint32_t>( l.m_rows ),
+                               height = static_cast<std::uint32_t>( l.m_columns );
+    const std::uint32_t        stride = ( width * 3 + 3 ) & ~3u;
+    const std::uint32_t        pixelBytes = stride * height;
+    std::vector<unsigned char> bmp( 54 + pixelBytes, 0 );
+    auto                       put32 = [&]( size_t at, std::uint32_t v )
+    {
+        for ( int i = 0; i < 4; ++i ) bmp[at + i] = static_cast<unsigned char>( v >> ( 8 * i ) );
+    };
+    auto put16 = [&]( size_t at, std::uint32_t v )
+    {
+        bmp[at] = static_cast<unsigned char>( v );
+        bmp[at + 1] = static_cast<unsigned char>( v >> 8 );
+    };
+    bmp[0] = 'B';
+    bmp[1] = 'M';
+    put32( 2, static_cast<std::uint32_t>( bmp.size() ) );
+    put32( 10, 54 );
+    put32( 14, 40 );
+    put32( 18, width );
+    put32( 22, height );
+    put16( 26, 1 );
+    put16( 28, 24 );
+    put32( 34, pixelBytes );
+    put32( 38, 2835 );
+    put32( 42, 2835 );
     // BMP rows run bottom-up: the first is the lowest column.
-    for (std::uint32_t y = 0; y < height; ++y)
-        for (std::uint32_t x = 0; x < width; ++x) {
-            const float a = l.m_amps[static_cast<size_t>(x) * l.m_columns + y];
-            const unsigned char g = static_cast<unsigned char>(std::lround(255.0f * ampToBrightness(a, rangeDb)));
-            unsigned char* px = bmp.data() + 54 + static_cast<size_t>(y) * stride + static_cast<size_t>(x) * 3;
+    for ( std::uint32_t y = 0; y < height; ++y )
+        for ( std::uint32_t x = 0; x < width; ++x )
+        {
+            const float         a = l.m_amps[static_cast<size_t>( x ) * l.m_columns + y];
+            const unsigned char g = static_cast<unsigned char>( std::lround( 255.0f * ampToBrightness( a, rangeDb ) ) );
+            unsigned char      *px = bmp.data() + 54 + static_cast<size_t>( y ) * stride + static_cast<size_t>( x ) * 3;
             px[0] = px[1] = px[2] = g;
         }
-    std::ofstream f(path, std::ios::binary);
-    f.write(reinterpret_cast<const char*>(bmp.data()), static_cast<std::streamsize>(bmp.size()));
-    if (!f) return fail(error, "cannot write " + path.string());
+    std::ofstream f( path, std::ios::binary );
+    f.write( reinterpret_cast<const char *>( bmp.data() ), static_cast<std::streamsize>( bmp.size() ) );
+    if ( !f ) return fail( error, "cannot write " + path.string() );
     return true;
 }
 
@@ -635,9 +772,10 @@ bool writeLandscapeBmp(const Landscape& l, const std::filesystem::path& path, fl
  * @param[out] error  receives the reason when it fails (may be null)
  * @return true when read
  */
-bool loadStereo(const fs::path& path, std::vector<float>& left, std::vector<float>& right, double& rate, std::string* error)
+bool loadStereo( const fs::path &path, std::vector<float> &left, std::vector<float> &right, double &rate,
+                 std::string *error )
 {
-    return readStereo(path, left, right, rate, error);
+    return readStereo( path, left, right, rate, error );
 }
 
-} // namespace additiv
+}   // namespace additiv
