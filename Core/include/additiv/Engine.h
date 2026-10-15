@@ -358,6 +358,10 @@ public:
 
     /** @brief Voices sounding after the last rendered block. @return 0 .. voices */
     int soundingVoices() const { return m_sounding.load( std::memory_order_relaxed ); }
+    /** @brief Chimes that struck since the engine was prepared (Phase 27; tests, diagnostics). @return the count */
+    long long chimeStrikes() const { return m_chimeStrikes.load( std::memory_order_relaxed ); }
+    /** @brief Memories the dream keeps, as the last block left them (Phase 27). @return 0 .. DreamMemories */
+    int dreamMemories() const { return m_cloud.dreamMemories(); }
 
     /**
      * @brief Voices sounding after the last rendered block, by whose notes they play.
@@ -480,6 +484,23 @@ public:
     /** @brief Where the spectral comb's notches stand, in notches (SpectralComb::phase), for the picture. Any thread. @return 0 .. 1 */
     float combPhase() const { return m_combPhaseView.load( std::memory_order_relaxed ); }
     /**
+     * @brief The pitches the phantom layer carries after the last block (Phase 27): its GPU voice's targets.
+     * @param[out] hz      receives the pitches, Hz
+     * @param[out] weight  receives each one's share of the full turn
+     * @return how many, 0 .. PhantomTargets
+     */
+    int phantomPitches( float *hz, float *weight )
+    {
+        const CloudVoice &cv = m_cloud.voice( static_cast<int>( m_voices.size() + m_ghosts.size() ) );
+        const int         n = cv.m_active ? std::clamp( cv.m_phantomCount, 0, PhantomTargets ) : 0;
+        for ( int k = 0; k < n; ++k )
+        {
+            hz[k] = cv.m_phantomHz[k];
+            weight[k] = cv.m_phantomWeight[k];
+        }
+        return n;
+    }
+    /**
      * @brief The ripple's string as it stands after the last block, low to high (tests, diagnostics).
      *        The worker's thread, or offline.
      * @param[out] out  receives RippleCells values
@@ -568,6 +589,9 @@ private:
         bool  m_pileLive = false;               ///< the pile is laid out for this note
         bool  m_subOn = false;                  ///< Subharmonics: clouds reserved for this note (decided at its start)
         std::array<float, SubClouds> m_sub{};   ///< their amplitudes, against harmonic 1's at rest
+        float m_pre = 0.0f;        ///< Premonition: seconds before the note sounds (its swell meanwhile), 0 sounding
+        float m_preTotal = 0.0f;   ///< the premonition's whole length for this note
+        float m_suck = 0.0f;       ///< 1 .. 0 over 0.15 s after the note began: the swell drawn into it
     };
 
     void workerLoop();    ///< the worker: renders while the ring is short of the latency
@@ -850,6 +874,21 @@ private:
      * @param[in]     breath    MPE's Breath on it, 0 .. 1
      */
     void stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, float breath );
+    /**
+     * @brief The Talbot timbre's eigen system for the mode and period (Phase 27), made again only when they change:
+     *        Revival -- the cosine basis over the first TalbotHarmonics harmonics, its n-th mode turning at n^2 times
+     *        2 pi over the period, so the amplitudes come back exactly after it (half way they stand mirrored, at a
+     *        quarter both at once: Talbot's effect); Bloch -- a chain of harmonics with hopping and a tilt of 2 pi over
+     *        the period from one to the next (a Wannier-Stark ladder), so the energy swings up and down the harmonics
+     *        and comes back after the period (Bloch's oscillation). Jacobi's rotations for the chain.
+     */
+    void talbotSystem();
+    /**
+     * @brief The layers that are not notes, one block (Phase 27): the phantom layer's voice (the pitches it carries,
+     *        folded into 220 .. 880 Hz), the dream's voice and its memory, the chime field's wind, gusts and pitches.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepLayers( float dt );
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost
@@ -899,8 +938,30 @@ private:
     double             m_islandDrift = 0.0;      ///< the Islands' drift across, cells of their grid
     std::array<float, SeasonFamilies> m_seasonShare{ 0.6f, 0.1f, 0.1f, 0.1f, 0.1f };   ///< Seasons: each family's share
     float                             m_seasonDepth = 0.0f;   ///< Seasons as it glides (half a second)
-    Rng   m_blowRng;            ///< Overblow's dice (its own stream: switching it on never moves the other drifters)
-    Rng   m_breatherRng;        ///< the breathers' dice (their drift)
+    Rng m_blowRng;       ///< Overblow's dice (its own stream: switching it on never moves the other drifters)
+    Rng m_breatherRng;   ///< the breathers' dice (their drift)
+    // Phase 27
+    std::array<float, TalbotHarmonics * TalbotHarmonics> m_talbotVec{};   ///< Talbot: the eigenvectors, one a row
+    std::array<double, TalbotHarmonics>                  m_talbotVal{};   ///< their frequencies, radians a second
+    float m_talbotKey[2] = { -1.0f, -1.0f };             ///< the mode and the period they were made for
+    float m_gust = 0.0f;                                 ///< the chimes' gust, a slow random (3 s memory)
+    Rng   m_windRng;                                     ///< its dice
+    float m_chimeLevel = 0.0f;                           ///< the chime field's level as it glides
+    bool  m_chimesOn = false;                            ///< the field ran in the last block
+    float m_phantomGain = 0.0f;                          ///< the phantom layer's level as it glides
+    Rng   m_phantomRng;                                  ///< the phantom melody's dice
+    float m_melodyHz[2] = { 0.0f, 0.0f };                ///< the phantom melody: its note now and the one before
+    float m_melodyWeight[2] = { 0.0f, 0.0f };            ///< their shares of the turn, one rising, one falling
+    int   m_melodyAt = -1;                               ///< the note now, among the scale's pitches in 220 .. 880 Hz
+    float m_melodyNext = 0.0f;                           ///< s until its next note
+    std::array<float, PhantomTargets> m_echoHz{};        ///< the phantom echo: notes that ended lately, Hz
+    std::array<float, PhantomTargets> m_echoAge{};       ///< and seconds since (fading over 30 s)
+    int                               m_echoCount = 0;   ///< how many
+    float                             m_dreamGain = 0.0f;    ///< the dream's level as it glides
+    int                               m_dreamBlocks = 0;     ///< blocks since the dream last kept what it heard
+    std::atomic<long long>            m_chimeStrikes{ 0 };   ///< chimes struck since prepare (chimeStrikes)
+    std::vector<float>                m_phantomL;            ///< the phantom layer's block from the GPU, left
+    std::vector<float>                m_phantomR;            ///< and right
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
@@ -918,68 +979,73 @@ private:
     /** @brief The parameter values one block works with. */
     struct Block
     {
-        float m_master = 1.0f;          ///< master gain, linear
-        int   m_partials = 20000;       ///< partials per voice
-        float m_tilt = 1.2f;            ///< spectral tilt
-        float m_width = 25.0f;          ///< cloud width, cents, after Purity's narrowing
-        float m_widthSlope = 0.3f;      ///< cloud widening
-        float m_drift = 3.0f;           ///< cents
-        float m_driftRate = 0.1f;       ///< Hz
-        float m_shimmer = 0.4f;         ///< 0 .. 1
-        float m_shimmerRate = 0.15f;    ///< Hz
-        float m_stereo = 1.0f;          ///< 0 .. 1
-        int   m_motion = 0;             ///< MotionKind
-        float m_motionRate = 1.0f;      ///< times
-        float m_motionDepth = 1.0f;     ///< times
-        float m_attack = 6.0f;          ///< seconds
-        float m_decay = 4.0f;           ///< seconds
-        float m_sustain = 1.0f;         ///< 0 .. 1
-        float m_release = 12.0f;        ///< seconds
-        float m_refPitch = 440.0f;      ///< Hz
-        float m_purity = 1.0f;          ///< 0 .. 1
-        float m_depth = 0.6f;           ///< conductor's depth
-        float m_keysDepth = 0.2f;       ///< played notes' distance
-        float m_farLevel = 0.8f;        ///< far reverb level
-        float m_brightness = 1.0f;      ///< brightness window
-        float m_oddEven = 0.0f;         ///< odd/even
-        float m_inharmonicB = 0.0f;     ///< the stiff string's B
-        float m_stretch = 1.0f;         ///< the harmonics' stretch exponent (Stretch / 1200)
-        float m_shift = 0.0f;           ///< Hz every partial is moved by
-        float m_air = 0.0f;             ///< air band level
-        float m_airCenter = 3.0f;       ///< its centre, times f0
-        float m_airWidth = 600.0f;      ///< its width, cents
-        float m_airJitter = 8.0f;       ///< its flicker, Hz
-        int   m_filterModel = 0;        ///< FilterModel
-        float m_cutoff = 2500.0f;       ///< Hz
-        float m_resonance = 0.15f;      ///< 0 .. 1
-        float m_filterEnv = 0.0f;       ///< octaves
-        float m_keyTrack = 0.5f;        ///< 0 .. 1
-        float m_filterDrift = 0.3f;     ///< 0 .. 1
-        float m_presence = 0.0f;        ///< dB
-        float m_padLowCut = 0.0f;       ///< Hz
-        float m_breath = 0.0f;          ///< 0 .. 1
-        float m_breathRate = 0.03f;     ///< Hz
-        float m_doppler = 0.0f;         ///< 0 .. 1
-        float m_tide = 0.0f;            ///< cents
-        float m_tidePeriod = 12.0f;     ///< minutes
-        bool  m_brain2 = false;         ///< the second conductor plays
-        int   m_brain2Interval = -12;   ///< semitones
-        float m_brain2Depth = 0.9f;     ///< its plane
-        float m_overblow = 0.0f;        ///< Overblow, 0 .. 1
-        float m_overblowTime = 0.6f;    ///< s
-        float m_seasons = 0.0f;         ///< Seasons, 0 .. 1
-        float m_seasonTime = 240.0f;    ///< s, a whole round
-        float m_avalanche = 0.0f;       ///< Avalanche, 0 .. 1
-        float m_avalancheRate = 0.3f;   ///< grains a second
-        float m_avalancheGlow = 0.6f;   ///< s
-        float m_subharmonics = 0.0f;    ///< Subharmonics, 0 .. 1
-        float m_subTime = 1.0f;         ///< s
-        float m_horizon = 0.0f;         ///< Horizon, 0 .. 1
-        float m_horizonRatio = 8.0f;    ///< the horizon over the fundamental
-        float m_grain = 0.0f;           ///< Grain, 0 .. 1
-        float m_grainLength = 0.08f;    ///< s
-        float m_grainDuty = 0.3f;       ///< Grain Density, 0 .. 1
-    } m_blk;                            ///< read by readParams()
+        float m_master = 1.0f;            ///< master gain, linear
+        int   m_partials = 20000;         ///< partials per voice
+        float m_tilt = 1.2f;              ///< spectral tilt
+        float m_width = 25.0f;            ///< cloud width, cents, after Purity's narrowing
+        float m_widthSlope = 0.3f;        ///< cloud widening
+        float m_drift = 3.0f;             ///< cents
+        float m_driftRate = 0.1f;         ///< Hz
+        float m_shimmer = 0.4f;           ///< 0 .. 1
+        float m_shimmerRate = 0.15f;      ///< Hz
+        float m_stereo = 1.0f;            ///< 0 .. 1
+        int   m_motion = 0;               ///< MotionKind
+        float m_motionRate = 1.0f;        ///< times
+        float m_motionDepth = 1.0f;       ///< times
+        float m_attack = 6.0f;            ///< seconds
+        float m_decay = 4.0f;             ///< seconds
+        float m_sustain = 1.0f;           ///< 0 .. 1
+        float m_release = 12.0f;          ///< seconds
+        float m_refPitch = 440.0f;        ///< Hz
+        float m_purity = 1.0f;            ///< 0 .. 1
+        float m_depth = 0.6f;             ///< conductor's depth
+        float m_keysDepth = 0.2f;         ///< played notes' distance
+        float m_farLevel = 0.8f;          ///< far reverb level
+        float m_brightness = 1.0f;        ///< brightness window
+        float m_oddEven = 0.0f;           ///< odd/even
+        float m_inharmonicB = 0.0f;       ///< the stiff string's B
+        float m_stretch = 1.0f;           ///< the harmonics' stretch exponent (Stretch / 1200)
+        float m_shift = 0.0f;             ///< Hz every partial is moved by
+        float m_air = 0.0f;               ///< air band level
+        float m_airCenter = 3.0f;         ///< its centre, times f0
+        float m_airWidth = 600.0f;        ///< its width, cents
+        float m_airJitter = 8.0f;         ///< its flicker, Hz
+        int   m_filterModel = 0;          ///< FilterModel
+        float m_cutoff = 2500.0f;         ///< Hz
+        float m_resonance = 0.15f;        ///< 0 .. 1
+        float m_filterEnv = 0.0f;         ///< octaves
+        float m_keyTrack = 0.5f;          ///< 0 .. 1
+        float m_filterDrift = 0.3f;       ///< 0 .. 1
+        float m_presence = 0.0f;          ///< dB
+        float m_padLowCut = 0.0f;         ///< Hz
+        float m_breath = 0.0f;            ///< 0 .. 1
+        float m_breathRate = 0.03f;       ///< Hz
+        float m_doppler = 0.0f;           ///< 0 .. 1
+        float m_tide = 0.0f;              ///< cents
+        float m_tidePeriod = 12.0f;       ///< minutes
+        bool  m_brain2 = false;           ///< the second conductor plays
+        int   m_brain2Interval = -12;     ///< semitones
+        float m_brain2Depth = 0.9f;       ///< its plane
+        float m_overblow = 0.0f;          ///< Overblow, 0 .. 1
+        float m_overblowTime = 0.6f;      ///< s
+        float m_seasons = 0.0f;           ///< Seasons, 0 .. 1
+        float m_seasonTime = 240.0f;      ///< s, a whole round
+        float m_avalanche = 0.0f;         ///< Avalanche, 0 .. 1
+        float m_avalancheRate = 0.3f;     ///< grains a second
+        float m_avalancheGlow = 0.6f;     ///< s
+        float m_subharmonics = 0.0f;      ///< Subharmonics, 0 .. 1
+        float m_subTime = 1.0f;           ///< s
+        float m_horizon = 0.0f;           ///< Horizon, 0 .. 1
+        float m_horizonRatio = 8.0f;      ///< the horizon over the fundamental
+        float m_grain = 0.0f;             ///< Grain, 0 .. 1
+        float m_grainLength = 0.08f;      ///< s
+        float m_grainDuty = 0.3f;         ///< Grain Density, 0 .. 1
+        float m_talbot = 0.0f;            ///< Talbot, 0 .. 1
+        float m_talbotMode = 0.0f;        ///< 0 Revival, 1 Bloch
+        float m_talbotTime = 60.0f;       ///< s
+        float m_premonition = 0.0f;       ///< Premonition, 0 .. 1
+        float m_premonitionTime = 5.0f;   ///< s
+    } m_blk;                              ///< read by readParams()
 
     std::vector<Event>         m_queue;        ///< audio thread -> renderer, a single-producer single-consumer ring
     std::atomic<std::uint32_t> m_qHead{ 0 };   ///< written by the audio thread

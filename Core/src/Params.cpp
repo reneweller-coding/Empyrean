@@ -40,6 +40,9 @@ const char *const LifeModeNames[NumLifeModes] = { "Off",    "Lenia", "Turing",  
 const char *const SyncModeNames[NumSyncModes] = { "Global", "Chimera", "Swarm" };
 const char *const MpeTargetNames[NumMpeTargets] = { "Off",    "Level",   "Filter", "Brightness", "Width",
                                                     "Nearer", "Shimmer", "Motion", "Breath" };
+const char *const TalbotModeNames[NumTalbotModes] = { "Revival", "Bloch" };
+const char *const PhantomLineNames[NumPhantomLines] = { "Melody", "Echo", "Chord" };
+const char *const ChimeKindNames[NumChimeKinds] = { "Tubes", "Glass", "Bamboo", "Bells" };
 const char *const FieldModeNames[NumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
@@ -376,6 +379,24 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::GRAIN_LENGTH, "grain_length", "Grain Length", "Grain", 0.01f, 1.f, 0.08f, 0.4f, "s" ),
     F( ParamIdE::GRAIN_DENSITY, "grain_density", "Grain Density", "Grain", 0.01f, 1.f, 0.3f, 0.5f, "" ),
     F( ParamIdE::RIPPLE_BREATHERS, "ripple_breathers", "Breathers", "Ripple", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::TALBOT, "talbot", "Talbot", "Talbot", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::TALBOT_MODE, "talbot_mode", "Talbot Mode", "Talbot", TalbotModeNames, NumTalbotModes, 0 ),
+    F( ParamIdE::TALBOT_TIME, "talbot_time", "Talbot Period", "Talbot", 5.f, 600.f, 60.f, 0.4f, "s" ),
+    F( ParamIdE::PHANTOM, "phantom", "Phantom", "Phantom", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::PHANTOM_LINE, "phantom_line", "Phantom Line", "Phantom", PhantomLineNames, NumPhantomLines, 0 ),
+    F( ParamIdE::PHANTOM_WIDTH, "phantom_width", "Phantom Width", "Phantom", 0.03f, 0.4f, 0.12f, 0.6f, "oct" ),
+    F( ParamIdE::CHIMES, "chimes", "Chimes", "Chimes", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::CHIME_KIND, "chime_kind", "Chime Kind", "Chimes", ChimeKindNames, NumChimeKinds, 0 ),
+    F( ParamIdE::CHIME_PITCH, "chime_pitch", "Chime Pitch", "Chimes", -2.f, 2.f, 0.f, 1.f, "oct" ),
+    F( ParamIdE::CHIME_DECAY, "chime_decay", "Chime Decay", "Chimes", 0.5f, 20.f, 4.f, 0.5f, "s" ),
+    F( ParamIdE::WIND, "wind", "Wind", "Chimes", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::GUSTS, "gusts", "Gusts", "Chimes", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::DREAM, "dream", "Dream", "Dream", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::DREAM_FOCUS, "dream_focus", "Dream Focus", "Dream", 0.f, 1.f, 0.6f, 1.f, "" ),
+    F( ParamIdE::DREAM_DRIFT, "dream_drift", "Dream Drift", "Dream", 0.f, 1.f, 0.4f, 1.f, "" ),
+    F( ParamIdE::DREAM_DEPTH, "dream_depth", "Dream Depth", "Dream", 0.f, 1.f, 0.8f, 1.f, "" ),
+    F( ParamIdE::PREMONITION, "premonition", "Premonition", "Premonition", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::PREMONITION_TIME, "premonition_time", "Premonition Time", "Premonition", 1.f, 15.f, 5.f, 0.6f, "s" ),
 } };
 
 }   // namespace

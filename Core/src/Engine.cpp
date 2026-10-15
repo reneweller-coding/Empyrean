@@ -125,6 +125,24 @@ const FactoryLandscapes &factoryLandscapes()
     return f;
 }
 
+/**
+ * @brief The Revival's clock (Phase 27): the carpet passed through quarter by quarter, slow at the quarter points
+ *        and fast between. Its landmarks -- whole, half and half, mirrored -- are exact only for about a
+ *        3300th of the period (the 23rd mode turns 529 times as fast as the first), a flash of milliseconds on a
+ *        plain clock; here each is heard for a while, and the timbre leaves it from the finest detail down.
+ * @param[in] age     the note's age in seconds
+ * @param[in] period  Talbot Time in seconds
+ * @return the time the wave function has lived, in seconds; equal to age at every quarter of the period
+ */
+double talbotClock( double age, double period )
+{
+    constexpr double Lambda = 17.0;   // e-foldings per quarter: the first modes leave after about 15 % of it
+    const double     q = period / 4.0, x = age / q, k = std::floor( x ), u = x - k;
+    const double     e = std::expm1( 0.5 * Lambda );
+    const double g = u <= 0.5 ? 0.5 * std::expm1( Lambda * u ) / e : 1.0 - 0.5 * std::expm1( Lambda * ( 1.0 - u ) ) / e;
+    return q * ( k + g );
+}
+
 }   // namespace
 
 Engine::Engine()
@@ -201,10 +219,11 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     CloudConfig cc;
     cc.m_sampleRate = m_cfg.m_sampleRate;
     cc.m_blockSize = G;
-    cc.m_voices = m_cfg.m_voices + std::max( 0, m_cfg.m_ghosts );
+    cc.m_voices = m_cfg.m_voices + std::max( 0, m_cfg.m_ghosts ) + 2;   // and the phantom layer and the dream
     cc.m_partialsPerVoice = m_cfg.m_partialsPerVoice;
     cc.m_spinWait = true;
     if ( !m_cloud.open( cc, error ) ) return false;
+    m_cloud.setLayers( cc.m_voices - 2, cc.m_voices - 1 );
     {   // the hall remembers across a new start (a new sample rate, a new block): its memory goes up again
         const std::lock_guard<std::mutex> lock( m_snapLock );
         if ( !m_hallPendingSet && m_snapHallValid )
@@ -253,10 +272,22 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
     for ( std::vector<float> *b : { &m_nearL, &m_nearR, &m_farL, &m_farR, &m_dryL, &m_dryR, &m_wetL, &m_wetR, &m_modalL,
-                                    &m_modalR, &m_specL, &m_specR, &m_meltL, &m_meltR } )
+                                    &m_modalR, &m_specL, &m_specR, &m_meltL, &m_meltR, &m_phantomL, &m_phantomR } )
         b->assign( static_cast<size_t>( G ), 0.0f );
     m_ghosts.assign( static_cast<size_t>( std::max( 0, m_cfg.m_ghosts ) ), Ghost{} );
     m_ghostRng = Rng( m_cfg.m_seed ^ 0x47686F7374ull );
+    m_windRng = Rng( m_cfg.m_seed ^ 0x57696E64ull );
+    m_phantomRng = Rng( m_cfg.m_seed ^ 0x5068616Eull );
+    m_melodyAt = -1;
+    m_melodyNext = 0.0f;
+    m_melodyHz[0] = m_melodyHz[1] = 0.0f;
+    m_melodyWeight[0] = m_melodyWeight[1] = 0.0f;
+    m_echoCount = 0;
+    m_gust = 0.0f;
+    m_chimesOn = false;
+    m_chimeLevel = m_phantomGain = m_dreamGain = 0.0f;
+    m_dreamBlocks = 0;
+    m_chimeStrikes.store( 0, std::memory_order_relaxed );
     m_noteRng = Rng( m_cfg.m_seed ^ 0x4E6F7465ull );
     m_randomNote = 0.0f;
     m_roughness = 0.0f;
@@ -923,6 +954,11 @@ void Engine::readParams()
     m_blk.m_grain = g( ParamIdE::GRAIN );
     m_blk.m_grainLength = g( ParamIdE::GRAIN_LENGTH );
     m_blk.m_grainDuty = g( ParamIdE::GRAIN_DENSITY );
+    m_blk.m_talbot = g( ParamIdE::TALBOT );
+    m_blk.m_talbotMode = std::round( g( ParamIdE::TALBOT_MODE ) );
+    m_blk.m_talbotTime = g( ParamIdE::TALBOT_TIME );
+    m_blk.m_premonition = g( ParamIdE::PREMONITION );
+    m_blk.m_premonitionTime = g( ParamIdE::PREMONITION_TIME );
 
     m_bp.m_on = g( ParamIdE::BRAIN_ON ) >= 0.5f;
     m_bp.m_mode = static_cast<BrainModeE>(
@@ -1239,7 +1275,11 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     v.m_breath.init( m_side );
     v.m_cutoffDrift.init( m_side );
     v.m_env.kill();
-    v.m_env.noteOn();
+    // Premonition (Phase 27): a conductor's note is heard coming -- its swell first, its envelope after.
+    v.m_pre = source != 0 && m_blk.m_premonition > 0.0f ? std::max( m_blk.m_premonitionTime, 0.5f ) : 0.0f;
+    v.m_preTotal = v.m_pre;
+    v.m_suck = 0.0f;
+    if ( v.m_pre <= 0.0f ) v.m_env.noteOn();
     v.m_seed = static_cast<std::uint32_t>( m_rng.next() ) | 1u;
     v.m_restart = true;
     v.m_onset = onset;
@@ -1337,6 +1377,11 @@ void Engine::stopNote( int note, int source, int channel )
         if ( v.m_note == note && v.m_source == source && ours && !v.m_released && !v.m_stealing )
         {
             v.m_released = true;
+            if ( v.m_pre > 0.0f )
+            {   // let go before it sounded: its swell is drawn away
+                v.m_pre = 0.0f;
+                v.m_suck = 1.0f;
+            }
             v.m_env.noteOff();
             CloudVoice &cv = m_cloud.voice( static_cast<int>( i ) );
             cv.m_releaseAt = cv.m_time;   // the motion's release tails start here
@@ -1719,6 +1764,43 @@ void Engine::stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, floa
             life |= 4;
     }
 
+    // Talbot (Phase 27): the first TalbotHarmonics amplitudes as a wave function, evolved in the eigen system
+    // (talbotSystem) from the note's start, mixed with the timbre at rest by power (Depth).
+    if ( m_blk.m_talbot > 0.0f )
+    {
+        talbotSystem();
+        constexpr int M = TalbotHarmonics;
+        float         s[M], c[M];
+        for ( int h = 0; h < M; ++h ) s[h] = harmonicShape( h + 1, cv.m_tilt, cv.m_oddEven, cv.m_brightness );
+        for ( int n = 0; n < M; ++n )
+        {
+            float acc = 0.0f;
+            for ( int h = 0; h < M; ++h ) acc += m_talbotVec[static_cast<size_t>( n * M + h )] * s[h];
+            c[n] = acc;
+        }
+        float        re[M] = {}, im[M] = {};
+        const double age = m_blk.m_talbotMode < 0.5f ? talbotClock( v.m_age, std::max( m_blk.m_talbotTime, 1.0f ) )
+                                                     : static_cast<double>( v.m_age );
+        for ( int n = 0; n < M; ++n )
+        {
+            const double ph = std::fmod( m_talbotVal[static_cast<size_t>( n )] * age, 6.283185307179586 );
+            const float  cs = static_cast<float>( std::cos( ph ) ) * c[n],
+                         sn = static_cast<float>( std::sin( ph ) ) * c[n];
+            for ( int h = 0; h < M; ++h )
+            {
+                re[h] += cs * m_talbotVec[static_cast<size_t>( n * M + h )];
+                im[h] -= sn * m_talbotVec[static_cast<size_t>( n * M + h )];
+            }
+        }
+        const float d = std::clamp( m_blk.m_talbot, 0.0f, 1.0f );
+        for ( int h = 0; h < M; ++h )
+        {
+            const float amp = std::sqrt( ( 1.0f - d ) * s[h] * s[h] + d * ( re[h] * re[h] + im[h] * im[h] ) );
+            cv.m_talbot[h] = s[h] > 1.0e-12f ? std::min( amp / s[h], 1.0e4f ) : 1.0f;
+        }
+        life |= 8;
+    }
+
     // The make-up: the voice's power over its first harmonics kept as it was without these lives (the
     // harmonics above are too soft to matter), so the registers, the seasons and the glints move the
     // power between harmonics and do not make the voice louder or softer.
@@ -1736,6 +1818,7 @@ void Engine::stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, floa
             if ( life & 1 ) f *= registerGain( k, cv.m_register );
             if ( ( life & 2 ) && k > 1 ) f *= cv.m_season[seasonFamily( k )];
             if ( ( life & 4 ) && k >= 2 && k < 2 + AvalancheSites ) f *= 1.0f + cv.m_glow[k - 2];
+            if ( ( life & 8 ) && k <= TalbotHarmonics ) f *= cv.m_talbot[k - 1];
             before += static_cast<double>( a ) * a;
             after += static_cast<double>( a * f ) * ( a * f );
             if ( k <= 7 ) shape[k] = a * f;
@@ -1783,6 +1866,268 @@ void Engine::stepHarmonics( Voice &v, CloudVoice &cv, float dt, float gain, floa
                 pump > 1.0e-9f ? std::sqrt( std::max( 1.0f - ( a1 * a1 ) / ( pump * pump ), 0.0f ) ) : 1.0f;
         }
         for ( int j = 0; j < SubClouds; ++j ) cv.m_sub[j] = sub[j];
+    }
+}
+
+void Engine::talbotSystem()
+{
+    const float mode = m_blk.m_talbotMode, period = std::max( m_blk.m_talbotTime, 1.0f );
+    if ( mode == m_talbotKey[0] && period == m_talbotKey[1] ) return;
+    m_talbotKey[0] = mode;
+    m_talbotKey[1] = period;
+    constexpr int M = TalbotHarmonics;
+    const double  w = 6.283185307179586 / period;
+    if ( mode < 0.5f )
+    {   // Revival: the cosine basis, mode n at n^2 w -- every phase whole again after the period
+        for ( int n = 0; n < M; ++n )
+        {
+            const double norm = std::sqrt( ( n == 0 ? 1.0 : 2.0 ) / M );
+            for ( int h = 0; h < M; ++h )
+                m_talbotVec[static_cast<size_t>( n * M + h )] =
+                    static_cast<float>( norm * std::cos( 3.141592653589793 * n * ( h + 0.5 ) / M ) );
+            m_talbotVal[static_cast<size_t>( n )] = w * n * n;
+        }
+        return;
+    }
+    // Bloch: hopping J between neighbouring harmonics, a tilt w from one to the next; J = w M / 8, so the swing
+    // spans about half the chain -- upwards from the fundamental, the timbre at rest being the packet at rest. Its eigen system by Jacobi's rotations (cyclic, to round-off).
+    double       a[M][M] = {}, v[M][M] = {};
+    const double J = w * M / 8.0;
+    for ( int h = 0; h < M; ++h )
+    {
+        a[h][h] = w * h;
+        v[h][h] = 1.0;
+        if ( h + 1 < M ) a[h][h + 1] = a[h + 1][h] = J;   // + J: a packet at rest climbs (its band's top)
+    }
+    for ( int sweep = 0; sweep < 50; ++sweep )
+    {
+        double off = 0.0;
+        for ( int p = 0; p < M; ++p )
+            for ( int q = p + 1; q < M; ++q ) off += a[p][q] * a[p][q];
+        if ( off < 1.0e-24 ) break;
+        for ( int p = 0; p < M; ++p )
+            for ( int q = p + 1; q < M; ++q )
+            {
+                if ( std::fabs( a[p][q] ) < 1.0e-30 ) continue;
+                const double theta = 0.5 * ( a[q][q] - a[p][p] ) / a[p][q];
+                const double t =
+                    ( theta >= 0.0 ? 1.0 : -1.0 ) / ( std::fabs( theta ) + std::sqrt( theta * theta + 1.0 ) );
+                const double c = 1.0 / std::sqrt( t * t + 1.0 ), s = t * c;
+                for ( int k = 0; k < M; ++k )
+                {   // the columns p and q
+                    const double akp = a[k][p], akq = a[k][q];
+                    a[k][p] = c * akp - s * akq;
+                    a[k][q] = s * akp + c * akq;
+                }
+                for ( int k = 0; k < M; ++k )
+                {   // and the rows
+                    const double apk = a[p][k], aqk = a[q][k];
+                    a[p][k] = c * apk - s * aqk;
+                    a[q][k] = s * apk + c * aqk;
+                }
+                for ( int k = 0; k < M; ++k )
+                {
+                    const double vkp = v[k][p], vkq = v[k][q];
+                    v[k][p] = c * vkp - s * vkq;
+                    v[k][q] = s * vkp + c * vkq;
+                }
+            }
+    }
+    // The ladder made exact: the eigenvalues in order, set w apart -- in the middle of the chain they are already, at
+    // its ends nearly -- so the swing comes back whole after the period.
+    int order[M];
+    for ( int n = 0; n < M; ++n ) order[n] = n;
+    std::sort( order, order + M, [&a]( int x, int y ) { return a[x][x] < a[y][y]; } );
+    for ( int r = 0; r < M; ++r )
+    {
+        const int n = order[r];
+        for ( int h = 0; h < M; ++h ) m_talbotVec[static_cast<size_t>( r * M + h )] = static_cast<float>( v[h][n] );
+        m_talbotVal[static_cast<size_t>( r )] = w * r;
+    }
+}
+
+void Engine::stepLayers( float dt )
+{
+    const int first = static_cast<int>( m_voices.size() + m_ghosts.size() );
+
+    // The phantom layer: the pitches it carries -- a melody of its own, the notes gone lately, or the chord -- folded
+    // into 220 .. 880 Hz, where a turn of phase between the ears is heard best.
+    {
+        CloudVoice &cv = m_cloud.voice( first );
+        const float want = cur( ParamIdE::PHANTOM );
+        m_phantomGain += ( want - m_phantomGain ) * ( 1.0f - std::exp( -dt / 0.3f ) );
+        if ( want <= 0.0f && m_phantomGain < 1.0e-4f )
+        {
+            m_phantomGain = 0.0f;
+            cv.m_active = 0;
+        }
+        else
+        {
+            struct Pitch
+            {
+                double hz;
+                float  weight;
+            };
+            std::vector<Pitch> sounding;
+            const int line = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::PHANTOM_LINE ) ) ), 0, 2 );
+            for ( int k = 0; k < m_echoCount; ++k ) m_echoAge[static_cast<size_t>( k )] += dt;
+            while ( m_echoCount > 0 && m_echoAge[static_cast<size_t>( m_echoCount - 1 )] > 30.0f ) --m_echoCount;
+            if ( line == 0 )
+            {   // Melody: a line of its own among the scale's pitches in 220 .. 880 Hz, a step of one or two every
+                // four to eight seconds, each note fading in over a second and a half as the last fades out
+                std::vector<double> scale;
+                for ( int k = 0; k < 128; ++k )
+                {
+                    const double f = frequencyOf( k );
+                    if ( f >= 220.0 && f < 880.0 && ( scale.empty() || f > scale.back() * 1.01 ) ) scale.push_back( f );
+                }
+                m_melodyNext -= dt;
+                if ( !scale.empty() && ( m_melodyNext <= 0.0f || m_melodyAt < 0 ) )
+                {
+                    const int n = static_cast<int>( scale.size() );
+                    int       at = m_melodyAt < 0 ? n / 2 : m_melodyAt;
+                    const int step = 1 + static_cast<int>( m_phantomRng.uniform() * 2.0f );
+                    at += m_phantomRng.uniform() < 0.5f ? -step : step;
+                    if ( at < 0 || at >= n )
+                        at = std::clamp( 2 * ( m_melodyAt < 0 ? n / 2 : m_melodyAt ) - at, 0, n - 1 );
+                    m_melodyHz[1] = m_melodyHz[0];
+                    m_melodyWeight[1] = m_melodyWeight[0];
+                    m_melodyHz[0] = static_cast<float>( scale[static_cast<size_t>( at )] );
+                    m_melodyWeight[0] = 0.0f;
+                    m_melodyAt = at;
+                    m_melodyNext = 4.0f + 4.0f * m_phantomRng.uniform();
+                }
+                const float fade = dt / 1.5f;
+                m_melodyWeight[0] = std::min( 1.0f, m_melodyWeight[0] + fade );
+                m_melodyWeight[1] = std::max( 0.0f, m_melodyWeight[1] - fade );
+                for ( int k = 0; k < 2; ++k )
+                    if ( m_melodyHz[k] > 0.0f && m_melodyWeight[k] > 0.0f )
+                        sounding.push_back( { m_melodyHz[k], m_melodyWeight[k] } );
+            }
+            else if ( line == 1 )
+            {   // Echo: the notes that ended lately, fading over half a minute
+                for ( int k = 0; k < m_echoCount; ++k )
+                    sounding.push_back(
+                        { m_echoHz[static_cast<size_t>( k )], 1.0f - m_echoAge[static_cast<size_t>( k )] / 30.0f } );
+            }
+            else
+            {   // Chord: the notes sounding now
+                for ( const Voice &v : m_voices )
+                    if ( v.m_note >= 0 && !v.m_stealing && v.m_lastGain > 0.02f && v.m_pre <= 0.0f )
+                        sounding.push_back( { v.m_hz, std::min( 1.0f, 1.5f * v.m_lastGain ) } );
+            }
+            cv.m_phantomCount = 0;
+            for ( const Pitch &p : sounding )
+            {
+                if ( cv.m_phantomCount >= PhantomTargets ) break;
+                double f = std::max( p.hz, 1.0 );
+                while ( f < 220.0 ) f *= 2.0;
+                while ( f >= 880.0 ) f *= 0.5;
+                cv.m_phantomHz[cv.m_phantomCount] = static_cast<float>( f );
+                cv.m_phantomWeight[cv.m_phantomCount] = p.weight;
+                ++cv.m_phantomCount;
+            }
+            cv.m_phantomWidth = cur( ParamIdE::PHANTOM_WIDTH );
+            cv.m_restart = cv.m_active ? 0 : 1;
+            cv.m_active = 1;
+            cv.m_kind = VoiceKindE::PHANTOM;
+            cv.m_partials = 8192;
+            cv.m_level = VoiceLevel * 0.6f;
+            cv.m_gain = m_phantomGain;
+            cv.m_distance = 0.0f;
+            cv.m_stereo = 0.0f;
+            cv.m_airAbsorb = 1.0f;
+            cv.m_seed = 0x50484E54u;
+            cv.m_onset = 0;
+            cv.m_harmonicLife = 0;
+            cv.m_subClouds = 0;
+            cv.m_grain = 0.0f;
+        }
+    }
+
+    // The dream: it keeps what was heard every three seconds if it is new, and wanders among its memories; its voice
+    // fades in once there are two of them to wander between.
+    {
+        Dream      &D = m_cloud.dream();
+        CloudVoice &cv = m_cloud.voice( first + 1 );
+        const float want = cur( ParamIdE::DREAM );
+        const int   memories = m_cloud.dreamMemories();
+        const float target = memories >= 2 ? want : 0.0f;
+        m_dreamGain += ( target - m_dreamGain ) * ( 1.0f - std::exp( -dt / 2.0f ) );
+        D.m_on = want > 0.0f || m_dreamGain > 1.0e-4f ? 1 : 0;
+        if ( D.m_on )
+        {
+            const float focus = cur( ParamIdE::DREAM_FOCUS ), drift = cur( ParamIdE::DREAM_DRIFT );
+            D.m_focus = 4.0f + 96.0f * focus * focus;
+            D.m_noise = 0.05f + 0.6f * drift;
+            D.m_ease = ( 0.05f + 0.6f * drift * drift ) * dt;   // a step of 1/20 .. 2/3 a second towards the recall
+            D.m_novelty = 0.985f;
+            if ( ++m_dreamBlocks >= static_cast<int>( 3.0f / dt ) )
+            {
+                D.m_store = want > 0.0f ? 1 : 0;   // nothing new is kept while it fades out
+                m_dreamBlocks = 0;
+            }
+        }
+        if ( !D.m_on )
+        {
+            cv.m_active = 0;
+        }
+        else
+        {
+            cv.m_restart = cv.m_active ? 0 : 1;
+            cv.m_active = 1;
+            cv.m_kind = VoiceKindE::DREAM;
+            cv.m_partials = 16384;
+            cv.m_level = VoiceLevel * 0.8f;
+            cv.m_gain = m_dreamGain;
+            cv.m_distance = cur( ParamIdE::DREAM_DEPTH );
+            cv.m_stereo = 1.0f;
+            cv.m_drift = 8.0f;
+            cv.m_driftRate = 0.05f;
+            cv.m_shimmer = 0.3f;
+            cv.m_shimmerRate = 0.1f;
+            cv.m_airAbsorb = 1.0f;
+            cv.m_seed = 0x44524D53u;
+            cv.m_onset = 0;
+            cv.m_harmonicLife = 0;
+            cv.m_subClouds = 0;
+            cv.m_grain = 0.0f;
+        }
+    }
+
+    // The chime field: its level gliding, the wind's push by the knob (measured: a strike or none a second at 0.3,
+    // a few at half, dozens at 0.7, more than a hundred at the top) and
+    // its gust (a slow random of three seconds' memory), the chimes tuned to the scale's pitches in their kind's
+    // register, moved by Chime Pitch.
+    {
+        ChimeField &C = m_cloud.chimes();
+        const float want = cur( ParamIdE::CHIMES );
+        m_chimeLevel += ( want - m_chimeLevel ) * ( 1.0f - std::exp( -dt / 0.3f ) );
+        const bool on = want > 0.0f || m_chimeLevel > 1.0e-4f;
+        C.m_on = on ? 1 : 0;
+        if ( on && !m_chimesOn ) C.m_reset = 1;   // a field begins from calm air and still clappers
+        m_chimesOn = on;
+        if ( on )
+        {
+            m_gust += -m_gust * dt / 3.0f + std::sqrt( 2.0f * dt / 3.0f ) * m_windRng.bipolar() * 1.7320508f;
+            const float wind = cur( ParamIdE::WIND );
+            const float gust = std::max( 0.0f, 1.0f + cur( ParamIdE::GUSTS ) * m_gust );
+            C.m_force = 2.0e-5f * std::pow( 2.0f * wind, 1.2f ) * gust;
+            C.m_kick = 16.0f;
+            C.m_level = 0.25f * m_chimeLevel * VoiceLevel;
+            C.m_decay = cur( ParamIdE::CHIME_DECAY );
+            C.m_kind =
+                std::clamp( static_cast<int>( std::lround( cur( ParamIdE::CHIME_KIND ) ) ), 0, NumChimeKinds - 1 );
+            static constexpr float Low[NumChimeKinds] = { 400.0f, 600.0f, 220.0f, 300.0f };
+            const float            lo = Low[C.m_kind] * std::exp2( cur( ParamIdE::CHIME_PITCH ) ), hi = 4.0f * lo;
+            int                    count = 0;
+            for ( int k = 0; k < 128 && count < ChimePitches; ++k )
+            {
+                const double f = frequencyOf( k );
+                if ( f >= lo && f < hi ) C.m_pitch[count++] = static_cast<float>( f );
+            }
+            C.m_pitchCount = count;
+        }
     }
 }
 
@@ -2013,6 +2358,7 @@ void Engine::renderBlock()
     if ( motionUsesLandscape( motion ) )
         landMakeup = 1.0f / std::max( 0.125f, 1.0f - m_blk.m_motionDepth + m_blk.m_motionDepth * m_landRms );
     stepSeasons( dtf );
+    stepLayers( dtf );
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
@@ -2045,14 +2391,42 @@ void Engine::renderBlock()
             continue;
         }
         v.m_env.setTimes( m_blk.m_attack, m_blk.m_decay, m_blk.m_sustain, m_blk.m_release );
-        const float gain = v.m_env.process();
+        // Premonition: before the note its swell -- rising as a reverb does backwards, a quarter of the way an e-fold
+        // -- the cloud wide and far; at its start the swell is drawn into the note over 0.15 s.
+        float preWide = 0.0f;
+        if ( v.m_pre > 0.0f )
+        {
+            v.m_pre -= dtf;
+            if ( v.m_pre <= 0.0f )
+            {
+                v.m_pre = 0.0f;
+                v.m_suck = 1.0f;
+                if ( !v.m_released ) v.m_env.noteOn();
+            }
+        }
+        float gain;
+        if ( v.m_pre > 0.0f )
+        {
+            gain = 0.5f * m_blk.m_premonition * std::exp( -4.0f * v.m_pre / std::max( v.m_preTotal, 0.5f ) );
+            preWide = 1.0f;
+        }
+        else
+        {
+            gain = v.m_env.process();
+            if ( v.m_suck > 0.0f )
+            {
+                gain = std::max( gain, 0.5f * m_blk.m_premonition * v.m_suck );
+                preWide = v.m_suck;
+                v.m_suck = std::max( 0.0f, v.m_suck - dtf / 0.15f );
+            }
+        }
         v.m_lastGain = gain;
         if ( v.m_source == 1 && !v.m_released )
         {
             chordGain += gain * gain;
             ++chordVoices;
         }   // the foundation matches these
-        if ( !v.m_env.isActive() )
+        if ( !v.m_env.isActive() && v.m_pre <= 0.0f && v.m_suck <= 0.0f )
         {
             // With dispersion the late partials sound on after the envelope: the voice stays until
             // the latest of them has heard the end of it.
@@ -2071,6 +2445,18 @@ void Engine::renderBlock()
             }
             v.m_note = -1;
             cv.m_active = 0;
+            if ( v.m_source != FoundationSource )
+            {   // the phantom echo remembers it: the newest first, the oldest dropped
+                const int n = std::min( m_echoCount, PhantomTargets - 1 );
+                for ( int k = n; k > 0; --k )
+                {
+                    m_echoHz[static_cast<size_t>( k )] = m_echoHz[static_cast<size_t>( k - 1 )];
+                    m_echoAge[static_cast<size_t>( k )] = m_echoAge[static_cast<size_t>( k - 1 )];
+                }
+                m_echoHz[0] = static_cast<float>( v.m_hz );
+                m_echoAge[0] = 0.0f;
+                m_echoCount = n + 1;
+            }
             continue;
         }
         // Breath: the voice's plane wanders (Noctuary's "the room breathes"); Doppler: coming closer
@@ -2202,6 +2588,13 @@ void Engine::renderBlock()
         cv.m_stereo = m_blk.m_stereo;
         cv.m_partials = m_blk.m_partials;
         cv.m_distance = std::clamp( v.m_distance - 0.5f * expr( MpeTargetE::NEARER ), 0.0f, 1.0f );
+        if ( preWide > 0.0f )
+        {   // the premonition: wide, far and a little dark, as a reverb's tail
+            const float p = m_blk.m_premonition * preWide;
+            cv.m_width *= 1.0f + 4.0f * p;
+            cv.m_distance += ( std::max( cv.m_distance, 0.9f ) - cv.m_distance ) * p;
+            cv.m_brightness *= 1.0f - 0.3f * p;
+        }
         srcW += gain * level;
         srcD += gain * level * v.m_distance;
         if ( m_rippleVoices < 64 )
@@ -2309,6 +2702,18 @@ void Engine::renderBlock()
         m_viewSource[i].store( 3, std::memory_order_relaxed );
         m_viewNote[i].store( -1, std::memory_order_relaxed );
     }
+    for ( size_t k = 0; k < 2; ++k )
+    {   // the phantom layer and the dream (Phase 27), drawn as the memory is, with no key of their own
+        const size_t i = m_voices.size() + m_ghosts.size() + k;
+        if ( i >= static_cast<size_t>( MaxViewVoices ) ) break;
+        const CloudVoice &cv = m_cloud.voice( static_cast<int>( i ) );
+        m_viewHz[i].store( 0.0f, std::memory_order_relaxed );
+        m_viewGain[i].store( cv.m_active ? cv.m_gain : 0.0f, std::memory_order_relaxed );
+        m_viewDistance[i].store( cv.m_distance, std::memory_order_relaxed );
+        m_viewTime[i].store( cv.m_time, std::memory_order_relaxed );
+        m_viewSource[i].store( 3, std::memory_order_relaxed );
+        m_viewNote[i].store( -1, std::memory_order_relaxed );
+    }
 
     // 4. The modal hall's settings: it runs on the GPU in the same graph, hearing the voices' block
     //    there. The level is applied here, so the hall rests (on = 0) only once the level has been
@@ -2347,7 +2752,7 @@ void Engine::renderBlock()
         // it neither learns nor changes. It learns with the hall's level at nothing too.
         mh.m_grow = cur( ParamIdE::HALL_GROW );
         const bool bent = cur( ParamIdE::TIME_BEND ) != 0.0f;
-        mh.m_listen = ( mh.m_grow != 0.0f || bent ) ? 1 : 0;
+        mh.m_listen = ( mh.m_grow != 0.0f || bent || cur( ParamIdE::DREAM ) > 0.0f ) ? 1 : 0;
         mh.m_memoryCoef =
             mh.m_grow != 0.0f ? 1.0f - std::exp( -dtf / std::max( cur( ParamIdE::HALL_MEMORY ), 1.0f ) ) : 0.0f;
         mh.m_densityCoef = mh.m_listen ? 1.0f - std::exp( -dtf / 0.3f ) : 0.0f;
@@ -2737,6 +3142,7 @@ void Engine::renderBlock()
     QueryPerformanceCounter( &qpcLaunch );
     m_cloud.launch();
     const float *q = m_cloud.wait();
+    m_chimeStrikes.fetch_add( m_cloud.chimeStrikes(), std::memory_order_relaxed );
     QueryPerformanceCounter( &qpcBack );
     {
         const float *dots = nullptr;
@@ -2788,6 +3194,12 @@ void Engine::renderBlock()
         m_specR[k] = f[7];
         m_meltL[k] = f[8];
         m_meltR[k] = f[9];
+        m_nearL[k] += f[10];   // the chime field, near and far, as the voices' planes (Phase 27)
+        m_nearR[k] += f[11];
+        m_farL[k] += f[12] * m_blk.m_farLevel;
+        m_farR[k] += f[13] * m_blk.m_farLevel;
+        m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
+        m_phantomR[k] = f[15];
     }
     // A level from the last block's to this one's, across the block (no zipper when it is modulated).
     auto ramp = [G]( float from, float to, int s )
@@ -2900,6 +3312,13 @@ void Engine::renderBlock()
     else
         m_midSide.set( cur( ParamIdE::BASS_MONO ), 0.0f, cur( ParamIdE::STEREO_WIDTH ) );
     m_midSide.process( m_nearL.data(), m_nearR.data(), G );
+    // The phantom layer after everything (Phase 27): the turn of phase between the ears is all there is to hear,
+    // and the echoes, the rooms and the width would blur it.
+    for ( int s = 0; s < G; ++s )
+    {
+        m_nearL[static_cast<size_t>( s )] += m_phantomL[static_cast<size_t>( s )];
+        m_nearR[static_cast<size_t>( s )] += m_phantomR[static_cast<size_t>( s )];
+    }
     for ( int s = 0; s < G; ++s )
     {
         const size_t at = static_cast<size_t>( ( pos + s ) & m_ringMask ) * 2;

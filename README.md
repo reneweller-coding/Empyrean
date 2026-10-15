@@ -103,11 +103,15 @@ offline renderer and the manual, and a portable zip.
 - **The harmonics' own lives:** registers that overblow as in a flute, seasons of overtone families taking turns,
   avalanches on a rice pile running up the harmonics, subharmonics pumped from below (a floor that opens under a held
   chord); grains, a horizon the harmonics crowd under, breathers on the ripple.
-- **7168 presets** in 112 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
-  visions, swarms and currents, halls and orbits, harmonic lives), levelled by their loudest second.
+- **Dreams and phantoms:** 2048 tuned chimes over the field, rung by a simulated wind (lattice Boltzmann); a melody
+  heard only between the ears (dichotic pitch, headphones); the instrument dreaming of what it played, by association
+  (a modern Hopfield network over its own spectra); the conductor's notes heard coming, as a reverb backwards; timbres
+  that fall apart and come back whole (Talbot's effect) or swing up and down the harmonics (Bloch).
+- **8192 presets** in 128 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (234 come with it, ten of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (267 come with it, eleven of them whole nights).
 
 ## Build
 

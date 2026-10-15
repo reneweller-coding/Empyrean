@@ -274,6 +274,25 @@ enum class ParamIdE : int
     GRAIN_LENGTH,     ///< s: a grain's mean length
     GRAIN_DENSITY,    ///< 0 .. 1: the share of its time a grain partial sounds
     RIPPLE_BREATHERS,   ///< 0 .. 1: the ripple's string becomes a sine-Gordon chain: a note's strike stays as a breather that pulses where it fell
+    // Phase 27 (16.10.2026): Talbot timbres, the phantom layer, the chime field, the dream, the premonition
+    TALBOT,   ///< 0 .. 1: the first 24 harmonics' amplitudes evolve as a wave function: they fall apart and come back
+    TALBOT_MODE,   ///< Revival (the timbre comes back whole after a period) or Bloch (its brightness swings up and down)
+    TALBOT_TIME,   ///< s: the period
+    PHANTOM,   ///< 0 .. 1: a noise the same in both ears but where pitches turn the phase between them: heard only in the head (headphones)
+    PHANTOM_LINE,    ///< what the phantom layer carries: a melody of its own, the echo of notes gone, the chord
+    PHANTOM_WIDTH,   ///< octaves over which the ears' phase turns round a pitch
+    CHIMES,          ///< 0 .. 1: 2048 tuned chimes over the field, rung by a simulated wind
+    CHIME_KIND,      ///< tubes, glass, bamboo, bells
+    CHIME_PITCH,     ///< octaves: the chimes' register up or down
+    CHIME_DECAY,     ///< s: how long a chime rings
+    WIND,            ///< 0 .. 1: the wind's strength
+    GUSTS,           ///< 0 .. 1: how much it gusts
+    DREAM,         ///< 0 .. 1: the instrument remembers what it heard and dreams it, far off, wandering by association
+    DREAM_FOCUS,   ///< 0 .. 1: a blend of memories .. one memory at a time
+    DREAM_DRIFT,   ///< 0 .. 1: how restlessly the dream wanders
+    DREAM_DEPTH,   ///< 0 .. 1: how far off the dream is heard
+    PREMONITION,   ///< 0 .. 1: the conductor's notes are heard coming -- a swell like a reverb backwards into their start
+    PREMONITION_TIME,   ///< s: how long before a note its premonition begins
     COUNT               ///< number of parameters
 };
 
@@ -369,7 +388,13 @@ enum class MpeTargetE : int
     MOTION,
     BREATH   ///< Overblow's breath and the subharmonics' pump (Phase 26)
 };
-constexpr int NumFieldModes = 6;   ///< entries of FieldModeNames
+constexpr int            NumTalbotModes = 2;                  ///< entries of TalbotModeNames
+extern const char *const TalbotModeNames[NumTalbotModes];     ///< "Revival", "Bloch"
+constexpr int            NumPhantomLines = 3;                 ///< entries of PhantomLineNames
+extern const char *const PhantomLineNames[NumPhantomLines];   ///< "Melody", "Echo", "Chord"
+constexpr int            NumChimeKinds = 4;                   ///< entries of ChimeKindNames
+extern const char *const ChimeKindNames[NumChimeKinds];   ///< "Tubes", "Glass", "Bamboo", "Bells" (Cloud.h ChimeKind)
+constexpr int            NumFieldModes = 6;               ///< entries of FieldModeNames
 extern const char *const
     FieldModeNames[NumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" (Cloud.h FieldMode)
 constexpr int            NumFarModes = 4;   ///< entries of FarModeNames

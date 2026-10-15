@@ -604,7 +604,7 @@ int main()
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 7168 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 8192 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -3445,6 +3445,234 @@ int main()
                fmt( "after 8 s, %.0f %% of the string's energy within an octave of where the note struck with "
                     "breathers, %.0f %% without",
                     100.0 * withB, 100.0 * without ) );
+    }
+
+    // 75. Phantom (Phase 27a): the phantom layer alone, carrying its melody. Between the ears the phase is turned
+    //     half way round at the pitch it carries and not at all a fifth above, while each ear alone has no peak
+    //     there: the pitch is only between them.
+    {
+        Engine e;
+        plainNote( e );
+        e.setParam( ParamIdE::PHANTOM, 1.0f );
+        e.setParam( ParamIdE::PHANTOM_LINE, 0.0f );
+        e.setParam( ParamIdE::PHANTOM_WIDTH, 0.12f );
+        bool ran = openOffline( e, false, 229 );
+        render( e, 1.8 );
+        float     hz[PhantomTargets] = {}, w[PhantomTargets] = {};
+        const int count = e.phantomPitches( hz, w );
+        double    f0 = 0.0;
+        for ( int k = 0; k < count; ++k )
+            if ( w[k] > 0.99f ) f0 = hz[k];
+        const std::vector<float> lr = render( e, 2.0 );   // still its first note (a note holds four to eight seconds)
+        const size_t             end = lr.size() / 2;
+        auto ipd = [&]( double f )
+        {   // the phase of the cross spectrum summed over +-1.5 Hz
+            std::complex<double> acc( 0.0, 0.0 );
+            for ( double d = -1.5; d <= 1.5; d += 0.5 )
+                acc += toneAt( lr, 0, end, f + d, 0 ) * std::conj( toneAt( lr, 0, end, f + d, 1 ) );
+            return std::arg( acc );
+        };
+        auto leftDb = [&]( double f )
+        {   // the left ear's power over +-5 Hz
+            double p = 0.0;
+            for ( double d = -5.0; d <= 5.0; d += 0.5 ) p += std::norm( toneAt( lr, 0, end, f + d, 0 ) );
+            return 10.0 * std::log10( std::max( p, 1.0e-30 ) );
+        };
+        ran = ran && f0 > 0.0;
+        const double at = ran ? std::fabs( ipd( f0 ) ) : 0.0, off = ran ? std::fabs( ipd( 1.5 * f0 ) ) : 9.0;
+        const double peak = ran ? leftDb( f0 ) - 0.5 * ( leftDb( 0.85 * f0 ) + leftDb( 1.18 * f0 ) ) : 99.0;
+        check( ran && at > 2.5 && off < 0.6 && std::fabs( peak ) < 4.0, "phantom: a pitch heard only between the ears",
+               fmt( "at its pitch %.0f Hz the ears are %.2f rad apart, a fifth above %.2f; the left ear alone %+.1f dB "
+                    "there against beside it",
+                    f0, at, off, peak ) );
+    }
+
+    // 76. Talbot (Phase 27b): Revival over a 20 s period -- half way the timbre stands upside down (the 24th harmonic
+    //     over the fundamental), after the period it is back within two decibels, the voice's power within one.
+    //     Bloch: the energy's centre climbs the harmonics half way and comes back.
+    {
+        auto play = [&]( float mode, double p1[3], double p24[3], double all[3], double centre[3] )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::TILT, 1.0f );
+            e.setParam( ParamIdE::TALBOT, 1.0f );
+            e.setParam( ParamIdE::TALBOT_MODE, mode );
+            e.setParam( ParamIdE::TALBOT_TIME, 20.0f );
+            if ( !openOffline( e, false, 231 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            render( e, 0.1 );
+            const double f0 = soundingHz( e );
+            const double when[3] = { 0.5, 10.5, 20.5 };
+            bool         seen[3] = { false, false, false };
+            watch( e, 21.0, 0.3,
+                   [&]( const std::vector<float> &dots, int per, double t )
+                   {
+                       for ( int k = 0; k < 3; ++k )
+                       {
+                           if ( seen[k] || t + 0.1 < when[k] ) continue;
+                           seen[k] = true;
+                           p1[k] = powerAt( dots, per, f0 );
+                           p24[k] = powerAt( dots, per, 24.0 * f0 );
+                           all[k] = powerAt( dots, per, 0.0 );
+                           double num = 0.0, den = 0.0;
+                           for ( int h = 1; h <= 24; ++h )
+                           {
+                               const double ph = powerAt( dots, per, h * f0 );
+                               num += h * ph;
+                               den += ph;
+                           }
+                           centre[k] = den > 0.0 ? num / den : 0.0;
+                       }
+                   } );
+            return f0 > 0.0 && seen[0] && seen[1] && seen[2];
+        };
+        double       p1[3] = {}, p24[3] = {}, all[3] = {}, c[3] = {}, b1[3] = {}, b24[3] = {}, ball[3] = {}, bc[3] = {};
+        const bool   ran = play( 0.0f, p1, p24, all, c ) && play( 1.0f, b1, b24, ball, bc );
+        const double before = dB( p1[0] / std::max( p24[0], 1e-30 ) ), half = dB( p1[1] / std::max( p24[1], 1e-30 ) ),
+                     back = dB( p1[2] / std::max( p24[2], 1e-30 ) );
+        check( ran && before > 10.0 && half < 0.0 && std::fabs( back - before ) < 2.0 &&
+                   std::fabs( dB( all[2] / all[0] ) ) < 1.0 && bc[1] > bc[0] + 3.0 && std::fabs( bc[2] - bc[0] ) < 2.0,
+               "talbot: the timbre stands upside down half way and comes back",
+               fmt( "fundamental over the 24th: %+.1f dB at first, %+.1f half way, %+.1f after the period (power "
+                    "%+.2f dB); Bloch's centre: harmonic %.1f, %.1f, %.1f",
+                    before, half, back, dB( all[2] / all[0] ), bc[0], bc[1], bc[2] ) );
+    }
+
+    // 77. Chimes (Phase 27c): in a wind of 0.6 the chimes strike many times in ten seconds and are heard across the
+    //     field (left and right differ); without wind none strikes and the field is silent.
+    {
+        auto play = [&]( float wind, long long &strikes, double &db, double &corr )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::CHIMES, 1.0f );
+            e.setParam( ParamIdE::WIND, wind );
+            e.setParam( ParamIdE::GUSTS, 0.5f );
+            if ( !openOffline( e, false, 233 ) ) return false;
+            render( e, 4.0 );
+            const long long          s0 = e.chimeStrikes();
+            const std::vector<float> lr = render( e, 10.0 );
+            strikes = e.chimeStrikes() - s0;
+            db = rmsDb( lr, 0, lr.size() / 2 );
+            double ll = 0.0, rr = 0.0, l_r = 0.0;
+            for ( size_t i = 0; i < lr.size() / 2; ++i )
+            {
+                ll += static_cast<double>( lr[2 * i] ) * lr[2 * i];
+                rr += static_cast<double>( lr[2 * i + 1] ) * lr[2 * i + 1];
+                l_r += static_cast<double>( lr[2 * i] ) * lr[2 * i + 1];
+            }
+            corr = ll > 0.0 && rr > 0.0 ? l_r / std::sqrt( ll * rr ) : 1.0;
+            return true;
+        };
+        long long  windy = 0, calm = 0;
+        double     db = 0.0, calmDb = 0.0, corr = 1.0, calmCorr = 1.0;
+        const bool ran = play( 0.6f, windy, db, corr ) && play( 0.0f, calm, calmDb, calmCorr );
+        check(
+            ran && windy > 30 && db > -70.0 && corr < 0.95 && calm == 0 && calmDb < -100.0,
+            "chimes: the wind rings them across the field, the calm leaves them still",
+            fmt( "in a wind of 0.6: %lld strikes in 10 s, %.1f dBFS, left and right correlated %.2f; in a calm %lld, "
+                 "%.0f dBFS",
+                 windy, db, corr, calm, calmDb ) );
+    }
+
+    // 78. Dream (Phase 27d): two chords heard, then nothing played: the dream keeps them (at least two memories) and
+    //     sings what it remembered -- most of its power within 40 cents of the first six harmonics of the notes that
+    //     were played.
+    {
+        Engine e;
+        plainNote( e );
+        e.setParam( ParamIdE::DREAM, 1.0f );
+        e.setParam( ParamIdE::DREAM_DEPTH, 0.0f );
+        e.setParam( ParamIdE::DREAM_FOCUS, 0.6f );
+        e.setParam( ParamIdE::DREAM_DRIFT, 0.3f );
+        bool                ran = openOffline( e, false, 239 );
+        const int           chordA[3] = { 48, 55, 64 }, chordB[3] = { 50, 57, 65 };
+        std::vector<double> played;
+        for ( const int *chord : { chordA, chordB } )
+        {
+            for ( int k = 0; k < 3; ++k ) e.noteOn( chord[k], 0.8f, 0 );
+            render( e, 0.2 );
+            for ( const double f : soundingAll( e ) ) played.push_back( f );
+            render( e, 9.8 );
+            for ( int k = 0; k < 3; ++k ) e.noteOff( chord[k], 0 );
+            render( e, 1.0 );
+        }
+        render( e, 5.0 );
+        const int dreamVoice = 16 + 4 + 1;   // after the voices, the ghosts and the phantom layer
+        double    inside = 0.0, total = 0.0;
+        watch( e, 4.0, 0.0,
+               [&]( const std::vector<float> &dots, int per, double )
+               {
+                   for ( int i = dreamVoice * per;
+                         i < ( dreamVoice + 1 ) * per && 2 * i + 1 < static_cast<int>( dots.size() ); ++i )
+                   {
+                       const double f = dots[static_cast<size_t>( 2 * i )], a = dots[static_cast<size_t>( 2 * i + 1 )];
+                       if ( f <= 0.0 ) continue;
+                       total += a * a;
+                       bool close = false;
+                       for ( const double p : played )
+                           for ( int h = 1; h <= 6 && !close; ++h )
+                               close = std::fabs( 1200.0 * std::log2( f / ( h * p ) ) ) < 40.0;
+                       if ( close ) inside += a * a;
+                   }
+               } );
+        const int memories = e.dreamMemories();
+        ran = ran && played.size() >= 6;
+        check( ran && memories >= 2 && total > 0.0 && inside / std::max( total, 1e-30 ) > 0.5,
+               "dream: it keeps what it heard and sings it when nothing is played",
+               fmt( "%d memories; %.0f %% of the dream's power inside the harmonics of the notes played", memories,
+                    100.0 * inside / std::max( total, 1e-30 ) ) );
+    }
+
+    // 79. Premonition (Phase 27e): the conductor's first note heard coming -- two seconds into its premonition its
+    //     cloud is spread three times as far or more as two seconds after it began, and softer.
+    {
+        Engine e;
+        plainNote( e );
+        e.setParam( ParamIdE::CLOUD_WIDTH, 10.0f );
+        e.setParam( ParamIdE::PREMONITION, 1.0f );
+        e.setParam( ParamIdE::PREMONITION_TIME, 4.0f );
+        e.setParam( ParamIdE::ATTACK, 0.5f );
+        bool ran = openOffline( e, true, 241 );
+        e.requestFill();
+        double before = -1.0, after = -1.0, gainBefore = 0.0, gainAfter = 0.0;
+        watch( e, 30.0, 0.0,
+               [&]( const std::vector<float> &dots, int per, double )
+               {
+                   const VoiceView v = e.voiceView( 0 );
+                   if ( v.m_hz <= 0.0f ) return;
+                   double sum = 0.0, sq = 0.0;
+                   int    count = 0;
+                   for ( int i = 0; i < per; ++i )
+                   {
+                       const double f = dots[static_cast<size_t>( 2 * i )], a = dots[static_cast<size_t>( 2 * i + 1 )];
+                       if ( f <= 0.0 || a <= 0.0 ) continue;
+                       const double c = 1200.0 * std::log2( f / v.m_hz );
+                       if ( std::fabs( c ) > 300.0 ) continue;   // the fundamental's cloud only
+                       sum += c;
+                       sq += c * c;
+                       ++count;
+                   }
+                   if ( count < 5 ) return;
+                   const double spread = std::sqrt( std::max( sq / count - ( sum / count ) * ( sum / count ), 0.0 ) );
+                   if ( before < 0.0 && v.m_time > 2.0f && v.m_time < 2.5f )
+                   {
+                       before = spread;
+                       gainBefore = v.m_gain;
+                   }
+                   if ( after < 0.0 && v.m_time > 6.0f && v.m_time < 6.5f )
+                   {
+                       after = spread;
+                       gainAfter = v.m_gain;
+                   }
+               } );
+        ran = ran && before > 0.0 && after > 0.0;
+        check( ran && before > 3.0 * after && gainBefore < gainAfter,
+               "premonition: the conductor's note is heard coming, wide and soft",
+               fmt( "its fundamental's cloud spread %.1f cents two seconds before it began, %.1f two seconds after; "
+                    "level %.2f, then %.2f",
+                    before, after, gainBefore, gainAfter ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

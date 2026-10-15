@@ -17,9 +17,9 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And eight whole nights across groups (two from the sleep concerts, one from the visions, one from the swarms and currents): twenty-four presets, the stillest few of every group in a
-family of groups, chained,
-twelve to twenty minutes each with glides of two and a half to five -- about six and a half
+And eleven whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
+currents, the halls and orbits, the harmonic lives and the dreams and phantoms): twenty-four presets, the stillest few
+of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
 
 Nothing here listens: a nearest neighbour in this space is a preset that is set alike, which is
@@ -65,6 +65,8 @@ WHOLE_NIGHTS = [
                                       "Memory Palaces", "Orbits"]),
     ("Whole Night - Harmonic Lives", ["Turning Years", "Night Ecology", "Breathing Grains", "Aurora Curtains", "Glacier Calving",
                                       "Breath Registers", "Subterranea", "Halo Horizons"]),
+    ("Whole Night - Dreams & Phantoms", ["Night Memories", "Breathing In", "Inner Voices", "Temple Winds", "Glass Forests",
+                                         "Dreaming Rooms", "Bloch Tides", "Lucid Dreams"]),
 ]
 
 

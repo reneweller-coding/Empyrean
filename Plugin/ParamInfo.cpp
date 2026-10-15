@@ -268,6 +268,28 @@ const Info InfoTable[] = {
     { "grain", "The share of the partials that sound in grains, each grain born at a new place in its cloud." },
     { "grain_length", "A grain's length." },
     { "grain_density", "How much of its time a grain partial sounds: low is sparse and glittering, high is dense." },
+    { "talbot", "The first 24 harmonics evolve as a wave does: the timbre falls apart and comes back whole after "
+                "the period." },
+    { "talbot_mode", "Revival: half way the timbre stands upside down, after the period it is whole again. Bloch: its "
+                     "brightness swings up and down the harmonics." },
+    { "talbot_time", "The period: how long until the timbre comes back." },
+    { "phantom", "Noise the same in both ears but where a pitch turns the phase between them: the pitch is heard only "
+                 "in the head. Headphones." },
+    { "phantom_line", "What the phantom layer carries: a melody of its own, the notes that just ended, or the chord." },
+    { "phantom_width", "How sharply the phase turns round a pitch: narrower is clearer, wider is softer." },
+    { "chimes",
+      "2048 tuned chimes over the field, rung by a simulated wind: gusts cross it and the chimes ring in waves." },
+    { "chime_kind", "Metal tubes, glass, bamboo or small bells." },
+    { "chime_pitch", "The chimes' register, in octaves up or down. They are tuned to the scale." },
+    { "chime_decay", "How long a chime rings." },
+    { "wind", "The wind's strength: calm below a quarter, a breeze at half, a gale at the top." },
+    { "gusts", "How much the wind gusts: steady air or squalls." },
+    { "dream", "The instrument remembers what it heard and dreams it far off, wandering from memory to memory." },
+    { "dream_focus", "A blend of memories, or one memory at a time." },
+    { "dream_drift", "How restlessly the dream wanders." },
+    { "dream_depth", "How far off the dream is heard." },
+    { "premonition", "The conductor's notes are heard coming: a swell like a reverb backwards into their start." },
+    { "premonition_time", "How long before a note its premonition begins." },
     { "ripple_breathers", "The ripple as a chain of pendulums: a note's strike stays where it fell as a breather, "
                           "pulsing there, and drifts slowly." },
 };

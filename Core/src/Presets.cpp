@@ -125,6 +125,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Harmonic Ecology",
     "Night Ecology",
     "Wild Harmonics",
+    "Phantom Choirs",
+    "Inner Voices",
+    "Talbot Carpets",
+    "Bloch Tides",
+    "Glass Forests",
+    "Bamboo Groves",
+    "Wind Tubes",
+    "Temple Winds",
+    "Storm Gardens",
+    "Dreaming Rooms",
+    "Night Memories",
+    "Premonitions",
+    "Breathing In",
+    "Phantom Gardens",
+    "Lucid Dreams",
+    "Elsewhere",
 };
 
 namespace

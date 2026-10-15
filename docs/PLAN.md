@@ -529,6 +529,60 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 27: Windspiele, Phantommelodien, Traum, Vorahnung, Talbot (gebaut, 16.10.2026, 0.17.0)
+
+Der Nutzer fragte nach Ideen weit über den Stand der Synthese hinaus, für Ambient auf der GPU; meine Vorschläge (im
+Gespräch) und sein „bitte baue das ein und erstelle gleich noch 1024 neue Presets“. Die Wellensimulation eines Raums
+(3D-FDTD) blieb für später.
+
+- **27a Phantom:** eine Sonderstimme (nach den Geistern) aus 8192 Rauschpartials 150 Hz .. 3 kHz, gleich je Oktave,
+  flackernd wie Air, in beiden Ohren gleich -- außer dass um jede Zieltonhöhe die Phase des rechten Ohrs einmal ganz
+  herumdreht (2 pi über Phantom Width, tanh). Huggins-Tonhöhe (Cramer & Huggins 1958), nur über Kopfhörer. Eigene
+  Kanäle (14, 15): `reduceKernel` lässt ihre Chunks aus, `phantomReduceKernel` summiert sie; die Engine mischt sie
+  nach Mid/Side trocken dazu (Echos, Räume, Breite verwischten die Phase). Der Render-Kernel rechnet ihre
+  Kosinusanteile auch ohne Binaural. **Gefunden:** zuerst trug sie die Töne des Akkords -- dort klingen die echten
+  Töne schon, die Phantomtonhöhe verschmolz mit ihnen (Kreuzspektrum dort ~0). Jetzt Phantom Line: Melody (eigene
+  Linie in der Skala, ein bis zwei Stufen alle 4 .. 8 s, Überblendung 1,5 s), Echo (die zuletzt verklungenen Noten,
+  30 s), Chord.
+- **27b Talbot:** die ersten 24 Harmonischen als Wellenfunktion ab Notenbeginn, im Eigensystem (`talbotSystem`,
+  zwischengespeichert): Revival = Kosinusbasis mit n² w (exakte Wiederkehr, bei T/2 gespiegelt, bei T/4 beides zur
+  Hälfte); Bloch = Kette mit Hüpfen J = wM/8 und Neigung w je Harmonischer (Jacobi-Rotationen), Eigenwerte auf die
+  exakte Leiter w n gesetzt (an den Kettenenden lagen sie daneben: die Rückkehr verfehlte um drei Harmonische).
+  **Gefunden:** mit −J lief das ruhende Paket nach unten in die Wand am Grundton und blieb; mit +J steigt es. Leistung
+  exakt erhalten (unitär), Depth mischt nach Leistung. **Gefunden beim Hören [M]:** die Wiederkehr ist scharf -- die
+  23. Mode dreht 529-mal so schnell wie die erste, das Bild steht nur ein 3300stel der Periode (bei 30 s 9 ms); über
+  2 s gemittelt lag der Grundton über der 23. nur bei +18 → ±0 → −14 → +18 dB, dazwischen Rauschen. Jetzt eine
+  verzerrte Uhr (`talbotClock`): je Viertelperiode langsam an den Rändern, exponentiell schnell dazwischen (17
+  e-Faltungen), so steht jede Marke -- ganz, halb und halb (bei T/4 exakt: Leistung = (Bild + Spiegel)/2),
+  gespiegelt -- eine Weile, und das Bild zerfällt von den feinsten Einzelheiten her. Prototyp: +27 (3 s) → +6 →
+  −22 (5 s) → +6 → +27 dB; im Render (A2 in der Skala 108,75 Hz, Velvet Dreaming mit Hall und Gedächtnis): +26 →
+  bis −21 → +28 dB, Bloch-Schwerpunkt 3,1 → 12,5 → 3,1.
+- **27c Chimes:** 2048 Windspiele (64 × 32, gejittert) × 16 Moden (acht, je ein Dublett ±1,5 Cent) = 32768 komplexe
+  Einpoler (`chimeKernel`, Bauart des modalen Halls, ruhende Blöcke schreiben nur Stille); Wind = D2Q9 BGK auf 128 ×
+  64 (tau 0,53, zwei Schritte je Block, Kraft nach rechts, drei Pfosten mit Wirbelstraßen, Pull-Streaming mit
+  Bounce-back); Klöppel als Pendel (0,6 .. 1,4 Hz) gestoßen von Querwind und Böigkeit, Anschlag beim Spalt mit
+  Samplelage. Böe: Ornstein-Uhlenbeck (3 s). Arten: Rohr (freier Stab 1, 2,76, 5,40 ..), Glas, Bambus (kurz), Glocke.
+  Gestimmt auf die Skala im Register der Art, Chime Pitch. Kanäle 10 .. 13 (nah/fern). Kalibriert [M]: Wind 0,3 →
+  0,8 Anschläge/s, 0,5 → 3,6, 0,6 → 18, 0,8 → 63, 1,0 → 71 (Klöppel 16, Kraft 2e-5 (2 Wind)^1,2); der Python-
+  Prototyp lag mit Klöppel 30 bei 10/s, die Engine bei 79 -- der Unterschied steckt in der Böe.
+- **27d Dream:** der Hall hört (listen) und sammelt 1024 Bänder; alle 3 s wird das Gesammelte (als 512 Bänder, Länge
+  1) eine Erinnerung, wenn es keiner zu 98,5 % gleicht (bis 4096, die älteste geht). `dreamSimKernel` (16 Blöcke)
+  vergleicht alle Erinnerungen mit der Anfrage (Zustand + Rauschen), `dreamRecallKernel` (ein Block) nimmt die 32
+  nächsten, mischt sie nach softmax(beta Ähnlichkeit) und zieht den Zustand ein Stück hin. Eine Sonderstimme (16384
+  Partials über die 512 Bänder) singt ihn, fern. Feste Reihenfolge: bitgleich. Die Traumstimme selbst wird nicht
+  gehört (keine Rückkopplung).
+- **27e Premonition:** eine Note des Dirigenten beginnt mit ihrem Anschwellen (e^(-4 Rest/Länge), Wolke × (1 + 4 p)
+  breit, fern, dunkler), die Hüllkurve erst nach Premonition Time; danach zieht sich der Schwall in 0,15 s in die
+  Note. Gespielte Tasten nicht (ihre Zukunft kennt das Instrument nicht).
+- **Seiten:** Talbot auf Harmonics; neue Seite **Dreams** (Sound): Chimes, Phantom, Dream, Premonition.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Dreams & Phantoms“); die bestehenden unverändert.
+
+**Gemessen [M]:** Selbsttest 79/79 (75 Phantom: an der Tonhöhe 2,91 rad zwischen den Ohren, eine Quinte darüber 0,00,
+ein Ohr allein −2,1 dB gegen daneben; 76 Talbot: Grundton über der 24. +14,9 → −15,6 → +14,9 dB, Leistung ±0,00;
+Bloch-Schwerpunkt 2,4 → 11,6 → 2,4; 77 Chimes: bei Wind 0,6 61 Anschläge in 10 s, ohne Wind keiner und Stille; 78
+Dream: 3 Erinnerungen, 61 % der Traumleistung an den Harmonischen der gespielten Noten; 79 Premonition: Wolke 12,4
+gegen 2,5 Cent, Pegel 0,07 gegen 1,00).
+
 ## Phase 26: Die eigenen Leben der Harmonischen, Körner, Horizont, Breather (gebaut, 15.10.2026, 0.16.0)
 
 Drei Texte des Nutzers über neue Klangerzeuger (Gabor-Atome, Schrödinger-Spektren, Weierstraß-Kaskaden,

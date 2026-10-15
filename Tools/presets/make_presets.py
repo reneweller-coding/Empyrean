@@ -63,7 +63,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Growing Halls", "Eroded Halls", "Cathedral Years", "Worn Stone", "Slow Clocks", "Quickened Air", "Gravity Lenses", "Lingering Waves",
           "Orbits", "Cyclotrons", "Planetaria", "Magnetic Choirs", "Event Horizons", "Memory Palaces", "Celestial Mechanics", "Living Architecture",
           "Overblown Flutes", "Breath Registers", "Four Seasons", "Turning Years", "Avalanches", "Glacier Calving", "Subterranea", "Period Doubling",
-          "Halo Horizons", "Aurora Curtains", "Rainfall Grains", "Breathing Grains", "Breather Chains", "Harmonic Ecology", "Night Ecology", "Wild Harmonics"]
+          "Halo Horizons", "Aurora Curtains", "Rainfall Grains", "Breathing Grains", "Breather Chains", "Harmonic Ecology", "Night Ecology", "Wild Harmonics",
+          "Phantom Choirs", "Inner Voices", "Talbot Carpets", "Bloch Tides", "Glass Forests", "Bamboo Groves", "Wind Tubes", "Temple Winds",
+          "Storm Gardens", "Dreaming Rooms", "Night Memories", "Premonitions", "Breathing In", "Phantom Gardens", "Lucid Dreams", "Elsewhere"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -292,6 +294,38 @@ NAMES = {
                       ["Marsh", "Heath", "Fen", "Bog", "Moor", "Brake", "Hollow", "Spinney"]),
     "Wild Harmonics": (["Wild", "Untamed", "Unruly", "Restless", "Storm-Torn", "Blustering", "Ragged", "Feverish"],
                        ["Harmonics", "Overtones", "Partials", "Spectra", "Cyclone", "Squall", "Maelstrom", "Whirlwind"]),
+    "Phantom Choirs": (["Phantom", "Unheard", "Inward", "Ghostly", "Concealed", "Mindborne", "Soundless", "Implied"],
+                       ["Choir", "Cantor", "Anthem", "Madrigal", "Plainsong", "Requiem", "Lauds", "Compline"]),
+    "Inner Voices": (["Inner", "Whispered", "Imagined", "Murmured", "Unspoken", "Secret", "Quiet", "Private"],
+                     ["Voice", "Melody", "Refrain", "Strain", "Tune", "Lilt", "Cadence", "Descant"]),
+    "Talbot Carpets": (["Jacquard", "Twilled", "Fractal", "Patterned", "Tessellated", "Interlaced", "Embroidered", "Tapestried"],
+                       ["Carpet", "Tapestry", "Rug", "Weave", "Loom", "Kilim", "Mosaic", "Brocade"]),
+    "Bloch Tides": (["Oscillating", "Rebounding", "Ebbing", "Periodic", "Upwelling", "Waxing", "Waning", "Recoiling"],
+                    ["Tide", "Ladder", "Crest", "Swell", "Ascent", "Spring Tide", "Neap", "Current"]),
+    "Glass Forests": (["Glassy", "Crystalline", "Tinkling", "Glinting", "Icy", "Chiming", "Ringing", "Silvered"],
+                      ["Forest", "Grove", "Canopy", "Woodland", "Thicket", "Glade", "Bower", "Coppice"]),
+    "Bamboo Groves": (["Hollow", "Knocking", "Clacking", "Wooden", "Green", "Bending", "Rustling", "Tapping"],
+                      ["Bamboo", "Cane", "Reedbed", "Stalk", "Culm", "Shoot", "Clump", "Bamboo Grove"]),
+    "Wind Tubes": (["Brass", "Silver", "Steel", "Copper", "Aluminium", "Pewter", "Tin", "Nickel"],
+                   ["Tubes", "Pipes", "Chimes", "Rods", "Wind Chime", "Bars", "Spindles", "Columns"]),
+    "Temple Winds": (["Shrine", "Pagoda", "Monastery", "Mountain", "Stupa", "Zen", "Prayer", "Cloistered"],
+                     ["Winds", "Bells", "Breeze", "Gust", "Air Bells", "Wind Bells", "Hand Bells", "Eaves"]),
+    "Storm Gardens": (["Stormy", "Squalling", "Gale-Blown", "Tempestuous", "Wild-Wind", "Thrashing", "Buffeted", "Lashing"],
+                      ["Garden", "Orchard", "Terrace", "Arbour", "Hedge", "Walled Garden", "Allotment", "Shrubbery"]),
+    "Dreaming Rooms": (["Dreaming", "Wandering", "Reverie", "Sleepwalking", "Daydreaming", "Musing", "Somnambulant", "Drowsing"],
+                       ["Room", "Attic", "Stairwell", "Landing", "Parlour", "Nursery", "Study", "Bedchamber"]),
+    "Night Memories": (["Forgotten", "Faded", "Bygone", "Half-Remembered", "Vanished", "Former", "Old", "Lost"],
+                       ["Night", "Evening", "Summer", "Winter", "Childhood", "Lullaby", "Letter", "Photograph"]),
+    "Premonitions": (["Foreseen", "Foretold", "Impending", "Oncoming", "Awaited", "Imminent", "Heralded", "Expected"],
+                     ["Premonition", "Omen", "Portent", "Harbinger", "Foretaste", "Prelude", "Augury", "Presage"]),
+    "Breathing In": (["Indrawn", "Drawing", "Welling", "Mounting", "Building", "Deepening", "Gathered", "Held"],
+                     ["Breath", "Inhalation", "Sigh", "Hush", "Pause", "Stillness", "Anticipation", "Intake"]),
+    "Phantom Gardens": (["Spectral", "Ghost", "Wraith", "Shade", "Eerie", "Phantasmal", "Wisp", "Fey"],
+                        ["Garden", "Bower", "Arbour", "Pergola", "Trellis", "Lawn", "Fountain", "Maze"]),
+    "Lucid Dreams": (["Lucid", "Waking", "Clear-Eyed", "Aware", "Vivid", "Luminous", "Transparent", "Wakeful"],
+                     ["Dream", "Vision", "Reverie", "Trance", "Rapture", "Daydream", "Somnium", "Oneiros"]),
+    "Elsewhere": (["Elsewhere", "Faraway", "Further", "Beyond", "Liminal", "Unmapped", "Remote", "Uncharted"],
+                  ["Shore", "Country", "Realm", "Province", "Valley", "Island", "Coast", "Hinterland"]),
 }
 
 
@@ -2505,6 +2539,207 @@ def p26_effects(r, group):
             set_breathers(r, (0.5, 0.9), lengthen=False)
 
 
+# ---- Phase 27 (16.10.2026): Talbot timbres, the phantom layer, the chime field, the dream, the premonition.
+
+CHIME = {"Tubes": 0, "Glass": 1, "Bamboo": 2, "Bells": 3}
+PHANTOM_LINE = {"Melody": 0, "Echo": 1, "Chord": 2}
+
+
+def set_talbot(r, mode, depth=(0.4, 0.9), period=(20, 180)):
+    """A Talbot timbre: Revival (0) falls apart and comes back whole after the period, Bloch (1) swings up and down."""
+    r.set("talbot", f(r.u(*depth), 2))
+    r.set("talbot_mode", mode)
+    r.set("talbot_time", f(r.lg(*period), 1))
+    if num(r, "tilt", 1.2) > 1.3:   # the upper harmonics a Talbot timbre brings up must be there to be heard
+        r.set("tilt", f(r.u(0.8, 1.3), 2))
+
+
+def set_phantom(r, line, level=(0.25, 0.6), width=(0.08, 0.2)):
+    """The phantom layer: its noise's level, what it carries, how sharply."""
+    r.set("phantom", f(r.u(*level), 2))
+    r.set("phantom_line", PHANTOM_LINE[line])
+    r.set("phantom_width", f(r.u(*width), 3))
+
+
+def set_chimes(r, kind, level=(0.4, 0.85), wind=(0.35, 0.6), gusts=(0.3, 0.7), decay=(3, 10), pitch=(-0.5, 0.5)):
+    """The chime field: its kind, level, wind, gusts, ring, register."""
+    r.set("chimes", f(r.u(*level), 2))
+    r.set("chime_kind", CHIME[kind])
+    r.set("wind", f(r.u(*wind), 2))
+    r.set("gusts", f(r.u(*gusts), 2))
+    r.set("chime_decay", f(r.lg(*decay), 2))
+    r.set("chime_pitch", f(r.u(*pitch), 2))
+
+
+def set_dream(r, level=(0.4, 0.8), focus=(0.4, 0.9), drift=(0.2, 0.6), depth=(0.6, 0.95)):
+    """The dream: it needs the conductor, which plays what it remembers."""
+    r.set("dream", f(r.u(*level), 2))
+    r.set("dream_focus", f(r.u(*focus), 2))
+    r.set("dream_drift", f(r.u(*drift), 2))
+    r.set("dream_depth", f(r.u(*depth), 2))
+    r.set("brain_on", 1)
+
+
+def set_premonition(r, depth=(0.5, 1.0), time=(3, 8)):
+    """The premonition of the conductor's notes."""
+    r.set("premonition", f(r.u(*depth), 2))
+    r.set("premonition_time", f(r.lg(*time), 2))
+    r.set("brain_on", 1)
+
+
+P27_POOLS = {
+    "chimes": [("lfo2", "wind", (0.08, 0.2)), ("lfo3", "gusts", (0.1, 0.2)), ("lorenz_x", "wind", (0.06, 0.15))],
+    "phantom": [("lfo3", "phantom", (0.08, 0.18)), ("lfo2", "phantom_width", (0.1, 0.2))],
+    "dream": [("root_age", "dream", (0.15, 0.3)), ("lfo3", "dream_focus", (0.1, 0.25))],
+    "talbot": [("lfo2", "talbot", (0.1, 0.25)), ("kura2", "talbot", (0.1, 0.2))],
+    "premonition": [("lfo3", "premonition", (0.1, 0.25))],
+}
+
+
+def p27_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P27_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        elif src.startswith("kura"):
+            setup(r, "kura")
+        elif src.startswith(("lorenz", "rossler")):
+            setup(r, "chaos")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def d_phantom_choirs(r):
+    based(r, "Choirs", "Sleep Concert", "Strings", "Organs", "Deep Space")
+    set_phantom(r, r.pick("Melody", "Melody", "Echo", "Chord"))
+    p27_rows(r, ["phantom"], 1)
+
+
+def d_inner(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_phantom(r, r.pick("Melody", "Echo"), level=(0.3, 0.6))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def d_carpets(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Shimmer", "Bells")
+    set_talbot(r, 0, depth=(0.5, 1.0), period=(15, 150))
+    p27_rows(r, ["talbot"], 1)
+
+
+def d_bloch(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Deep Space", "Organs", "Waves")
+    set_talbot(r, 1, depth=(0.5, 1.0), period=(10, 120))
+    p27_rows(r, ["talbot"], 1)
+
+
+def d_glass(r):
+    based(r, *CALM)
+    set_chimes(r, "Glass", decay=(4, 12), pitch=(-0.3, 0.7))
+    p27_rows(r, ["chimes"], 1)
+
+
+def d_bamboo(r):
+    based(r, "Sleep Concert", "Deep Space", "Air & Noise", "Dark Drones", "Strings")
+    set_chimes(r, "Bamboo", wind=(0.4, 0.65), decay=(2, 6), pitch=(-0.5, 0.3))
+    p27_rows(r, ["chimes"], 1)
+
+
+def d_tubes(r):
+    based(r, *CALM)
+    set_chimes(r, "Tubes", decay=(5, 14))
+    p27_rows(r, ["chimes"], 1)
+
+
+def d_temple(r):
+    based(r, "Bells", "Deep Space", "Dark Drones", "Sleep Concert", "Organs")
+    set_chimes(r, "Bells", wind=(0.3, 0.55), decay=(6, 16), pitch=(-0.6, 0.3))
+    p27_rows(r, ["chimes"], 1)
+
+
+def d_storm(r):
+    based(r, "Air & Noise", "Dark Drones", "Deep Space", "Waves", "Strings")
+    set_chimes(r, r.pick("Tubes", "Glass", "Bamboo", "Bells"), wind=(0.6, 0.85), gusts=(0.6, 1.0), decay=(2, 8))
+    p27_rows(r, ["chimes"], 2)
+
+
+def d_rooms(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Organs", "Keys", "Glass")
+    set_dream(r)
+    p27_rows(r, ["dream"], 1)
+
+
+def d_memories(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_dream(r, level=(0.3, 0.6), drift=(0.1, 0.3), depth=(0.75, 1.0))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def d_premonitions(r):
+    based(r, "Choirs", "Strings", "Organs", "Bells", "Glass", "Deep Space")
+    set_premonition(r)
+    if num(r, "attack", 2.0) > 3.0:   # the swell is drawn into the note: an attack too slow would leave a gap after it
+        r.set("attack", f(r.u(0.5, 3.0), 3))
+    p27_rows(r, ["premonition"], 1)
+
+
+def d_breathing_in(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_premonition(r, depth=(0.4, 0.8), time=(6, 12))
+    sleep_rows(r, ["breath"], 1)
+
+
+def d_phantom_gardens(r):
+    based(r, *CALM)
+    set_chimes(r, r.pick("Glass", "Bells", "Tubes"), level=(0.3, 0.6), wind=(0.3, 0.5), decay=(4, 12))
+    set_phantom(r, "Melody", level=(0.25, 0.5))
+    p27_rows(r, ["chimes", "phantom"], 1)
+
+
+def d_lucid(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Organs", "Shimmer", "Deep Space")
+    set_dream(r, level=(0.35, 0.7))
+    if r.rng.random() < 0.6:
+        set_talbot(r, r.pick(0, 1), depth=(0.3, 0.7), period=(30, 240))
+    if r.rng.random() < 0.6:
+        set_premonition(r, depth=(0.4, 0.8))
+    p27_rows(r, ["dream", "talbot"], 1)
+
+
+def d_elsewhere(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("chimes", "phantom", "dream", "talbot", "premonition") if r.rng.random() < 0.45]
+    if "chimes" in kinds:
+        set_chimes(r, r.pick("Tubes", "Glass", "Bamboo", "Bells"), level=(0.3, 0.7))
+    if "phantom" in kinds:
+        set_phantom(r, r.pick("Melody", "Echo", "Chord"), level=(0.2, 0.5))
+    if "dream" in kinds:
+        set_dream(r, level=(0.3, 0.6))
+    if "talbot" in kinds:
+        set_talbot(r, r.pick(0, 1), depth=(0.3, 0.8))
+    if "premonition" in kinds:
+        set_premonition(r, depth=(0.4, 0.9))
+    p27_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [d_phantom_choirs, d_inner, d_carpets, d_bloch, d_glass, d_bamboo, d_tubes, d_temple, d_storm,
+                     d_rooms, d_memories, d_premonitions, d_breathing_in, d_phantom_gardens, d_lucid, d_elsewhere]
+
+
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
     a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was."""
@@ -2552,7 +2787,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 112 groups of 64 (Presets.h).",
+             "/// The factory presets: 128 groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

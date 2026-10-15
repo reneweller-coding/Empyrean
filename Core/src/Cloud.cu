@@ -66,8 +66,8 @@ struct BlockHeader
     int           m_landRows;         ///< its time rows
     float         m_landRowSeconds;   ///< how long one row lasts
     std::uint32_t m_blockIndex;       ///< blocks launched since open(): where this block's levels go in the ring
-    std::uint32_t m_hpad0;            ///< keeps what follows 16-byte aligned
-    std::uint32_t m_hpad1;            ///< likewise
+    std::int32_t  m_phantomVoice;     ///< the GPU voice of the phantom layer (its chunks reduced apart), -1 none
+    std::int32_t  m_dreamVoice;       ///< the GPU voice of the dream, -1 none
     std::uint32_t m_hpad2;            ///< likewise
     ModalHall     m_modal;            ///< the modal hall's settings for this block
     SpectralField m_field;            ///< the field and the dispersion for this block
@@ -80,6 +80,8 @@ struct BlockHeader
     Melt          m_melt;             ///< the melt for this block
     SpectralComb  m_comb;             ///< the spectral comb for this block
     Turbulence    m_turb;             ///< the energy cascade for this block
+    ChimeField    m_chimes;           ///< the chime field for this block (Phase 27)
+    Dream         m_dream;            ///< the dream for this block (Phase 27)
     std::int32_t  m_lifeParity;       ///< which of the two field buffers holds the field before this block's steps
     std::int32_t  m_lpad0;            ///< keeps the header 16-byte aligned
     std::int32_t  m_lpad1;            ///< likewise
@@ -441,9 +443,10 @@ __device__ float orbitStep( const SpectralField &F, const float4 *prev, float4 *
  * @param[in,out] hist     per band the amplitude gathered this block (fixed point, 1e-12)
  * @param[in,out] memory   per band the hall's memory, 1 the average
  * @param[in,out] density  per band the spectrum's density, 1 the average
+ * @param[in,out] dreamAcc per band what the dream gathers for its next memory (Phase 27)
  */
 __global__ void __launch_bounds__( HallBins )
-    hallKernel( const BlockHeader *hdr, unsigned long long *hist, float *memory, float *density )
+    hallKernel( const BlockHeader *hdr, unsigned long long *hist, float *memory, float *density, float *dreamAcc )
 {
     const ModalHall &mh = hdr->m_modal;
     if ( !mh.m_listen ) return;
@@ -452,6 +455,7 @@ __global__ void __launch_bounds__( HallBins )
     const int        b = static_cast<int>( threadIdx.x );
     const float      h = static_cast<float>( hist[b] ) * 1.0e-12f;
     hist[b] = 0ULL;
+    if ( hdr->m_dream.m_on ) dreamAcc[b] += h;   // the dream gathers what was heard (Phase 27)
     red[b] = h;
     __syncthreads();
     for ( int s = HallBins / 2; s > 0; s >>= 1 )
@@ -1177,7 +1181,7 @@ __global__ void syncOrderKernel( const BlockHeader *hdr, const CloudVoice *voice
     const int v = gid / pcap, g = gid - v * pcap;
     if ( v >= hdr->m_voices ) return;
     const CloudVoice &cv = voices[v];
-    if ( !cv.m_active ) return;
+    if ( !cv.m_active || cv.m_kind != VoiceKindE::NOTE ) return;
     const int H = cv.m_harmonics, K = cv.m_members, HP = cv.m_harmonicPartials;
     int       first, count;
     if ( g < H )
@@ -1546,13 +1550,15 @@ __global__ void cascadeKernel( const BlockHeader *hdr, const CloudVoice *voices,
  * @param[in,out] tau          per partial its own clock (Time Bend)
  * @param[in,out] orbitA       the Orbit field's state, buffer A (even blocks read it)
  * @param[in,out] orbitB       buffer B
+ * @param[in]     dreamState   the dream's spectrum, DreamBands (dreamRecallKernel), for a voice of the kind DREAM
  */
 __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, int pcap, const EnvShape *shapes,
                               const float *land, uint4 *run, float4 *amp, float4 *gains, const float *ring,
                               float2 *ampQ, float2 *snap, const float2 *lifeA, const float2 *lifeB, float *theta,
                               float *sx, const float2 *order, size_t plane, float2 *flockA, float2 *flockB,
                               const float *qa, const float *qb, const float *filterTable, unsigned long long *hallHist,
-                              const float *density, float *tau, float4 *orbitA, float4 *orbitB )
+                              const float *density, float *tau, float4 *orbitA, float4 *orbitB,
+                              const float *dreamState )
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1589,7 +1595,60 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     const int  H = cv.m_harmonics, K = cv.m_members, S = cv.m_subClouds;
     const int  HP = cv.m_harmonicPartials;
     const bool isAir = p >= HP;
-    if ( isAir || p < ( H + S ) * K )
+    float      phantomTurn = 0.0f;   // the phantom layer: the turn of phase from the left ear to the right
+    if ( cv.m_kind != VoiceKindE::NOTE )
+    {
+        // The layers that are not notes (Phase 27). Their partials are heard as they are: no filter, no motion.
+        float centre, drift, sh;
+        if ( cv.m_kind == VoiceKindE::PHANTOM )
+        {
+            // Noise of partials from 150 Hz to 3 kHz, even per octave, flickering as Air does -- the same in both
+            // ears but where a pitch turns the right ear's phase once round over `width` octaves: there the ears
+            // disagree, and the brain hears a faint tone that is in neither (Huggins' pitch).
+            centre = 150.0f * exp2f( 4.3219281f * hash01( seed, up, 70 ) );   // log2(20)
+            const float j = 6.0f;
+            drift = 25.0f * ( 0.6f * slowSine( j * ( 0.5f + hash01( seed, up, 2 ) ), t, hash01( seed, up, 3 ) ) +
+                              0.4f * slowSine( j * ( 1.3f + hash01( seed, up, 4 ) ), t, hash01( seed, up, 5 ) ) );
+            sh = fmaxf(
+                0.0f,
+                1.0f + 0.6f * ( 0.7f * slowSine( j * ( 0.7f + hash01( seed, up, 6 ) ), t, hash01( seed, up, 7 ) ) +
+                                0.3f * slowSine( j * ( 1.6f + hash01( seed, up, 8 ) ), t, hash01( seed, up, 9 ) ) ) );
+            place = 0.0f;
+        }
+        else
+        {
+            // The dream: its partials spread over the bands, each band as loud as the dream's state there.
+            const int b = p % DreamBands;
+            centre = 20.0f * exp2f( 9.96578428f * ( static_cast<float>( b ) + hash01( seed, up, 70 ) ) /
+                                    static_cast<float>( DreamBands ) );
+            drift =
+                cv.m_drift * slowSine( cv.m_driftRate * ( 0.5f + hash01( seed, up, 2 ) ), t, hash01( seed, up, 3 ) );
+            sh = fmaxf( 0.0f, 1.0f + cv.m_shimmer * slowSine( cv.m_shimmerRate * ( 0.5f + hash01( seed, up, 6 ) ), t,
+                                                              hash01( seed, up, 7 ) ) );
+            sh *= dreamState[b];
+        }
+        f = centre * exp2f( drift * ( 1.0f / 1200.0f ) );
+        if ( cv.m_kind == VoiceKindE::PHANTOM )
+        {
+            const float lf = log2f( fmaxf( f, 1.0f ) );
+            float       turn = 0.0f;
+            for ( int k = 0; k < min( cv.m_phantomCount, PhantomTargets ); ++k )
+            {
+                const float x = ( lf - log2f( fmaxf( cv.m_phantomHz[k], 1.0f ) ) ) / fmaxf( cv.m_phantomWidth, 0.005f );
+                turn += cv.m_phantomWeight[k] * 0.5f * ( 1.0f + tanhf( 2.5f * x ) );
+            }
+            phantomTurn = 6.2831853f * turn;
+        }
+        const float fade = fminf( fmaxf( ( 0.47f * fs - f ) / ( 0.04f * fs ), 0.0f ), 1.0f ) *
+                           fminf( fmaxf( ( f - 5.0f ) * ( 1.0f / 15.0f ), 0.0f ), 1.0f );
+        f = fmaxf( f, 1.0f );
+        const float dist = fminf( fmaxf( cv.m_distance, 0.0f ), 1.0f );
+        const float x0 = f * ( 1.0f / 16000.0f );
+        const float x = x0 / exp2f( -5.0f * dist * cv.m_airAbsorb );
+        const float absorb = sqrtf( ( 1.0f + x0 * x0 ) / ( 1.0f + x * x ) );
+        target = cv.m_scale * sh * fade * cv.m_gain * exp2f( -dist ) * absorb;
+    }
+    else if ( isAir || p < ( H + S ) * K )
     {
         // Who the partial is: a member of harmonic h's cloud, or one of the air band's partials.
         int   h = 1;
@@ -1691,6 +1750,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                     if ( cv.m_harmonicLife & 1 ) g *= registerGain( h, cv.m_register );
                     if ( ( cv.m_harmonicLife & 2 ) && h > 1 ) g *= cv.m_season[seasonFamily( h )];
                     if ( ( cv.m_harmonicLife & 4 ) && h >= 2 && h < 2 + AvalancheSites ) g *= 1.0f + cv.m_glow[h - 2];
+                    if ( ( cv.m_harmonicLife & 8 ) && h <= TalbotHarmonics ) g *= cv.m_talbot[h - 1];
                     amp0 *= g;
                 }
                 // The power the harmonics 1, 3, 5 and 7 handed down to their subharmonics.
@@ -1950,7 +2010,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         // The hall's ear: this partial's amplitude in its band, in whole numbers (the sum is the same in
         // any order). Amplitudes, not powers: a chord's upper harmonics count as heard too, not only the
         // few loudest bands.
-        if ( hdr->m_modal.m_listen && target > 0.0f )
+        if ( hdr->m_modal.m_listen && target > 0.0f && cv.m_kind == VoiceKindE::NOTE )
             atomicAdd( hallHist + hallBin( f ), static_cast<unsigned long long>( target * 1.0e12f ) );
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>( fminf( f / fs, 0.49f ) * 4294967296.0f );
@@ -1992,7 +2052,15 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     __sincosf( 1.57079633f * fminf( fmaxf( cv.m_distance, 0.0f ), 1.0f ), &gf, &gn );
     float4 t4 = make_float4( target * gl * gn, target * gr * gn, target * gl * gf, target * gr * gf );
     float2 tq = make_float2( 0.0f, 0.0f );
-    if ( hdr->m_binaural.m_on && target != 0.0f )
+    if ( cv.m_kind == VoiceKindE::PHANTOM )
+    {
+        // The phantom layer: the left ear hears the partial as it is, the right ear turned by its phase.
+        float ts, tc;
+        __sincosf( phantomTurn, &ts, &tc );
+        t4 = make_float4( target * gl * gn, target * gr * gn * tc, 0.0f, 0.0f );
+        tq = make_float2( 0.0f, target * gr * gn * ts );
+    }
+    else if ( hdr->m_binaural.m_on && target != 0.0f )
     {
         // Binaural: the near plane's two ears as complex gains, a sine part and a cosine part each.
         float el[2], er[2];
@@ -2007,7 +2075,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     gains[3 * gid + 2] = make_float4( q0.x, ( tq.x - q0.x ) * inv, q0.y, ( tq.y - q0.y ) * inv );
     amp[gid] = t4;
     ampQ[gid] = tq;
-    if ( dot ) *dot = make_float2( f, target );
+    if ( dot ) *dot = cv.m_kind == VoiceKindE::PHANTOM ? make_float2( 0.0f, 0.0f ) : make_float2( f, target );
     run[gid] = make_uint4( ph, inc0, dinc, __float_as_uint( fieldOff ) );
 }
 
@@ -2048,7 +2116,7 @@ __global__ void __launch_bounds__( Threads )
     }
     const int  count = min( Chunk, cv.m_partials - first );
     const int  base = v * pcap + first;
-    const bool binaural = hdr->m_binaural.m_on != 0;
+    const bool binaural = hdr->m_binaural.m_on != 0 || cv.m_kind == VoiceKindE::PHANTOM;
     for ( int j = threadIdx.x; j < count; j += Threads )
     {
         sgn[j] = gains[3 * ( base + j )];
@@ -2139,10 +2207,12 @@ __global__ void __launch_bounds__( Threads )
  * @param[in]     hdr      the block header
  * @param[in]     scratch  the render kernel's per-chunk blocks
  * @param[in]     chunks   how many chunks
+ * @param[in]     perVoice chunks a voice has (the phantom layer's are left out)
  * @param[in]     maxN     the scratch stride
  * @param[in,out] out      n frames of CloudOutChannels
  */
-__global__ void reduceKernel( const BlockHeader *hdr, const float *scratch, int chunks, int maxN, float *out )
+__global__ void reduceKernel( const BlockHeader *hdr, const float *scratch, int chunks, int perVoice, int maxN,
+                              float *out )
 {
     __shared__ float part[ReduceGroups][ReduceLanes + 1];
     const int        n = hdr->m_n;
@@ -2150,10 +2220,13 @@ __global__ void reduceKernel( const BlockHeader *hdr, const float *scratch, int 
     const int        c = t / maxN;
     const int        s = t - c * maxN;
     const bool       live = c < CloudChannels && s < n;
-    float            acc = 0.0f;
+    // The phantom layer's chunks are summed apart (phantomReduceKernel).
+    const int skip0 = hdr->m_phantomVoice >= 0 ? hdr->m_phantomVoice * perVoice : chunks;
+    const int skip1 = hdr->m_phantomVoice >= 0 ? skip0 + perVoice : chunks;
+    float     acc = 0.0f;
     if ( live )
         for ( int k = threadIdx.y; k < chunks; k += ReduceGroups )
-            acc += scratch[static_cast<size_t>( k ) * CloudChannels * maxN + t];
+            if ( k < skip0 || k >= skip1 ) acc += scratch[static_cast<size_t>( k ) * CloudChannels * maxN + t];
     part[threadIdx.y][threadIdx.x] = acc;
     __syncthreads();
     if ( threadIdx.y == 0 && live )
@@ -2377,6 +2450,554 @@ __global__ void modalReduceKernel( const BlockHeader *hdr, const float *scratch,
         for ( int q = 1; q < ReduceGroups; ++q ) acc += part[q][threadIdx.x];
         out[s * CloudOutChannels + CloudChannels + c] = acc;
     }
+}
+
+// ---- Phase 27 (16.10.2026): the chime field in its wind, the dream.
+
+constexpr int   WindCells = WindW * WindH;                      ///< cells of the wind's lattice
+constexpr float WindTau = 0.53f;                                ///< the wind's relaxation time (its viscosity)
+constexpr int   ChimeThreads = 256;                             ///< modes per CUDA block of the chime kernel
+constexpr int   ChimeBlocks = ChimeModesTotal / ChimeThreads;   ///< CUDA blocks of the chime kernel
+constexpr int   ChimeTile = 128;                                ///< samples the chime kernel sums per pass
+constexpr int   ChimesAcross = 64;                              ///< chimes from left to right (32 from near to far)
+constexpr int   DreamThreads = 256;                             ///< memories per CUDA block of the dream's likeness
+static_assert( ChimeModesTotal % ChimeThreads == 0, "the chimes' modes fill whole CUDA blocks" );
+static_assert( DreamMemories % DreamThreads == 0, "the memories fill whole CUDA blocks" );
+static_assert( HallBins == 2 * DreamBands, "a dream band is two of the hall's" );
+
+/** @brief D2Q9's directions across. */
+__constant__ int cWindX[9] = { 0, 1, 0, -1, 0, 1, -1, -1, 1 };
+/** @brief And up. */
+__constant__ int cWindY[9] = { 0, 0, 1, 0, -1, 1, 1, -1, -1 };
+/** @brief Each direction's opposite (bounce-back). */
+__constant__ int cWindOpp[9] = { 0, 3, 4, 1, 2, 7, 8, 5, 6 };
+/** @brief Their weights. */
+__constant__ float cWindW[9] = { 4.0f / 9.0f,  1.0f / 9.0f,  1.0f / 9.0f,  1.0f / 9.0f, 1.0f / 9.0f,
+                                 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f };
+
+/**
+ * @brief Whether a cell of the wind is one of the three posts that shed its vortex streets.
+ * @param[in] x  across, 0 .. WindW - 1
+ * @param[in] y  from near to far, 0 .. WindH - 1
+ * @return true inside a post
+ */
+__device__ __forceinline__ bool windPost( int x, int y )
+{
+    const int ax = x - 20, ay = y - 12, bx = x - 24, by = y - 34, cx = x - 18, cy = y - 54;
+    return ax * ax + ay * ay <= 16 || bx * bx + by * by <= 16 || cx * cx + cy * cy <= 16;
+}
+
+/**
+ * @brief One step of the wind (Phase 27): a D2Q9 lattice Boltzmann flow (BGK) on the torus, pulled cell by cell from
+ *        its neighbours (a post's side bounces back), pushed to the right by the field's force, relaxed towards its
+ *        equilibrium. Two steps a block: the first reads buffer A and writes B, the second back into A.
+ * @param[in]     hdr   the block header
+ * @param[in]     node  0 or 1, the step in the block
+ * @param[in,out] a     the lattice, nine directions a cell, buffer A
+ * @param[in,out] b     buffer B
+ */
+__global__ void windStepKernel( const BlockHeader *hdr, int node, float *a, float *b )
+{
+    const ChimeField &C = hdr->m_chimes;
+    if ( !C.m_on ) return;
+    const int idx = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
+    if ( idx >= WindCells ) return;
+    const int    x = idx % WindW, y = idx / WindW;
+    const float *src = node == 0 ? a : b;
+    float       *dst = node == 0 ? b : a;
+    if ( ( C.m_reset && node == 0 ) || windPost( x, y ) )
+    {   // at rest (a post's cells stay so)
+        for ( int k = 0; k < 9; ++k ) dst[k * WindCells + idx] = cWindW[k];
+        return;
+    }
+    float f[9], rho = 0.0f, ux = 0.0f, uy = 0.0f;
+    for ( int k = 0; k < 9; ++k )
+    {
+        const int xs = ( x - cWindX[k] ) & ( WindW - 1 ), ys = ( y - cWindY[k] ) & ( WindH - 1 );
+        f[k] = windPost( xs, ys ) ? src[cWindOpp[k] * WindCells + idx] : src[k * WindCells + ys * WindW + xs];
+        rho += f[k];
+        ux += static_cast<float>( cWindX[k] ) * f[k];
+        uy += static_cast<float>( cWindY[k] ) * f[k];
+    }
+    if ( !( rho > 0.2f && rho < 5.0f ) )
+    {   // never blown up: a cell gone wrong starts again at rest
+        for ( int k = 0; k < 9; ++k ) dst[k * WindCells + idx] = cWindW[k];
+        return;
+    }
+    ux = ux / rho + WindTau * C.m_force / rho;   // the push, as a shift of the equilibrium's velocity
+    uy /= rho;
+    const float uu = 1.5f * ( ux * ux + uy * uy );
+    for ( int k = 0; k < 9; ++k )
+    {
+        const float cu = 3.0f * ( static_cast<float>( cWindX[k] ) * ux + static_cast<float>( cWindY[k] ) * uy );
+        const float eq = cWindW[k] * rho * ( 1.0f + cu + 0.5f * cu * cu - uu );
+        dst[k * WindCells + idx] = f[k] - ( f[k] - eq ) * ( 1.0f / WindTau );
+    }
+}
+
+/**
+ * @brief Where a chime hangs, across (0 .. WindW) and from near to far (0 .. WindH): a jittered grid of 64 x 32.
+ * @param[in]  c   the chime
+ * @param[out] gx  across, cells
+ * @param[out] gy  from near to far, cells
+ */
+__device__ __forceinline__ void chimePlace( int c, float &gx, float &gy )
+{
+    gx =
+        static_cast<float>( ( c % ChimesAcross ) * 2 ) + 2.0f * hash01( 0xC417E5U, static_cast<std::uint32_t>( c ), 1 );
+    gy =
+        static_cast<float>( ( c / ChimesAcross ) * 2 ) + 2.0f * hash01( 0xC417E5U, static_cast<std::uint32_t>( c ), 2 );
+}
+
+/**
+ * @brief One block of the chimes' clappers (Phase 27): each a pendulum of its own (0.6 .. 1.4 Hz, lightly damped)
+ *        swung by the wind where it hangs -- its sideways part and its gusting part (the wind against the clapper's
+ *        own slow average of it) -- striking the chime when it swings past its gap: the strike's strength is the
+ *        clapper's speed, its sample where the swing crossed the gap, and the clapper bounces back.
+ * @param[in]     hdr      the block header
+ * @param[in]     wind     the wind's lattice after this block's steps (buffer A)
+ * @param[in,out] state    per chime (angle, angular speed, slow wind, -)
+ * @param[out]    impulse  per chime this block's strike (strength, sample), strength 0 when none
+ * @param[in,out] meta     the Phase 27 counters: [1] the strikes this block
+ */
+__global__ void chimeStepKernel( const BlockHeader *hdr, const float *wind, float4 *state, float2 *impulse, int *meta )
+{
+    const ChimeField &C = hdr->m_chimes;
+    const int         c = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
+    if ( c >= ChimeCount ) return;
+    if ( !C.m_on || C.m_reset )
+    {
+        impulse[c] = make_float2( 0.0f, 0.0f );
+        if ( C.m_reset ) state[c] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+        return;
+    }
+    float gx, gy;
+    chimePlace( c, gx, gy );
+    const int idx = ( static_cast<int>( gy ) & ( WindH - 1 ) ) * WindW + ( static_cast<int>( gx ) & ( WindW - 1 ) );
+    float     rho = 0.0f, ux = 0.0f, uy = 0.0f;
+    for ( int k = 0; k < 9; ++k )
+    {
+        const float f = wind[k * WindCells + idx];
+        rho += f;
+        ux += static_cast<float>( cWindX[k] ) * f;
+        uy += static_cast<float>( cWindY[k] ) * f;
+    }
+    if ( rho > 1.0e-3f )
+    {
+        ux /= rho;
+        uy /= rho;
+    }
+    const std::uint32_t uc = static_cast<std::uint32_t>( c );
+    const float         dt = static_cast<float>( hdr->m_n ) / hdr->m_sampleRate;
+    const float         wp = 6.2831853f * ( 0.6f + 0.8f * hash01( 0xC417E5U, uc, 3 ) );
+    const float         gap = 0.15f + 0.15f * hash01( 0xC417E5U, uc, 4 );
+    float4              s = state[c];
+    s.z += ( ux - s.z ) * fminf( dt * 0.5f, 1.0f );
+    const float drive = C.m_kick * ( uy + ( ux - s.z ) );
+    s.y += dt * ( -wp * wp * s.x - 2.0f * 0.08f * wp * s.y + drive );
+    const float next = s.x + dt * s.y;
+    float2      hit = make_float2( 0.0f, 0.0f );
+    if ( fabsf( next ) > gap )
+    {
+        const float before = fabsf( s.x ), after = fabsf( next );
+        const float frac = after > before ? fminf( fmaxf( ( gap - before ) / ( after - before ), 0.0f ), 1.0f ) : 0.0f;
+        hit = make_float2(
+            fminf( fabsf( s.y ) * 2.0f, 1.5f ),
+            static_cast<float>( min( static_cast<int>( frac * static_cast<float>( hdr->m_n ) ), hdr->m_n - 1 ) ) );
+        s.x = copysignf( gap, next );
+        s.y = -0.5f * s.y;
+        atomicAdd( meta + 1, 1 );
+    }
+    else
+    {
+        s.x = next;
+    }
+    state[c] = s;
+    impulse[c] = hit;
+}
+
+/**
+ * @brief A chime's mode as a multiple of its pitch, by its kind (ChimeKind): a free bar's for tubes and bamboo,
+ *        a glass bowl's, a small bell's (hum, prime, tierce, quint, nominal ..).
+ * @param[in] kind  ChimeKindE
+ * @param[in] m     the mode, 0 .. 7
+ * @return the ratio
+ */
+__device__ __forceinline__ float chimeRatio( int kind, int m )
+{
+    switch ( kind )
+    {
+    case 1:
+    {
+        const float r[8] = { 1.0f, 2.32f, 4.25f, 6.63f, 9.38f, 12.5f, 16.0f, 19.9f };
+        return r[m];
+    }
+    case 3:
+    {
+        const float r[8] = { 0.5f, 1.0f, 1.2f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f };
+        return r[m];
+    }
+    default:
+    {
+        const float r[8] = { 1.0f, 2.756f, 5.404f, 8.933f, 13.34f, 18.64f, 24.81f, 31.87f };
+        return r[m];
+    }
+    }
+}
+
+/**
+ * @brief The chime field's sound (Phase 27): one thread a mode (ChimeModes a chime: eight, each a doublet a few cents
+ *        apart, so a chime beats as a real one does), a complex one-pole as the modal hall's, struck at its chime's
+ *        sample by its clapper; heard from where its chime hangs -- across the field, near or far (its share of the
+ *        far plane, and the air darkening it). A CUDA block of chimes that all rest writes nothing but silence.
+ * @param[in]     hdr      the block header
+ * @param[in]     impulse  per chime this block's strike (chimeStepKernel)
+ * @param[in,out] state    per mode its complex state
+ * @param[out]    scratch  per CUDA block four channels of sums (near L, R, far L, R)
+ * @param[in]     maxN     the scratch stride
+ */
+__global__ void __launch_bounds__( ChimeThreads )
+    chimeKernel( const BlockHeader *hdr, const float2 *impulse, float2 *state, float *scratch, int maxN )
+{
+    __shared__ float  sAcc[ChimeThreads / 32][4][ChimeTile];
+    const ChimeField &C = hdr->m_chimes;
+    const int         n = hdr->m_n;
+    const int         mode = static_cast<int>( blockIdx.x ) * ChimeThreads + static_cast<int>( threadIdx.x );
+    const int         c = mode / ChimeModes, k = mode - c * ChimeModes;
+    float            *out = scratch + static_cast<size_t>( blockIdx.x ) * 4 * maxN;
+    float2            y = ( C.m_on && !C.m_reset ) ? state[mode] : make_float2( 0.0f, 0.0f );
+    const float2      hit = C.m_on ? impulse[c] : make_float2( 0.0f, 0.0f );
+    const bool        alive = C.m_on && C.m_pitchCount > 0 && ( y.x * y.x + y.y * y.y > 1.0e-14f || hit.x > 0.0f );
+    if ( !__syncthreads_or( alive ) )
+    {   // the whole block rests: silence, and its modes cleared
+        state[mode] = make_float2( 0.0f, 0.0f );
+        for ( int s = threadIdx.x; s < n; s += ChimeThreads )
+            for ( int ch = 0; ch < 4; ++ch ) out[ch * maxN + s] = 0.0f;
+        return;
+    }
+    const float         fs = hdr->m_sampleRate;
+    const std::uint32_t uc = static_cast<std::uint32_t>( c );
+    const int           m = k >> 1;
+    const float pitch = C.m_pitchCount > 0
+                            ? C.m_pitch[hash32( uc ^ 0x5E1E5E1EU ) % static_cast<std::uint32_t>( C.m_pitchCount )]
+                            : 0.0f;
+    const float cents = 6.0f * ( 2.0f * hash01( 0xC417E5U, uc, 5 ) - 1.0f ) + ( ( k & 1 ) ? 1.5f : -1.5f );
+    const float f = pitch * chimeRatio( C.m_kind, m ) * exp2f( cents * ( 1.0f / 1200.0f ) );
+    float       T = fmaxf( C.m_decay, 0.05f ) * __powf( fmaxf( chimeRatio( C.m_kind, m ), 0.25f ), -0.6f );
+    if ( C.m_kind == 2 ) T *= 0.12f;   // bamboo: wood, a knock that rings briefly
+    const float r = __expf( -6.9077553f / ( T * fs ) );
+    float       sw, cw;
+    sincosf( 6.2831853f * f / fs, &sw, &cw );
+    const float ar = r * cw, ai = r * sw;
+    float       gx, gy;
+    chimePlace( c, gx, gy );
+    const float place = 2.0f * gx / static_cast<float>( WindW ) - 1.0f;
+    const float dist = gy / static_cast<float>( WindH );
+    float       gl, gr, gn, gf;
+    __sincosf( 0.78539816f * ( 1.0f + place ), &gr, &gl );
+    __sincosf( 1.57079633f * dist, &gf, &gn );
+    // The strike's share of the mode (the higher, the less), the air's darkening with distance, the level.
+    const float w = ( f > 20.0f && f < 0.45f * fs ) ? 0.5f * __powf( 1.0f + static_cast<float>( m ), -0.8f ) *
+                                                          __expf( -dist * f * ( 1.0f / 9000.0f ) ) * C.m_level
+                                                    : 0.0f;
+    const float gNL = gl * gn * w, gNR = gr * gn * w, gFL = gl * gf * w, gFR = gr * gf * w;
+    const int   at = hit.x > 0.0f ? static_cast<int>( hit.y ) : -1;
+    const int   lane = static_cast<int>( threadIdx.x ) & 31, warp = static_cast<int>( threadIdx.x ) >> 5;
+    for ( int t0 = 0; t0 < n; t0 += ChimeTile )
+    {
+        const int tn = min( ChimeTile, n - t0 );
+        for ( int i = 0; i < tn; ++i )
+        {
+            const float yr = fmaf( ar, y.x, -ai * y.y );
+            const float yi = fmaf( ar, y.y, ai * y.x );
+            y.x = yr + ( t0 + i == at ? hit.x : 0.0f );   // struck: a real kick, so the sine starts from nothing
+            y.y = yi;
+            float v[4] = { yi * gNL, yi * gNR, yi * gFL, yi * gFR };
+            for ( int ch = 0; ch < 4; ++ch )
+                for ( int off = 16; off > 0; off >>= 1 ) v[ch] += __shfl_down_sync( 0xFFFFFFFFU, v[ch], off );
+            if ( lane == 0 )
+                for ( int ch = 0; ch < 4; ++ch ) sAcc[warp][ch][i] = v[ch];
+        }
+        __syncthreads();
+        for ( int s = threadIdx.x; s < 4 * tn; s += ChimeThreads )
+        {
+            const int ch = s / tn, i = s - ch * tn;
+            float     a = 0.0f;
+            for ( int wv = 0; wv < ChimeThreads / 32; ++wv ) a += sAcc[wv][ch][i];
+            out[ch * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    state[mode] = ( fabsf( y.x ) + fabsf( y.y ) > 1.0e-9f ) ? y : make_float2( 0.0f, 0.0f );
+}
+
+/**
+ * @brief The chime field's reduce: the CUDA blocks' sums added sample by sample, in a fixed order, into the frames'
+ *        channels 10 .. 13 (near left and right, far left and right).
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  the chime kernel's per-block sums
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels
+ */
+__global__ void chimeReduceKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out )
+{
+    __shared__ float part[ReduceGroups][ReduceLanes + 1];
+    const int        n = hdr->m_n;
+    const int        t = static_cast<int>( blockIdx.x ) * ReduceLanes + static_cast<int>( threadIdx.x );
+    const int        c = t / maxN;
+    const int        s = t - c * maxN;
+    const bool       live = c < 4 && s < n;
+    float            acc = 0.0f;
+    if ( live && hdr->m_chimes.m_on )
+        for ( int k = threadIdx.y; k < ChimeBlocks; k += ReduceGroups )
+            acc += scratch[static_cast<size_t>( k ) * 4 * maxN + t];
+    part[threadIdx.y][threadIdx.x] = acc;
+    __syncthreads();
+    if ( threadIdx.y == 0 && live )
+    {
+        for ( int q = 1; q < ReduceGroups; ++q ) acc += part[q][threadIdx.x];
+        out[s * CloudOutChannels + 10 + c] = acc;
+    }
+}
+
+/**
+ * @brief The phantom layer's reduce: its voice's chunks summed sample by sample, in a fixed order, into the frames'
+ *        channels 14 and 15 -- kept apart from the voices, so that it reaches the ears untouched (the echoes, the
+ *        rooms and the width would blur the turn of phase between them that is all there is to hear).
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  per chunk four channels of sums (the render kernel's)
+ * @param[in]     perVoice chunks a voice has
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels
+ */
+__global__ void phantomReduceKernel( const BlockHeader *hdr, const float *scratch, int perVoice, int maxN, float *out )
+{
+    const int s = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
+    const int n = hdr->m_n;
+    if ( s >= n ) return;
+    const int v = hdr->m_phantomVoice;
+    float     l = 0.0f, r = 0.0f;
+    if ( v >= 0 )
+        for ( int k = v * perVoice; k < ( v + 1 ) * perVoice; ++k )
+        {
+            l += scratch[static_cast<size_t>( k ) * CloudChannels * maxN + s];
+            r += scratch[static_cast<size_t>( k ) * CloudChannels * maxN + maxN + s];
+        }
+    out[s * CloudOutChannels + 14] = l;
+    out[s * CloudOutChannels + 15] = r;
+}
+
+/**
+ * @brief A dream band's place in the noise of a query: the same in every CUDA block of a block (hashed from the
+ *        block's index and the band), uniform, -1 .. 1.
+ * @param[in] block  the block's index
+ * @param[in] b      the band
+ * @return the noise
+ */
+__device__ __forceinline__ float dreamNoise( std::uint32_t block, int b )
+{
+    return 2.0f * hash01( block * 0x9E3779B9U + 0xD7EA3U, static_cast<std::uint32_t>( b ), 71 ) - 1.0f;
+}
+
+/**
+ * @brief The dream's likeness (Phase 27): every memory against the query -- the dream's state with a wander in it --
+ *        and, in a block that keeps what it gathered, against the gathered spectrum too (whether it is new). The
+ *        memories are kept band by band (DreamMemories each), so neighbouring threads read neighbouring memories.
+ * @param[in]  hdr    the block header
+ * @param[in]  acc    the hall's bands gathered since the last memory was kept (amplitudes)
+ * @param[in]  mem    the memories, DreamBands x DreamMemories
+ * @param[in]  state  the dream's state, DreamBands
+ * @param[out] sims   per memory its likeness to the query, then (DreamMemories on) to the gathered spectrum
+ * @param[in]  meta   the Phase 27 counters: [0] memories kept
+ */
+__global__ void __launch_bounds__( DreamThreads )
+    dreamSimKernel( const BlockHeader *hdr, const float *acc, const float *mem, const float *state, float *sims,
+                    const int *meta )
+{
+    const Dream &D = hdr->m_dream;
+    if ( !D.m_on ) return;
+    __shared__ float q[DreamBands];
+    __shared__ float g[DreamBands];
+    __shared__ float red[2][DreamThreads];
+    const int        t = static_cast<int>( threadIdx.x );
+    float            qq = 0.0f, gg = 0.0f;
+    for ( int b = t; b < DreamBands; b += DreamThreads )
+    {
+        q[b] = state[b] + D.m_noise * dreamNoise( hdr->m_blockIndex, b ) * 0.0441942f;   // 1 / sqrt(512)
+        g[b] = acc[2 * b] + acc[2 * b + 1];
+        qq += q[b] * q[b];
+        gg += g[b] * g[b];
+    }
+    red[0][t] = qq;
+    red[1][t] = gg;
+    __syncthreads();
+    for ( int s = DreamThreads / 2; s > 0; s >>= 1 )
+    {
+        if ( t < s )
+        {
+            red[0][t] += red[0][t + s];
+            red[1][t] += red[1][t + s];
+        }
+        __syncthreads();
+    }
+    const float iq = red[0][0] > 1.0e-20f ? rsqrtf( red[0][0] ) : 0.0f;
+    const float ig = red[1][0] > 1.0e-20f ? rsqrtf( red[1][0] ) : 0.0f;
+    const int   mu = static_cast<int>( blockIdx.x ) * DreamThreads + t;
+    if ( mu >= meta[0] ) return;
+    float sq = 0.0f, sg = 0.0f;
+    for ( int b = 0; b < DreamBands; ++b )
+    {
+        const float x = mem[static_cast<size_t>( b ) * DreamMemories + mu];
+        sq = fmaf( x, q[b], sq );
+        sg = fmaf( x, g[b], sg );
+    }
+    sims[mu] = sq * iq;
+    if ( D.m_store ) sims[DreamMemories + mu] = sg * ig;
+}
+
+/**
+ * @brief The dream's memory and its recall (Phase 27), one CUDA block, a thread a band: in a block that keeps what it
+ *        gathered, the spectrum is kept as a memory if it is new (less like every memory than `novelty`; past
+ *        DreamMemories the oldest goes) and the gathering begins again; then the DreamRecall memories nearest the
+ *        query are blended by the softmax of their likeness (sharpness `focus`), and the state moves a little of the
+ *        way there (`ease`), its length kept 1. All in a fixed order: the same input dreams the same dream.
+ * @param[in]     hdr    the block header
+ * @param[in,out] acc    the hall's bands gathered since the last memory was kept (cleared when one is)
+ * @param[in,out] mem    the memories, DreamBands x DreamMemories
+ * @param[in,out] state  the dream's state, DreamBands
+ * @param[in]     sims   the likenesses (dreamSimKernel)
+ * @param[in,out] meta   the Phase 27 counters: [0] memories kept, [2] where the next goes
+ */
+__global__ void __launch_bounds__( DreamBands )
+    dreamRecallKernel( const BlockHeader *hdr, float *acc, float *mem, float *state, const float *sims, int *meta )
+{
+    const Dream &D = hdr->m_dream;
+    if ( !D.m_on ) return;
+    __shared__ float red[DreamBands];
+    __shared__ int   who[DreamBands];
+    __shared__ float topSim[DreamRecall];
+    __shared__ int   topWho[DreamRecall];
+    const int        b = static_cast<int>( threadIdx.x );
+    const int        count = meta[0];
+    if ( D.m_clear )
+    {
+        state[b] = 0.0f;
+        acc[2 * b] = acc[2 * b + 1] = 0.0f;
+        __syncthreads();
+        if ( b == 0 ) meta[0] = meta[2] = 0;
+        return;
+    }
+    // A thread's band of the block-wide sums, and the block-wide maximum (value, lowest index first).
+    auto sum = [&]( float x )
+    {
+        red[b] = x;
+        __syncthreads();
+        for ( int s = DreamBands / 2; s > 0; s >>= 1 )
+        {
+            if ( b < s ) red[b] += red[b + s];
+            __syncthreads();
+        }
+        const float total = red[0];
+        __syncthreads();
+        return total;
+    };
+    auto argmax = [&]( float x, int i, float &best )
+    {
+        red[b] = x;
+        who[b] = i;
+        __syncthreads();
+        for ( int s = DreamBands / 2; s > 0; s >>= 1 )
+        {
+            if ( b < s && ( red[b + s] > red[b] || ( red[b + s] == red[b] && who[b + s] < who[b] ) ) )
+            {
+                red[b] = red[b + s];
+                who[b] = who[b + s];
+            }
+            __syncthreads();
+        }
+        best = red[0];
+        const int at = who[0];
+        __syncthreads();
+        return at;
+    };
+    if ( D.m_store )
+    {
+        const float g = acc[2 * b] + acc[2 * b + 1];
+        const float energy = sum( g * g );
+        float       nearest = -2.0f;
+        for ( int mu = b; mu < count; mu += DreamBands ) nearest = fmaxf( nearest, sims[DreamMemories + mu] );
+        float     most = -2.0f;
+        const int dummy = argmax( nearest, 0, most );
+        (void)dummy;
+        if ( energy > 1.0e-10f && ( count == 0 || most < D.m_novelty ) )
+        {
+            const int slot = meta[2];
+            mem[static_cast<size_t>( b ) * DreamMemories + slot] = g * rsqrtf( energy );
+            __syncthreads();
+            if ( b == 0 )
+            {
+                meta[2] = ( slot + 1 ) % DreamMemories;
+                meta[0] = min( count + 1, DreamMemories );
+            }
+        }
+        acc[2 * b] = acc[2 * b + 1] = 0.0f;
+    }
+    if ( count == 0 ) return;   // nothing remembered yet: nothing to dream (the new memory is recalled from the next)
+    // The nearest memories to the query, one by one.
+    const int k = min( DreamRecall, count );
+    for ( int j = 0; j < k; ++j )
+    {
+        float bestHere = -3.0f;
+        int   whoHere = 0x7FFFFFFF;
+        for ( int mu = b; mu < count; mu += DreamBands )
+        {
+            bool taken = false;
+            for ( int i = 0; i < j; ++i ) taken = taken || topWho[i] == mu;
+            if ( !taken && sims[mu] > bestHere )
+            {
+                bestHere = sims[mu];
+                whoHere = mu;
+            }
+        }
+        float     best = -3.0f;
+        const int at = argmax( bestHere, whoHere, best );
+        if ( b == 0 )
+        {
+            topSim[j] = best;
+            topWho[j] = at;
+        }
+        __syncthreads();
+    }
+    // Their blend by the softmax of their likeness, and the state a step towards it.
+    float wsum = 0.0f, r = 0.0f;
+    for ( int j = 0; j < k; ++j )
+    {
+        const float w = __expf( D.m_focus * ( topSim[j] - topSim[0] ) );
+        wsum += w;
+        r = fmaf( w, mem[static_cast<size_t>( b ) * DreamMemories + topWho[j]], r );
+    }
+    r /= fmaxf( wsum, 1.0e-20f );
+    const float rr = sum( r * r );
+    r *= rr > 1.0e-20f ? rsqrtf( rr ) : 0.0f;
+    const float x0 = state[b];
+    const float xx0 = sum( x0 * x0 );
+    float       x = xx0 > 1.0e-12f ? x0 + D.m_ease * ( r - x0 ) : r;
+    const float xx = sum( x * x );
+    state[b] = xx > 1.0e-20f ? x * rsqrtf( xx ) : 0.0f;
+}
+
+/**
+ * @brief The Phase 27 counters brought to the block's statistics: [12] the memories the dream keeps, [13] the chimes
+ *        that struck; the strikes counted again from the next block.
+ * @param[in,out] meta   the counters
+ * @param[out]    stats  the statistics the host reads every block
+ */
+__global__ void phase27StatsKernel( int *meta, float *stats )
+{
+    if ( threadIdx.x != 0 ) return;
+    stats[12] = static_cast<float>( meta[0] );
+    stats[13] = static_cast<float>( meta[1] );
+    meta[1] = 0;
 }
 
 /**
@@ -3193,6 +3814,21 @@ struct CloudEngine::Impl
     SpectralField m_field;                     ///< the host's copy of the field and the dispersion
     std::uint32_t m_blockIndex = 0;            ///< blocks launched since open()
     float        *m_dModalScratch = nullptr;   ///< device: per modal CUDA block two channels of sums
+    float        *m_dWindA = nullptr;          ///< device: the wind's lattice, nine directions a cell, buffer A
+    float        *m_dWindB = nullptr;          ///< device: buffer B
+    float4       *m_dChimeState = nullptr;     ///< device: per chime its clapper (angle, speed, slow wind)
+    float2       *m_dChimeHit = nullptr;       ///< device: per chime this block's strike
+    float2       *m_dChimeModes = nullptr;     ///< device: per chime mode its complex state
+    float        *m_dChimeScratch = nullptr;   ///< device: per chime CUDA block four channels of sums
+    float        *m_dDreamAcc = nullptr;       ///< device: the hall's bands gathered for the dream's next memory
+    float        *m_dDreamMem = nullptr;       ///< device: the dream's memories, DreamBands x DreamMemories
+    float        *m_dDreamState = nullptr;     ///< device: the dream's state, DreamBands
+    float        *m_dDreamSims = nullptr;      ///< device: the memories' likenesses, two sets
+    int          *m_dMeta = nullptr;           ///< device: the Phase 27 counters (memories, strikes, next slot)
+    ChimeField    m_chimes;                    ///< the host's copy of the chime field's settings
+    Dream         m_dream;                     ///< the host's copy of the dream's settings
+    int           m_phantomVoice = -1;         ///< the phantom layer's GPU voice, -1 none
+    int           m_dreamVoice = -1;           ///< the dream's GPU voice, -1 none
     ModalHall     m_modal;                     ///< the host's copy of the modal hall's settings
     float         m_gpuMs = 0.0f;              ///< GPU time of the last finished block
     bool          m_launched = false;          ///< a block is in flight
@@ -3217,32 +3853,37 @@ struct CloudEngine::Impl
         if ( m_hSnap ) cudaFreeHost( m_hSnap );
         if ( m_hLifeStats ) cudaFreeHost( m_hLifeStats );
         if ( m_hLife ) cudaFreeHost( m_hLife );
-        for ( void *p : { static_cast<void *>( m_dUpload ),      static_cast<void *>( m_dOut ),
-                          static_cast<void *>( m_dScratch ),     static_cast<void *>( m_dRun ),
-                          static_cast<void *>( m_dAmp ),         static_cast<void *>( m_dGains ),
-                          static_cast<void *>( m_dShapes ),      static_cast<void *>( m_dLand ),
-                          static_cast<void *>( m_dModal ),       static_cast<void *>( m_dModalScratch ),
-                          static_cast<void *>( m_dGainRing ),    static_cast<void *>( m_dAmpQ ),
-                          static_cast<void *>( m_dEchoHist ),    static_cast<void *>( m_dEchoAcc ),
-                          static_cast<void *>( m_dEchoRing ),    static_cast<void *>( m_dEchoState ),
-                          static_cast<void *>( m_dSnap ),        static_cast<void *>( m_dLifeA ),
-                          static_cast<void *>( m_dLifeB ),       static_cast<void *>( m_dLifeStats ),
-                          static_cast<void *>( m_dSyncTheta ),   static_cast<void *>( m_dSyncOrder ),
-                          static_cast<void *>( m_dFlockA ),      static_cast<void *>( m_dFlockB ),
-                          static_cast<void *>( m_dListenHist ),  static_cast<void *>( m_dListenPrev ),
-                          static_cast<void *>( m_dListenState ), static_cast<void *>( m_dResW ),
-                          static_cast<void *>( m_dResIn ),       static_cast<void *>( m_dResOut ),
-                          static_cast<void *>( m_dResX ),        static_cast<void *>( m_dMeltHist ),
-                          static_cast<void *>( m_dMeltAcc ),     static_cast<void *>( m_dMeltEnergy ),
-                          static_cast<void *>( m_dMeltOmega ),   static_cast<void *>( m_dMeltPhase ),
-                          static_cast<void *>( m_dMeltHeard ),   static_cast<void *>( m_dMeltState ),
-                          static_cast<void *>( m_dSyncX ),       static_cast<void *>( m_dFluidA ),
-                          static_cast<void *>( m_dFluidB ),      static_cast<void *>( m_dIsles ),
-                          static_cast<void *>( m_dCascadeA ),    static_cast<void *>( m_dCascadeB ),
-                          static_cast<void *>( m_dFilterTable ), static_cast<void *>( m_dHallHist ),
-                          static_cast<void *>( m_dHallMemory ),  static_cast<void *>( m_dDensity ),
-                          static_cast<void *>( m_dTau ),         static_cast<void *>( m_dOrbitA ),
-                          static_cast<void *>( m_dOrbitB ) } )
+        for ( void *p : { static_cast<void *>( m_dUpload ),       static_cast<void *>( m_dOut ),
+                          static_cast<void *>( m_dScratch ),      static_cast<void *>( m_dRun ),
+                          static_cast<void *>( m_dAmp ),          static_cast<void *>( m_dGains ),
+                          static_cast<void *>( m_dShapes ),       static_cast<void *>( m_dLand ),
+                          static_cast<void *>( m_dModal ),        static_cast<void *>( m_dModalScratch ),
+                          static_cast<void *>( m_dGainRing ),     static_cast<void *>( m_dAmpQ ),
+                          static_cast<void *>( m_dEchoHist ),     static_cast<void *>( m_dEchoAcc ),
+                          static_cast<void *>( m_dEchoRing ),     static_cast<void *>( m_dEchoState ),
+                          static_cast<void *>( m_dSnap ),         static_cast<void *>( m_dLifeA ),
+                          static_cast<void *>( m_dLifeB ),        static_cast<void *>( m_dLifeStats ),
+                          static_cast<void *>( m_dSyncTheta ),    static_cast<void *>( m_dSyncOrder ),
+                          static_cast<void *>( m_dFlockA ),       static_cast<void *>( m_dFlockB ),
+                          static_cast<void *>( m_dListenHist ),   static_cast<void *>( m_dListenPrev ),
+                          static_cast<void *>( m_dListenState ),  static_cast<void *>( m_dResW ),
+                          static_cast<void *>( m_dResIn ),        static_cast<void *>( m_dResOut ),
+                          static_cast<void *>( m_dResX ),         static_cast<void *>( m_dMeltHist ),
+                          static_cast<void *>( m_dMeltAcc ),      static_cast<void *>( m_dMeltEnergy ),
+                          static_cast<void *>( m_dMeltOmega ),    static_cast<void *>( m_dMeltPhase ),
+                          static_cast<void *>( m_dMeltHeard ),    static_cast<void *>( m_dMeltState ),
+                          static_cast<void *>( m_dSyncX ),        static_cast<void *>( m_dFluidA ),
+                          static_cast<void *>( m_dFluidB ),       static_cast<void *>( m_dIsles ),
+                          static_cast<void *>( m_dCascadeA ),     static_cast<void *>( m_dCascadeB ),
+                          static_cast<void *>( m_dFilterTable ),  static_cast<void *>( m_dHallHist ),
+                          static_cast<void *>( m_dHallMemory ),   static_cast<void *>( m_dDensity ),
+                          static_cast<void *>( m_dTau ),          static_cast<void *>( m_dOrbitA ),
+                          static_cast<void *>( m_dOrbitB ),       static_cast<void *>( m_dWindA ),
+                          static_cast<void *>( m_dWindB ),        static_cast<void *>( m_dChimeState ),
+                          static_cast<void *>( m_dChimeHit ),     static_cast<void *>( m_dChimeModes ),
+                          static_cast<void *>( m_dChimeScratch ), static_cast<void *>( m_dDreamAcc ),
+                          static_cast<void *>( m_dDreamMem ),     static_cast<void *>( m_dDreamState ),
+                          static_cast<void *>( m_dDreamSims ),    static_cast<void *>( m_dMeta ) } )
             if ( p ) cudaFree( p );
         m_exec = nullptr;
         m_graph = nullptr;
@@ -3292,6 +3933,13 @@ struct CloudEngine::Impl
         m_dHallMemory = m_dDensity = m_dTau = nullptr;
         m_dOrbitA = m_dOrbitB = nullptr;
         m_hHallMemory = m_hHallUp = nullptr;
+        m_dWindA = m_dWindB = nullptr;
+        m_dChimeState = nullptr;
+        m_dChimeHit = nullptr;
+        m_dChimeModes = nullptr;
+        m_dChimeScratch = nullptr;
+        m_dDreamAcc = m_dDreamMem = m_dDreamState = m_dDreamSims = nullptr;
+        m_dMeta = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -3320,6 +3968,17 @@ struct CloudEngine::Impl
         const float cutoff = std::min( 20000.0f, 0.43f * fs );
         const int   partials = std::clamp( v.m_partials, 1, m_cfg.m_partialsPerVoice );
         v.m_partials = partials;
+        if ( v.m_kind != VoiceKindE::NOTE )
+        {   // the phantom layer and the dream (Phase 27): every partial a sine of one amplitude, RMS `level`
+            const int per = v.m_kind == VoiceKindE::DREAM ? std::max( partials / DreamBands, 1 ) : partials;
+            v.m_harmonics = 0;
+            v.m_members = 0;
+            v.m_harmonicPartials = 0;
+            v.m_subClouds = 0;
+            v.m_scale = static_cast<float>( v.m_level * std::sqrt( 2.0 / per ) );
+            v.m_airScale = 0.0f;
+            return;
+        }
         const int airPartials =
             ( v.m_air > 0.0f && partials >= 2 )
                 ? std::clamp( static_cast<int>( std::lround( partials * AirShare ) ), 1, partials - 1 )
@@ -3497,7 +4156,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                "cudaHostAlloc hall", error ) &&
            ok( cudaHostAlloc( &m.m_hHallUp, sizeof( float ) * HallBins, cudaHostAllocDefault ), "cudaHostAlloc hall",
                error ) &&
-           ok( cudaMalloc( &m.m_dLifeStats, sizeof( float ) * 12 ), "cudaMalloc life stats", error ) &&
+           ok( cudaMalloc( &m.m_dLifeStats, sizeof( float ) * 16 ), "cudaMalloc life stats", error ) &&
            ok( cudaMalloc( &m.m_dResW, sizeof( float ) * ReservoirN * ReservoirN ), "cudaMalloc reservoir", error ) &&
            ok( cudaMalloc( &m.m_dResIn, sizeof( float ) * ReservoirN * ReservoirInputs ), "cudaMalloc reservoir",
                error ) &&
@@ -3519,7 +4178,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dFlockB, sizeof( float2 ) * partialsTotal ), "cudaMalloc flock", error ) &&
            ok( cudaMalloc( &m.m_dSyncOrder, sizeof( float2 ) * 3 * partialsTotal ), "cudaMalloc sync order", error ) &&
            ok( cudaMalloc( &m.m_dSyncX, sizeof( float ) * partialsTotal ), "cudaMalloc sync places", error ) &&
-           ok( cudaHostAlloc( &m.m_hLifeStats, sizeof( float ) * 12, cudaHostAllocDefault ), "cudaHostAlloc life stats",
+           ok( cudaHostAlloc( &m.m_hLifeStats, sizeof( float ) * 16, cudaHostAllocDefault ), "cudaHostAlloc life stats",
                error ) &&
            ok( cudaHostAlloc( &m.m_hLife, sizeof( float2 ) * LifeCells, cudaHostAllocDefault ), "cudaHostAlloc life",
                error ) &&
@@ -3529,7 +4188,20 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dModalScratch, sizeof( float ) * 2 * n * static_cast<size_t>( ModalBlocks ) ),
                "cudaMalloc modal scratch", error ) &&
            ok( cudaMalloc( &m.m_dGainRing, sizeof( float ) * GainRing * static_cast<size_t>( config.m_voices ) ),
-               "cudaMalloc gain ring", error );
+               "cudaMalloc gain ring", error ) &&
+           ok( cudaMalloc( &m.m_dWindA, sizeof( float ) * 9 * WindCells ), "cudaMalloc wind", error ) &&
+           ok( cudaMalloc( &m.m_dWindB, sizeof( float ) * 9 * WindCells ), "cudaMalloc wind", error ) &&
+           ok( cudaMalloc( &m.m_dChimeState, sizeof( float4 ) * ChimeCount ), "cudaMalloc chimes", error ) &&
+           ok( cudaMalloc( &m.m_dChimeHit, sizeof( float2 ) * ChimeCount ), "cudaMalloc chimes", error ) &&
+           ok( cudaMalloc( &m.m_dChimeModes, sizeof( float2 ) * ChimeModesTotal ), "cudaMalloc chimes", error ) &&
+           ok( cudaMalloc( &m.m_dChimeScratch, sizeof( float ) * 4 * n * static_cast<size_t>( ChimeBlocks ) ),
+               "cudaMalloc chimes", error ) &&
+           ok( cudaMalloc( &m.m_dDreamAcc, sizeof( float ) * HallBins ), "cudaMalloc dream", error ) &&
+           ok( cudaMalloc( &m.m_dDreamMem, sizeof( float ) * DreamBands * static_cast<size_t>( DreamMemories ) ),
+               "cudaMalloc dream", error ) &&
+           ok( cudaMalloc( &m.m_dDreamState, sizeof( float ) * DreamBands ), "cudaMalloc dream", error ) &&
+           ok( cudaMalloc( &m.m_dDreamSims, sizeof( float ) * 2 * DreamMemories ), "cudaMalloc dream", error ) &&
+           ok( cudaMalloc( &m.m_dMeta, sizeof( int ) * 4 ), "cudaMalloc counters", error );
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -3570,7 +4242,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             error ) &&
         ok( cudaMemsetAsync( m.m_dOrbitB, 0, sizeof( float4 ) * partialsTotal, m.m_stream ), "cudaMemsetAsync",
             error ) &&
-        ok( cudaMemsetAsync( m.m_dLifeStats, 0, sizeof( float ) * 12, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dLifeStats, 0, sizeof( float ) * 16, m.m_stream ), "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dListenHist, 0, sizeof( float ) * 2 * EchoN, m.m_stream ), "cudaMemsetAsync",
             error ) &&
         ok( cudaMemsetAsync( m.m_dListenPrev, 0, sizeof( float ) * EchoBins, m.m_stream ), "cudaMemsetAsync", error ) &&
@@ -3590,6 +4262,23 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         ok( cudaMemsetAsync( m.m_dGainRing, 0, sizeof( float ) * GainRing * static_cast<size_t>( config.m_voices ),
                              m.m_stream ),
             "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dWindA, 0, sizeof( float ) * 9 * WindCells, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dWindB, 0, sizeof( float ) * 9 * WindCells, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dChimeState, 0, sizeof( float4 ) * ChimeCount, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dChimeHit, 0, sizeof( float2 ) * ChimeCount, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dChimeModes, 0, sizeof( float2 ) * ChimeModesTotal, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dDreamAcc, 0, sizeof( float ) * HallBins, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dDreamMem, 0, sizeof( float ) * DreamBands * static_cast<size_t>( DreamMemories ),
+                             m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dDreamState, 0, sizeof( float ) * DreamBands, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dDreamSims, 0, sizeof( float ) * 2 * DreamMemories, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dMeta, 0, sizeof( int ) * 4, m.m_stream ), "cudaMemsetAsync", error ) &&
         ok( cudaStreamSynchronize( m.m_stream ), "cudaStreamSynchronize", error );
     if ( good )
     {
@@ -3612,7 +4301,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         reservoirInitKernel<<<static_cast<unsigned>( ( static_cast<size_t>( ReservoirN ) * ReservoirN + 255 ) / 256 ),
                               256, 0, m.m_stream>>>( m.m_dResW, m.m_dResIn, m.m_dResOut, m.m_dResX );
         good = ok( cudaStreamSynchronize( m.m_stream ), "reservoir init", error );
-        std::memset( m.m_hLifeStats, 0, sizeof( float ) * 12 );
+        std::memset( m.m_hLifeStats, 0, sizeof( float ) * 16 );
         m.m_melt.m_clear = 1;                                         // the first block fills the melt's tables
         for ( int b = 0; b < HallBins; ++b ) m.m_hHallUp[b] = 1.0f;   // the hall new: every band at the average
         good =
@@ -3644,6 +4333,10 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                                                                m.m_dLifeB );
             islandsKernel<<<1, 1024, 0, m.m_stream>>>( hdr, m.m_dIsles, m.m_dLifeA, m.m_dLifeB );
             lifeStatsKernel<<<1, 256, 0, m.m_stream>>>( hdr, m.m_dLifeA, m.m_dLifeB, m.m_dLifeStats );
+            windStepKernel<<<( WindCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, 0, m.m_dWindA, m.m_dWindB );
+            windStepKernel<<<( WindCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, 1, m.m_dWindA, m.m_dWindB );
+            chimeStepKernel<<<( ChimeCount + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dChimeState,
+                                                                                 m.m_dChimeHit, m.m_dMeta );
             gainRingKernel<<<static_cast<unsigned>( config.m_voices ), 256, 0, m.m_stream>>>( hdr, voices,
                                                                                               m.m_dGainRing );
             cascadeKernel<<<static_cast<unsigned>( ( partialsTotal + Threads - 1 ) / Threads ), Threads, 0,
@@ -3658,12 +4351,23 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                                           m.m_dGainRing, m.m_dAmpQ, m.m_dSnap, m.m_dLifeA, m.m_dLifeB, m.m_dSyncTheta,
                                           m.m_dSyncX, m.m_dSyncOrder, partialsTotal, m.m_dFlockA, m.m_dFlockB,
                                           m.m_dCascadeA, m.m_dCascadeB, m.m_dFilterTable, m.m_dHallHist, m.m_dDensity,
-                                          m.m_dTau, m.m_dOrbitA, m.m_dOrbitB );
-            hallKernel<<<1, HallBins, 0, m.m_stream>>>( hdr, m.m_dHallHist, m.m_dHallMemory, m.m_dDensity );
+                                          m.m_dTau, m.m_dOrbitA, m.m_dOrbitB, m.m_dDreamState );
+            hallKernel<<<1, HallBins, 0, m.m_stream>>>( hdr, m.m_dHallHist, m.m_dHallMemory, m.m_dDensity,
+                                                        m.m_dDreamAcc );
+            dreamSimKernel<<<DreamMemories / DreamThreads, DreamThreads, 0, m.m_stream>>>(
+                hdr, m.m_dDreamAcc, m.m_dDreamMem, m.m_dDreamState, m.m_dDreamSims, m.m_dMeta );
+            dreamRecallKernel<<<1, DreamBands, 0, m.m_stream>>>( hdr, m.m_dDreamAcc, m.m_dDreamMem, m.m_dDreamState,
+                                                                 m.m_dDreamSims, m.m_dMeta );
             renderKernel<<<static_cast<unsigned>( m.m_chunks ), Threads, 0, m.m_stream>>>(
                 hdr, voices, m.m_pcap, m.m_dRun, m.m_dGains, m.m_dScratch, n );
             reduceKernel<<<static_cast<unsigned>( CloudChannels * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ),
-                           0, m.m_stream>>>( hdr, m.m_dScratch, m.m_chunks, n, m.m_dOut );
+                           0, m.m_stream>>>( hdr, m.m_dScratch, m.m_chunks, m.m_pcap / Chunk, n, m.m_dOut );
+            phantomReduceKernel<<<static_cast<unsigned>( ( n + 127 ) / 128 ), 128, 0, m.m_stream>>>(
+                hdr, m.m_dScratch, m.m_pcap / Chunk, n, m.m_dOut );
+            chimeKernel<<<static_cast<unsigned>( ChimeBlocks ), ChimeThreads, 0, m.m_stream>>>(
+                hdr, m.m_dChimeHit, m.m_dChimeModes, m.m_dChimeScratch, n );
+            chimeReduceKernel<<<static_cast<unsigned>( 4 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
+                                m.m_stream>>>( hdr, m.m_dChimeScratch, n, m.m_dOut );
             modalKernel<<<static_cast<unsigned>( ModalBlocks ), ModalThreads, 0, m.m_stream>>>(
                 hdr, m.m_dOut, m.m_dModal, m.m_dModalScratch, n, m.m_dLand, m.m_dHallMemory );
             modalReduceKernel<<<static_cast<unsigned>( 2 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
@@ -3678,7 +4382,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             reservoirStepKernel<<<static_cast<unsigned>( ReservoirN * 32 / 256 ), 256, 0, m.m_stream>>>(
                 hdr, m.m_dResW, m.m_dResIn, m.m_dResX );
             reservoirReadKernel<<<1, 256, 0, m.m_stream>>>( hdr, m.m_dResOut, m.m_dResX, m.m_dLifeStats );
-            cudaMemcpyAsync( m.m_hLifeStats, m.m_dLifeStats, sizeof( float ) * 12, cudaMemcpyDeviceToHost, m.m_stream );
+            phase27StatsKernel<<<1, 32, 0, m.m_stream>>>( m.m_dMeta, m.m_dLifeStats );
+            cudaMemcpyAsync( m.m_hLifeStats, m.m_dLifeStats, sizeof( float ) * 16, cudaMemcpyDeviceToHost, m.m_stream );
             cudaMemcpyAsync( m.m_hOut, m.m_dOut, sizeof( float ) * CloudOutChannels * n, cudaMemcpyDeviceToHost,
                              m.m_stream );
             good = ok( cudaStreamEndCapture( m.m_stream, &m.m_graph ), "cudaStreamEndCapture", error ) &&
@@ -3795,6 +4500,32 @@ Turbulence &CloudEngine::turbulence()
     return m_impl->m_turb;
 }
 
+ChimeField &CloudEngine::chimes()
+{
+    return m_impl->m_chimes;
+}
+
+Dream &CloudEngine::dream()
+{
+    return m_impl->m_dream;
+}
+
+int CloudEngine::dreamMemories() const
+{
+    return m_impl ? static_cast<int>( m_impl->m_hLifeStats[12] ) : 0;
+}
+
+int CloudEngine::chimeStrikes() const
+{
+    return m_impl ? static_cast<int>( m_impl->m_hLifeStats[13] ) : 0;
+}
+
+void CloudEngine::setLayers( int phantomVoice, int dreamVoice )
+{
+    m_impl->m_phantomVoice = phantomVoice;
+    m_impl->m_dreamVoice = dreamVoice;
+}
+
 bool CloudEngine::hallMemory( float *out ) const
 {
     if ( !m_impl || !m_impl->m_hallDown ) return false;
@@ -3877,6 +4608,15 @@ void CloudEngine::launch()
     hdr->m_melt = m.m_melt;
     hdr->m_comb = m.m_comb;
     hdr->m_turb = m.m_turb;
+    hdr->m_chimes = m.m_chimes;
+    hdr->m_chimes.m_pitchCount = std::clamp( m.m_chimes.m_pitchCount, 0, ChimePitches );
+    hdr->m_chimes.m_kind = std::clamp( m.m_chimes.m_kind, 0, static_cast<int>( ChimeKindE::COUNT ) - 1 );
+    m.m_chimes.m_reset = 0;   // asked for once
+    hdr->m_dream = m.m_dream;
+    m.m_dream.m_store = 0;   // asked for once
+    m.m_dream.m_clear = 0;
+    hdr->m_phantomVoice = m.m_phantomVoice >= 0 && m.m_phantomVoice < m.m_cfg.m_voices ? m.m_phantomVoice : -1;
+    hdr->m_dreamVoice = m.m_dreamVoice >= 0 && m.m_dreamVoice < m.m_cfg.m_voices ? m.m_dreamVoice : -1;
     m.m_melt.m_clear = 0;   // asked for once
     hdr->m_life = m.m_life;
     hdr->m_life.m_steps = m.m_life.m_mode == LifeModeE::OFF ? 0 : std::clamp( m.m_life.m_steps, 0, 2 );

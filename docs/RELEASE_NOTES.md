@@ -1,5 +1,29 @@
 # Release notes
 
+## 0.17.0 (16.10.2026, not released)
+
+Four layers that are not notes, made for the night -- a field of chimes in a wind, a melody heard only between the ears,
+a dream of what was played, the conductor's notes heard coming -- and timbres that come back. A page Dreams, 1024 presets.
+
+- **Chimes** (the new page Dreams): 2048 tuned chimes hang over the field, left to right and near to far, in a real
+  simulated wind (a lattice Boltzmann flow, vortex streets shed from three posts). Each clapper is a pendulum the wind
+  swings; gusts cross the field and the chimes ring in waves. Tubes, glass, bamboo or bells, tuned to the scale; Wind
+  and Gusts.
+- **Phantom** (Dreams): noise the same in both ears except where a pitch turns the phase between them -- the brain
+  hears a faint, clear tone there that is in neither ear (Huggins' pitch). With headphones. It carries a slow melody
+  of its own, the notes that just ended, or the chord; heard dry, after the rooms and echoes.
+- **Dream** (Dreams): every three seconds the instrument keeps what it heard, if it is new, and a dream wanders among
+  these memories by association (a modern Hopfield network), sung far off: over a night the harmonies of hours ago
+  come back, blurred and linked.
+- **Premonition** (Dreams): the conductor's notes are heard coming -- their cloud swells wide and far before they
+  begin, as a reverb backwards, and is drawn into them.
+- **Talbot** (Harmonics): the first 24 harmonics evolve as a wave function. Revival: the timbre falls apart, stands
+  upside down half way and is whole again after the period, lingering at each (Talbot's effect); Bloch: the energy
+  climbs the harmonics and comes back.
+- **8192 presets:** sixteen new groups of dreams and phantoms (Phantom Choirs, Inner Voices, Talbot Carpets, Bloch
+  Tides, Glass Forests, Bamboo Groves, Wind Tubes, Temple Winds, Storm Gardens, Dreaming Rooms, Night Memories,
+  Premonitions, Breathing In, Phantom Gardens, Lucid Dreams, Elsewhere); the presets before are as they were.
+
 ## 0.16.0 (15.10.2026, not released)
 
 The harmonics get lives of their own: registers that overblow, seasons of overtone families, avalanches, a floor that

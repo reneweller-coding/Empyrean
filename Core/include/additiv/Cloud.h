@@ -109,6 +109,27 @@ struct EnvLane
     std::int32_t m_pad = 0;                         ///< keeps the lane 64 bytes
 };
 
+// Phase 27 (16.10.2026): the phantom layer, Talbot timbres, the chime field, the dream.
+constexpr int PhantomTargets = 8;                          ///< pitches the phantom layer carries at once
+constexpr int TalbotHarmonics = 24;                        ///< harmonics a Talbot timbre moves (1 .. 24)
+constexpr int ChimeCount = 2048;                           ///< the chime field's chimes
+constexpr int ChimeModes = 16;                             ///< modes per chime: eight, each a doublet a few cents apart
+constexpr int ChimeModesTotal = ChimeCount * ChimeModes;   ///< every mode of the field
+constexpr int ChimePitches = 64;                           ///< pitches the chimes may be tuned to
+constexpr int WindW = 128;                                 ///< the wind's lattice from left to right
+constexpr int WindH = 64;                                  ///< and from near to far
+constexpr int DreamBands = 512;       ///< the dream's spectrum: bands over 20 Hz .. 20 kHz on the log axis
+constexpr int DreamMemories = 4096;   ///< snapshots of the heard spectrum the dream keeps
+constexpr int DreamRecall = 32;       ///< memories a recall blends at most (the nearest)
+
+/** @brief What a GPU voice plays: a note, or one of the layers that are not notes (Phase 27). */
+enum class VoiceKindE : std::int32_t
+{
+    NOTE = 0,   ///< a note: its harmonics' clouds and its air
+    PHANTOM,    ///< the phantom layer: noise the same in both ears but where pitches turn the phase between them
+    DREAM       ///< the dream: a cloud over DreamBands bands, shaped by what the dream recalls
+};
+
 constexpr int VoiceFilters = 4;    ///< filters a voice carries during a morph between different ones (the heaviest)
 constexpr int FilterBins = 1024;   ///< the transported filter's table: 20 Hz .. 20 kHz on the log axis
 
@@ -195,9 +216,13 @@ struct CloudVoice
     float m_grainLength = 0.08f;   ///< s: a grain's mean length
     float m_grainDuty = 0.3f;      ///< 0 .. 1: the share of its time a partial sounds
     float m_grainNorm = 1.0f;      ///< the grains' make-up, so their power is the continuous one's
-    float m_pad2 = 0.0f;           ///< keeps the struct a multiple of 16 bytes
-    float m_pad3 = 0.0f;           ///< likewise
-    float m_pad4 = 0.0f;           ///< likewise
+    // Phase 27
+    VoiceKindE m_kind = VoiceKindE::NOTE;   ///< what the voice plays (a note, the phantom layer, the dream)
+    int        m_phantomCount = 0;          ///< Phantom: pitches in phantomHz
+    float      m_phantomWidth = 0.1f;       ///< Phantom: octaves over which the ears' phase turns once round a pitch
+    float      m_phantomHz[PhantomTargets] = {};       ///< Phantom: the pitches heard only between the ears
+    float      m_phantomWeight[PhantomTargets] = {};   ///< each one's share of the full turn (it fades in and out)
+    float m_talbot[TalbotHarmonics] = {};   ///< Talbot: harmonics 1 .. 24, their amplitude factors (harmonicLife 8)
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
@@ -217,8 +242,11 @@ enum class FilterModelE : int
 constexpr int NumFilterModels = static_cast<int>( FilterModelE::COUNT );   ///< entries of FilterModelNames
 
 constexpr int CloudChannels = 4;   ///< the voices' channels on the GPU: near left, near right, far left, far right
-constexpr int CloudOutChannels =
-    10;   ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right, the melt's left and right
+/**
+ * @brief A finished frame: the four voice channels, the modal hall's left and right, the spectral echo's, the
+ *        melt's, the chime field's four (near and far, left and right) and the phantom layer's two (heard dry).
+ */
+constexpr int CloudOutChannels = 16;
 constexpr int ModalModes = 65536;   ///< the modal hall's resonances
 constexpr int ModalTuned = 128;     ///< pitches the hall's tuned modes may sit on
 constexpr int HallBins =
@@ -391,6 +419,56 @@ struct Turbulence
     float m_pad1 = 0.0f;     ///< likewise
 };
 static_assert( sizeof( Turbulence ) % 16 == 0, "Turbulence rides in the block header" );
+
+/** @brief The chimes' bodies: the ChimeKind parameter's choices. */
+enum class ChimeKindE : std::int32_t
+{
+    TUBES = 0,   ///< metal tubes: a free bar's modes (1, 2.76, 5.40, 8.93 ..)
+    GLASS,       ///< glass bowls: 1, 2.32, 4.25, 6.63 ..
+    BAMBOO,      ///< bamboo: a tube's modes, short and woody
+    BELLS,       ///< small bells: hum, prime, tierce, quint, nominal ..
+    COUNT        ///< number of kinds
+};
+
+/**
+ * @brief The chime field (Phase 27): ChimeCount tuned chimes over the field -- left to right, near to far -- in a
+ *        wind. The wind is a lattice Boltzmann flow (D2Q9) on a WindW x WindH torus, pushed to the right, shedding
+ *        vortex streets from three posts; every chime's clapper is a pendulum swung by the wind's sideways and gusting
+ *        parts, and where it strikes the chime's modes ring (complex one-poles, as the modal hall's). So gusts cross
+ *        the field and the chimes ring in waves, from one side to the other.
+ */
+struct ChimeField
+{
+    int   m_on = 0;           ///< 1: the field sounds and its wind blows (0: nothing computed, everything kept)
+    int   m_kind = 0;         ///< ChimeKindE
+    int   m_pitchCount = 0;   ///< pitches in `pitch`
+    int   m_reset = 0;        ///< 1 for one block: the wind and the clappers begin again from rest
+    float m_level = 0.0f;     ///< the field's amplitude
+    float m_force = 0.0f;     ///< the wind's push this block, lattice units (its gusts in it)
+    float m_decay = 4.0f;     ///< s: the lowest mode's ring to -60 dB
+    float m_kick = 30.0f;     ///< how hard the wind swings the clappers
+    float m_pitch[ChimePitches] = {};   ///< Hz: the pitches the chimes are tuned to, each chime one of them
+};
+static_assert( sizeof( ChimeField ) % 16 == 0, "ChimeField rides in the block header" );
+
+/**
+ * @brief The dream (Phase 27): every few seconds the spectrum the instrument heard, gathered over DreamBands bands,
+ *        is kept as a memory if it is new; a dream state wanders among the memories by association -- a modern
+ *        Hopfield network (Ramsauer et al. 2020): the nearest memories to the state, a little noise in the query,
+ *        blended by a softmax of their likeness -- and a voice of the kind DREAM sings it, far off.
+ */
+struct Dream
+{
+    int   m_on = 0;             ///< 1: the dream remembers and recalls (0: nothing computed, the memories kept)
+    int   m_store = 0;          ///< 1 for one block: what was gathered is kept as a memory if it is new
+    int   m_clear = 0;          ///< 1 for one block: every memory forgotten
+    int   m_pad0 = 0;           ///< keeps the floats 16-byte aligned
+    float m_focus = 20.0f;      ///< the recall's sharpness (the softmax's beta): low blends, high recalls one memory
+    float m_ease = 0.002f;      ///< a block's share of the way from the state to what it recalls
+    float m_noise = 0.1f;       ///< the wander in the query (against the state's length 1)
+    float m_novelty = 0.985f;   ///< a snapshot this like a memory (cosine) is not kept
+};
+static_assert( sizeof( Dream ) % 16 == 0, "Dream rides in the block header" );
 
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
@@ -709,6 +787,21 @@ public:
     SpectralComb &comb();
     /** @brief The energy cascade's settings for the next block (the voices carry their drives). @return them */
     Turbulence &turbulence();
+    /** @brief The chime field's settings for the next block (Phase 27). @return them */
+    ChimeField &chimes();
+    /** @brief The dream's settings for the next block (Phase 27). @return them */
+    Dream &dream();
+    /** @brief How many memories the dream keeps, as the last block left it. @return 0 .. DreamMemories */
+    int dreamMemories() const;
+    /** @brief How many chimes struck in the last block. @return the count */
+    int chimeStrikes() const;
+    /**
+     * @brief Which GPU voices carry the layers that are not notes (Phase 27): the phantom layer's chunks are summed
+     *        apart, into the frame's channels 14 and 15.
+     * @param[in] phantomVoice  the phantom layer's voice, -1 none
+     * @param[in] dreamVoice    the dream's voice, -1 none
+     */
+    void setLayers( int phantomVoice, int dreamVoice );
 
     /**
      * @brief The hall's memory (ModalHall::grow): per band over the octaves, how much was heard there
