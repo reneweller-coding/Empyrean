@@ -42,14 +42,14 @@ private:
     /** @brief The depth at a distance from you. @param r pixels @return 0 .. 1 */
     float depthAt(float r) const;
 
-    static constexpr int kTrail = 24;   ///< positions a voice's trail keeps (about three seconds)
-    AdditivProcessor& proc_;            ///< whose voices
-    std::array<std::array<juce::Point<float>, kTrail>, additiv::kMaxViewVoices> trails_{};   ///< per voice its last places (depth, pitch 0 .. 1)
-    std::array<additiv::VoiceView, additiv::kMaxViewVoices> views_{};                       ///< the voices now
-    std::array<int, additiv::kMaxViewVoices> seen_{};                                      ///< how many places each trail holds
-    int head_ = 0;                      ///< where the next places go
-    int tick_ = 0;                      ///< timer ticks
-    int held_ = -1;                     ///< the ring taken: 0 Depth, 1 Keys Depth, -1 none
+    static constexpr int Trail = 24;   ///< positions a voice's trail keeps (about three seconds)
+    AdditivProcessor& m_proc;            ///< whose voices
+    std::array<std::array<juce::Point<float>, Trail>, additiv::MaxViewVoices> m_trails{};   ///< per voice its last places (depth, pitch 0 .. 1)
+    std::array<additiv::VoiceView, additiv::MaxViewVoices> m_views{};                       ///< the voices now
+    std::array<int, additiv::MaxViewVoices> m_seen{};                                      ///< how many places each trail holds
+    int m_head = 0;                      ///< where the next places go
+    int m_tick = 0;                      ///< timer ticks
+    int m_held = -1;                     ///< the ring taken: 0 Depth, 1 Keys Depth, -1 none
 };
 
 /** @brief The Space page: its knobs, and the space below them. */
@@ -70,6 +70,6 @@ public:
     juce::String describe() const;
 
 private:
-    ParamPage params_;    ///< Planes, Near, Far Reverb, Master, Binaural
-    SpaceView view_;      ///< the space
+    ParamPage m_params;    ///< Planes, Near, Far Reverb, Master, Binaural
+    SpaceView m_view;      ///< the space
 };

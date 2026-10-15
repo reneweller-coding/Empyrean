@@ -21,10 +21,10 @@ class ParamPage final : public juce::Component, public juce::DragAndDropTarget, 
 public:
     /** @brief A group's state, for the page's marks in the tabs. */
     struct GroupState {
-        juce::String title;     ///< the group's title
-        juce::Colour colour;    ///< its family's colour
-        bool gated = false;     ///< it has main controls that wake it
-        bool awake = true;      ///< a main control is up (or a row moves it)
+        juce::String m_title;     ///< the group's title
+        juce::Colour m_colour;    ///< its family's colour
+        bool m_gated = false;     ///< it has main controls that wake it
+        bool m_awake = true;      ///< a main control is up (or a row moves it)
     };
     /**
      * @brief A group: its title, its family (the colour), its parameters in order, and what wakes it --
@@ -32,12 +32,12 @@ public:
      *        "off" by its title); they are drawn as its main controls.
      */
     struct Group {
-        juce::String title;                      ///< the box's title
-        frame::Family family;                    ///< its colour
-        std::vector<additiv::ParamId> ids;       ///< its parameters
-        std::vector<additiv::ParamId> gate = {}; ///< what wakes it (none: always awake)
-        std::vector<std::pair<additiv::ParamId, additiv::ParamId>> spans = {};   ///< low and high of a span, shown as one bar
-        std::vector<std::pair<additiv::ParamId, additiv::ParamId>> links = {};   ///< two knobs that may be linked
+        juce::String m_title;                      ///< the box's title
+        frame::FamilyE m_family;                    ///< its colour
+        std::vector<additiv::ParamIdE> m_ids;       ///< its parameters
+        std::vector<additiv::ParamIdE> m_gate = {}; ///< what wakes it (none: always awake)
+        std::vector<std::pair<additiv::ParamIdE, additiv::ParamIdE>> m_spans = {};   ///< low and high of a span, shown as one bar
+        std::vector<std::pair<additiv::ParamIdE, additiv::ParamIdE>> m_links = {};   ///< two knobs that may be linked
     };
 
     /**
@@ -69,12 +69,12 @@ public:
     std::vector<GroupState> groupStates() const;
 
     /** @brief Every page shows the MIDI controller learned on each knob as a small mark (the header's MIDI button). */
-    static inline bool showMidi = false;
+    static inline bool M_ShowMidi = false;
     /** @brief Who hears that a source was dropped on a knob: the editor, found up the page's parents (every page, also those made later). */
     struct DropListener {
         virtual ~DropListener() = default;
         /** @brief A row was made (or not: row -1). @param s the source @param id the parameter @param row the row */
-        virtual void modDropped(additiv::ModSource s, int id, int row) = 0;
+        virtual void modDropped(additiv::ModSourceE s, int id, int row) = 0;
     };
     /** @brief Only a source's chip (ModDock). @param d the drag @return true for one */
     bool isInterestedInDragSource(const SourceDetails& d) override;
@@ -93,23 +93,23 @@ private:
 
     /** @brief One control in a box. */
     struct Cell {
-        juce::Component* control = nullptr;   ///< the knob, chooser or switch
-        juce::Label* label = nullptr;         ///< its name
-        int width = 0;                        ///< its cell's width
-        int id = -1;                          ///< its parameter
-        int id2 = -1;                         ///< a span's high end, -1 none
-        bool gate = false;                    ///< one of what wakes its group (a main control)
-        bool moved = false;                   ///< a matrix row was on it at the last look
-        bool away = false;                    ///< it stood away from its preset at the last look
+        juce::Component* m_control = nullptr;   ///< the knob, chooser or switch
+        juce::Label* m_label = nullptr;         ///< its name
+        int m_width = 0;                        ///< its cell's width
+        int m_id = -1;                          ///< its parameter
+        int m_id2 = -1;                         ///< a span's high end, -1 none
+        bool m_gate = false;                    ///< one of what wakes its group (a main control)
+        bool m_moved = false;                   ///< a matrix row was on it at the last look
+        bool m_away = false;                    ///< it stood away from its preset at the last look
     };
     /** @brief One group box. */
     struct Box {
-        juce::String title;                   ///< its title
-        juce::Colour colour;                  ///< its family's colour
-        std::vector<Cell> cells;              ///< its controls
-        juce::Rectangle<int> bounds;          ///< where it was laid out
-        int width = 0;                        ///< the width it needs
-        bool resting = false;                 ///< every gate at nothing: its other controls dimmed
+        juce::String m_title;                   ///< its title
+        juce::Colour m_colour;                  ///< its family's colour
+        std::vector<Cell> m_cells;              ///< its controls
+        juce::Rectangle<int> m_bounds;          ///< where it was laid out
+        int m_width = 0;                        ///< the width it needs
+        bool m_resting = false;                 ///< every gate at nothing: its other controls dimmed
     };
     /** @brief Whether a group has main controls. @param b the group @return true then */
     static bool gated(const Box& b);
@@ -123,25 +123,25 @@ private:
      */
     std::vector<juce::Rectangle<int>> flow(int width) const;
 
-    AdditivProcessor& proc_;                                                      ///< whose parameters
-    std::vector<Box> boxes_;                                                      ///< the boxes
+    AdditivProcessor& m_proc;                                                      ///< whose parameters
+    std::vector<Box> m_boxes;                                                      ///< the boxes
     /** @brief Two linked knobs and their chain. */
     struct Link {
-        juce::Slider* a = nullptr;                    ///< the first knob
-        juce::Slider* b = nullptr;                    ///< the second
-        std::unique_ptr<juce::Button> chain;          ///< links and unlinks them
-        double ratio = 1.0;                           ///< b over a, taken when a drag begins
-        bool busy = false;                            ///< one is being moved by the other
+        juce::Slider* m_a = nullptr;                    ///< the first knob
+        juce::Slider* m_b = nullptr;                    ///< the second
+        std::unique_ptr<juce::Button> m_chain;          ///< links and unlinks them
+        double m_ratio = 1.0;                           ///< b over a, taken when a drag begins
+        bool m_busy = false;                            ///< one is being moved by the other
     };
-    std::vector<std::unique_ptr<Link>> links_;                                    ///< the linked pairs
-    int flashId_ = -1;                                                            ///< the control lighting up, -1 none
-    int dropId_ = -1;                                                             ///< the knob under a dragged source, -1 none
-    additiv::ModSource dropSource_ = additiv::ModSource::Off;                     ///< the source dragged
-    double flashUntil_ = 0.0;                                                     ///< until when (ms)
-    std::vector<additiv::ParamId> ids_;                                           ///< every parameter on the page
-    juce::OwnedArray<juce::Component> controls_;                                  ///< the controls
-    juce::OwnedArray<juce::Label> labels_;                                        ///< their names
-    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> sliders_;      ///< knobs to parameters
-    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> combos_;     ///< choosers to parameters
-    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> buttons_;      ///< switches to parameters
+    std::vector<std::unique_ptr<Link>> m_links;                                    ///< the linked pairs
+    int m_flashId = -1;                                                            ///< the control lighting up, -1 none
+    int m_dropId = -1;                                                             ///< the knob under a dragged source, -1 none
+    additiv::ModSourceE m_dropSource = additiv::ModSourceE::OFF;                     ///< the source dragged
+    double m_flashUntil = 0.0;                                                     ///< until when (ms)
+    std::vector<additiv::ParamIdE> m_ids;                                           ///< every parameter on the page
+    juce::OwnedArray<juce::Component> m_controls;                                  ///< the controls
+    juce::OwnedArray<juce::Label> m_labels;                                        ///< their names
+    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_sliders;      ///< knobs to parameters
+    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> m_combos;     ///< choosers to parameters
+    std::vector<std::unique_ptr<juce::ButtonParameterAttachment>> m_buttons;      ///< switches to parameters
 };

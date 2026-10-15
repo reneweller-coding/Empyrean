@@ -16,12 +16,12 @@
 
 namespace additiv {
 
-/** @brief A landscape on the host: rows of time, each `columns` amplitudes from kLandLowHz to kLandHighHz. */
+/** @brief A landscape on the host: rows of time, each `columns` amplitudes from LandLowHz to LandHighHz. */
 struct Landscape {
-    int columns = 0;            ///< frequency columns, logarithmically spaced
-    int rows = 0;               ///< time rows; the landscape loops over all of them
-    float rowSeconds = 0.1f;    ///< how long one row lasts at rate 1
-    std::vector<float> amps;    ///< rows * columns amplitudes 0 .. 1, row by row
+    int m_columns = 0;            ///< frequency columns, logarithmically spaced
+    int m_rows = 0;               ///< time rows; the landscape loops over all of them
+    float m_rowSeconds = 0.1f;    ///< how long one row lasts at rate 1
+    std::vector<float> m_amps;    ///< rows * columns amplitudes 0 .. 1, row by row
 };
 
 /** @brief The centre frequency of a column. @param column 0 .. columns-1 @param columns how many @return Hz */
@@ -44,11 +44,11 @@ float ampToBrightness(float a, float rangeDb);
  */
 Landscape landscapeAurora(float loopSeconds, float rangeDb = 40.0f, int columns = 256, int rows = 1024);
 
-constexpr int kNumFactoryLandscapes = 5;                         ///< entries of kLandscapeNames
-extern const char* const kLandscapeNames[kNumFactoryLandscapes];  ///< Aurora, Shepard, Tides, Rain, Choir
-constexpr int kUserLandscape = kNumFactoryLandscapes;             ///< the Landscape choice that is the player's own (Engine::setUserLandscape)
-constexpr int kNumLandscapeChoices = kNumFactoryLandscapes + 1;   ///< entries of kLandscapeChoiceNames
-extern const char* const kLandscapeChoiceNames[kNumLandscapeChoices];   ///< the factory's, then "Your Own"
+constexpr int NumFactoryLandscapes = 5;                         ///< entries of LandscapeNames
+extern const char* const LandscapeNames[NumFactoryLandscapes];  ///< Aurora, Shepard, Tides, Rain, Choir
+constexpr int UserLandscape = NumFactoryLandscapes;             ///< the Landscape choice that is the player's own (Engine::setUserLandscape)
+constexpr int NumLandscapeChoices = NumFactoryLandscapes + 1;   ///< entries of LandscapeChoiceNames
+extern const char* const LandscapeChoiceNames[NumLandscapeChoices];   ///< the factory's, then "Your Own"
 
 /**
  * @brief One of the generated landscapes, each looping seamlessly over a floor (motion on a carrying
@@ -58,7 +58,7 @@ extern const char* const kLandscapeChoiceNames[kNumLandscapeChoices];   ///< the
  *        Tides -- broad swells rolling up through the spectrum (60 s);
  *        Rain -- sixty short glints at chance places (30 s);
  *        Choir -- the formants of u-o-a-e-i, the vowel turning slowly (48 s).
- * @param index    0 .. kNumFactoryLandscapes-1
+ * @param index    0 .. NumFactoryLandscapes-1
  * @param rangeDb  the decibel range of the brightness
  * @return         the landscape (Aurora for an unknown index)
  */

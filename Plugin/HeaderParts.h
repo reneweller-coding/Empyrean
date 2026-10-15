@@ -14,19 +14,19 @@
 class ViewButton final : public juce::Button {
 public:
     /** @brief The glyphs it can draw. */
-    enum class Glyph {
-        Night,     ///< a crescent: the night mode
-        Search,    ///< a lens: the command palette
-        Canvas,    ///< a frame's corners: the picture alone
-        Compare    ///< A | B: hold to hear the preset as it was
+    enum class GlyphE {
+        NIGHT,     ///< a crescent: the night mode
+        SEARCH,    ///< a lens: the command palette
+        CANVAS,    ///< a frame's corners: the picture alone
+        COMPARE    ///< A | B: hold to hear the preset as it was
     };
     /** @brief A button with @p glyph and @p tooltip; it never takes the keyboard focus. @param glyph its glyph @param tooltip its tooltip */
-    ViewButton(Glyph glyph, const juce::String& tooltip);
+    ViewButton(GlyphE glyph, const juce::String& tooltip);
     /** @brief The frame's button background, the glyph over it. @param g where @param highlighted under the mouse @param down pressed */
     void paintButton(juce::Graphics& g, bool highlighted, bool down) override;
 
 private:
-    Glyph glyph_;   ///< what it draws
+    GlyphE m_glyph;   ///< what it draws
 };
 
 /** @brief The output's meter (see the file comment). */
@@ -41,8 +41,8 @@ public:
     void mouseDown(const juce::MouseEvent& e) override;
 
 private:
-    float level_[2] = { 0.0f, 0.0f };   ///< what each bar shows, falling slowly (linear)
-    float hold_[2] = { 0.0f, 0.0f };    ///< the held peak
-    int holdTicks_[2] = { 0, 0 };       ///< how much longer it is held
-    bool clipped_ = false;              ///< the output reached full scale
+    float m_level[2] = { 0.0f, 0.0f };   ///< what each bar shows, falling slowly (linear)
+    float m_hold[2] = { 0.0f, 0.0f };    ///< the held peak
+    int m_holdTicks[2] = { 0, 0 };       ///< how much longer it is held
+    bool m_clipped = false;              ///< the output reached full scale
 };

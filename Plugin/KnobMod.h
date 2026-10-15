@@ -21,7 +21,7 @@ namespace knobmod {
  * @param s  the source
  * @return   the colour
  */
-juce::Colour sourceColour(additiv::ModSource s);
+juce::Colour sourceColour(additiv::ModSourceE s);
 
 /**
  * @brief Whether a parameter can be a matrix row's target.
@@ -39,21 +39,21 @@ bool canTarget(int id);
  * @param depth   how far, of the knob's range (a fifth: heard, and easy to change)
  * @return        the row, -1 when all sixteen are taken or the parameter is no target
  */
-int addRow(AdditivProcessor& proc, additiv::ModSource source, int id, float depth = 0.2f);
+int addRow(AdditivProcessor& proc, additiv::ModSourceE source, int id, float depth = 0.2f);
 
 /**
  * @brief What a source's chip carries while it is dragged onto a knob (DragAndDropContainer).
  * @param s  the source
  * @return   the drag's description
  */
-juce::var dragOf(additiv::ModSource s);
+juce::var dragOf(additiv::ModSourceE s);
 
 /**
  * @brief The source a drag carries.
  * @param description  the drag's description
  * @return             the source, Off when it carries none
  */
-additiv::ModSource sourceOfDrag(const juce::var& description);
+additiv::ModSourceE sourceOfDrag(const juce::var& description);
 
 /**
  * @brief Adds the modulation items for parameter @p id to a knob's menu: the rows on it (depth, remove)

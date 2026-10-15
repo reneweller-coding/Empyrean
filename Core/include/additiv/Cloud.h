@@ -30,30 +30,30 @@
 
 namespace additiv {
 
-constexpr int kEnvPoints = 16;            ///< breakpoints per envelope shape
-constexpr int kEnvShapes = 64;            ///< shapes in the bank
-constexpr int kLandMaxColumns = 512;      ///< frequency columns a landscape may have
-constexpr int kLandMaxRows = 8192;        ///< time rows a landscape may have
-constexpr float kLandLowHz = 20.0f;       ///< a landscape's first column
-constexpr float kLandHighHz = 20000.0f;   ///< and its last; the columns between are spaced logarithmically
+constexpr int EnvPoints = 16;            ///< breakpoints per envelope shape
+constexpr int EnvShapes = 64;            ///< shapes in the bank
+constexpr int LandMaxColumns = 512;      ///< frequency columns a landscape may have
+constexpr int LandMaxRows = 8192;        ///< time rows a landscape may have
+constexpr float LandLowHz = 20.0f;       ///< a landscape's first column
+constexpr float LandHighHz = 20000.0f;   ///< and its last; the columns between are spaced logarithmically
 
 /** @brief What a partial's share of an envelope lane is read from: each source is 0 .. 1 per partial. */
-enum class MapSource : std::int32_t {
-    None = 0,   ///< always 0: every partial the same
-    Pitch,      ///< the partial's centre frequency, logarithmically from kLandLowHz (0) to kLandHighHz (1)
-    Harmonic,   ///< its harmonic within the voice: 0 for the fundamental, 1 for the highest
-    Member,     ///< its place in its harmonic's cloud: 0 the lowest member, 0.5 the centre, 1 the highest
-    Random,     ///< its own dice
-    OddEven,    ///< 0 on odd harmonics, 1 on even ones
+enum class MapSourceE : std::int32_t {
+    NONE = 0,   ///< always 0: every partial the same
+    PITCH,      ///< the partial's centre frequency, logarithmically from LandLowHz (0) to LandHighHz (1)
+    HARMONIC,   ///< its harmonic within the voice: 0 for the fundamental, 1 for the highest
+    MEMBER,     ///< its place in its harmonic's cloud: 0 the lowest member, 0.5 the centre, 1 the highest
+    RANDOM,     ///< its own dice
+    ODD_EVEN,    ///< 0 on odd harmonics, 1 on even ones
 };
-constexpr int kMapSources = 6;   ///< how many MapSource values there are
+constexpr int MapSources = 6;   ///< how many MapSource values there are
 
 /** @brief One breakpoint of an envelope shape. */
 struct EnvPoint {
-    float time = 0.0f;    ///< seconds from the shape's start, rising from point to point
-    float level = 0.0f;   ///< 0 .. 1 on the amplitude lane, -1 .. 1 on pitch and pan
-    float curve = 0.0f;   ///< -1 .. 1, the bend of the segment arriving here (0 straight, + slow start, - fast start)
-    float pad = 0.0f;     ///< keeps the point 16 bytes
+    float m_time = 0.0f;    ///< seconds from the shape's start, rising from point to point
+    float m_level = 0.0f;   ///< 0 .. 1 on the amplitude lane, -1 .. 1 on pitch and pan
+    float m_curve = 0.0f;   ///< -1 .. 1, the bend of the segment arriving here (0 straight, + slow start, - fast start)
+    float m_pad = 0.0f;     ///< keeps the point 16 bytes
 };
 
 /**
@@ -66,11 +66,11 @@ struct EnvPoint {
  * its last level.
  */
 struct EnvShape {
-    EnvPoint p[kEnvPoints];       ///< the points, `count` of them
-    std::int32_t count = 0;       ///< points in use, 0 .. kEnvPoints (0 = a flat zero)
-    std::int32_t loopStart = -1;  ///< first point of the loop, -1 = no loop
-    std::int32_t loopEnd = -1;    ///< last point of the loop
-    std::int32_t pad = 0;         ///< keeps the shape a multiple of 16 bytes
+    EnvPoint m_p[EnvPoints];       ///< the points, `count` of them
+    std::int32_t m_count = 0;       ///< points in use, 0 .. EnvPoints (0 = a flat zero)
+    std::int32_t m_loopStart = -1;  ///< first point of the loop, -1 = no loop
+    std::int32_t m_loopEnd = -1;    ///< last point of the loop
+    std::int32_t m_pad = 0;         ///< keeps the shape a multiple of 16 bytes
 };
 
 /**
@@ -80,123 +80,123 @@ struct EnvShape {
  * skipped and costs nothing.
  */
 struct EnvLane {
-    float amount = 0.0f;       ///< amplitude: depth 0 .. 1; pitch: cents; pan: share of the field 0 .. 1
-    float rate = 1.0f;         ///< how fast the shapes run (1 = as written)
-    float rateSpread = 0.0f;   ///< rate times (1 + rateSpread * source): a linear spread makes a pendulum wave
-    float phase = 0.0f;        ///< loop cycles added times the source: a travelling wave (negative: the other way)
-    float delay = 0.0f;        ///< seconds of delay times the source (negative: times 1 - source)
-    float depthTilt = 0.0f;    ///< -1 .. 1: the amount only where the source is low (-1) or high (+1)
-    float chaos = 0.0f;        ///< 0 .. 1: from lockstep to every partial for itself (random loop phase, rate +-1 octave)
-    std::int32_t shape = 0;         ///< first shape of the bank this lane uses
-    std::int32_t shapeSpread = 1;   ///< how many shapes from there the partials spread over
-    std::int32_t landscape = 0;     ///< 1 = read the landscape instead of a shape
-    MapSource shapeBy = MapSource::Random;     ///< which source picks the shape
-    MapSource rateBy = MapSource::Harmonic;    ///< which source spreads the rate
-    MapSource phaseBy = MapSource::Pitch;      ///< which source spreads the loop phase
-    MapSource delayBy = MapSource::Pitch;      ///< which source spreads the delay
-    MapSource depthBy = MapSource::Pitch;      ///< which source tilts the depth
-    std::int32_t pad = 0;           ///< keeps the lane 64 bytes
+    float m_amount = 0.0f;       ///< amplitude: depth 0 .. 1; pitch: cents; pan: share of the field 0 .. 1
+    float m_rate = 1.0f;         ///< how fast the shapes run (1 = as written)
+    float m_rateSpread = 0.0f;   ///< rate times (1 + rateSpread * source): a linear spread makes a pendulum wave
+    float m_phase = 0.0f;        ///< loop cycles added times the source: a travelling wave (negative: the other way)
+    float m_delay = 0.0f;        ///< seconds of delay times the source (negative: times 1 - source)
+    float m_depthTilt = 0.0f;    ///< -1 .. 1: the amount only where the source is low (-1) or high (+1)
+    float m_chaos = 0.0f;        ///< 0 .. 1: from lockstep to every partial for itself (random loop phase, rate +-1 octave)
+    std::int32_t m_shape = 0;         ///< first shape of the bank this lane uses
+    std::int32_t m_shapeSpread = 1;   ///< how many shapes from there the partials spread over
+    std::int32_t m_landscape = 0;     ///< 1 = read the landscape instead of a shape
+    MapSourceE m_shapeBy = MapSourceE::RANDOM;     ///< which source picks the shape
+    MapSourceE m_rateBy = MapSourceE::HARMONIC;    ///< which source spreads the rate
+    MapSourceE m_phaseBy = MapSourceE::PITCH;      ///< which source spreads the loop phase
+    MapSourceE m_delayBy = MapSourceE::PITCH;      ///< which source spreads the delay
+    MapSourceE m_depthBy = MapSourceE::PITCH;      ///< which source tilts the depth
+    std::int32_t m_pad = 0;           ///< keeps the lane 64 bytes
 };
 
-constexpr int kVoiceFilters = 4;   ///< filters a voice carries during a morph between different ones (the heaviest)
-constexpr int kFilterBins = 1024;  ///< the transported filter's table: 20 Hz .. 20 kHz on the log axis
+constexpr int VoiceFilters = 4;   ///< filters a voice carries during a morph between different ones (the heaviest)
+constexpr int FilterBins = 1024;  ///< the transported filter's table: 20 Hz .. 20 kHz on the log axis
 
 /** @brief One voice as the host describes it; the engine fills the derived fields at launch(). */
 struct CloudVoice {
-    float hz = 110.0f;            ///< fundamental, Hz
-    float level = 0.05f;          ///< RMS the voice aims at with gain 1 (all partials together)
-    float gain = 0.0f;            ///< the envelope at the end of the coming block; the partials ramp to it across the block
-    float tilt = 1.2f;            ///< spectral tilt: harmonic h at h^-tilt
-    float width = 25.0f;          ///< cents: the cloud's width (two standard deviations) around harmonic 1
-    float widthSlope = 0.3f;      ///< how the width grows with the harmonic number: width * h^widthSlope
-    float drift = 3.0f;           ///< cents each partial wanders on its own
-    float driftRate = 0.1f;       ///< Hz, the speed of that wander
-    float shimmer = 0.4f;         ///< 0 .. 1, each partial's own amplitude wander
-    float shimmerRate = 0.15f;    ///< Hz, the speed of the shimmer
-    float stereo = 1.0f;          ///< 0 .. 1, how far the partials scatter across the stereo field
-    float time = 0.0f;            ///< seconds since the note began, the clock of every envelope (advanced by the engine)
-    float releaseAt = -1.0f;      ///< the note's time of release in seconds, -1 while it is held
-    int   partials = 20000;       ///< partials this voice renders, 1 .. the engine's partialsPerVoice
-    std::uint32_t seed = 1;       ///< the note's dice: initial phases, member offsets, drift and shimmer rates, pans
-    int   active = 0;             ///< 0 = silent: the GPU skips the voice entirely
-    int   restart = 0;            ///< 1 = a new note: fresh phases, amplitudes from zero, time 0 (cleared by launch())
-    EnvLane amp;                  ///< the amplitude lane
-    EnvLane pitch;                ///< the pitch lane, in cents
-    EnvLane pan;                  ///< the stereo lane, added to each partial's place
+    float m_hz = 110.0f;            ///< fundamental, Hz
+    float m_level = 0.05f;          ///< RMS the voice aims at with gain 1 (all partials together)
+    float m_gain = 0.0f;            ///< the envelope at the end of the coming block; the partials ramp to it across the block
+    float m_tilt = 1.2f;            ///< spectral tilt: harmonic h at h^-tilt
+    float m_width = 25.0f;          ///< cents: the cloud's width (two standard deviations) around harmonic 1
+    float m_widthSlope = 0.3f;      ///< how the width grows with the harmonic number: width * h^widthSlope
+    float m_drift = 3.0f;           ///< cents each partial wanders on its own
+    float m_driftRate = 0.1f;       ///< Hz, the speed of that wander
+    float m_shimmer = 0.4f;         ///< 0 .. 1, each partial's own amplitude wander
+    float m_shimmerRate = 0.15f;    ///< Hz, the speed of the shimmer
+    float m_stereo = 1.0f;          ///< 0 .. 1, how far the partials scatter across the stereo field
+    float m_time = 0.0f;            ///< seconds since the note began, the clock of every envelope (advanced by the engine)
+    float m_releaseAt = -1.0f;      ///< the note's time of release in seconds, -1 while it is held
+    int   m_partials = 20000;       ///< partials this voice renders, 1 .. the engine's partialsPerVoice
+    std::uint32_t m_seed = 1;       ///< the note's dice: initial phases, member offsets, drift and shimmer rates, pans
+    int   m_active = 0;             ///< 0 = silent: the GPU skips the voice entirely
+    int   m_restart = 0;            ///< 1 = a new note: fresh phases, amplitudes from zero, time 0 (cleared by launch())
+    EnvLane m_amp;                  ///< the amplitude lane
+    EnvLane m_pitch;                ///< the pitch lane, in cents
+    EnvLane m_pan;                  ///< the stereo lane, added to each partial's place
     /**
      * @brief Where the voice stands, 0 at the ear .. 1 deep in the background (Noctuary's planes,
      *        after Robert Rich). Every partial splits between the near and the far output by
      *        cos/sin(d pi/2), loses 6 dB per unit and is darkened by the air (see airAbsorb).
      */
-    float distance = 0.0f;
-    float airAbsorb = 1.0f;       ///< 0 .. 1: how far distance darkens -- at 1 a partial's corner falls 5 octaves per unit from 16 kHz
-    int   onset = 0;              ///< with restart: samples into the block at which the note begins (sample-accurate starts)
+    float m_distance = 0.0f;
+    float m_airAbsorb = 1.0f;       ///< 0 .. 1: how far distance darkens -- at 1 a partial's corner falls 5 octaves per unit from 16 kHz
+    int   m_onset = 0;              ///< with restart: samples into the block at which the note begins (sample-accurate starts)
     // The spectrum (Noctuary's formula; the voice is normalised after it, so these colour, not level).
-    float brightness = 1.0f;      ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (raised cosine); 1 keeps them all
-    float oddEven = 0.0f;         ///< -1 .. 1: positive thins the even harmonics, negative the odd ones above the first
-    float inharmonic = 0.0f;      ///< the stiff string's B: harmonic h at h sqrt(1 + B h^2)
-    float presenceDb = 0.0f;      ///< 0 .. 6 dB: a bell over 1.8 .. 5.6 kHz, only near the listener (times 1 - distance)
-    float lowCut = 0.0f;          ///< Hz: partials below fall 12 dB/oct (0 = off)
+    float m_brightness = 1.0f;      ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (raised cosine); 1 keeps them all
+    float m_oddEven = 0.0f;         ///< -1 .. 1: positive thins the even harmonics, negative the odd ones above the first
+    float m_inharmonic = 0.0f;      ///< the stiff string's B: harmonic h at h sqrt(1 + B h^2)
+    float m_presenceDb = 0.0f;      ///< 0 .. 6 dB: a bell over 1.8 .. 5.6 kHz, only near the listener (times 1 - distance)
+    float m_lowCut = 0.0f;          ///< Hz: partials below fall 12 dB/oct (0 = off)
     // The voice filter, read as a frequency response at every partial (FilterModel).
-    int   filterModel = 0;        ///< FilterModel; 0 = off
-    float cutoff = 2500.0f;       ///< Hz, after key tracking, envelope and drift (the engine's)
-    float filterQ = 0.707f;       ///< the resonance as a Q
-    float vowel = 0.0f;           ///< Formant: 0 .. 4, u o a e i
+    int   m_filterModel = 0;        ///< FilterModel; 0 = off
+    float m_cutoff = 2500.0f;       ///< Hz, after key tracking, envelope and drift (the engine's)
+    float m_filterQ = 0.707f;       ///< the resonance as a Q
+    float m_vowel = 0.0f;           ///< Formant: 0 .. 4, u o a e i
     // Air: a share of the partials as a band of noise around a multiple of the fundamental.
-    float air = 0.0f;             ///< 0 .. 1: the band's level against the voice's
-    float airCenter = 3.0f;       ///< the band's centre, times the fundamental
-    float airWidth = 600.0f;      ///< its width in cents (two standard deviations)
-    float airJitter = 8.0f;       ///< Hz: how fast its partials flicker in pitch and level -- what makes them noise
+    float m_air = 0.0f;             ///< 0 .. 1: the band's level against the voice's
+    float m_airCenter = 3.0f;       ///< the band's centre, times the fundamental
+    float m_airWidth = 600.0f;      ///< its width in cents (two standard deviations)
+    float m_airJitter = 8.0f;       ///< Hz: how fast its partials flicker in pitch and level -- what makes them noise
     // Filled by the engine at launch(), read by the GPU.
-    int   harmonics = 0;          ///< harmonics below the cutoff, at most `partials`
-    int   members = 0;            ///< partials per harmonic
-    int   harmonicPartials = 0;   ///< partials of the harmonic clouds; the rest up to `partials` are air
-    float scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
-    float airScale = 0.0f;        ///< amplitude of every air partial
-    float filterMix = 1.0f;       ///< 0 .. 1: the filter's gain raised to this (a morph fades one filter out and another in)
-    float stretch = 1.0f;         ///< harmonic h at h^stretch (partialRatio)
-    float shift = 0.0f;           ///< Hz added to every partial (below 20 Hz they fade out)
-    float turbulence = 0.0f;      ///< the energy cascade's drive for this note, per second (0: none; Turbulence)
+    int   m_harmonics = 0;          ///< harmonics below the cutoff, at most `partials`
+    int   m_members = 0;            ///< partials per harmonic
+    int   m_harmonicPartials = 0;   ///< partials of the harmonic clouds; the rest up to `partials` are air
+    float m_scale = 0.0f;           ///< amplitude of harmonic 1's every member, so that the voice meets `level`
+    float m_airScale = 0.0f;        ///< amplitude of every air partial
+    float m_filterMix = 1.0f;       ///< 0 .. 1: the filter's gain raised to this (a morph fades one filter out and another in)
+    float m_stretch = 1.0f;         ///< harmonic h at h^stretch (partialRatio)
+    float m_shift = 0.0f;           ///< Hz added to every partial (below 20 Hz they fade out)
+    float m_turbulence = 0.0f;      ///< the energy cascade's drive for this note, per second (0: none; Turbulence)
     // The voice filters during a morph between different ones (Morph.h): with two or more, the
     // filter above is not read; the card transports them into each other (filterTransportKernel).
-    int   filterCount = 0;        ///< filters in the lists below (0 or 1: the filter above alone)
-    float filterWeight[kVoiceFilters] = {};   ///< each one's share
-    float filterModels[kVoiceFilters] = {};   ///< its model (FilterModel, as a number)
-    float filterCutoffs[kVoiceFilters] = {};  ///< its cutoff, Hz
-    float filterQs[kVoiceFilters] = {};       ///< its Q
-    float filterVowels[kVoiceFilters] = {};   ///< its vowel (Formant)
-    float fpad0 = 0.0f;           ///< keeps the struct a multiple of 16 bytes
-    float fpad1 = 0.0f;           ///< likewise
-    float fpad2 = 0.0f;           ///< likewise
-    float pad2 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
-    float pad3 = 0.0f;            ///< likewise
+    int   m_filterCount = 0;        ///< filters in the lists below (0 or 1: the filter above alone)
+    float m_filterWeight[VoiceFilters] = {};   ///< each one's share
+    float m_filterModels[VoiceFilters] = {};   ///< its model (FilterModel, as a number)
+    float m_filterCutoffs[VoiceFilters] = {};  ///< its cutoff, Hz
+    float m_filterQs[VoiceFilters] = {};       ///< its Q
+    float m_filterVowels[VoiceFilters] = {};   ///< its vowel (Formant)
+    float m_fpad0 = 0.0f;           ///< keeps the struct a multiple of 16 bytes
+    float m_fpad1 = 0.0f;           ///< likewise
+    float m_fpad2 = 0.0f;           ///< likewise
+    float m_pad2 = 0.0f;            ///< keeps the struct a multiple of 16 bytes
+    float m_pad3 = 0.0f;            ///< likewise
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
-enum class FilterModel : int {
-    Off = 0,   ///< no filter
+enum class FilterModelE : int {
+    OFF = 0,   ///< no filter
     LP6,       ///< one-pole low pass
     LP12,      ///< two-pole low pass with resonance
     LP24,      ///< two of them in series
     HP12,      ///< two-pole high pass
     BP12,      ///< band pass, unity at the cutoff
-    Notch,     ///< band stop
-    Peak,      ///< a resonant bell on a flat line
-    Formant,   ///< three band passes on the formants of u-o-a-e-i; the cutoff picks the vowel
-    Count      ///< number of models
+    NOTCH,     ///< band stop
+    PEAK,      ///< a resonant bell on a flat line
+    FORMANT,   ///< three band passes on the formants of u-o-a-e-i; the cutoff picks the vowel
+    COUNT      ///< number of models
 };
-constexpr int kNumFilterModels = static_cast<int>(FilterModel::Count);   ///< entries of kFilterModelNames
+constexpr int NumFilterModels = static_cast<int>(FilterModelE::COUNT);   ///< entries of FilterModelNames
 
-constexpr int kCloudChannels = 4;      ///< the voices' channels on the GPU: near left, near right, far left, far right
-constexpr int kCloudOutChannels = 10;  ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right, the melt's left and right
-constexpr int kModalModes = 65536;     ///< the modal hall's resonances
-constexpr int kModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
-constexpr int kHallBins = 1024;        ///< the hall's memory and the spectrum's density: bands over 20 Hz .. 20 kHz on the log axis (11.7 cents)
+constexpr int CloudChannels = 4;      ///< the voices' channels on the GPU: near left, near right, far left, far right
+constexpr int CloudOutChannels = 10;  ///< a finished frame: the four voice channels, the modal hall's left and right, the spectral echo's left and right, the melt's left and right
+constexpr int ModalModes = 65536;     ///< the modal hall's resonances
+constexpr int ModalTuned = 128;       ///< pitches the hall's tuned modes may sit on
+constexpr int HallBins = 1024;        ///< the hall's memory and the spectrum's density: bands over 20 Hz .. 20 kHz on the log axis (11.7 cents)
 
 /**
  * @brief The modal hall's settings for the next block: the host's copy, sent up with the voices.
  *
- * A reverb made the way the instrument is made: kModalModes resonances, each a complex one-pole
+ * A reverb made the way the instrument is made: ModalModes resonances, each a complex one-pole
  * (a damped sine) driven by the voices of the block -- near and far, left and right -- and heard
  * through a phase of its own in each ear. Its tail is a sum of decaying sines, as the voices are a
  * sum of sustained ones (Abel, Coffin and Spratt 2014, a modal architecture for artificial
@@ -208,27 +208,27 @@ constexpr int kHallBins = 1024;        ///< the hall's memory and the spectrum's
  * making it louder.
  */
 struct ModalHall {
-    int   on = 0;           ///< 0: the hall rests -- silent, its modes cleared, almost no GPU time
-    int   freeze = 0;       ///< 1: the modes ring on (about 24 minutes to -60 dB) with the input shut
-    int   tunedCount = 0;   ///< pitches in `tuned`
-    int   pad = 0;          ///< keeps what follows 16-byte aligned
-    float decay = 8.0f;     ///< seconds to -60 dB at and below 250 Hz
-    float damp = 0.35f;     ///< 0 .. 1: every octave above 250 Hz dies 2^damp times faster
-    float tune = 0.5f;      ///< 0 .. 1: the share of the modes on the scale's pitches
-    float spread = 6.0f;    ///< cents a tuned mode may lie from its pitch (a triangle)
-    float drift = 4.0f;     ///< cents of every mode's slow wander (0.02 .. 0.12 Hz)
-    float width = 1.0f;     ///< 0: both ears hear the same phase of every mode (mono) .. 1: each its own
-    float low = 80.0f;      ///< Hz: the lowest mode of the spread ones
-    float time = 0.0f;      ///< seconds: the drift's clock, wrapped at 1000 s (every drift rate is a whole number of cycles in 1000 s)
-    float breath = 0.0f;    ///< 0 .. 1: every mode's decay wanders by up to an octave either way, slowly, each on its own
-    float paint = 0.0f;     ///< 0 .. 1: every mode heard through the landscape at its frequency (the painted hall)
-    float paintNorm = 1.0f; ///< the landscape's make-up (one over its RMS), so the painted hall keeps its level
-    float paintTime = 0.0f; ///< seconds into the landscape's loop, for the painting
-    float grow = 0.0f;      ///< -1 .. 1: how far the hall's memory lengthens (growth) or shortens (erosion) its modes' decays
-    float memoryCoef = 0.0f;///< the memory's step this block, 1 - exp(-dt / Memory) (0: it does not learn)
-    float densityCoef = 0.0f;///< the spectrum's density followed this block, 1 - exp(-dt / 0.3 s)
-    int   listen = 0;       ///< 1: the partials' amplitudes are gathered over the octaves this block (for the memory or the partials' time)
-    float tuned[kModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
+    int   m_on = 0;           ///< 0: the hall rests -- silent, its modes cleared, almost no GPU time
+    int   m_freeze = 0;       ///< 1: the modes ring on (about 24 minutes to -60 dB) with the input shut
+    int   m_tunedCount = 0;   ///< pitches in `tuned`
+    int   m_pad = 0;          ///< keeps what follows 16-byte aligned
+    float m_decay = 8.0f;     ///< seconds to -60 dB at and below 250 Hz
+    float m_damp = 0.35f;     ///< 0 .. 1: every octave above 250 Hz dies 2^damp times faster
+    float m_tune = 0.5f;      ///< 0 .. 1: the share of the modes on the scale's pitches
+    float m_spread = 6.0f;    ///< cents a tuned mode may lie from its pitch (a triangle)
+    float m_drift = 4.0f;     ///< cents of every mode's slow wander (0.02 .. 0.12 Hz)
+    float m_width = 1.0f;     ///< 0: both ears hear the same phase of every mode (mono) .. 1: each its own
+    float m_low = 80.0f;      ///< Hz: the lowest mode of the spread ones
+    float m_time = 0.0f;      ///< seconds: the drift's clock, wrapped at 1000 s (every drift rate is a whole number of cycles in 1000 s)
+    float m_breath = 0.0f;    ///< 0 .. 1: every mode's decay wanders by up to an octave either way, slowly, each on its own
+    float m_paint = 0.0f;     ///< 0 .. 1: every mode heard through the landscape at its frequency (the painted hall)
+    float m_paintNorm = 1.0f; ///< the landscape's make-up (one over its RMS), so the painted hall keeps its level
+    float m_paintTime = 0.0f; ///< seconds into the landscape's loop, for the painting
+    float m_grow = 0.0f;      ///< -1 .. 1: how far the hall's memory lengthens (growth) or shortens (erosion) its modes' decays
+    float m_memoryCoef = 0.0f;///< the memory's step this block, 1 - exp(-dt / Memory) (0: it does not learn)
+    float m_densityCoef = 0.0f;///< the spectrum's density followed this block, 1 - exp(-dt / 0.3 s)
+    int   m_listen = 0;       ///< 1: the partials' amplitudes are gathered over the octaves this block (for the memory or the partials' time)
+    float m_tuned[ModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
 };
 static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header");
 
@@ -245,10 +245,10 @@ static_assert(sizeof(ModalHall) % 16 == 0, "ModalHall rides in the block header"
  * the place, not the level.
  */
 struct Binaural {
-    int   on = 0;          ///< 1: the near plane binaural (for headphones)
-    float span = 0.5f;     ///< 0: the partials' places spread over the front half (+-90 degrees) .. 1: all round (+-180)
-    float height = 0.3f;   ///< 0 .. 1: elevations spread over up to +-60 degrees
-    float angle = 0.0f;    ///< radians: the whole cloud turned (the orbit), 0 in front, positive to the right
+    int   m_on = 0;          ///< 1: the near plane binaural (for headphones)
+    float m_span = 0.5f;     ///< 0: the partials' places spread over the front half (+-90 degrees) .. 1: all round (+-180)
+    float m_height = 0.3f;   ///< 0 .. 1: elevations spread over up to +-60 degrees
+    float m_angle = 0.0f;    ///< radians: the whole cloud turned (the orbit), 0 in front, positive to the right
 };
 static_assert(sizeof(Binaural) % 16 == 0, "Binaural rides in the block header");
 
@@ -263,28 +263,28 @@ static_assert(sizeof(Binaural) % 16 == 0, "Binaural rides in the block header");
  * `damp`. Echoes then come back as cascades rather than as copies.
  */
 struct SpectralEcho {
-    int   on = 0;            ///< 1: running (0: silent, nothing computed)
-    int   clear = 0;         ///< 1 for one block: the lines emptied first (the engine asks when it switches on)
-    int   pad0 = 0;          ///< keeps the floats 16-byte aligned
-    int   pad1 = 0;          ///< likewise
-    float frames = 187.0f;   ///< the bands' middle delay, in blocks
-    float tilt = 0.0f;       ///< -1 .. 1: the delay times 2^(2 tilt (place - 0.5)), place 0 at 20 Hz .. 1 at 20 kHz
-    float scatter = 0.0f;    ///< 0 .. 1: each band's time scattered by up to +-75 %
-    float feedback = 0.0f;   ///< 0 .. 0.95
-    float damp = 0.0f;       ///< 0 .. 1: the feedback times (1 - damp place)
-    float pad2 = 0.0f;       ///< keeps the table 16-byte aligned
-    float pad3 = 0.0f;       ///< likewise
-    float pad4 = 0.0f;       ///< likewise
+    int   m_on = 0;            ///< 1: running (0: silent, nothing computed)
+    int   m_clear = 0;         ///< 1 for one block: the lines emptied first (the engine asks when it switches on)
+    int   m_pad0 = 0;          ///< keeps the floats 16-byte aligned
+    int   m_pad1 = 0;          ///< likewise
+    float m_frames = 187.0f;   ///< the bands' middle delay, in blocks
+    float m_tilt = 0.0f;       ///< -1 .. 1: the delay times 2^(2 tilt (place - 0.5)), place 0 at 20 Hz .. 1 at 20 kHz
+    float m_scatter = 0.0f;    ///< 0 .. 1: each band's time scattered by up to +-75 %
+    float m_feedback = 0.0f;   ///< 0 .. 0.95
+    float m_damp = 0.0f;       ///< 0 .. 1: the feedback times (1 - damp place)
+    float m_pad2 = 0.0f;       ///< keeps the table 16-byte aligned
+    float m_pad3 = 0.0f;       ///< likewise
+    float m_pad4 = 0.0f;       ///< likewise
 };
 static_assert(sizeof(SpectralEcho) % 16 == 0, "SpectralEcho rides in the block header");
 
-constexpr int kMeltN = 4096;     ///< the melt's FFT size (11.7 Hz bands at 48 kHz)
-constexpr int kMeltHop = 512;    ///< samples between its frames
+constexpr int MeltN = 4096;     ///< the melt's FFT size (11.7 Hz bands at 48 kHz)
+constexpr int MeltHop = 512;    ///< samples between its frames
 
 /**
- * @brief The melt: a spectral blur on the GPU (output: channels 8 and 9, kMeltN - block samples late).
+ * @brief The melt: a spectral blur on the GPU (output: channels 8 and 9, MeltN - block samples late).
  *
- * Every kMeltHop samples the voices (near and far) are taken apart by a kMeltN-point FFT. Each band's
+ * Every MeltHop samples the voices (near and far) are taken apart by a MeltN-point FFT. Each band's
  * energy is held -- the new frame mixed in by 1 - `keep` -- and the held spectrum diffuses across the
  * bands, a little every frame (`widen`, in octaves on a log axis), so what has been held longest is
  * spread widest: a chord melts into the space between its notes. A phase vocoder sings it again:
@@ -292,24 +292,24 @@ constexpr int kMeltHop = 512;    ///< samples between its frames
  * to its own centre by `pull` as it melts, and is detuned a little, otherwise in each ear.
  */
 struct Melt {
-    int   on = 0;              ///< 1: running (0: silent, nothing computed)
-    int   clear = 0;           ///< 1 for one block: everything emptied first (the engine asks when it switches on)
-    int   pad0 = 0;            ///< keeps the floats 16-byte aligned
-    int   pad1 = 0;            ///< likewise
-    float keep = 0.99f;        ///< per frame: the share of the held energy kept
-    float widen = 0.0f;        ///< per frame: the blur's standard deviation in bands, per band index
-    float pull = 0.0f;         ///< per frame: each band's frequency pulled towards its centre by this share
-    float detune = 0.0f;       ///< radians a sample: each band's offset at most (its own in each ear)
+    int   m_on = 0;              ///< 1: running (0: silent, nothing computed)
+    int   m_clear = 0;           ///< 1 for one block: everything emptied first (the engine asks when it switches on)
+    int   m_pad0 = 0;            ///< keeps the floats 16-byte aligned
+    int   m_pad1 = 0;            ///< likewise
+    float m_keep = 0.99f;        ///< per frame: the share of the held energy kept
+    float m_widen = 0.0f;        ///< per frame: the blur's standard deviation in bands, per band index
+    float m_pull = 0.0f;         ///< per frame: each band's frequency pulled towards its centre by this share
+    float m_detune = 0.0f;       ///< radians a sample: each band's offset at most (its own in each ear)
 };
 static_assert(sizeof(Melt) % 16 == 0, "Melt rides in the block header");
 
-constexpr int kSnapStride = 8;       ///< every eighth partial of every voice is in the picture's snapshot
-constexpr int kLifeW = 256;          ///< the living field's width, cells (across the spectrum)
-constexpr int kLifeH = 128;          ///< its height, cells (across a cloud's members)
-constexpr int kLifeRadius = 10;      ///< Lenia's ring kernel radius, cells
-constexpr int kLifeJets = 16;        ///< the Fluid's jets: two for each of the eight loudest notes
-constexpr int kIsleW = 64;           ///< Islands: its grid across (each cell four of the field's)
-constexpr int kIsleH = 32;           ///< Islands: its grid along
+constexpr int SnapStride = 8;       ///< every eighth partial of every voice is in the picture's snapshot
+constexpr int LifeW = 256;          ///< the living field's width, cells (across the spectrum)
+constexpr int LifeH = 128;          ///< its height, cells (across a cloud's members)
+constexpr int LifeRadius = 10;      ///< Lenia's ring kernel radius, cells
+constexpr int LifeJets = 16;        ///< the Fluid's jets: two for each of the eight loudest notes
+constexpr int IsleW = 64;           ///< Islands: its grid across (each cell four of the field's)
+constexpr int IsleH = 32;           ///< Islands: its grid along
 
 /**
  * @brief The spectral comb: notches evenly spaced per octave, read at every partial's frequency
@@ -319,14 +319,14 @@ constexpr int kIsleH = 32;           ///< Islands: its grid along
  *        the stereo field, so left and right are combed apart.
  */
 struct SpectralComb {
-    float depth = 0.0f;     ///< 0 .. 1: the notches' depth (0: no comb)
-    float density = 2.0f;   ///< notches an octave
-    float phase = 0.0f;     ///< where the notches stand, in notches (the engine runs it on)
-    float stereo = 0.0f;    ///< 0 .. 1: half a notch apart from one side of the field to the other
-    float makeup = 1.0f;    ///< one over the root of the comb's mean square
-    float pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
-    float pad1 = 0.0f;      ///< likewise
-    float pad2 = 0.0f;      ///< likewise
+    float m_depth = 0.0f;     ///< 0 .. 1: the notches' depth (0: no comb)
+    float m_density = 2.0f;   ///< notches an octave
+    float m_phase = 0.0f;     ///< where the notches stand, in notches (the engine runs it on)
+    float m_stereo = 0.0f;    ///< 0 .. 1: half a notch apart from one side of the field to the other
+    float m_makeup = 1.0f;    ///< one over the root of the comb's mean square
+    float m_pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
+    float m_pad1 = 0.0f;      ///< likewise
+    float m_pad2 = 0.0f;      ///< likewise
 };
 static_assert(sizeof(SpectralComb) % 16 == 0, "SpectralComb rides in the block header");
 
@@ -343,45 +343,45 @@ static_assert(sizeof(SpectralComb) % 16 == 0, "SpectralComb rides in the block h
  * growing louder.
  */
 struct Turbulence {
-    float on = 0.0f;        ///< 1 when any voice cascades (else nothing is computed)
-    float settle = 6.0f;    ///< s: how long the harmonics take to settle back
-    float pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
-    float pad1 = 0.0f;      ///< likewise
+    float m_on = 0.0f;        ///< 1 when any voice cascades (else nothing is computed)
+    float m_settle = 6.0f;    ///< s: how long the harmonics take to settle back
+    float m_pad0 = 0.0f;      ///< keeps the struct a multiple of 16 bytes
+    float m_pad1 = 0.0f;      ///< likewise
 };
 static_assert(sizeof(Turbulence) % 16 == 0, "Turbulence rides in the block header");
 
 /** @brief What lives in the field: the LifeMode parameter's choices. */
-enum class LifeMode : std::int32_t {
-    Off = 0,   ///< no field
-    Lenia,     ///< Lenia (Chan 2019): Conway's Life made continuous -- blobs that drift, pulse, split, die
-    Turing,    ///< Gray-Scott reaction-diffusion (Pearson 1993): spots, mitosis, coral, worms, mazes
+enum class LifeModeE : std::int32_t {
+    OFF = 0,   ///< no field
+    LENIA,     ///< Lenia (Chan 2019): Conway's Life made continuous -- blobs that drift, pulse, split, die
+    TURING,    ///< Gray-Scott reaction-diffusion (Pearson 1993): spots, mitosis, coral, worms, mazes
     // Animated pictures (Phase 13d): KaleidoscopeEnhanced's continuous transforms, over the landscape
     // (the factory's or the player's own) or drawn from nothing.
-    Kaleidoscope,   ///< the landscape folded into turning mirror wedges round a wandering centre
-    Tunnel,         ///< a flight down a tunnel lined with the landscape: rings born in the middle, running out
-    Spiral,         ///< the landscape wound into a log-polar spiral that zooms for ever (Droste)
-    Flow,           ///< the landscape carried on a flowing noise current, like ink in water
-    Feedback,       ///< video feedback: the field fed back into itself, turned and zoomed, the landscape seeping in
-    Rain,           ///< drops on a pond: a damped 2D wave, rings spreading and crossing
-    Starfield,      ///< stars streaming out of the middle (log-polar: they speed up as they go)
-    Moire,          ///< two turning line gratings, their slow interference bands
+    KALEIDOSCOPE,   ///< the landscape folded into turning mirror wedges round a wandering centre
+    TUNNEL,         ///< a flight down a tunnel lined with the landscape: rings born in the middle, running out
+    SPIRAL,         ///< the landscape wound into a log-polar spiral that zooms for ever (Droste)
+    FLOW,           ///< the landscape carried on a flowing noise current, like ink in water
+    FEEDBACK,       ///< video feedback: the field fed back into itself, turned and zoomed, the landscape seeping in
+    RAIN,           ///< drops on a pond: a damped 2D wave, rings spreading and crossing
+    STARFIELD,      ///< stars streaming out of the middle (log-polar: they speed up as they go)
+    MOIRE,          ///< two turning line gratings, their slow interference bands
     // Phase 16: two more fields that live
-    Fluid,     ///< a fluid (lattice Boltzmann): the notes played blow plumes of ink into it, which roll up into eddies
-    Islands,   ///< Cahn-Hilliard separation (Oono-Puri): a fine-grained field gathers into a few large islands that drift
-    Count      ///< number of modes
+    FLUID,     ///< a fluid (lattice Boltzmann): the notes played blow plumes of ink into it, which roll up into eddies
+    ISLANDS,   ///< Cahn-Hilliard separation (Oono-Puri): a fine-grained field gathers into a few large islands that drift
+    COUNT      ///< number of modes
 };
 
 /** @brief Whether a living landscape is one of the animated pictures (computed, not grown). @param m the mode @return true then */
 #if defined(__CUDACC__)
 __host__ __device__
 #endif
-inline bool lifeIsPicture(LifeMode m) { return m >= LifeMode::Kaleidoscope && m <= LifeMode::Moire; }
+inline bool lifeIsPicture(LifeModeE m) { return m >= LifeModeE::KALEIDOSCOPE && m <= LifeModeE::MOIRE; }
 
 /**
  * @brief The living landscape: a field on a torus the GPU steps every block, and every partial reads.
  *
  * Where the landscapes are pictures that loop, this one lives: a Lenia field or a Gray-Scott
- * field of kLifeW x kLifeH cells, stepped up to twice a block in the graph before the partials are
+ * field of LifeW x LifeH cells, stepped up to twice a block in the graph before the partials are
  * updated. Each partial reads it at its frequency (across, log, `zoom` of the field spanning the
  * range) and at its place in its cloud (along), so every harmonic is a slice through the living
  * pattern and the pattern's motion is the partials' loudness. Made up by the field's own power
@@ -389,45 +389,45 @@ inline bool lifeIsPicture(LifeMode m) { return m >= LifeMode::Kaleidoscope && m 
  * the level; a field that died or filled up is seeded again.
  */
 struct LifeField {
-    LifeMode mode = LifeMode::Off;   ///< what lives in it
-    int   steps = 0;                 ///< steps this block, 0 .. 2
-    int   reseed = 0;                ///< 1 for one block: seeded again first (the engine asks)
-    int   salt = 0;                  ///< the seeding's dice, counted up at every seeding
-    float depth = 0.0f;              ///< 0 .. 1: how far the partials' loudness follows the field
-    float zoom = 1.0f;               ///< 0.25 .. 1: how much of the field's width the range spans
-    float makeup = 1.0f;             ///< one over the field's RMS (the engine's, from lifeStats)
-    float lenMu = 0.15f;             ///< Lenia: the growth bell's centre
-    float lenSigma = 0.015f;         ///< Lenia: its width
-    float feed = 0.035f;             ///< Turing: the feed rate F
-    float kill = 0.065f;             ///< Turing: the kill rate k
-    float time = 0.0f;               ///< pictures: how far the flow has run (Life Rate's units)
-    float angle = 0.0f;              ///< pictures: how far it has turned, radians (Turn)
-    float sides = 6.0f;              ///< pictures: mirror wedges, spiral arms, grating lines (Sides)
-    float character = 0.3f;          ///< pictures: how strongly the transform distorts (Character)
-    float seconds = 0.0f;            ///< pictures: real seconds, for the centre's slow wander
-    float drops = 0.0f;              ///< Rain: the chance a cell is struck this block
-    float turnStep = 0.0f;           ///< pictures: the turn this block, radians (Feedback turns by it)
-    float fade = 0.999f;             ///< Fluid: the share of the ink kept each step
-    float tau = 0.53f;               ///< Fluid: the lattice's relaxation time (its viscosity: (tau - 1/2) / 3)
-    float push = 0.004f;             ///< Fluid: the jets' force, lattice units at full strength
-    int   substeps = 1;              ///< Islands: steps of the separation this block
-    float mean = 0.0f;               ///< Islands: the field's mean (0: a labyrinth; below: islands of the minority)
-    float eps = 0.001f;              ///< Islands: Oono and Puri's long-range term (more: smaller domains, which stop growing)
-    float drift = 0.0f;              ///< Islands: how far the field has drifted across, cells of its grid
-    float pad1 = 0.0f;               ///< keeps the table 16-byte aligned
-    float pad2 = 0.0f;               ///< likewise
-    float pad3 = 0.0f;               ///< likewise
-    float jetX[kLifeJets] = {};      ///< Fluid: where each jet blows, cells across (the notes' frequencies)
-    float jetAmt[kLifeJets] = {};    ///< Fluid: how strongly, 0 .. 1 (0: none)
-    float jetSway[kLifeJets] = {};   ///< Fluid: its lean, sideways share of its push
+    LifeModeE m_mode = LifeModeE::OFF;   ///< what lives in it
+    int   m_steps = 0;                 ///< steps this block, 0 .. 2
+    int   m_reseed = 0;                ///< 1 for one block: seeded again first (the engine asks)
+    int   m_salt = 0;                  ///< the seeding's dice, counted up at every seeding
+    float m_depth = 0.0f;              ///< 0 .. 1: how far the partials' loudness follows the field
+    float m_zoom = 1.0f;               ///< 0.25 .. 1: how much of the field's width the range spans
+    float m_makeup = 1.0f;             ///< one over the field's RMS (the engine's, from lifeStats)
+    float m_lenMu = 0.15f;             ///< Lenia: the growth bell's centre
+    float m_lenSigma = 0.015f;         ///< Lenia: its width
+    float m_feed = 0.035f;             ///< Turing: the feed rate F
+    float m_kill = 0.065f;             ///< Turing: the kill rate k
+    float m_time = 0.0f;               ///< pictures: how far the flow has run (Life Rate's units)
+    float m_angle = 0.0f;              ///< pictures: how far it has turned, radians (Turn)
+    float m_sides = 6.0f;              ///< pictures: mirror wedges, spiral arms, grating lines (Sides)
+    float m_character = 0.3f;          ///< pictures: how strongly the transform distorts (Character)
+    float m_seconds = 0.0f;            ///< pictures: real seconds, for the centre's slow wander
+    float m_drops = 0.0f;              ///< Rain: the chance a cell is struck this block
+    float m_turnStep = 0.0f;           ///< pictures: the turn this block, radians (Feedback turns by it)
+    float m_fade = 0.999f;             ///< Fluid: the share of the ink kept each step
+    float m_tau = 0.53f;               ///< Fluid: the lattice's relaxation time (its viscosity: (tau - 1/2) / 3)
+    float m_push = 0.004f;             ///< Fluid: the jets' force, lattice units at full strength
+    int   m_substeps = 1;              ///< Islands: steps of the separation this block
+    float m_mean = 0.0f;               ///< Islands: the field's mean (0: a labyrinth; below: islands of the minority)
+    float m_eps = 0.001f;              ///< Islands: Oono and Puri's long-range term (more: smaller domains, which stop growing)
+    float m_drift = 0.0f;              ///< Islands: how far the field has drifted across, cells of its grid
+    float m_pad1 = 0.0f;               ///< keeps the table 16-byte aligned
+    float m_pad2 = 0.0f;               ///< likewise
+    float m_pad3 = 0.0f;               ///< likewise
+    float m_jetX[LifeJets] = {};      ///< Fluid: where each jet blows, cells across (the notes' frequencies)
+    float m_jetAmt[LifeJets] = {};    ///< Fluid: how strongly, 0 .. 1 (0: none)
+    float m_jetSway[LifeJets] = {};   ///< Fluid: its lean, sideways share of its push
 };
 static_assert(sizeof(LifeField) % 16 == 0, "LifeField rides in the block header");
 
 /** @brief How the partials' oscillators couple (PartialSync::mode). */
-enum class SyncMode : std::int32_t {
-    Global = 0,   ///< Kuramoto: every member to its cloud's mean
-    Chimera,      ///< to its neighbours round the cloud, with a phase lag: an ordered part beside a disordered one
-    Swarm,        ///< swarmalators: the phase and a place on a circle in pitch and pan pull each other
+enum class SyncModeE : std::int32_t {
+    GLOBAL = 0,   ///< Kuramoto: every member to its cloud's mean
+    CHIMERA,      ///< to its neighbours round the cloud, with a phase lag: an ordered part beside a disordered one
+    SWARM,        ///< swarmalators: the phase and a place on a circle in pitch and pan pull each other
 };
 
 /**
@@ -457,18 +457,18 @@ enum class SyncMode : std::int32_t {
  * a phase wave broken into several, pulsing against each other.
  */
 struct PartialSync {
-    float depth = 0.0f;      ///< 0 .. 1: how far the loudness follows the phase (0: nothing computed)
-    float coupling = 0.0f;   ///< K, rad/s
-    float rate = 0.5f;       ///< Hz: the oscillators' middle rate
-    float spread = 0.3f;     ///< 0 .. 1: each rate scattered by up to this share either way
-    SyncMode mode = SyncMode::Global;   ///< how they couple
-    float swarm = 0.0f;      ///< Swarm: J, rad/s (positive: like phases gather)
-    float reach = 0.0f;      ///< Swarm: cents a partial is moved on its circle
-    float lag = 1.39f;       ///< Chimera: the phase lag, radians
+    float m_depth = 0.0f;      ///< 0 .. 1: how far the loudness follows the phase (0: nothing computed)
+    float m_coupling = 0.0f;   ///< K, rad/s
+    float m_rate = 0.5f;       ///< Hz: the oscillators' middle rate
+    float m_spread = 0.3f;     ///< 0 .. 1: each rate scattered by up to this share either way
+    SyncModeE m_mode = SyncModeE::GLOBAL;   ///< how they couple
+    float m_swarm = 0.0f;      ///< Swarm: J, rad/s (positive: like phases gather)
+    float m_reach = 0.0f;      ///< Swarm: cents a partial is moved on its circle
+    float m_lag = 1.39f;       ///< Chimera: the phase lag, radians
 };
 static_assert(sizeof(PartialSync) % 16 == 0, "PartialSync rides in the block header");
 
-constexpr int kRippleCells = 256;   ///< the ripple's string: cells over the range, log (20 Hz .. 20 kHz)
+constexpr int RippleCells = 256;   ///< the ripple's string: cells over the range, log (20 Hz .. 20 kHz)
 
 /**
  * @brief The ripple: a damped wave along the spectrum, its displacement read by every partial at its
@@ -476,47 +476,47 @@ constexpr int kRippleCells = 256;   ///< the ripple's string: cells over the ran
  *        it up with the voices.
  */
 struct Ripple {
-    float depth = 0.0f;                   ///< 0 .. 1: (1 + depth tanh u) times the make-up (0: nothing read)
-    float makeup = 1.0f;                  ///< one over the root of (1 + depth^2 mean tanh^2 u)
-    float pad0 = 0.0f;                    ///< keeps the table 16-byte aligned
-    float pad1 = 0.0f;                    ///< likewise
-    float u[kRippleCells] = {};           ///< the string's displacement, cell by cell
+    float m_depth = 0.0f;                   ///< 0 .. 1: (1 + depth tanh u) times the make-up (0: nothing read)
+    float m_makeup = 1.0f;                  ///< one over the root of (1 + depth^2 mean tanh^2 u)
+    float m_pad0 = 0.0f;                    ///< keeps the table 16-byte aligned
+    float m_pad1 = 0.0f;                    ///< likewise
+    float m_u[RippleCells] = {};           ///< the string's displacement, cell by cell
 };
 static_assert(sizeof(Ripple) % 16 == 0, "Ripple rides in the block header");
 
-constexpr int kReservoirN = 2048;      ///< the reservoir's neurons
-constexpr int kReservoirInputs = 8;    ///< what it is fed
-constexpr int kReservoirOutputs = 4;   ///< what is read from it
+constexpr int ReservoirN = 2048;      ///< the reservoir's neurons
+constexpr int ReservoirInputs = 8;    ///< what it is fed
+constexpr int ReservoirOutputs = 4;   ///< what is read from it
 
 /**
- * @brief The reservoir: an echo state network (Jaeger 2001) on the GPU -- kReservoirN neurons, a
+ * @brief The reservoir: an echo state network (Jaeger 2001) on the GPU -- ReservoirN neurons, a
  *        fixed random coupling scaled to `chaos` (its spectral radius: below 1 it forgets, about 1
  *        it rings at the edge of chaos, above it runs on by itself), leaking at `leak` a block,
- *        driven by kReservoirInputs numbers about the music, read out by kReservoirOutputs fixed
+ *        driven by ReservoirInputs numbers about the music, read out by ReservoirOutputs fixed
  *        random projections. Smooth, never periodic, with a memory of what was played.
  */
 struct Reservoir {
-    int   on = 0;                       ///< 1: stepped this block (a matrix row reads it)
-    float chaos = 0.95f;                ///< the coupling's spectral radius
-    float leak = 0.001f;                ///< a block's share of the new state
-    float input = 0.7f;                 ///< the inputs' gain
-    float u[kReservoirInputs] = {};     ///< the inputs, about -1 .. 1
+    int   m_on = 0;                       ///< 1: stepped this block (a matrix row reads it)
+    float m_chaos = 0.95f;                ///< the coupling's spectral radius
+    float m_leak = 0.001f;                ///< a block's share of the new state
+    float m_input = 0.7f;                 ///< the inputs' gain
+    float m_u[ReservoirInputs] = {};     ///< the inputs, about -1 .. 1
 };
 static_assert(sizeof(Reservoir) % 16 == 0, "Reservoir rides in the block header");
 
-constexpr int kFieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
-constexpr int kFieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
-constexpr int kGainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
+constexpr int FieldPoints = 128;    ///< the scale's pitches a Scale field may pull to
+constexpr int FieldAttractors = 8;  ///< attractors a Swarm or Scatter field may have
+constexpr int GainRing = 1024;      ///< blocks of every voice's level the GPU keeps, for the dispersion (2.7 s at 128)
 
 /** @brief What the field does: the FieldMode parameter's choices. */
-enum class FieldMode : std::int32_t {
-    Off = 0,   ///< every partial at its own place (a field switched off lets them glide home)
-    Scale,     ///< every partial pulled towards the nearest pitch of the scale: the cloud collapses into the key
-    Swarm,     ///< a few attractors wander through the spectrum on chaotic paths and gather the partials near them
-    Scatter,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
-    Flock,     ///< every cloud's members as a flock of starlings: cohesion, alignment, separation, a wind
-    Orbit,     ///< the scale's pitches as wells in pitch and side, a magnetic field bending every move: the partials circle them
-    Count      ///< number of modes
+enum class FieldModeE : std::int32_t {
+    OFF = 0,   ///< every partial at its own place (a field switched off lets them glide home)
+    SCALE,     ///< every partial pulled towards the nearest pitch of the scale: the cloud collapses into the key
+    SWARM,     ///< a few attractors wander through the spectrum on chaotic paths and gather the partials near them
+    SCATTER,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
+    FLOCK,     ///< every cloud's members as a flock of starlings: cohesion, alignment, separation, a wind
+    ORBIT,     ///< the scale's pitches as wells in pitch and side, a magnetic field bending every move: the partials circle them
+    COUNT      ///< number of modes
 };
 
 /**
@@ -538,30 +538,30 @@ enum class FieldMode : std::int32_t {
  * falling chirp, as in a dispersive medium -- a long spring, a stiff string, ice), or rising.
  */
 struct SpectralField {
-    FieldMode mode = FieldMode::Off;   ///< what pulls the partials
-    int   count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`; Flock: winds in `pos`
-    int   flockFresh = 0;              ///< Flock: 1 when the last block was no flock (its state is taken from where the partials are)
-    int   orbitFresh = 0;              ///< Orbit: 1 when the last block was no orbit (its state is taken from where the partials are)
-    float strength = 0.0f;             ///< cents a second a partial may move at most
-    float radius = 60.0f;              ///< cents: an attractor's reach (the bell's width); the Scale field's stiffness
-    float spring = 0.3f;               ///< per second: how fast a partial is drawn back to its own place
-    float dispersion = 0.0f;           ///< seconds: the clock of the lowest partials late (positive) or of the highest (negative)
-    float orbitWell = 3.0f;            ///< Orbit: the wells' angular frequency, rad/s (their depth)
-    float orbitField = 6.0f;           ///< Orbit: the magnetic field as the circling's angular frequency, rad/s
-    float orbitDamp = 0.3f;            ///< Orbit: the damping, per second
-    float timeBend = 0.0f;             ///< -1 .. 1: each partial's clock slower (positive) or faster where the spectrum is dense
-    float pos[kFieldPoints] = {};      ///< log2 Hz: the scale's pitches ascending (Scale), or the attractors (Swarm, Scatter)
-    float mass[kFieldAttractors] = {}; ///< the attractors' weights; Scatter's are negative
+    FieldModeE m_mode = FieldModeE::OFF;   ///< what pulls the partials
+    int   m_count = 0;                   ///< Scale: pitches in `pos`; Swarm, Scatter: attractors in `pos` and `mass`; Flock: winds in `pos`
+    int   m_flockFresh = 0;              ///< Flock: 1 when the last block was no flock (its state is taken from where the partials are)
+    int   m_orbitFresh = 0;              ///< Orbit: 1 when the last block was no orbit (its state is taken from where the partials are)
+    float m_strength = 0.0f;             ///< cents a second a partial may move at most
+    float m_radius = 60.0f;              ///< cents: an attractor's reach (the bell's width); the Scale field's stiffness
+    float m_spring = 0.3f;               ///< per second: how fast a partial is drawn back to its own place
+    float m_dispersion = 0.0f;           ///< seconds: the clock of the lowest partials late (positive) or of the highest (negative)
+    float m_orbitWell = 3.0f;            ///< Orbit: the wells' angular frequency, rad/s (their depth)
+    float m_orbitField = 6.0f;           ///< Orbit: the magnetic field as the circling's angular frequency, rad/s
+    float m_orbitDamp = 0.3f;            ///< Orbit: the damping, per second
+    float m_timeBend = 0.0f;             ///< -1 .. 1: each partial's clock slower (positive) or faster where the spectrum is dense
+    float m_pos[FieldPoints] = {};      ///< log2 Hz: the scale's pitches ascending (Scale), or the attractors (Swarm, Scatter)
+    float m_mass[FieldAttractors] = {}; ///< the attractors' weights; Scatter's are negative
 };
 static_assert(sizeof(SpectralField) % 16 == 0, "SpectralField rides in the block header");
 
 /** @brief How an engine is laid out; fixed between open() and close(). */
 struct CloudConfig {
-    double sampleRate = 48000.0;  ///< Hz
-    int    blockSize = 128;       ///< samples per launch(), a power of two, 32 .. 4096
-    int    voices = 16;           ///< voices the GPU tables hold
-    int    partialsPerVoice = 20000;   ///< the most partials one voice can render
-    bool   spinWait = true;       ///< wait() spins on the GPU's event (lowest latency) instead of sleeping on it
+    double m_sampleRate = 48000.0;  ///< Hz
+    int    m_blockSize = 128;       ///< samples per launch(), a power of two, 32 .. 4096
+    int    m_voices = 16;           ///< voices the GPU tables hold
+    int    m_partialsPerVoice = 20000;   ///< the most partials one voice can render
+    bool   m_spinWait = true;       ///< wait() spins on the GPU's event (lowest latency) instead of sleeping on it
 };
 
 /**
@@ -594,17 +594,17 @@ public:
     /**
      * @brief Replaces the bank of envelope shapes; waits for a block in flight first.
      * @param shapes  the shapes
-     * @param count   how many, at most kEnvShapes (more are dropped)
+     * @param count   how many, at most EnvShapes (more are dropped)
      * @return        true when uploaded
      */
     bool setShapes(const EnvShape* shapes, int count);
 
     /**
-     * @brief Replaces the landscape: rows of time, each `columns` amplitudes from kLandLowHz to
-     *        kLandHighHz; it loops over all its rows. Waits for a block in flight first.
+     * @brief Replaces the landscape: rows of time, each `columns` amplitudes from LandLowHz to
+     *        LandHighHz; it loops over all its rows. Waits for a block in flight first.
      * @param amps        rows * columns amplitudes 0 .. 1, row by row
-     * @param columns     2 .. kLandMaxColumns
-     * @param rows        1 .. kLandMaxRows
+     * @param columns     2 .. LandMaxColumns
+     * @param rows        1 .. LandMaxRows
      * @param rowSeconds  how long one row lasts at rate 1
      * @return            true when uploaded (false: outside the limits, nothing changed)
      */
@@ -652,14 +652,14 @@ public:
     /**
      * @brief The hall's memory (ModalHall::grow): per band over the octaves, how much was heard there
      *        against the average (1), as the last snapshot brought it down.
-     * @param out  receives kHallBins values
+     * @param out  receives HallBins values
      * @return     true when the memory has come down at least once
      */
     bool hallMemory(float* out) const;
-    /** @brief Replaces the hall's memory at the next launch (a hall loaded, or a new one). @param in kHallBins values (1: nothing learnt) */
+    /** @brief Replaces the hall's memory at the next launch (a hall loaded, or a new one). @param in HallBins values (1: nothing learnt) */
     void setHallMemory(const float* in);
 
-    /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives kReservoirOutputs values */
+    /** @brief The reservoir's outputs after the last block, -1 .. 1. @param out receives ReservoirOutputs values */
     void reservoirOut(float* out) const;
 
     /**
@@ -680,13 +680,13 @@ public:
     void heard(float& levelDb, float& centroid, float& flux) const;
 
     /**
-     * @brief The living field as the last snapshot brought it down: kLifeW x kLifeH cells, each the value
+     * @brief The living field as the last snapshot brought it down: LifeW x LifeH cells, each the value
      *        the partials read (0 .. 1), row after row. Valid after takeSnapshot() returned true.
      * @return  the cells, or null when the field is off
      */
     const float* lifePicture() const;
 
-    /** @brief The next launch() also brings the partials' snapshot down (every kSnapStride-th partial's frequency and amplitude). */
+    /** @brief The next launch() also brings the partials' snapshot down (every SnapStride-th partial's frequency and amplitude). */
     void requestSnapshot();
 
     /**
@@ -708,7 +708,7 @@ public:
 
     /**
      * @brief Waits for the launched block.
-     * @return  blockSize frames of kCloudOutChannels (near L, R, far L, R, modal hall L, R, spectral echo L, R, melt L, R), valid until the next launch()
+     * @return  blockSize frames of CloudOutChannels (near L, R, far L, R, modal hall L, R, spectral echo L, R, melt L, R), valid until the next launch()
      */
     const float* wait();
 
@@ -720,7 +720,7 @@ public:
 
 private:
     struct Impl;                    ///< the CUDA side, defined in Cloud.cu
-    std::unique_ptr<Impl> impl_;    ///< null while closed
+    std::unique_ptr<Impl> m_impl;    ///< null while closed
 };
 
 } // namespace additiv

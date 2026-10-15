@@ -17,11 +17,11 @@ class CommandPalette final : public juce::Component, private juce::ListBoxModel,
 public:
     /** @brief One thing it can do. */
     struct Command {
-        juce::String title;     ///< what it is called
-        juce::String detail;    ///< where it is, or what it does
-        juce::String kind;      ///< "Knob", "Preset", "Yours", "Action"
-        bool takesNumber = false;   ///< a number after its name is its value ("cutoff 800")
-        std::function<void(const juce::String& number)> run;   ///< what it does (the number, "" when none was typed)
+        juce::String m_title;     ///< what it is called
+        juce::String m_detail;    ///< where it is, or what it does
+        juce::String m_kind;      ///< "Knob", "Preset", "Yours", "Action"
+        bool m_takesNumber = false;   ///< a number after its name is its value ("cutoff 800")
+        std::function<void(const juce::String& number)> m_run;   ///< what it does (the number, "" when none was typed)
     };
     /** @brief An empty palette; open() fills it. */
     CommandPalette();
@@ -31,11 +31,11 @@ public:
      */
     void open(std::vector<Command> commands);
     /** @brief Commands made from the words typed (presets by how they sound), shown first; empty when the words ask for none. */
-    std::function<std::vector<Command>(const juce::StringArray&)> fromWords;
+    std::function<std::vector<Command>(const juce::StringArray&)> m_fromWords;
     /** @brief Closes it. */
     void close();
     /** @brief Types into the search (the shot mode's way of showing it). @param text what */
-    void type(const juce::String& text) { search_.setText(text, true); }
+    void type(const juce::String& text) { m_search.setText(text, true); }
     /** @brief The dimmed window and the panel. */
     void paint(juce::Graphics& g) override;
     /** @brief The search on top, the list under it. */
@@ -67,10 +67,10 @@ private:
     /** @brief Up and down in the search move the choice. */
     bool keyPressed(const juce::KeyPress& key, juce::Component* origin) override;
 
-    std::vector<Command> all_;          ///< what it can do
-    size_t fixed_ = 0;                  ///< how many of them were given to open() (the rest came from the words)
-    std::vector<int> shown_;            ///< what matches, best first
-    juce::String number_;               ///< a number typed after the words
-    juce::TextEditor search_;           ///< the search
-    juce::ListBox list_;                ///< the matches
+    std::vector<Command> m_all;          ///< what it can do
+    size_t m_fixed = 0;                  ///< how many of them were given to open() (the rest came from the words)
+    std::vector<int> m_shown;            ///< what matches, best first
+    juce::String m_number;               ///< a number typed after the words
+    juce::TextEditor m_search;           ///< the search
+    juce::ListBox m_list;                ///< the matches
 };

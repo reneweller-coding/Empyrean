@@ -26,27 +26,27 @@
 /** @brief The sources as chips (see the file comment). */
 class ModDock final : public juce::Component, public juce::SettableTooltipClient, private juce::Timer {
 public:
-    static constexpr int kHistory = 120;   ///< samples a trace holds: four seconds at 30 a second
-    static constexpr int kHeight = 30;     ///< the dock's height
+    static constexpr int History = 120;   ///< samples a trace holds: four seconds at 30 a second
+    static constexpr int Height = 30;     ///< the dock's height
 
     /** @brief The sources of @p proc's engine. @param proc the processor */
     explicit ModDock(AdditivProcessor& proc);
 
     /** @brief A chip was clicked: its source. */
-    std::function<void(additiv::ModSource)> onChoose;
+    std::function<void(additiv::ModSourceE)> m_onChoose;
     /** @brief The dock's button: the inspector open or shut. */
-    std::function<void()> onToggle;
+    std::function<void()> m_onToggle;
     /** @brief The source the inspector shows (its chip is marked). @param s the source */
-    void setChosen(additiv::ModSource s);
+    void setChosen(additiv::ModSourceE s);
     /** @brief Whether the inspector is open (the button's arrow). @param open open */
     void setOpen(bool open);
     /**
      * @brief A source's trace, oldest first.
      * @param s  the source
-     * @param k  0 .. kHistory-1
+     * @param k  0 .. History-1
      * @return   its value then
      */
-    float traceAt(additiv::ModSource s, int k) const;
+    float traceAt(additiv::ModSourceE s, int k) const;
 
     /** @brief The chips. @param g where */
     void paint(juce::Graphics& g) override;
@@ -69,7 +69,7 @@ private:
     /** @brief Samples every source; repaints while on screen. */
     void timerCallback() override;
     /** @brief The chips to show now: the classic sources, those the matrix reads, the one chosen with "+". @return them */
-    std::vector<additiv::ModSource> wanted() const;
+    std::vector<additiv::ModSourceE> wanted() const;
     /** @brief The chips' area (between the button and "+"). @return pixels */
     juce::Rectangle<int> chipArea() const;
     /** @brief A chip's rectangle. @param k its place @param n the chips @return pixels */
@@ -81,24 +81,24 @@ private:
     /** @brief The menu of every source: the one chosen gets a chip. */
     void showMore();
     /** @brief The rows that read a source. @param s the source @return how many */
-    int rowsOf(additiv::ModSource s) const;
+    int rowsOf(additiv::ModSourceE s) const;
 
-    AdditivProcessor& proc_;                                                         ///< whose engine
-    juce::TextButton toggle_;                                                        ///< the inspector open or shut
-    std::vector<additiv::ModSource> shown_;                                          ///< the chips as last laid out
-    additiv::ModSource pinned_ = additiv::ModSource::Off;                           ///< the source chosen with "+"
-    additiv::ModSource chosen_ = additiv::ModSource::Off;                           ///< the source the inspector shows
-    int pressed_ = -1;                                                               ///< the chip pressed, -1 none, -2 "+"
-    bool dragging_ = false;                                                          ///< a chip is being dragged
-    int hover_ = -1;                                                                 ///< the chip under the mouse
-    std::array<std::array<float, kHistory>, additiv::kNumModSources> history_{};    ///< per source its last values, a ring
-    int head_ = 0;                                                                   ///< where the next sample goes
+    AdditivProcessor& m_proc;                                                         ///< whose engine
+    juce::TextButton m_toggle;                                                        ///< the inspector open or shut
+    std::vector<additiv::ModSourceE> m_shown;                                          ///< the chips as last laid out
+    additiv::ModSourceE m_pinned = additiv::ModSourceE::OFF;                           ///< the source chosen with "+"
+    additiv::ModSourceE m_chosen = additiv::ModSourceE::OFF;                           ///< the source the inspector shows
+    int m_pressed = -1;                                                               ///< the chip pressed, -1 none, -2 "+"
+    bool m_dragging = false;                                                          ///< a chip is being dragged
+    int m_hover = -1;                                                                 ///< the chip under the mouse
+    std::array<std::array<float, History>, additiv::NumModSources> m_history{};    ///< per source its last values, a ring
+    int m_head = 0;                                                                   ///< where the next sample goes
 };
 
 /** @brief One source seen whole: its trace, its own knobs, its rows (see ModDock.h's file comment). */
 class SourceInspector final : public juce::Component, private juce::Timer {
 public:
-    static constexpr int kHeight = 112;   ///< the inspector's height
+    static constexpr int Height = 112;   ///< the inspector's height
 
     /**
      * @brief The inspector.
@@ -108,21 +108,21 @@ public:
      */
     SourceInspector(AdditivProcessor& proc, const frame::ControlActions& actions, const ModDock& dock);
     /** @brief Shows a source. @param s the source */
-    void show(additiv::ModSource s);
+    void show(additiv::ModSourceE s);
     /** @brief The source shown. @return it */
-    additiv::ModSource source() const { return source_; }
+    additiv::ModSourceE source() const { return m_source; }
     /** @brief Over the pages (with a button that shuts it) or docked under them. @param on over the pages */
     void setOverlay(bool on);
     /** @brief The shut button was pressed (over the pages). */
-    std::function<void()> onClose;
+    std::function<void()> m_onClose;
     /** @brief A row's target was clicked: its parameter, to show its knob. */
-    std::function<void(int)> onReveal;
+    std::function<void(int)> m_onReveal;
     /** @brief The Matrix button: the matrix page. */
-    std::function<void()> onMatrix;
+    std::function<void()> m_onMatrix;
     /** @brief A source's own parameters (an LFO's shape and rate, a macro, the attractors' period ...). @param s the source @return them */
-    static std::vector<additiv::ParamId> ownParams(additiv::ModSource s);
+    static std::vector<additiv::ParamIdE> ownParams(additiv::ModSourceE s);
     /** @brief The source whose own knob a parameter is (the first, for knobs shared by a family). @param id the parameter @return it, Off none */
-    static additiv::ModSource sourceOf(int id);
+    static additiv::ModSourceE sourceOf(int id);
 
     /** @brief The box, the name, the trace. @param g where */
     void paint(juce::Graphics& g) override;
@@ -143,24 +143,24 @@ private:
 
     /** @brief One row's controls: its target, its depth, its removal. */
     struct RowUi {
-        int row = -1;                          ///< the matrix row
-        juce::TextButton target;               ///< the target's name; a click shows its knob
-        juce::Slider depth;                    ///< how far
-        juce::TextButton remove{ "x" };        ///< removes the row
+        int m_row = -1;                          ///< the matrix row
+        juce::TextButton m_target;               ///< the target's name; a click shows its knob
+        juce::Slider m_depth;                    ///< how far
+        juce::TextButton m_remove{ "x" };        ///< removes the row
     };
 
-    AdditivProcessor& proc_;                                                    ///< whose engine
-    const frame::ControlActions& actions_;                                      ///< the knobs' menu
-    const ModDock& dock_;                                                       ///< the traces
-    additiv::ModSource source_ = additiv::ModSource::Lfo1;                     ///< the source shown
-    bool overlay_ = false;                                                      ///< over the pages
-    juce::String key_;                                                          ///< the rows as last built
-    juce::Label hint_;                                                          ///< what to do when no row reads it
-    juce::TextButton close_{ "x" };                                             ///< shuts it (over the pages)
-    juce::TextButton matrix_{ "Matrix ..." };                                   ///< the matrix page
-    std::vector<std::unique_ptr<RowUi>> rows_;                                  ///< the rows' controls
-    std::vector<std::unique_ptr<juce::Label>> labels_;                          ///< the own knobs' names
-    std::vector<std::unique_ptr<juce::Component>> controls_;                    ///< the own knobs and choosers
-    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> sliders_;    ///< knobs to parameters (before the knobs go)
-    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> combos_;   ///< choosers to parameters
+    AdditivProcessor& m_proc;                                                    ///< whose engine
+    const frame::ControlActions& m_actions;                                      ///< the knobs' menu
+    const ModDock& m_dock;                                                       ///< the traces
+    additiv::ModSourceE m_source = additiv::ModSourceE::LFO1;                     ///< the source shown
+    bool m_overlay = false;                                                      ///< over the pages
+    juce::String m_key;                                                          ///< the rows as last built
+    juce::Label m_hint;                                                          ///< what to do when no row reads it
+    juce::TextButton m_close{ "x" };                                             ///< shuts it (over the pages)
+    juce::TextButton m_matrix{ "Matrix ..." };                                   ///< the matrix page
+    std::vector<std::unique_ptr<RowUi>> m_rows;                                  ///< the rows' controls
+    std::vector<std::unique_ptr<juce::Label>> m_labels;                          ///< the own knobs' names
+    std::vector<std::unique_ptr<juce::Component>> m_controls;                    ///< the own knobs and choosers
+    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_sliders;    ///< knobs to parameters (before the knobs go)
+    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> m_combos;   ///< choosers to parameters
 };

@@ -10,7 +10,7 @@
 
 namespace additiv {
 
-const char* const kPresetGroupNames[kNumPresetGroups] = {
+const char* const PresetGroupNames[NumPresetGroups] = {
     "Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air & Noise", "Deep Space",
     "Glissandi", "Pendulums", "Waves", "Shepard & Tides", "Shimmer", "Dark Drones", "Microtonal", "Keys",
     "Living Fields", "Turing Gardens", "Synchrony", "Flocks", "Ripples", "Melting Spectra", "Spectral Cascades", "Resonant Halls",
@@ -28,26 +28,26 @@ const char* const kPresetGroupNames[kNumPresetGroups] = {
 
 namespace {
 #include "Presets.inc"
-constexpr int kCount = static_cast<int>(sizeof(kPresets) / sizeof(kPresets[0]));   ///< presets in the table
+constexpr int Count = static_cast<int>(sizeof(Presets) / sizeof(Presets[0]));   ///< presets in the table
 } // namespace
 
-bool keptByPresets(ParamId id)
+bool keptByPresets(ParamIdE id)
 {
-    return id == ParamId::Binaural || id == ParamId::MorphActive || id == ParamId::MorphPos || id == ParamId::PresetGlide
-        || id == ParamId::MapActive || id == ParamId::MapX || id == ParamId::MapY || id == ParamId::MapRadius || id == ParamId::MapGlide
-        || id == ParamId::RouteSpeed || id == ParamId::MpeOn || id == ParamId::MpeBend;   // the player's controller
+    return id == ParamIdE::BINAURAL || id == ParamIdE::MORPH_ACTIVE || id == ParamIdE::MORPH_POS || id == ParamIdE::PRESET_GLIDE
+        || id == ParamIdE::MAP_ACTIVE || id == ParamIdE::MAP_X || id == ParamIdE::MAP_Y || id == ParamIdE::MAP_RADIUS || id == ParamIdE::MAP_GLIDE
+        || id == ParamIdE::ROUTE_SPEED || id == ParamIdE::MPE_ON || id == ParamIdE::MPE_BEND;   // the player's controller
 }
 
-int numPresets() { return kCount; }
+int numPresets() { return Count; }
 
-const Preset& preset(int i) { return kPresets[std::clamp(i, 0, kCount - 1)]; }
+const Preset& preset(int i) { return Presets[std::clamp(i, 0, Count - 1)]; }
 
 int presetValues(int i, float* values, std::string* modText)
 {
-    for (const ParamDesc& d : paramTable()) values[static_cast<size_t>(d.id)] = d.def;
+    for (const ParamDesc& d : paramTable()) values[static_cast<size_t>(d.m_id)] = d.m_def;
     const Preset& p = preset(i);
     int known = 0;
-    const char* s = p.params;
+    const char* s = p.m_params;
     while (*s != 0) {
         while (*s == ' ') ++s;
         const char* eq = std::strchr(s, '=');
@@ -57,36 +57,36 @@ int presetValues(int i, float* values, std::string* modText)
         char key[64] = {};
         std::memcpy(key, s, static_cast<size_t>(std::min<std::ptrdiff_t>(eq - s, 63)));
         if (const ParamDesc* d = findParam(key)) {
-            values[static_cast<size_t>(d->id)] = std::clamp(static_cast<float>(std::atof(eq + 1)), d->min, d->max);
+            values[static_cast<size_t>(d->m_id)] = std::clamp(static_cast<float>(std::atof(eq + 1)), d->m_min, d->m_max);
             ++known;
         }
         s = end;
     }
-    if (modText != nullptr) *modText = p.mod;
+    if (modText != nullptr) *modText = p.m_mod;
     return known;
 }
 
 int presetIndexInGroup(int i)
 {
-    const int g = preset(i).group;
+    const int g = preset(i).m_group;
     int index = 0;
-    for (int k = 0; k < std::clamp(i, 0, kCount - 1); ++k)
-        if (kPresets[k].group == g) ++index;
+    for (int k = 0; k < std::clamp(i, 0, Count - 1); ++k)
+        if (Presets[k].m_group == g) ++index;
     return index;
 }
 
 int findPreset(const char* name)
 {
-    for (int k = 0; k < kCount && name != nullptr; ++k)
-        if (std::strcmp(kPresets[k].name, name) == 0) return k;
+    for (int k = 0; k < Count && name != nullptr; ++k)
+        if (std::strcmp(Presets[k].m_name, name) == 0) return k;
     return -1;
 }
 
 int presetAt(int group, int index)
 {
     int seen = 0;
-    for (int k = 0; k < kCount; ++k)
-        if (kPresets[k].group == group && seen++ == index) return k;
+    for (int k = 0; k < Count; ++k)
+        if (Presets[k].m_group == group && seen++ == index) return k;
     return -1;
 }
 

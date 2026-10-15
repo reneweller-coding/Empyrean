@@ -17,7 +17,7 @@
 class PresetBrowser final : public juce::Component, private juce::ListBoxModel, private juce::TextEditor::Listener {
 public:
     /** @brief A preset taken from the browser: its factory index, or the player's (index into userPresets()). */
-    std::function<void(int factory, int user)> onChoose;
+    std::function<void(int factory, int user)> m_onChoose;
     /** @brief The browser of @p proc's presets. @param proc the processor */
     explicit PresetBrowser(AdditivProcessor& proc);
     /** @brief Lets go of the lists. */
@@ -38,20 +38,20 @@ public:
 private:
     /** @brief One preset as the browser lists it. */
     struct Entry {
-        int factory = -1;          ///< its index in the bank, or -1
-        int user = -1;             ///< its index in the player's, or -1
-        juce::String name;         ///< its name
-        juce::String group;        ///< its group ("Yours" for the player's)
-        int section = 0;           ///< 0 .. 5 the bank's sections, 6 the player's
-        float traits[4] = {};      ///< brightness, motion, width, noise in spreads (the player's: unknown, nought)
-        bool measured = false;     ///< the traits are measured
-        bool hands = false;        ///< made for the hands (the conductor rests)
+        int m_factory = -1;          ///< its index in the bank, or -1
+        int m_user = -1;             ///< its index in the player's, or -1
+        juce::String m_name;         ///< its name
+        juce::String m_group;        ///< its group ("Yours" for the player's)
+        int m_section = 0;           ///< 0 .. 5 the bank's sections, 6 the player's
+        float m_traits[4] = {};      ///< brightness, motion, width, noise in spreads (the player's: unknown, nought)
+        bool m_measured = false;     ///< the traits are measured
+        bool m_hands = false;        ///< made for the hands (the conductor rests)
     };
     /** @brief One category on the left: All, Favourites, Recent, Yours, a section or a group. */
     struct Category {
-        juce::String title;        ///< as listed
-        int kind = 0;              ///< 0 all, 1 favourites, 2 recent, 3 yours, 4 a section, 5 a group
-        int which = 0;             ///< the section's or group's number
+        juce::String m_title;        ///< as listed
+        int m_kind = 0;              ///< 0 all, 1 favourites, 2 recent, 3 yours, 4 a section, 5 a group
+        int m_which = 0;             ///< the section's or group's number
     };
     /** @brief A row of the list: the play mark (held: listen), the star, the name, the group, the traits. */
     class Row;
@@ -79,23 +79,23 @@ private:
     /** @brief Typing filters. */
     void textEditorTextChanged(juce::TextEditor&) override { filter(); }
     /** @brief Return in the search takes the chosen one. */
-    void textEditorReturnKeyPressed(juce::TextEditor&) override { choose(list_.getSelectedRow()); }
+    void textEditorReturnKeyPressed(juce::TextEditor&) override { choose(m_list.getSelectedRow()); }
     /** @brief Esc closes. */
     void textEditorEscapeKeyPressed(juce::TextEditor&) override { close(); }
 
-    AdditivProcessor& proc_;                           ///< whose presets
-    std::vector<Entry> all_;                           ///< every preset
-    std::vector<int> shown_;                           ///< those that pass
-    std::vector<Category> categories_;                 ///< the categories
-    int category_ = 0;                                 ///< the one chosen
-    juce::TextEditor search_;                          ///< by name or group
-    std::unique_ptr<Categories> categoryModel_;        ///< the categories' list's model (made before the list, gone after it)
-    std::unique_ptr<juce::ListBox> categoryList_;      ///< the categories' list
-    std::array<std::unique_ptr<RangeBar>, 4> traits_;  ///< the traits' ranges
-    std::array<juce::Label, 4> traitNames_;            ///< their ends' names
-    juce::ComboBox who_;                               ///< who plays: anyone, the conductor, the hands
-    juce::TextButton take_{ "Take" };                  ///< takes the chosen one
-    juce::TextButton close_{ "Close" };                ///< closes
-    juce::Label count_;                                ///< how many pass
-    juce::ListBox list_;                               ///< the presets that pass
+    AdditivProcessor& m_proc;                           ///< whose presets
+    std::vector<Entry> m_all;                           ///< every preset
+    std::vector<int> m_shown;                           ///< those that pass
+    std::vector<Category> m_categories;                 ///< the categories
+    int m_category = 0;                                 ///< the one chosen
+    juce::TextEditor m_search;                          ///< by name or group
+    std::unique_ptr<Categories> m_categoryModel;        ///< the categories' list's model (made before the list, gone after it)
+    std::unique_ptr<juce::ListBox> m_categoryList;      ///< the categories' list
+    std::array<std::unique_ptr<RangeBar>, 4> m_traits;  ///< the traits' ranges
+    std::array<juce::Label, 4> m_traitNames;            ///< their ends' names
+    juce::ComboBox m_who;                               ///< who plays: anyone, the conductor, the hands
+    juce::TextButton m_take{ "Take" };                  ///< takes the chosen one
+    juce::TextButton m_close{ "Close" };                ///< closes
+    juce::Label m_count;                                ///< how many pass
+    juce::ListBox m_list;                               ///< the presets that pass
 };

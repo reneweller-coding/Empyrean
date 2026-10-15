@@ -60,7 +60,7 @@ public:
     /** @brief The factory presets are the programs. @return their count */
     int getNumPrograms() override;
     /** @brief The preset last applied. @return its index (0 when none was) */
-    int getCurrentProgram() override { return std::max(current_.load(std::memory_order_relaxed), 0); }
+    int getCurrentProgram() override { return std::max(m_current.load(std::memory_order_relaxed), 0); }
     /** @brief Applies a factory preset (message thread). @param index the preset */
     void setCurrentProgram(int index) override { choosePreset(index, false); }   // the host's: not one the player played
     /** @brief A preset's name with its group. @param index the preset @return "Group: Name" */
@@ -74,11 +74,11 @@ public:
     void setStateInformation(const void* data, int size) override;
 
     /** @brief The engine, for the editor's status and pictures. @return the engine */
-    additiv::Engine& engine() { return engine_; }
+    additiv::Engine& engine() { return m_engine; }
     /** @brief A parameter by its ParamId. @param id the parameter's index @return the host parameter, null outside the table */
     juce::RangedAudioParameter* parameter(int id) const
     {
-        return id >= 0 && id < static_cast<int>(params_.size()) ? params_[static_cast<size_t>(id)] : nullptr;
+        return id >= 0 && id < static_cast<int>(m_params.size()) ? m_params[static_cast<size_t>(id)] : nullptr;
     }
     /** @brief A parameter's value in its unit. @param id ParamId @return the value */
     float value(int id) const;
@@ -86,7 +86,7 @@ public:
     void setValue(int id, float v);
 
     /** @brief MIDI learn: the next controller that moves is bound to parameter @p id. @param id ParamId */
-    void learn(int id) { learning_.store(id, std::memory_order_relaxed); }
+    void learn(int id) { m_learning.store(id, std::memory_order_relaxed); }
     /** @brief The controller bound to a parameter. @param id ParamId @return 0 .. 127, -1 none */
     int controllerFor(int id) const;
     /** @brief Unbinds a parameter's controller. @param id ParamId */
@@ -94,7 +94,7 @@ public:
     /** @brief A parameter back to its default. @param id ParamId */
     void resetToDefault(int id);
     /** @brief Whether a learn is waiting for its controller. @return the parameter waiting, -1 none */
-    int learning() const { return learning_.load(std::memory_order_relaxed); }
+    int learning() const { return m_learning.load(std::memory_order_relaxed); }
 
     /**
      * @brief Applies a factory preset: every parameter to the preset's value (its default where the
@@ -127,7 +127,7 @@ public:
     /** @brief A slot takes a factory preset. @param slot 0 or 1 @param index the preset */
     void setSlotFromPreset(int slot, int index);
     /** @brief What a slot holds, in words. @param slot 0 or 1 @return a preset's name, "the sound of ...", or "empty" */
-    juce::String slotName(int slot) const { return slotNames_[slot & 1].isEmpty() ? juce::String("empty") : slotNames_[slot & 1]; }
+    juce::String slotName(int slot) const { return m_slotNames[slot & 1].isEmpty() ? juce::String("empty") : m_slotNames[slot & 1]; }
     /** @} */
 
     /** @name The player's own landscape @{ */
@@ -141,11 +141,11 @@ public:
      */
     bool loadLandscape(const juce::File& file, bool letItSound, juce::String* error);
     /** @brief The player's own landscape (empty when none). Message thread. @return it */
-    const additiv::Landscape& userLandscape() const { return userLand_; }
+    const additiv::Landscape& userLandscape() const { return m_userLand; }
     /** @brief Bumped whenever the player's landscape changes (for the picture). @return the count */
-    int userLandscapeVersion() const { return userLandVersion_; }
+    int userLandscapeVersion() const { return m_userLandVersion; }
     /** @brief The file the player's landscape came from. @return it, or an empty File */
-    juce::File userLandscapeFile() const { return userLandFile_; }
+    juce::File userLandscapeFile() const { return m_userLandFile; }
     /** @} */
 
     /** @name The preset map (PresetMap.h) and its routes (Route.h) @{ */
@@ -154,29 +154,29 @@ public:
     /** @brief The preset nearest a place on the map. @param x across @param y up @return its index */
     int nearestPreset(float x, float y) const;
     /** @brief The route being played or written. @return it */
-    const additiv::Route& route() const { return route_; }
+    const additiv::Route& route() const { return m_route; }
     /** @brief Its name (a built-in's, a file's, or empty). @return the name */
-    juce::String routeName() const { return routeName_; }
+    juce::String routeName() const { return m_routeName; }
     /** @brief A route to choose: one that comes with the instrument, or a file of the player's. */
     struct RouteEntry {
-        juce::String name;    ///< as the list shows it
-        int builtin = -1;     ///< the built-in route, -1 for a file
-        juce::File file;      ///< the file, for the player's own
+        juce::String m_name;    ///< as the list shows it
+        int m_builtin = -1;     ///< the built-in route, -1 for a file
+        juce::File m_file;      ///< the file, for the player's own
     };
     /** @brief Where the player's routes live: Documents/Empyrean/Routes. @return the folder */
     static juce::File routeFolder();
     /** @name The player's own presets (Documents/Empyrean/Presets) @{ */
     /** @brief One of the player's presets. */
     struct UserPreset {
-        juce::String name;            ///< its name (its file's)
-        std::vector<float> values;    ///< its knobs, kNumParams values (those it does not name at their defaults)
-        std::string mod;              ///< its matrix
-        juce::File file;              ///< its file
+        juce::String m_name;            ///< its name (its file's)
+        std::vector<float> m_values;    ///< its knobs, NumParams values (those it does not name at their defaults)
+        std::string m_mod;              ///< its matrix
+        juce::File m_file;              ///< its file
     };
     /** @brief Where the player's presets live: Documents/Empyrean/Presets. @return the folder */
     static juce::File presetFolder();
     /** @brief The player's presets as last read from the folder, by name. @return them */
-    const std::vector<UserPreset>& userPresets() const { return userPresets_; }
+    const std::vector<UserPreset>& userPresets() const { return m_userPresets; }
     /** @brief Reads the folder again. */
     void refreshUserPresets();
     /**
@@ -192,9 +192,9 @@ public:
     /** @brief One of the player's presets by name. @param name its name @return its index, -1 none */
     int findUserPreset(const juce::String& name) const;
     /** @brief The player's preset playing, by name ("" when a factory one is, or none). @return it */
-    juce::String currentUserPreset() const { return currentUser_; }
-    /** @brief The knobs of the preset the sound came from (what "changed" is measured against). @return kNumParams values, empty before any */
-    const std::vector<float>& reference() const { return reference_; }
+    juce::String currentUserPreset() const { return m_currentUser; }
+    /** @brief The knobs of the preset the sound came from (what "changed" is measured against). @return NumParams values, empty before any */
+    const std::vector<float>& reference() const { return m_reference; }
     /** @brief Whether the sound has moved from its preset: a knob a preset sets, or the matrix. @return true then */
     bool modified() const;
     /** @brief Back to the preset the sound came from, gliding over a second. */
@@ -206,12 +206,12 @@ public:
     /** @name Snapshots (the Focus page) @{ */
     /** @brief A moment of the sound kept: its knobs, its matrix, its picture. */
     struct Snapshot {
-        std::vector<float> values;    ///< the knobs, kNumParams values
-        std::string mod;              ///< the matrix
-        juce::Image picture;          ///< the partials as they looked (none after a session was reloaded)
+        std::vector<float> m_values;    ///< the knobs, NumParams values
+        std::string m_mod;              ///< the matrix
+        juce::Image m_picture;          ///< the partials as they looked (none after a session was reloaded)
     };
     /** @brief The snapshots, the oldest first (at most eight). @return them */
-    const std::vector<Snapshot>& snapshots() const { return snapshots_; }
+    const std::vector<Snapshot>& snapshots() const { return m_snapshots; }
     /** @brief Keeps the sound now (the oldest gives way to a ninth). @param picture what the partials look like */
     void takeSnapshot(const juce::Image& picture);
     /** @brief Back to a snapshot, gliding over a second. @param i which */
@@ -230,7 +230,7 @@ public:
     /** @brief Back to the sound before the listening, gliding. */
     void endPreview();
     /** @brief Whether a preset is being listened to. @return true then */
-    bool previewingPreset() const { return browsing_; }
+    bool previewingPreset() const { return m_browsing; }
     /** @brief Whether a preset is one of the player's favourites. @param name its name @return true then */
     bool favorite(const juce::String& name) const;
     /** @brief Marks or unmarks a favourite. @param name its name @param on marked */
@@ -242,18 +242,18 @@ public:
     /** @} */
 
     /** @name The Focus page (Focus.h, Find.h) @{ */
-    /** @brief The knobs as they stand. @return kNumParams values */
+    /** @brief The knobs as they stand. @return NumParams values */
     std::vector<float> knobValues() const;
     /**
      * @brief Sets the knobs a preset sets (the listener's stay), the engine gliding there.
-     * @param v      kNumParams values
+     * @param v      NumParams values
      * @param glide  seconds (0: at once)
      */
     void applyValues(const std::vector<float>& v, double glide);
     /**
      * @brief A nudge: every heard shaping knob a little towards brighter, livelier, wider or airier (or
      *        the other way), the level held.
-     * @param axis  0 .. kNudgeAxes-1
+     * @param axis  0 .. NudgeAxes-1
      * @param sign  +1 or -1
      * @return      the predicted change, in spreads of the measure
      */
@@ -261,11 +261,11 @@ public:
     /** @brief Six variations around the sound now (Focus.h vary). @param far how far, 0 .. 1 */
     void makeVariations(float far);
     /** @brief How many variations there are. @return 0 or 6 */
-    int variationCount() const { return static_cast<int>(variations_.size()); }
+    int variationCount() const { return static_cast<int>(m_variations.size()); }
     /** @brief Listens to a variation, gliding there (-1: back to the sound before, gliding). @param k which */
     void previewVariation(int k);
     /** @brief Which variation is being listened to. @return it, -1 none */
-    int previewing() const { return previewing_; }
+    int previewing() const { return m_previewing; }
     /** @brief Keeps a variation: it becomes the sound, and the next six are made around it. @param k which */
     void takeVariation(int k);
     /** @brief Back to the sound before the last variation kept, and six around it. @return false when there is none */
@@ -273,9 +273,9 @@ public:
     /** @brief What a variation changes most, in words. @param k which @return the text */
     juce::String variationSummary(int k) const;
     /** @brief The sound the variations were made around (empty before the first). @return its values */
-    const std::vector<float>& variationParent() const { return parent_; }
+    const std::vector<float>& variationParent() const { return m_parent; }
     /** @brief How often the variations were made anew (a page sees new ones by it). @return the count */
-    int variationGeneration() const { return variationGeneration_; }
+    int variationGeneration() const { return m_variationGeneration; }
     /** @brief Whether they can be made now without leaving a blend (the map, the morph). @return true then */
     bool variationsFree() const;
     /**
@@ -285,7 +285,7 @@ public:
      */
     void compareWithPreset(bool on);
     /** @brief Whether the preset is being compared with. @return true then */
-    bool comparing() const { return comparing_; }
+    bool comparing() const { return m_comparing; }
     /**
      * @brief The output's peaks since the last look, per side (the meter in the header); they reset as they are read.
      * @param left   receives the left side's
@@ -293,8 +293,8 @@ public:
      */
     void takePeaks(float& left, float& right)
     {
-        left = peak_[0].exchange(0.0f, std::memory_order_relaxed);
-        right = peak_[1].exchange(0.0f, std::memory_order_relaxed);
+        left = m_peak[0].exchange(0.0f, std::memory_order_relaxed);
+        right = m_peak[1].exchange(0.0f, std::memory_order_relaxed);
     }
     /** @brief Begins to teach a macro: the sound now is its place at its value now. @param m 0 .. 3 */
     void teachBegin(int m);
@@ -310,9 +310,9 @@ public:
     /** @brief Ends a teaching without a new place: the knobs back where it began, the lesson as it was. @param m 0 .. 3 */
     void teachCancel(int m);
     /** @brief Whether a macro has a lesson (two places at least). @param m 0 .. 3 @return true then */
-    bool taught(int m) const { return m >= 0 && m < 4 && lessons_[static_cast<size_t>(m)].count >= 2; }
+    bool taught(int m) const { return m >= 0 && m < 4 && m_lessons[static_cast<size_t>(m)].m_count >= 2; }
     /** @brief Whether a macro is being taught. @param m 0 .. 3 @return true then */
-    bool teaching(int m) const { return m >= 0 && m < 4 && !teachBase_[static_cast<size_t>(m)].empty(); }
+    bool teaching(int m) const { return m >= 0 && m < 4 && !m_teachBase[static_cast<size_t>(m)].empty(); }
     /**
      * @brief A macro's name: what it moves most -- the knob its lesson moves furthest, or the target of
      *        its strongest matrix row ("Motion Depth"), "and n more" when it moves several; "Macro n" when
@@ -331,9 +331,9 @@ public:
      */
     bool findLike(const juce::File& file, juce::String& why);
     /** @brief The presets the last search found, nearest first. @return them */
-    const std::vector<int>& found() const { return found_; }
+    const std::vector<int>& found() const { return m_found; }
     /** @brief Their distances, in spreads. @return them */
-    const std::vector<float>& foundDistance() const { return foundDistance_; }
+    const std::vector<float>& foundDistance() const { return m_foundDistance; }
     /** @} */
 
     /** @brief Where the player's halls live: Documents/Empyrean/Halls. @return the folder */
@@ -345,7 +345,7 @@ public:
     /** @brief A new hall: everything it has heard forgotten. */
     void newHall();
     /** @brief The hall's name: the file it was last loaded from or saved to, empty for one never saved. @return the name */
-    juce::String hallName() const { return hallName_; }
+    juce::String hallName() const { return m_hallName; }
     /** @brief The routes to choose from: the built-ins, then the player's files. @return them */
     std::vector<RouteEntry> routes() const;
     /** @brief Loads a route (it does not start). @param entry which @return false when it cannot be read */
@@ -353,21 +353,21 @@ public:
     /** @brief Starts the route from where the cursor is (the map on; a journey stops). @return false when it is empty */
     bool startRoute();
     /** @brief Stops the route; the cursor stays. */
-    void stopRoute() { route_.stop(); }
+    void stopRoute() { m_route.stop(); }
     /** @brief Whether a route is being walked. @return true then */
-    bool routeRunning() const { return route_.running(); }
+    bool routeRunning() const { return m_route.running(); }
     /** @brief Whether the route starts over after its last point. @return true then */
-    bool routeLoop() const { return routeLoop_; }
+    bool routeLoop() const { return m_routeLoop; }
     /** @brief Sets whether it loops (from the next start). @param on loop */
-    void setRouteLoop(bool on) { routeLoop_ = on; }
+    void setRouteLoop(bool on) { m_routeLoop = on; }
     /** @brief Appends a waypoint: a preset's place (index >= 0) or a free one. @param x across @param y up @param preset the preset, -1 none */
     void addWaypoint(float x, float y, int preset);
     /** @brief Changes a waypoint (its times, its radius). @param i which @param w the point */
-    void setWaypoint(int i, const additiv::Waypoint& w) { route_.set(i, w); }
+    void setWaypoint(int i, const additiv::Waypoint& w) { m_route.set(i, w); }
     /** @brief Removes a waypoint. @param i which */
-    void removeWaypoint(int i) { route_.remove(i); }
+    void removeWaypoint(int i) { m_route.remove(i); }
     /** @brief Empties the route. */
-    void clearRoute() { route_.clear(); routeName_.clear(); }
+    void clearRoute() { m_route.clear(); m_routeName.clear(); }
     /** @brief Writes the route to a file (one waypoint a line). @param file where @return false when it cannot */
     bool saveRoute(const juce::File& file);
     /** @brief The route under way in words, empty when none is. @return the text */
@@ -377,9 +377,9 @@ public:
     /** @name Journeys (Journey.h) @{ */
     /** @brief A journey to choose: one that comes with the instrument, or a file of the player's. */
     struct JourneyEntry {
-        juce::String name;    ///< as the box shows it
-        int builtin = -1;     ///< the built-in journey, -1 for a file
-        juce::File file;      ///< the file, for the player's own
+        juce::String m_name;    ///< as the box shows it
+        int m_builtin = -1;     ///< the built-in journey, -1 for a file
+        juce::File m_file;      ///< the file, for the player's own
     };
     /** @brief Where the player's journeys live: Documents/Empyrean/Journeys. @return the folder */
     static juce::File journeyFolder();
@@ -388,40 +388,40 @@ public:
     /** @brief Starts a journey from its first step (the A/B morph lets go: it would hold the sound). @param entry which @return false when it cannot be read or names no known preset */
     bool startJourney(const JourneyEntry& entry);
     /** @brief Stops the journey; the preset playing stays. */
-    void stopJourney() { journeyPlayer_.stop(); }
+    void stopJourney() { m_journeyPlayer.stop(); }
     /** @brief The journey's clock: running, its step, the seconds left in it, the journey (the timeline). @return it */
-    const additiv::JourneyPlayer& journeyPlayer() const { return journeyPlayer_; }
+    const additiv::JourneyPlayer& journeyPlayer() const { return m_journeyPlayer; }
     /** @brief Reads a journey without starting it (the timeline's preview). @param entry which @param out receives it @return false when it cannot be read */
     static bool readJourney(const JourneyEntry& entry, additiv::Journey& out)
     {
-        const bool read = entry.builtin >= 0 ? out.parse(additiv::builtinJourneyText(entry.builtin)) : out.load(entry.file.getFullPathName().toRawUTF8());
-        if (read && out.name.empty()) out.name = entry.name.toStdString();
-        return read && !out.steps.empty();
+        const bool read = entry.m_builtin >= 0 ? out.parse(additiv::builtinJourneyText(entry.m_builtin)) : out.load(entry.m_file.getFullPathName().toRawUTF8());
+        if (read && out.m_name.empty()) out.m_name = entry.m_name.toStdString();
+        return read && !out.m_steps.empty();
     }
     /** @brief The journey under way in words (name, step, preset, time left), empty when none is. @return the text */
     juce::String journeyStatus() const;
     /** @brief Appends the preset playing to the journey being written. */
     void journeyAddCurrent();
     /** @brief How many presets the journey being written has. @return the count */
-    int journeyDraftSteps() const { return static_cast<int>(draft_.steps.size()); }
+    int journeyDraftSteps() const { return static_cast<int>(m_draft.m_steps.size()); }
     /** @brief The journey being written (the timeline edits it). @return it */
-    const additiv::Journey& journeyDraft() const { return draft_; }
+    const additiv::Journey& journeyDraft() const { return m_draft; }
     /** @brief The journey being written, replaced (a step moved, longer, gone; or a copy of another to edit). @param j the journey */
-    void setJourneyDraft(const additiv::Journey& j) { draft_ = j; }
+    void setJourneyDraft(const additiv::Journey& j) { m_draft = j; }
     /** @brief The journey under way goes on from another step, gliding into it as into any. @param step its index */
     void skipJourneyTo(int step);
     /** @brief Writes the journey being written to a file (named after it when it has no name). @param file where @return false when it cannot */
     bool saveJourneyDraft(const juce::File& file);
     /** @} */
     /** @brief The preset last applied. @return its index, -1 none */
-    int currentPreset() const { return current_.load(std::memory_order_relaxed); }
+    int currentPreset() const { return m_current.load(std::memory_order_relaxed); }
 
     /** @brief The family jam's line for the settings menu. @return who leads, who follows, what is heard */
-    juce::String jamStatus() const { return jam_.status(); }
+    juce::String jamStatus() const { return m_jam.status(); }
     /** @brief Why the GPU engine did not open, for the status line. @return the reason, empty when it runs */
-    juce::String engineError() const { const std::lock_guard<std::mutex> lock(errorLock_); return juce::String(engineError_); }
+    juce::String engineError() const { const std::lock_guard<std::mutex> lock(m_errorLock); return juce::String(m_engineError); }
     /** @brief The hands arriving from a Quest app in bridge mode. @return the headset */
-    frame::Headset& headset() { return headset_; }
+    frame::Headset& headset() { return m_headset; }
     /**
      * @brief A key played from the panel (the canvas's spectrum), as if from a keyboard on channel 1.
      *        Message thread.
@@ -430,18 +430,18 @@ public:
      */
     void tapNote(int note, float velocity)
     {
-        if (velocity > 0.0f) taps_.noteOn(1, note, velocity);
-        else taps_.noteOff(1, note, 0.0f);
+        if (velocity > 0.0f) m_taps.noteOn(1, note, velocity);
+        else m_taps.noteOff(1, note, 0.0f);
     }
-    static constexpr const char* kApp = "Empyrean";   ///< the settings' and the jam's name
+    static constexpr const char* App = "Empyrean";   ///< the settings' and the jam's name
 
 private:
-    additiv::Engine engine_;                               ///< the instrument
-    std::vector<juce::RangedAudioParameter*> params_;      ///< the host's parameters, index = ParamId
-    std::vector<float> pushed_;                            ///< the value last handed to the engine, per parameter
-    juce::AudioBuffer<float> spare_;                       ///< a right channel when the host gives only one
-    std::array<std::atomic<int>, 128> ccMap_;              ///< per controller the parameter it moves, -1 none
-    std::atomic<int> learning_{ -1 };                      ///< the parameter waiting for a controller, -1 none
+    additiv::Engine m_engine;                               ///< the instrument
+    std::vector<juce::RangedAudioParameter*> m_params;      ///< the host's parameters, index = ParamId
+    std::vector<float> m_pushed;                            ///< the value last handed to the engine, per parameter
+    juce::AudioBuffer<float> m_spare;                       ///< a right channel when the host gives only one
+    std::array<std::atomic<int>, 128> m_ccMap;              ///< per controller the parameter it moves, -1 none
+    std::atomic<int> m_learning{ -1 };                      ///< the parameter waiting for a controller, -1 none
     /** @brief Applies a program change that came from MIDI (message thread). */
     void handleAsyncUpdate() override;
     /** @brief The jam's role from the settings, and the headset's hands, thirty times a second (message thread). */
@@ -461,75 +461,75 @@ private:
     /** @brief The map and the A/B morph let go (the map onto its nearest preset): a nudge, a variation or a lesson starts from knobs that sound. */
     void stepOutOfBlends();
 
-    frame::JamBus jam_{ kApp };                            ///< the family jam's bus
-    frame::Headset headset_;                               ///< the hands from the Quest app (bridge mode)
-    int jamPostedRoot_ = -1;                               ///< leading: the root posted last
-    int jamPostedScale_ = -1;                              ///< leading: the scale posted last
+    frame::JamBus m_jam{ App };                            ///< the family jam's bus
+    frame::Headset m_headset;                               ///< the hands from the Quest app (bridge mode)
+    int m_jamPostedRoot = -1;                               ///< leading: the root posted last
+    int m_jamPostedScale = -1;                              ///< leading: the scale posted last
 
-    std::atomic<int> current_{ -1 };                       ///< the preset last applied, -1 none
-    juce::String slotNames_[2];                            ///< what the morph's slots hold, in words
-    std::vector<float> slotValues_[2];                     ///< the slots' parameters (for the state), empty when unset
-    std::string slotMods_[2];                              ///< the slots' matrices (for the state)
-    additiv::Journey journey_;                             ///< the journey under way
-    additiv::JourneyPlayer journeyPlayer_;                 ///< its clock and step
-    double journeyLastTick_ = 0.0;                         ///< seconds of the last tick, 0 before the first
-    additiv::Journey draft_;                               ///< the journey being written
-    additiv::Landscape userLand_;                          ///< the player's own landscape, as read
-    additiv::MapBlender blender_;                          ///< the map's blend (keeps the presets it has read)
-    float mapX_ = -1.0f;                                   ///< the cursor last blended at, across (-1: none yet)
-    float mapY_ = -1.0f;                                   ///< likewise, up
-    float mapR_ = -1.0f;                                   ///< likewise, the radius
-    bool mapOnWas_ = false;                                ///< the map was on at the last tick
-    double mapLastTick_ = 0.0;                             ///< seconds of the last map tick
-    additiv::Route route_;                                 ///< the route being played or written
-    bool routeLoop_ = true;                                ///< it starts over after its last point
-    juce::String routeName_;                               ///< its name
-    juce::String hallName_;   ///< the hall's name (hallName())
-    std::vector<std::vector<float>> variations_;           ///< the six variations, each kNumParams values
-    std::vector<float> parent_;                            ///< the sound they were made around
-    std::vector<std::vector<float>> parents_;              ///< the sounds before, for Back
-    std::vector<float> previewFrom_;                       ///< the sound before a variation was listened to
-    int previewing_ = -1;                                  ///< the variation listened to, -1 none
-    float varFar_ = 0.3f;                                  ///< how far the last variations went
-    std::uint64_t varSeed_ = 1;                            ///< their dice
-    std::array<additiv::MacroLesson, 4> lessons_{};        ///< what each macro was taught
-    std::array<std::vector<float>, 4> teachBase_{};        ///< per macro the knobs when its teaching began (empty: not teaching)
-    std::vector<UserPreset> userPresets_;                  ///< the player's presets (refreshUserPresets)
-    std::vector<Snapshot> snapshots_;                      ///< the snapshots, the oldest first
-    std::unique_ptr<juce::PropertiesFile> userSettings_;   ///< favourites, recent, night mode, the tour (userSettings)
-    std::vector<float> browseFrom_;                        ///< the knobs before a preset was listened to
-    std::string browseFromMod_;                            ///< and the matrix
-    bool browsing_ = false;                                ///< a preset is being listened to
-    int variationGeneration_ = 0;                          ///< variationGeneration()
-    std::vector<float> compareFrom_;                       ///< the knobs while the preset is compared with
-    std::string compareFromMod_;                           ///< and the matrix
-    bool comparing_ = false;                               ///< the preset is being compared with
-    std::array<std::atomic<float>, 2> peak_{};             ///< the output's peaks since the last look (takePeaks)
+    std::atomic<int> m_current{ -1 };                       ///< the preset last applied, -1 none
+    juce::String m_slotNames[2];                            ///< what the morph's slots hold, in words
+    std::vector<float> m_slotValues[2];                     ///< the slots' parameters (for the state), empty when unset
+    std::string m_slotMods[2];                              ///< the slots' matrices (for the state)
+    additiv::Journey m_journey;                             ///< the journey under way
+    additiv::JourneyPlayer m_journeyPlayer;                 ///< its clock and step
+    double m_journeyLastTick = 0.0;                         ///< seconds of the last tick, 0 before the first
+    additiv::Journey m_draft;                               ///< the journey being written
+    additiv::Landscape m_userLand;                          ///< the player's own landscape, as read
+    additiv::MapBlender m_blender;                          ///< the map's blend (keeps the presets it has read)
+    float m_mapX = -1.0f;                                   ///< the cursor last blended at, across (-1: none yet)
+    float m_mapY = -1.0f;                                   ///< likewise, up
+    float m_mapR = -1.0f;                                   ///< likewise, the radius
+    bool m_mapOnWas = false;                                ///< the map was on at the last tick
+    double m_mapLastTick = 0.0;                             ///< seconds of the last map tick
+    additiv::Route m_route;                                 ///< the route being played or written
+    bool m_routeLoop = true;                                ///< it starts over after its last point
+    juce::String m_routeName;                               ///< its name
+    juce::String m_hallName;   ///< the hall's name (hallName())
+    std::vector<std::vector<float>> m_variations;           ///< the six variations, each NumParams values
+    std::vector<float> m_parent;                            ///< the sound they were made around
+    std::vector<std::vector<float>> m_parents;              ///< the sounds before, for Back
+    std::vector<float> m_previewFrom;                       ///< the sound before a variation was listened to
+    int m_previewing = -1;                                  ///< the variation listened to, -1 none
+    float m_varFar = 0.3f;                                  ///< how far the last variations went
+    std::uint64_t m_varSeed = 1;                            ///< their dice
+    std::array<additiv::MacroLesson, 4> m_lessons{};        ///< what each macro was taught
+    std::array<std::vector<float>, 4> m_teachBase{};        ///< per macro the knobs when its teaching began (empty: not teaching)
+    std::vector<UserPreset> m_userPresets;                  ///< the player's presets (refreshUserPresets)
+    std::vector<Snapshot> m_snapshots;                      ///< the snapshots, the oldest first
+    std::unique_ptr<juce::PropertiesFile> m_userSettings;   ///< favourites, recent, night mode, the tour (userSettings)
+    std::vector<float> m_browseFrom;                        ///< the knobs before a preset was listened to
+    std::string m_browseFromMod;                            ///< and the matrix
+    bool m_browsing = false;                                ///< a preset is being listened to
+    int m_variationGeneration = 0;                          ///< variationGeneration()
+    std::vector<float> m_compareFrom;                       ///< the knobs while the preset is compared with
+    std::string m_compareFromMod;                           ///< and the matrix
+    bool m_comparing = false;                               ///< the preset is being compared with
+    std::array<std::atomic<float>, 2> m_peak{};             ///< the output's peaks since the last look (takePeaks)
     /** @brief A preset chosen by the player goes on the recent list. @param name its name */
     void noteRecent(const juce::String& name);
     /** @brief Knobs and matrix applied for listening (no reference, no recent). @param v the knobs @param mod the matrix */
     void previewValues(const std::vector<float>& v, const std::string& mod);
-    juce::String currentUser_;                             ///< the player's preset playing, "" none
-    std::vector<float> reference_;                         ///< the knobs of the preset the sound came from
-    std::string referenceMod_;                             ///< and its matrix, as the engine writes it
+    juce::String m_currentUser;                             ///< the player's preset playing, "" none
+    std::vector<float> m_reference;                         ///< the knobs of the preset the sound came from
+    std::string m_referenceMod;                             ///< and its matrix, as the engine writes it
     /** @brief The sound now is what "changed" is measured against (after a preset arrives or is saved). */
     void setReference();
     /** @brief One of the player's presets applied (no journey or morph let go). @param i its index @param glide seconds, -1: Preset Glide */
     void applyUserPreset(int i, double glide);
-    std::vector<int> found_;                               ///< the last search's presets
-    std::vector<float> foundDistance_;                     ///< and their distances
-    juce::File userLandFile_;                              ///< where it came from
-    int userLandVersion_ = 0;                              ///< bumped when it changes
-    mutable std::mutex errorLock_;                         ///< guards engineError_ (set by prepareToPlay, read by the editor)
-    std::string engineError_;                              ///< why the engine did not open, empty when it runs
-    const bool muted_ = juce::SystemStats::getEnvironmentVariable("ADDITIV_MUTE", {}).isNotEmpty();   ///< ADDITIV_MUTE: silent output
-    std::atomic<int> pendingProgram_{ -1 };                ///< a MIDI program change waiting for the message thread
-    int bankGroup_ = 0;                                    ///< the group bank select (CC 0) chose
-    bool sustain_ = false;                                 ///< the hold pedal (CC 64) is down
-    juce::MidiKeyboardState taps_;                         ///< keys the picture plays (the canvas), merged into the block's MIDI
-    std::bitset<128> held_;                                ///< notes let go while the pedal was down, released with it
-    float masterBend_ = 2.0f;                              ///< MPE: the master channel's bend range, semitones (its RPN 0)
-    int rpn_[16] = { 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF,
+    std::vector<int> m_found;                               ///< the last search's presets
+    std::vector<float> m_foundDistance;                     ///< and their distances
+    juce::File m_userLandFile;                              ///< where it came from
+    int m_userLandVersion = 0;                              ///< bumped when it changes
+    mutable std::mutex m_errorLock;                         ///< guards m_engineError (set by prepareToPlay, read by the editor)
+    std::string m_engineError;                              ///< why the engine did not open, empty when it runs
+    const bool m_muted = juce::SystemStats::getEnvironmentVariable("ADDITIV_MUTE", {}).isNotEmpty();   ///< ADDITIV_MUTE: silent output
+    std::atomic<int> m_pendingProgram{ -1 };                ///< a MIDI program change waiting for the message thread
+    int m_bankGroup = 0;                                    ///< the group bank select (CC 0) chose
+    bool m_sustain = false;                                 ///< the hold pedal (CC 64) is down
+    juce::MidiKeyboardState m_taps;                         ///< keys the picture plays (the canvas), merged into the block's MIDI
+    std::bitset<128> m_held;                                ///< notes let go while the pedal was down, released with it
+    float m_masterBend = 2.0f;                              ///< MPE: the master channel's bend range, semitones (its RPN 0)
+    int m_rpn[16] = { 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF,
                      0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF, 0x3FFF };   ///< each channel's chosen RPN (CC 101 and 100), 0x3FFF none
     /**
      * @brief MPE's controllers on a channel: the RPN chosen (CC 101 / 100), and its value (CC 6):

@@ -8,18 +8,18 @@
 
 Tour::Tour()
 {
-    next_.onClick = [this] { next(); };
-    skip_.onClick = [this] { finish(); };
-    addAndMakeVisible(next_);
-    addAndMakeVisible(skip_);
+    m_next.onClick = [this] { next(); };
+    m_skip.onClick = [this] { finish(); };
+    addAndMakeVisible(m_next);
+    addAndMakeVisible(m_skip);
     setInterceptsMouseClicks(true, true);
 }
 
 void Tour::start(std::vector<Step> steps)
 {
-    steps_ = std::move(steps);
-    at_ = 0;
-    if (steps_.empty()) return;
+    m_steps = std::move(steps);
+    m_at = 0;
+    if (m_steps.empty()) return;
     setVisible(true);
     toFront(true);
     resized();
@@ -28,7 +28,7 @@ void Tour::start(std::vector<Step> steps)
 
 void Tour::next()
 {
-    if (++at_ >= steps_.size()) { finish(); return; }
+    if (++m_at >= m_steps.size()) { finish(); return; }
     resized();
     repaint();
 }
@@ -36,14 +36,14 @@ void Tour::next()
 void Tour::finish()
 {
     setVisible(false);
-    steps_.clear();
-    if (onDone) onDone();
+    m_steps.clear();
+    if (m_onDone) m_onDone();
 }
 
 juce::Rectangle<int> Tour::hole() const
 {
-    if (at_ >= steps_.size() || steps_[at_].target == nullptr) return {};
-    return getLocalArea(steps_[at_].target.getComponent(), steps_[at_].target->getLocalBounds()).expanded(6);
+    if (m_at >= m_steps.size() || m_steps[m_at].m_target == nullptr) return {};
+    return getLocalArea(m_steps[m_at].m_target.getComponent(), m_steps[m_at].m_target->getLocalBounds()).expanded(6);
 }
 
 juce::Rectangle<int> Tour::bubble() const
@@ -59,15 +59,15 @@ juce::Rectangle<int> Tour::bubble() const
 void Tour::resized()
 {
     const auto b = bubble();
-    next_.setButtonText(at_ + 1 >= steps_.size() ? "Done" : "Next");
-    next_.setBounds(b.getRight() - 92, b.getBottom() - 36, 80, 26);
-    skip_.setBounds(b.getRight() - 180, b.getBottom() - 36, 80, 26);
-    skip_.setVisible(at_ + 1 < steps_.size());
+    m_next.setButtonText(m_at + 1 >= m_steps.size() ? "Done" : "Next");
+    m_next.setBounds(b.getRight() - 92, b.getBottom() - 36, 80, 26);
+    m_skip.setBounds(b.getRight() - 180, b.getBottom() - 36, 80, 26);
+    m_skip.setVisible(m_at + 1 < m_steps.size());
 }
 
 void Tour::paint(juce::Graphics& g)
 {
-    if (at_ >= steps_.size()) return;
+    if (m_at >= m_steps.size()) return;
     const frame::Skin& skin = additivui::skin();
     const auto h = hole();
     // The window dimmed, the control left bright.
@@ -75,26 +75,26 @@ void Tour::paint(juce::Graphics& g)
     dim.addRectangle(getLocalBounds().toFloat());
     if (!h.isEmpty()) dim.addRoundedRectangle(h.toFloat(), 8.0f);
     dim.setUsingNonZeroWinding(false);
-    g.setColour(skin.bg.withAlpha(0.72f));
+    g.setColour(skin.m_bg.withAlpha(0.72f));
     g.fillPath(dim);
     if (!h.isEmpty()) {
-        g.setColour(skin.accent);
+        g.setColour(skin.m_accent);
         g.drawRoundedRectangle(h.toFloat(), 8.0f, 2.0f);
     }
     const auto b = bubble().toFloat();
-    g.setColour(skin.group);
+    g.setColour(skin.m_group);
     g.fillRoundedRectangle(b, 8.0f);
-    g.setColour(skin.accent.withAlpha(0.7f));
+    g.setColour(skin.m_accent.withAlpha(0.7f));
     g.drawRoundedRectangle(b.reduced(0.5f), 8.0f, 1.2f);
-    const Step& s = steps_[at_];
-    g.setColour(skin.accent);
+    const Step& s = m_steps[m_at];
+    g.setColour(skin.m_accent);
     g.setFont(juce::FontOptions(15.0f, juce::Font::bold));
-    g.drawText(s.title, b.reduced(14.0f, 10.0f).withHeight(22.0f), juce::Justification::centredLeft);
-    g.setColour(skin.dim);
+    g.drawText(s.m_title, b.reduced(14.0f, 10.0f).withHeight(22.0f), juce::Justification::centredLeft);
+    g.setColour(skin.m_dim);
     g.setFont(juce::FontOptions(11.0f));
-    g.drawText(juce::String(static_cast<int>(at_) + 1) + " / " + juce::String(static_cast<int>(steps_.size())), b.reduced(14.0f, 10.0f).withHeight(22.0f),
+    g.drawText(juce::String(static_cast<int>(m_at) + 1) + " / " + juce::String(static_cast<int>(m_steps.size())), b.reduced(14.0f, 10.0f).withHeight(22.0f),
                juce::Justification::centredRight);
-    g.setColour(skin.ink);
+    g.setColour(skin.m_ink);
     g.setFont(juce::FontOptions(13.0f));
-    g.drawFittedText(s.text, b.reduced(14.0f, 10.0f).withTrimmedTop(26.0f).withTrimmedBottom(36.0f).toNearestInt(), juce::Justification::topLeft, 4);
+    g.drawFittedText(s.m_text, b.reduced(14.0f, 10.0f).withTrimmedTop(26.0f).withTrimmedBottom(36.0f).toNearestInt(), juce::Justification::topLeft, 4);
 }

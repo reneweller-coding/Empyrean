@@ -20,7 +20,7 @@ public:
     /** @brief The rows' numbers and the column heads. */
     void paint(juce::Graphics& g) override;
     /** @brief The height the rows need in one or two columns. @param columns 1 or 2 @return pixels */
-    static int heightFor(int columns) { return columns == 1 ? 28 + additiv::kModRows * 28 + 4 : 28 + additiv::kModRows / 2 * 30; }
+    static int heightFor(int columns) { return columns == 1 ? 28 + additiv::ModRows * 28 + 4 : 28 + additiv::ModRows / 2 * 30; }
     /** @brief The rows in words, for the help. @return the text */
     juce::String describe() const;
 
@@ -29,18 +29,18 @@ private:
     int columns() const { return getHeight() >= heightFor(1) ? 1 : 2; }
     /** @brief One row's controls. */
     struct Row {
-        juce::ComboBox source;   ///< where from
-        juce::ComboBox target;   ///< what it moves
-        juce::ComboBox via;      ///< a second source scaling the depth (an amount 0 .. 1), "-" none
-        juce::Slider depth;      ///< how far, -1 .. 1
+        juce::ComboBox m_source;   ///< where from
+        juce::ComboBox m_target;   ///< what it moves
+        juce::ComboBox m_via;      ///< a second source scaling the depth (an amount 0 .. 1), "-" none
+        juce::Slider m_depth;      ///< how far, -1 .. 1
     };
     /** @brief Reads the engine's rows into the controls (a preset or a state may have changed them). */
     void timerCallback() override;
     /** @brief Writes one row's controls into the engine. @param i the row */
     void push(int i);
 
-    AdditivProcessor& proc_;                       ///< whose engine
-    std::vector<std::unique_ptr<Row>> rows_;       ///< kModRows of them
-    std::vector<int> targets_;                     ///< the target menu's ParamIds, in its order (item id = index + 2)
-    bool updating_ = false;                        ///< the controls are being set from the engine: push nothing
+    AdditivProcessor& m_proc;                       ///< whose engine
+    std::vector<std::unique_ptr<Row>> m_rows;       ///< ModRows of them
+    std::vector<int> m_targets;                     ///< the target menu's ParamIds, in its order (item id = index + 2)
+    bool m_updating = false;                        ///< the controls are being set from the engine: push nothing
 };

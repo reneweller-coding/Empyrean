@@ -77,11 +77,11 @@ std::string fmt(const char* fmt, ...)
 bool openOffline(Engine& e, bool brain, std::uint64_t seed = 0x5EEDu)
 {
     e.setRealtime(false);
-    e.setParam(ParamId::BrainOn, brain ? 1.0f : 0.0f);
+    e.setParam(ParamIdE::BRAIN_ON, brain ? 1.0f : 0.0f);
     EngineConfig c;
-    c.maxHostBlock = 256;
-    c.realtimeGpuClass = false;
-    c.seed = seed;
+    c.m_maxHostBlock = 256;
+    c.m_realtimeGpuClass = false;
+    c.m_seed = seed;
     std::string error;
     if (e.prepare(c, &error)) return true;
     std::printf("  FAIL  the engine did not prepare: %s\n", error.c_str());
@@ -125,8 +125,8 @@ double rmsDb(const std::vector<float>& lr, size_t from, size_t to)
  */
 void noEffects(Engine& e)
 {
-    for (ParamId id : { ParamId::FarLevel, ParamId::EarlyLevel, ParamId::NearMix, ParamId::DelayMix, ParamId::DelayToFar,
-                        ParamId::Delay2Mix, ParamId::Delay2ToFar, ParamId::ModalLevel, ParamId::FarUnmask })
+    for (ParamIdE id : { ParamIdE::FAR_LEVEL, ParamIdE::EARLY_LEVEL, ParamIdE::NEAR_MIX, ParamIdE::DELAY_MIX, ParamIdE::DELAY_TO_FAR,
+                        ParamIdE::DELAY2_MIX, ParamIdE::DELAY2_TO_FAR, ParamIdE::MODAL_LEVEL, ParamIdE::FAR_UNMASK })
         e.setParam(id, 0.0f);
 }
 
@@ -137,9 +137,9 @@ void noEffects(Engine& e)
 void quietEffects(Engine& e)
 {
     noEffects(e);
-    e.setParam(ParamId::Attack, 0.01f);
-    e.setParam(ParamId::Release, 0.05f);
-    e.setParam(ParamId::Sustain, 1.0f);
+    e.setParam(ParamIdE::ATTACK, 0.01f);
+    e.setParam(ParamIdE::RELEASE, 0.05f);
+    e.setParam(ParamIdE::SUSTAIN, 1.0f);
 }
 
 /**
@@ -195,7 +195,7 @@ std::vector<double> soundingAll(const Engine& e)
 {
     std::vector<double> hz;
     for (int i = 0; i < 16; ++i)
-        if (e.voiceView(i).hz > 0.0f) hz.push_back(e.voiceView(i).hz);
+        if (e.voiceView(i).m_hz > 0.0f) hz.push_back(e.voiceView(i).m_hz);
     std::sort(hz.begin(), hz.end());
     return hz;
 }
@@ -208,7 +208,7 @@ std::vector<double> soundingAll(const Engine& e)
 double soundingHz(const Engine& e)
 {
     for (int i = 0; i < 16; ++i)
-        if (e.voiceView(i).hz > 0.0f) return e.voiceView(i).hz;
+        if (e.voiceView(i).m_hz > 0.0f) return e.voiceView(i).m_hz;
     return 0.0;
 }
 
@@ -220,14 +220,14 @@ int main()
     // 1. The parameter table: in ParamId order, defaults inside their ranges, keys found.
     {
         bool ordered = true, inRange = true;
-        for (int i = 0; i < kNumParams; ++i) {
+        for (int i = 0; i < NumParams; ++i) {
             const ParamDesc& d = paramTable()[static_cast<size_t>(i)];
-            ordered = ordered && static_cast<int>(d.id) == i;
-            inRange = inRange && d.def >= d.min && d.def <= d.max;
+            ordered = ordered && static_cast<int>(d.m_id) == i;
+            inRange = inRange && d.m_def >= d.m_min && d.m_def <= d.m_max;
         }
         const ParamDesc* p = findParam("purity");
-        check(ordered && inRange && p && p->id == ParamId::Purity, "parameter table: order, defaults, keys",
-              fmt("%d parameters", kNumParams));
+        check(ordered && inRange && p && p->m_id == ParamIdE::PURITY, "parameter table: order, defaults, keys",
+              fmt("%d parameters", NumParams));
     }
 
     // 2. The tuning (Noctuary's): the root sounds its tempered pitch, the fifth above it 3/2 of that.
@@ -254,7 +254,7 @@ int main()
     {
         Engine e;
         if (!openOffline(e, false)) return 1;
-        e.setParam(ParamId::Attack, 0.01f);
+        e.setParam(ParamIdE::ATTACK, 0.01f);
         e.noteOn(69, 1.0f, 37);
         const std::vector<float> lr = render(e, 1.0);
         size_t first = lr.size();
@@ -271,7 +271,7 @@ int main()
         for (std::vector<float>* dst : { &a, &b }) {
             Engine e;
             if (!openOffline(e, true, 42)) return 1;
-            e.setParam(ParamId::AutoRate, 5.0f);
+            e.setParam(ParamIdE::AUTO_RATE, 5.0f);
             *dst = render(e, 20.0);
         }
         const bool same = a.size() == b.size() && std::memcmp(a.data(), b.data(), sizeof(float) * a.size()) == 0;
@@ -282,9 +282,9 @@ int main()
     {
         Engine e;
         if (!openOffline(e, true, 7)) return 1;
-        e.setParam(ParamId::AutoMode, 1.0f);
-        e.setParam(ParamId::AutoRate, 5.0f);
-        e.setParam(ParamId::BrainDensity, 5.0f);
+        e.setParam(ParamIdE::AUTO_MODE, 1.0f);
+        e.setParam(ParamIdE::AUTO_RATE, 5.0f);
+        e.setParam(ParamIdE::BRAIN_DENSITY, 5.0f);
         const std::vector<float> lr = render(e, 60.0);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
         const double db = rmsDb(lr, 40 * 48000, 60 * 48000);
@@ -296,7 +296,7 @@ int main()
     {
         Engine e;
         if (!openOffline(e, false)) return 1;
-        e.setParam(ParamId::Attack, 0.01f);
+        e.setParam(ParamIdE::ATTACK, 0.01f);
         for (int k = 0; k < 20; ++k) e.noteOn(48 + k, 0.8f, k * 10);
         const std::vector<float> lr = render(e, 1.5);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x); });
@@ -307,8 +307,8 @@ int main()
     {
         Engine e;
         if (!openOffline(e, false)) return 1;
-        e.setParam(ParamId::Attack, 0.05f);
-        e.setParam(ParamId::Release, 0.3f);
+        e.setParam(ParamIdE::ATTACK, 0.05f);
+        e.setParam(ParamIdE::RELEASE, 0.3f);
         e.noteOn(60, 1.0f, 0);
         render(e, 1.0);
         const int during = e.soundingVoices();
@@ -324,8 +324,8 @@ int main()
         Engine e;
         e.setRealtime(true);
         EngineConfig c;
-        c.maxHostBlock = 256;
-        c.realtimeGpuClass = true;
+        c.m_maxHostBlock = 256;
+        c.m_realtimeGpuClass = true;
         std::string error;
         if (!e.prepare(c, &error)) { check(false, "real time: prepare", error); return 1; }
         std::vector<float> L(256), R(256);
@@ -353,9 +353,9 @@ int main()
     {
         Engine e;
         if (!openOffline(e, true, 11)) return 1;
-        e.setParam(ParamId::AutoRate, 5.0f);
-        e.setParam(ParamId::Brain2On, 1.0f);
-        e.setParam(ParamId::Brain2Rate, 4.0f);
+        e.setParam(ParamIdE::AUTO_RATE, 5.0f);
+        e.setParam(ParamIdE::BRAIN2_ON, 1.0f);
+        e.setParam(ParamIdE::BRAIN2_RATE, 4.0f);
         const std::vector<float> lr = render(e, 60.0);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x); });
         check(finite && e.soundingFrom(1) >= 3 && e.soundingFrom(2) >= 1, "brain 2: a second conductor in the background",
@@ -365,20 +365,20 @@ int main()
     // 11. The Timbre scale (Sethares) is made from the cloud's own spectrum.
     {
         BrainSpectrum sp;
-        sp.count = BrainSpectrum::kMax;
-        for (int h = 1; h <= sp.count; ++h) { sp.ratio[h - 1] = h * stretchOf(h, 0.02f); sp.amp[h - 1] = harmonicShape(h, 1.2f, 0.0f, 1.0f); }
+        sp.m_count = BrainSpectrum::Max;
+        for (int h = 1; h <= sp.m_count; ++h) { sp.m_ratio[h - 1] = h * stretchOf(h, 0.02f); sp.m_amp[h - 1] = harmonicShape(h, 1.2f, 0.0f, 1.0f); }
         FixedScale s;
         const bool built = makeTimbreScale(sp, s);
         Engine e;
         if (!openOffline(e, false)) return 1;
-        e.setParam(ParamId::Scale, static_cast<float>(kTimbreScaleIndex));
-        e.setParam(ParamId::Attack, 0.05f);
+        e.setParam(ParamIdE::SCALE, static_cast<float>(TimbreScaleIndex));
+        e.setParam(ParamIdE::ATTACK, 0.05f);
         e.noteOn(60, 0.8f, 0);
         e.noteOn(67, 0.8f, 0);
         const std::vector<float> lr = render(e, 2.0);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x); });
-        check(built && s.count >= 2 && finite && rmsDb(lr, 48000, 96000) > -60.0, "timbre scale: from the stretched spectrum",
-              fmt("%d degrees per period, plays at %.1f dBFS", s.count, rmsDb(lr, 48000, 96000)));
+        check(built && s.m_count >= 2 && finite && rmsDb(lr, 48000, 96000) > -60.0, "timbre scale: from the stretched spectrum",
+              fmt("%d degrees per period, plays at %.1f dBFS", s.m_count, rmsDb(lr, 48000, 96000)));
     }
 
     // 12. The landscape's make-up: the same chord in Aurora sits within 4 dB of the bare cloud;
@@ -387,12 +387,12 @@ int main()
         auto chordDb = [](float motion, float filterModel) {
             Engine e;
             if (!openOffline(e, false)) return -200.0;
-            e.setParam(ParamId::Motion, motion);
-            e.setParam(ParamId::FilterModel, filterModel);
-            e.setParam(ParamId::Cutoff, 60.0f);   // below every fundamental: at tilt 1.2 they carry two thirds of the power
-            e.setParam(ParamId::KeyTrack, 0.0f);
-            e.setParam(ParamId::FilterDrift, 0.0f);
-            e.setParam(ParamId::Attack, 0.5f);
+            e.setParam(ParamIdE::MOTION, motion);
+            e.setParam(ParamIdE::FILTER_MODEL, filterModel);
+            e.setParam(ParamIdE::CUTOFF, 60.0f);   // below every fundamental: at tilt 1.2 they carry two thirds of the power
+            e.setParam(ParamIdE::KEY_TRACK, 0.0f);
+            e.setParam(ParamIdE::FILTER_DRIFT, 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.5f);
             for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
             const std::vector<float> lr = render(e, 20.0);
             return rmsDb(lr, 5 * 48000, 20 * 48000);
@@ -409,21 +409,21 @@ int main()
     {
         Engine e;
         if (!openOffline(e, true, 5)) return 1;
-        e.setParam(ParamId::AutoRate, 4.0f);
-        e.setParam(ParamId::Breath, 1.0f);
-        e.setParam(ParamId::BreathRate, 0.2f);
-        e.setParam(ParamId::Doppler, 1.0f);
-        e.setParam(ParamId::Tide, 30.0f);
-        e.setParam(ParamId::TidePeriod, 1.0f);
-        e.setParam(ParamId::Air, 0.7f);
-        e.setParam(ParamId::Presence, 6.0f);
-        e.setParam(ParamId::PadLowCut, 120.0f);
-        e.setParam(ParamId::FilterModel, 8.0f);   // Formant
-        e.setParam(ParamId::Resonance, 0.8f);
-        e.setParam(ParamId::FilterEnv, 2.0f);
-        e.setParam(ParamId::FilterDrift, 1.0f);
-        e.setParam(ParamId::Motion, 5.0f);       // Glissando
-        e.setParam(ParamId::Inharmonic, 0.5f);
+        e.setParam(ParamIdE::AUTO_RATE, 4.0f);
+        e.setParam(ParamIdE::BREATH, 1.0f);
+        e.setParam(ParamIdE::BREATH_RATE, 0.2f);
+        e.setParam(ParamIdE::DOPPLER, 1.0f);
+        e.setParam(ParamIdE::TIDE, 30.0f);
+        e.setParam(ParamIdE::TIDE_PERIOD, 1.0f);
+        e.setParam(ParamIdE::AIR, 0.7f);
+        e.setParam(ParamIdE::PRESENCE, 6.0f);
+        e.setParam(ParamIdE::PAD_LOW_CUT, 120.0f);
+        e.setParam(ParamIdE::FILTER_MODEL, 8.0f);   // Formant
+        e.setParam(ParamIdE::RESONANCE, 0.8f);
+        e.setParam(ParamIdE::FILTER_ENV, 2.0f);
+        e.setParam(ParamIdE::FILTER_DRIFT, 1.0f);
+        e.setParam(ParamIdE::MOTION, 5.0f);       // Glissando
+        e.setParam(ParamIdE::INHARMONIC, 0.5f);
         const std::vector<float> lr = render(e, 40.0);
         const bool finite = std::all_of(lr.begin(), lr.end(), [](float x) { return std::isfinite(x) && std::fabs(x) <= 1.0f; });
         const double db = rmsDb(lr, 20 * 48000, 40 * 48000);
@@ -433,31 +433,31 @@ int main()
     // 14. The matrix as text: written by one engine, read by another, the same rows.
     {
         Engine a, b;
-        a.setModRow(0, { ModSource::Lfo1, static_cast<int>(ParamId::Cutoff), 0.35f });
-        a.setModRow(3, { ModSource::Macro2, static_cast<int>(ParamId::MotionDepth), -0.5f });
-        a.setModRow(5, { ModSource::Env1, static_cast<int>(ParamId::Scale), 0.2f });   // a choice: not a target, dropped
+        a.setModRow(0, { ModSourceE::LFO1, static_cast<int>(ParamIdE::CUTOFF), 0.35f });
+        a.setModRow(3, { ModSourceE::MACRO2, static_cast<int>(ParamIdE::MOTION_DEPTH), -0.5f });
+        a.setModRow(5, { ModSourceE::ENV1, static_cast<int>(ParamIdE::SCALE), 0.2f });   // a choice: not a target, dropped
         const std::string text = a.modText();
         b.setModText(text);
         const ModRow r0 = b.modRow(0), r1 = b.modRow(1), r2 = b.modRow(2);
-        const bool same = r0.source == ModSource::Lfo1 && r0.target == static_cast<int>(ParamId::Cutoff) && std::fabs(r0.depth - 0.35f) < 1e-6f
-                       && r1.source == ModSource::Macro2 && r1.target == static_cast<int>(ParamId::MotionDepth) && std::fabs(r1.depth + 0.5f) < 1e-6f
-                       && r2.source == ModSource::Off;
+        const bool same = r0.m_source == ModSourceE::LFO1 && r0.m_target == static_cast<int>(ParamIdE::CUTOFF) && std::fabs(r0.m_depth - 0.35f) < 1e-6f
+                       && r1.m_source == ModSourceE::MACRO2 && r1.m_target == static_cast<int>(ParamIdE::MOTION_DEPTH) && std::fabs(r1.m_depth + 0.5f) < 1e-6f
+                       && r2.m_source == ModSourceE::OFF;
         check(same, "modulation: the matrix as text and back", "\"" + text + "\"");
     }
 
     // 15. No source ever steps: every LFO shape, a hundred cycles at 1 Hz in millisecond steps.
     {
         double worst = 0.0;
-        for (int shape = 0; shape < kNumLfoShapes; ++shape) {
+        for (int shape = 0; shape < NumLfoShapes; ++shape) {
             Modulators m;
             m.reset(3);
             ModInputs in;
-            for (int i = 0; i < 4; ++i) { in.lfoShape[i] = shape; in.lfoRate[i] = 1.0f; }
+            for (int i = 0; i < 4; ++i) { in.m_lfoShape[i] = shape; in.m_lfoRate[i] = 1.0f; }
             m.advance(0.001f, in);
-            float prev = m.value(ModSource::Lfo1);
+            float prev = m.value(ModSourceE::LFO1);
             for (int s = 0; s < 100000; ++s) {
                 m.advance(0.001f, in);
-                const float v = m.value(ModSource::Lfo1);
+                const float v = m.value(ModSourceE::LFO1);
                 worst = std::max(worst, static_cast<double>(std::fabs(v - prev)));
                 prev = v;
             }
@@ -472,15 +472,15 @@ int main()
             Engine e;
             if (!openOffline(e, false)) return 0.0;
             noEffects(e);   // the level's swing as the voices make it: a room or a hall would smooth it
-            e.setParam(ParamId::FilterModel, 2.0f);   // LP 12
-            e.setParam(ParamId::Cutoff, 400.0f);
-            e.setParam(ParamId::KeyTrack, 0.0f);
-            e.setParam(ParamId::FilterDrift, 0.0f);
-            e.setParam(ParamId::Attack, 0.1f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Lfo1Shape, 0.0f);
-            e.setParam(ParamId::Lfo1Rate, 0.5f);
-            if (modulated) e.setModRow(0, { ModSource::Lfo1, static_cast<int>(ParamId::Cutoff), 0.4f });
+            e.setParam(ParamIdE::FILTER_MODEL, 2.0f);   // LP 12
+            e.setParam(ParamIdE::CUTOFF, 400.0f);
+            e.setParam(ParamIdE::KEY_TRACK, 0.0f);
+            e.setParam(ParamIdE::FILTER_DRIFT, 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.1f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::LFO1_SHAPE, 0.0f);
+            e.setParam(ParamIdE::LFO1_RATE, 0.5f);
+            if (modulated) e.setModRow(0, { ModSourceE::LFO1, static_cast<int>(ParamIdE::CUTOFF), 0.4f });
             for (int note : { 45, 52, 57 }) e.noteOn(note, 0.8f, 0);
             const std::vector<float> lr = render(e, 8.0);
             double lo = 1e9, hi = -1e9;
@@ -489,7 +489,7 @@ int main()
                 lo = std::min(lo, db);
                 hi = std::max(hi, db);
             }
-            if (played) *played = e.playedNorm(ParamId::Cutoff);
+            if (played) *played = e.playedNorm(ParamIdE::CUTOFF);
             return hi - lo;
         };
         float played = 0.0f, still = 0.0f;
@@ -505,37 +505,37 @@ int main()
     // 17. The factory bank: 64 groups of 64, unique names, every key known and every value in its
     //     range, every matrix row read, and bank select plus program finding each preset again.
     {
-        int bad = 0, outOfRange = 0, rowsLost = 0, perGroup[kNumPresetGroups] = {};
+        int bad = 0, outOfRange = 0, rowsLost = 0, perGroup[NumPresetGroups] = {};
         std::vector<std::string> names;
         for (int i = 0; i < numPresets(); ++i) {
             const Preset& p = preset(i);
-            ++perGroup[std::clamp(p.group, 0, kNumPresetGroups - 1)];
-            names.push_back(p.name);
+            ++perGroup[std::clamp(p.m_group, 0, NumPresetGroups - 1)];
+            names.push_back(p.m_name);
             int entries = 0;
-            for (const char* s = p.params; *s != 0; ++s) if (*s == '=') ++entries;
-            float values[kNumParams];
+            for (const char* s = p.m_params; *s != 0; ++s) if (*s == '=') ++entries;
+            float values[NumParams];
             std::string mod;
             if (presetValues(i, values, &mod) != entries) ++bad;
             // In range before the clamp: read each value again and compare.
-            for (const char* s = p.params; *s != 0;) {
+            for (const char* s = p.m_params; *s != 0;) {
                 while (*s == ' ') ++s;
                 const char* eq = std::strchr(s, '=');
                 if (eq == nullptr) break;
                 const std::string key(s, eq);
                 const float v = static_cast<float>(std::atof(eq + 1));
-                if (const ParamDesc* d = findParam(key.c_str()); d != nullptr && (v < d->min || v > d->max)) ++outOfRange;
+                if (const ParamDesc* d = findParam(key.c_str()); d != nullptr && (v < d->m_min || v > d->m_max)) ++outOfRange;
                 const char* end = std::strchr(eq, ' ');
                 s = end != nullptr ? end : eq + std::strlen(eq);
             }
-            ModRow rows[kModRows];
+            ModRow rows[ModRows];
             const int want = mod.empty() ? 0 : 1 + static_cast<int>(std::count(mod.begin(), mod.end(), ';'));
-            if (modRowsFromText(mod, rows, kModRows) != want) ++rowsLost;
-            if (presetAt(p.group, presetIndexInGroup(i)) != i) ++bad;
+            if (modRowsFromText(mod, rows, ModRows) != want) ++rowsLost;
+            if (presetAt(p.m_group, presetIndexInGroup(i)) != i) ++bad;
         }
         std::sort(names.begin(), names.end());
         const bool unique = std::adjacent_find(names.begin(), names.end()) == names.end();
         bool full = true;
-        for (int g = 0; g < kNumPresetGroups; ++g) full = full && perGroup[g] == 64;
+        for (int g = 0; g < NumPresetGroups; ++g) full = full && perGroup[g] == 64;
         check(numPresets() == 6144 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0, "presets: the factory bank",
               fmt("%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(), unique ? "names unique" : "NAMES REPEAT",
                   bad, outOfRange, rowsLost));
@@ -546,8 +546,8 @@ int main()
     {
         Engine e;
         if (!openOffline(e, true, 21)) return 1;
-        e.setParam(ParamId::AutoRate, 4.0f);
-        e.setParam(ParamId::AutoRootMove, 1.0f);   // the conductor wants to wander; the jam holds it
+        e.setParam(ParamIdE::AUTO_RATE, 4.0f);
+        e.setParam(ParamIdE::AUTO_ROOT_MOVE, 1.0f);   // the conductor wants to wander; the jam holds it
         e.setJamRoot(7);
         e.setJamEnergy(0.5f);
         bool held = true;
@@ -564,10 +564,10 @@ int main()
         auto conducted = [](bool fill, int& count) {
             Engine e;
             if (!openOffline(e, true, 23)) return false;
-            e.setParam(ParamId::AutoMode, 1.0f);
-            e.setParam(ParamId::BrainRate, 120.0f);
-            e.setParam(ParamId::AutoRate, 300.0f);
-            e.setParam(ParamId::BrainDensity, 5.0f);
+            e.setParam(ParamIdE::AUTO_MODE, 1.0f);
+            e.setParam(ParamIdE::BRAIN_RATE, 120.0f);
+            e.setParam(ParamIdE::AUTO_RATE, 300.0f);
+            e.setParam(ParamIdE::BRAIN_DENSITY, 5.0f);
             render(e, 1.0);
             if (fill) e.requestFill();
             render(e, 4.0);
@@ -583,11 +583,11 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::ModalLevel, 1.0f);
-        e.setParam(ParamId::ModalDecay, 2.0f);
-        e.setParam(ParamId::ModalDamp, 0.0f);
-        e.setParam(ParamId::ModalTune, 0.0f);
-        e.setParam(ParamId::ModalDrift, 0.0f);
+        e.setParam(ParamIdE::MODAL_LEVEL, 1.0f);
+        e.setParam(ParamIdE::MODAL_DECAY, 2.0f);
+        e.setParam(ParamIdE::MODAL_DAMP, 0.0f);
+        e.setParam(ParamIdE::MODAL_TUNE, 0.0f);
+        e.setParam(ParamIdE::MODAL_DRIFT, 0.0f);
         if (!openOffline(e, false, 31)) return 1;
         e.noteOn(62, 0.8f, 0);
         render(e, 1.0);
@@ -604,12 +604,12 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::ModalLevel, 1.0f);
-            e.setParam(ParamId::ModalDecay, 4.0f);
-            e.setParam(ParamId::ModalDamp, 0.0f);
-            e.setParam(ParamId::ModalTune, static_cast<float>(k));
-            e.setParam(ParamId::ModalSpread, 0.0f);
-            e.setParam(ParamId::ModalDrift, 0.0f);
+            e.setParam(ParamIdE::MODAL_LEVEL, 1.0f);
+            e.setParam(ParamIdE::MODAL_DECAY, 4.0f);
+            e.setParam(ParamIdE::MODAL_DAMP, 0.0f);
+            e.setParam(ParamIdE::MODAL_TUNE, static_cast<float>(k));
+            e.setParam(ParamIdE::MODAL_SPREAD, 0.0f);
+            e.setParam(ParamIdE::MODAL_DRIFT, 0.0f);
             if (!openOffline(e, false, 37)) return 1;
             e.noteOn(62, 0.8f, 0);
             render(e, 1.5);
@@ -626,14 +626,14 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::ModalLevel, 1.0f);
-        e.setParam(ParamId::ModalDecay, 3.0f);
-        e.setParam(ParamId::ModalDrift, 0.0f);
+        e.setParam(ParamIdE::MODAL_LEVEL, 1.0f);
+        e.setParam(ParamIdE::MODAL_DECAY, 3.0f);
+        e.setParam(ParamIdE::MODAL_DRIFT, 0.0f);
         if (!openOffline(e, false, 41)) return 1;
         e.noteOn(62, 0.8f, 0);
         render(e, 1.0);
         e.noteOff(62, 0);
-        e.setParam(ParamId::ModalFreeze, 1.0f);
+        e.setParam(ParamIdE::MODAL_FREEZE, 1.0f);
         const std::vector<float> lr = render(e, 4.0);
         const double a = rmsDb(lr, 24000, 48000), b = rmsDb(lr, 168000, 192000);
         check(std::fabs(a - b) < 1.5 && a > -80.0, "modal hall: frozen, it holds", fmt("%.1f dBFS after 0.5 s, %.1f dBFS after 3.5 s", a, b));
@@ -644,12 +644,12 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.005f);
-        e.setParam(ParamId::Release, 0.03f);
-        e.setParam(ParamId::DelayMix, 1.0f);
-        e.setParam(ParamId::DelayTimeL, 0.5f);
-        e.setParam(ParamId::DelayTimeR, 0.5f);
-        e.setParam(ParamId::DelayFeedback, 0.0f);
+        e.setParam(ParamIdE::ATTACK, 0.005f);
+        e.setParam(ParamIdE::RELEASE, 0.03f);
+        e.setParam(ParamIdE::DELAY_MIX, 1.0f);
+        e.setParam(ParamIdE::DELAY_TIME_L, 0.5f);
+        e.setParam(ParamIdE::DELAY_TIME_R, 0.5f);
+        e.setParam(ParamIdE::DELAY_FEEDBACK, 0.0f);
         if (!openOffline(e, false, 43)) return 1;
         e.noteOn(62, 0.8f, 0);
         const std::vector<float> on = render(e, 0.1);
@@ -662,11 +662,11 @@ int main()
     // 24. Everything at once, with the conductor: finite, inside the rails, at a sane level.
     {
         Engine e;
-        for (const auto& [id, v] : std::initializer_list<std::pair<ParamId, float>>{
-                 { ParamId::DelayMix, 0.4f }, { ParamId::Delay2Mix, 0.3f }, { ParamId::DelayFeedback, 0.7f }, { ParamId::EarlyLevel, 0.5f },
-                 { ParamId::NearMix, 0.4f }, { ParamId::FarDiffuse, 0.8f }, { ParamId::FarUnmask, 0.6f }, { ParamId::FarMode, 3.0f },
-                 { ParamId::ModalLevel, 0.6f }, { ParamId::ModalTune, 0.7f }, { ParamId::ModalDecay, 30.0f }, { ParamId::AutoRate, 6.0f },
-                 { ParamId::ModalBreath, 0.7f }, { ParamId::FieldMode, 2.0f }, { ParamId::FieldStrength, 0.8f }, { ParamId::Dispersion, 0.4f } })
+        for (const auto& [id, v] : std::initializer_list<std::pair<ParamIdE, float>>{
+                 { ParamIdE::DELAY_MIX, 0.4f }, { ParamIdE::DELAY2_MIX, 0.3f }, { ParamIdE::DELAY_FEEDBACK, 0.7f }, { ParamIdE::EARLY_LEVEL, 0.5f },
+                 { ParamIdE::NEAR_MIX, 0.4f }, { ParamIdE::FAR_DIFFUSE, 0.8f }, { ParamIdE::FAR_UNMASK, 0.6f }, { ParamIdE::FAR_MODE, 3.0f },
+                 { ParamIdE::MODAL_LEVEL, 0.6f }, { ParamIdE::MODAL_TUNE, 0.7f }, { ParamIdE::MODAL_DECAY, 30.0f }, { ParamIdE::AUTO_RATE, 6.0f },
+                 { ParamIdE::MODAL_BREATH, 0.7f }, { ParamIdE::FIELD_MODE, 2.0f }, { ParamIdE::FIELD_STRENGTH, 0.8f }, { ParamIdE::DISPERSION, 0.4f } })
             e.setParam(id, v);
         if (!openOffline(e, true, 47)) return 1;
         const std::vector<float> lr = render(e, 30.0);
@@ -682,12 +682,12 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.5f);
-            e.setParam(ParamId::CloudWidth, 60.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::FieldMode, k == 1 ? 1.0f : 0.0f);
-            e.setParam(ParamId::FieldStrength, 0.8f);
-            e.setParam(ParamId::FieldSpring, 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.5f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 60.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::FIELD_MODE, k == 1 ? 1.0f : 0.0f);
+            e.setParam(ParamIdE::FIELD_STRENGTH, 0.8f);
+            e.setParam(ParamIdE::FIELD_SPRING, 0.0f);
             if (!openOffline(e, false, 53)) return 1;
             e.noteOn(62, 0.8f, 0);
             const std::vector<float> lr = render(e, 4.0);
@@ -705,11 +705,11 @@ int main()
         auto play = [](int mode) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.5f);
-            e.setParam(ParamId::FieldMode, static_cast<float>(mode));
-            e.setParam(ParamId::FieldStrength, 0.9f);
-            e.setParam(ParamId::FieldRadius, 200.0f);
-            e.setParam(ParamId::FieldRate, 0.5f);
+            e.setParam(ParamIdE::ATTACK, 0.5f);
+            e.setParam(ParamIdE::FIELD_MODE, static_cast<float>(mode));
+            e.setParam(ParamIdE::FIELD_STRENGTH, 0.9f);
+            e.setParam(ParamIdE::FIELD_RADIUS, 200.0f);
+            e.setParam(ParamIdE::FIELD_RATE, 0.5f);
             if (!openOffline(e, false, 59)) return std::vector<float>();
             for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
             return render(e, 6.0);
@@ -727,9 +727,9 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.005f);
-        e.setParam(ParamId::Release, 0.03f);
-        e.setParam(ParamId::Dispersion, 1.0f);
+        e.setParam(ParamIdE::ATTACK, 0.005f);
+        e.setParam(ParamIdE::RELEASE, 0.03f);
+        e.setParam(ParamIdE::DISPERSION, 1.0f);
         if (!openOffline(e, false, 61)) return 1;
         e.noteOn(62, 0.8f, 0);
         std::vector<float> lr = render(e, 0.3);
@@ -751,12 +751,12 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Stereo, 0.0f);
-            e.setParam(ParamId::Binaural, 1.0f);
-            e.setParam(ParamId::BinauralHeight, 0.0f);
-            e.setParam(ParamId::BinauralOrbit, k == 1 ? 0.25f : 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::STEREO, 0.0f);
+            e.setParam(ParamIdE::BINAURAL, 1.0f);
+            e.setParam(ParamIdE::BINAURAL_HEIGHT, 0.0f);
+            e.setParam(ParamIdE::BINAURAL_ORBIT, k == 1 ? 0.25f : 0.0f);
             if (!openOffline(e, false, 67)) return 1;
             e.noteOn(62, 0.8f, 0);
             const std::vector<float> lr = render(e, 1.2);
@@ -777,11 +777,11 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.5f);
-            e.setParam(ParamId::Release, 2.0f);
-            e.setParam(ParamId::MemoryLevel, k == 1 ? 0.8f : 0.0f);
-            e.setParam(ParamId::MemoryBloom, 4.0f);
-            e.setParam(ParamId::MemorySink, 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.5f);
+            e.setParam(ParamIdE::RELEASE, 2.0f);
+            e.setParam(ParamIdE::MEMORY_LEVEL, k == 1 ? 0.8f : 0.0f);
+            e.setParam(ParamIdE::MEMORY_BLOOM, 4.0f);
+            e.setParam(ParamIdE::MEMORY_SINK, 0.0f);
             if (!openOffline(e, false, 71)) return 1;
             for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
             render(e, 4.0);
@@ -801,10 +801,10 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.3f);
-            e.setParam(ParamId::Scale, 0.0f);   // 12-TET
-            e.setParam(ParamId::TuneGravity, k == 1 ? 1.0f : 0.0f);
-            e.setParam(ParamId::TuneAnchor, 0.02f);
+            e.setParam(ParamIdE::ATTACK, 0.3f);
+            e.setParam(ParamIdE::SCALE, 0.0f);   // 12-TET
+            e.setParam(ParamIdE::TUNE_GRAVITY, k == 1 ? 1.0f : 0.0f);
+            e.setParam(ParamIdE::TUNE_ANCHOR, 0.02f);
             if (!openOffline(e, false, 73)) return 1;
             for (int note : { 60, 64, 67 }) e.noteOn(note, 0.8f, 0);
             render(e, 6.0);
@@ -823,14 +823,14 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.005f);
-        e.setParam(ParamId::Release, 0.03f);
-        e.setParam(ParamId::SpecMix, 1.0f);
-        e.setParam(ParamId::SpecToFar, 0.0f);
-        e.setParam(ParamId::SpecTime, 0.6f);
-        e.setParam(ParamId::SpecTilt, 1.0f);
-        e.setParam(ParamId::SpecScatter, 0.0f);
-        e.setParam(ParamId::SpecFeedback, 0.0f);
+        e.setParam(ParamIdE::ATTACK, 0.005f);
+        e.setParam(ParamIdE::RELEASE, 0.03f);
+        e.setParam(ParamIdE::SPEC_MIX, 1.0f);
+        e.setParam(ParamIdE::SPEC_TO_FAR, 0.0f);
+        e.setParam(ParamIdE::SPEC_TIME, 0.6f);
+        e.setParam(ParamIdE::SPEC_TILT, 1.0f);
+        e.setParam(ParamIdE::SPEC_SCATTER, 0.0f);
+        e.setParam(ParamIdE::SPEC_FEEDBACK, 0.0f);
         if (!openOffline(e, false, 79)) return 1;
         e.noteOn(62, 0.8f, 0);
         std::vector<float> lr = render(e, 0.1);
@@ -852,10 +852,10 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.5f);
-            e.setParam(ParamId::ModalLevel, 1.0f);
-            e.setParam(ParamId::ModalPaint, static_cast<float>(k));
-            e.setParam(ParamId::Landscape, 0.0f);   // Aurora
+            e.setParam(ParamIdE::ATTACK, 0.5f);
+            e.setParam(ParamIdE::MODAL_LEVEL, 1.0f);
+            e.setParam(ParamIdE::MODAL_PAINT, static_cast<float>(k));
+            e.setParam(ParamIdE::LANDSCAPE, 0.0f);   // Aurora
             if (!openOffline(e, false, 83)) return 1;
             for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
             const std::vector<float> lr = render(e, 8.0);
@@ -869,7 +869,7 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.05f);
+        e.setParam(ParamIdE::ATTACK, 0.05f);
         if (!openOffline(e, false, 89)) return 1;
         e.noteOn(62, 0.8f, 0);
         render(e, 1.0);
@@ -879,7 +879,7 @@ int main()
         const double f0 = soundingHz(e);
         int voice = -1;
         for (int i = 0; i < 16; ++i)
-            if (e.voiceView(i).hz > 0.0f) voice = i;
+            if (e.voiceView(i).m_hz > 0.0f) voice = i;
         int onHarmonic = 0, loud = 0, elsewhere = 0;
         if (got && per > 0 && voice >= 0) {
             for (int v = 0; v < static_cast<int>(dots.size() / 2) / per; ++v)
@@ -900,29 +900,29 @@ int main()
     // 34. Noctuary's sources move and keep to their ranges: each routed to the brightness, its live
     //     value sampled every half second over 40 s of the conductor.
     {
-        const ModSource kSources[] = { ModSource::Lenia1, ModSource::LorenzX, ModSource::RosslerZ, ModSource::Kura1,
-                                       ModSource::RootAge, ModSource::Note, ModSource::RandomNote };
+        const ModSourceE Sources[] = { ModSourceE::LENIA1, ModSourceE::LORENZ_X, ModSourceE::ROSSLER_Z, ModSourceE::KURA1,
+                                       ModSourceE::ROOT_AGE, ModSourceE::NOTE, ModSourceE::RANDOM_NOTE };
         std::string still;
-        for (ModSource s : kSources) {
+        for (ModSourceE s : Sources) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::AutoRate, 5.0f);
-            e.setParam(ParamId::ChaosPeriod, 10.0f);
-            e.setParam(ParamId::Brightness, 0.5f);
-            e.setModRow(0, { s, static_cast<int>(ParamId::Brightness), 0.5f });
+            e.setParam(ParamIdE::AUTO_RATE, 5.0f);
+            e.setParam(ParamIdE::CHAOS_PERIOD, 10.0f);
+            e.setParam(ParamIdE::BRIGHTNESS, 0.5f);
+            e.setModRow(0, { s, static_cast<int>(ParamIdE::BRIGHTNESS), 0.5f });
             if (!openOffline(e, true, 97)) return 1;
             float lo = 1e9f, hi = -1e9f;
             bool sane = true;
             for (int k = 0; k < 80; ++k) {
                 render(e, 0.5);
-                const float v = e.playedNorm(ParamId::Brightness);
+                const float v = e.playedNorm(ParamIdE::BRIGHTNESS);
                 if (!std::isfinite(v) || v < -0.001f || v > 1.001f) sane = false;
                 lo = std::min(lo, v);
                 hi = std::max(hi, v);
             }
             // Root Age climbs over ten minutes: in forty seconds a fifteenth of the way, at half depth 0.033.
-            const float need = s == ModSource::RootAge ? 0.02f : 0.05f;
-            if (!sane || hi - lo < need) still += std::string(kModSourceNames[static_cast<int>(s)]) + fmt(" (%.3f) ", hi - lo);
+            const float need = s == ModSourceE::ROOT_AGE ? 0.02f : 0.05f;
+            if (!sane || hi - lo < need) still += std::string(ModSourceNames[static_cast<int>(s)]) + fmt(" (%.3f) ", hi - lo);
         }
         check(still.empty(), "modulation: Lenia, chaos, Kuramoto and the piece's sources move", still.empty() ? std::string("all seven swing, all inside the range") : still);
     }
@@ -933,12 +933,12 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.1f);
-            e.setParam(ParamId::Scale, k == 0 ? 0.0f : 3.0f);   // 12-TET, JI 7-limit
-            e.setParam(ParamId::RootNote, 0.0f);                 // C: C and G a pure fifth in the just scale
-            e.setParam(ParamId::Purity, 1.0f);
-            e.setParam(ParamId::Brightness, 0.5f);
-            e.setModRow(0, { ModSource::Beat, static_cast<int>(ParamId::Brightness), 0.5f });
+            e.setParam(ParamIdE::ATTACK, 0.1f);
+            e.setParam(ParamIdE::SCALE, k == 0 ? 0.0f : 3.0f);   // 12-TET, JI 7-limit
+            e.setParam(ParamIdE::ROOT_NOTE, 0.0f);                 // C: C and G a pure fifth in the just scale
+            e.setParam(ParamIdE::PURITY, 1.0f);
+            e.setParam(ParamIdE::BRIGHTNESS, 0.5f);
+            e.setModRow(0, { ModSourceE::BEAT, static_cast<int>(ParamIdE::BRIGHTNESS), 0.5f });
             if (!openOffline(e, false, 101)) return 1;
             e.noteOn(60, 0.8f, 0);
             e.noteOn(67, 0.8f, 0);
@@ -946,8 +946,8 @@ int main()
             float lo = 1e9f, hi = -1e9f;
             for (int i = 0; i < 40; ++i) {
                 render(e, 0.1);
-                lo = std::min(lo, e.playedNorm(ParamId::Brightness));
-                hi = std::max(hi, e.playedNorm(ParamId::Brightness));
+                lo = std::min(lo, e.playedNorm(ParamIdE::BRIGHTNESS));
+                hi = std::max(hi, e.playedNorm(ParamIdE::BRIGHTNESS));
             }
             swing[k] = hi - lo;
         }
@@ -961,25 +961,25 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Lfo1Rate, 1.0f);
-            e.setParam(ParamId::Brightness, 0.5f);
-            e.setParam(ParamId::Macro1, static_cast<float>(k));
-            ModRow r{ ModSource::Lfo1, static_cast<int>(ParamId::Brightness), 0.5f };
-            r.via = ModSource::Macro1;
+            e.setParam(ParamIdE::LFO1_RATE, 1.0f);
+            e.setParam(ParamIdE::BRIGHTNESS, 0.5f);
+            e.setParam(ParamIdE::MACRO1, static_cast<float>(k));
+            ModRow r{ ModSourceE::LFO1, static_cast<int>(ParamIdE::BRIGHTNESS), 0.5f };
+            r.m_via = ModSourceE::MACRO1;
             e.setModRow(0, r);
             if (!openOffline(e, false, 103)) return 1;
             float lo = 1e9f, hi = -1e9f;
             for (int i = 0; i < 30; ++i) {
                 render(e, 0.1);
-                lo = std::min(lo, e.playedNorm(ParamId::Brightness));
-                hi = std::max(hi, e.playedNorm(ParamId::Brightness));
+                lo = std::min(lo, e.playedNorm(ParamIdE::BRIGHTNESS));
+                hi = std::max(hi, e.playedNorm(ParamIdE::BRIGHTNESS));
             }
             swing[k] = hi - lo;
         }
         ModRow rows[2];
         modRowsFromText("lfo1>cutoff:0.35:lenia2;kura3>drift:-0.2", rows, 2);
         const std::string back = modRowsToText(rows, 2);
-        check(swing[0] < 0.01f && swing[1] > 0.5f && rows[0].via == ModSource::Lenia2 && rows[1].via == ModSource::Off
+        check(swing[0] < 0.01f && swing[1] > 0.5f && rows[0].m_via == ModSourceE::LENIA2 && rows[1].m_via == ModSourceE::OFF
                   && back == "lfo1>cutoff:0.35:lenia2;kura3>drift:-0.2",
               "modulation: a via source scales the depth", fmt("swing %.3f at Macro 1 = 0, %.3f at 1; text '%s'", swing[0], swing[1], back.c_str()));
     }
@@ -994,10 +994,10 @@ int main()
             auto play = [&](std::vector<float>& f3, std::vector<float>& f6) {
                 Engine e;
                 quietEffects(e);
-                e.setParam(ParamId::Attack, 0.5f);
-                e.setParam(ParamId::LifeMode, static_cast<float>(mode));
-                e.setParam(ParamId::LifeDepth, 0.8f);
-                e.setParam(ParamId::LifeRate, 0.5f);
+                e.setParam(ParamIdE::ATTACK, 0.5f);
+                e.setParam(ParamIdE::LIFE_MODE, static_cast<float>(mode));
+                e.setParam(ParamIdE::LIFE_DEPTH, 0.8f);
+                e.setParam(ParamIdE::LIFE_RATE, 0.5f);
                 if (!openOffline(e, false, 107)) return std::vector<float>();
                 for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
                 std::vector<float> lr = render(e, 3.0);
@@ -1015,9 +1015,9 @@ int main()
             double moved = 0.0;
             for (size_t i = 0; i < a3.size() && i < a6.size(); ++i) moved += std::fabs(a6[i] - a3[i]);
             moved /= std::max<size_t>(1, a3.size());
-            const bool ok = a3.size() == static_cast<size_t>(kLifeW * kLifeH) && moved > 0.01 && std::fabs(level - level0) < 2.0 && a == b;
+            const bool ok = a3.size() == static_cast<size_t>(LifeW * LifeH) && moved > 0.01 && std::fabs(level - level0) < 2.0 && a == b;
             good = good && ok;
-            report += fmt("%s: moved %.3f a cell, %.1f dBFS (free %.1f)%s; ", kLifeModeNames[mode], moved, level, level0, a == b ? "" : ", NOT identical");
+            report += fmt("%s: moved %.3f a cell, %.1f dBFS (free %.1f)%s; ", LifeModeNames[mode], moved, level, level0, a == b ? "" : ", NOT identical");
         }
         check(good, "life: Lenia and Turing live, keep the level, repeat", report);
     }
@@ -1029,13 +1029,13 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::SyncDepth, 1.0f);
-            e.setParam(ParamId::SyncRate, 1.0f);
-            e.setParam(ParamId::SyncCoupling, static_cast<float>(k));
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::SYNC_DEPTH, 1.0f);
+            e.setParam(ParamIdE::SYNC_RATE, 1.0f);
+            e.setParam(ParamIdE::SYNC_COUPLING, static_cast<float>(k));
             if (!openOffline(e, false, 109)) return 1;
             e.noteOn(62, 0.8f, 0);
             const std::vector<float> lr = render(e, 12.0);
@@ -1059,26 +1059,26 @@ int main()
     //     more change at an attack than in a held note, rougher for a minor second than a pure fifth.
     {
         // A source's value through a row onto the brightness (depth 1 from 0): the live value is the source.
-        auto heard = [](ModSource s, const std::vector<int>& notes, float tilt, double seconds, float attack, float scale = 3.0f) {
+        auto heard = [](ModSourceE s, const std::vector<int>& notes, float tilt, double seconds, float attack, float scale = 3.0f) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, attack);
-            e.setParam(ParamId::Tilt, tilt);
-            e.setParam(ParamId::Scale, scale);     // JI 7-limit on C (C and G pure); 12-TET where a semitone must be a semitone
-            e.setParam(ParamId::RootNote, 0.0f);
-            e.setParam(ParamId::Brightness, 0.0f);
-            e.setModRow(0, { s, static_cast<int>(ParamId::Brightness), 1.0f });
+            e.setParam(ParamIdE::ATTACK, attack);
+            e.setParam(ParamIdE::TILT, tilt);
+            e.setParam(ParamIdE::SCALE, scale);     // JI 7-limit on C (C and G pure); 12-TET where a semitone must be a semitone
+            e.setParam(ParamIdE::ROOT_NOTE, 0.0f);
+            e.setParam(ParamIdE::BRIGHTNESS, 0.0f);
+            e.setModRow(0, { s, static_cast<int>(ParamIdE::BRIGHTNESS), 1.0f });
             if (!openOffline(e, false, 113)) return -1.0f;
             for (int note : notes) e.noteOn(note, 0.8f, 0);
             render(e, seconds);
-            return e.playedNorm(ParamId::Brightness);
+            return e.playedNorm(ParamIdE::BRIGHTNESS);
         };
-        const float quiet = heard(ModSource::Loudness, {}, 1.2f, 2.0, 0.05f), loud = heard(ModSource::Loudness, { 60, 64, 67 }, 1.2f, 2.0, 0.05f);
-        const float dark = heard(ModSource::Centroid, { 48 }, 3.0f, 2.0, 0.05f), bright = heard(ModSource::Centroid, { 48 }, 0.3f, 2.0, 0.05f);
+        const float quiet = heard(ModSourceE::LOUDNESS, {}, 1.2f, 2.0, 0.05f), loud = heard(ModSourceE::LOUDNESS, { 60, 64, 67 }, 1.2f, 2.0, 0.05f);
+        const float dark = heard(ModSourceE::CENTROID, { 48 }, 3.0f, 2.0, 0.05f), bright = heard(ModSourceE::CENTROID, { 48 }, 0.3f, 2.0, 0.05f);
         // Change right after the attack (the attack's rise lasts a frame or two, the source follows over a fifth of a second).
-        const float onset = heard(ModSource::Flux, { 60 }, 1.2f, 0.06, 0.005f), held = heard(ModSource::Flux, { 60 }, 1.2f, 4.0, 0.005f);
+        const float onset = heard(ModSourceE::FLUX, { 60 }, 1.2f, 0.06, 0.005f), held = heard(ModSourceE::FLUX, { 60 }, 1.2f, 4.0, 0.005f);
         // In 12-TET: the just scale has no C sharp of its own, so C and C sharp on the keys would be a unison.
-        const float pure = heard(ModSource::Roughness, { 60, 67 }, 1.2f, 3.0, 0.05f, 0.0f), rough = heard(ModSource::Roughness, { 60, 61 }, 1.2f, 3.0, 0.05f, 0.0f);
+        const float pure = heard(ModSourceE::ROUGHNESS, { 60, 67 }, 1.2f, 3.0, 0.05f, 0.0f), rough = heard(ModSourceE::ROUGHNESS, { 60, 61 }, 1.2f, 3.0, 0.05f, 0.0f);
         check(loud > quiet + 0.3f && bright > dark + 0.1f && onset > held + 0.03f && rough > pure + 0.2f, "listening: loudness, brightness, change, roughness",
               fmt("loudness %.2f -> %.2f, brightness %.2f -> %.2f, change %.2f at the attack / %.2f held, roughness %.2f fifth / %.2f second",
                   quiet, loud, dark, bright, onset, held, pure, rough));
@@ -1091,12 +1091,12 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::FieldMode, k == 1 ? 4.0f : 0.0f);   // Off, Flock
-            e.setParam(ParamId::FieldStrength, 0.8f);
-            e.setParam(ParamId::FieldRate, 0.3f);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::FIELD_MODE, k == 1 ? 4.0f : 0.0f);   // Off, Flock
+            e.setParam(ParamIdE::FIELD_STRENGTH, 0.8f);
+            e.setParam(ParamIdE::FIELD_RATE, 0.3f);
             if (!openOffline(e, false, 127)) return 1;
             e.noteOn(62, 0.8f, 0);
             // The 4th harmonic's points in the snapshot: their mean and spread in cents from it.
@@ -1106,7 +1106,7 @@ int main()
                 e.partialSnapshot(dots, per);
                 const double f4 = 4.0 * soundingHz(e);
                 int voice = -1;
-                for (int i = 0; i < 16; ++i) if (e.voiceView(i).hz > 0.0f) voice = i;
+                for (int i = 0; i < 16; ++i) if (e.voiceView(i).m_hz > 0.0f) voice = i;
                 double s = 0.0, s2 = 0.0;
                 int count = 0;
                 for (int i = 0; voice >= 0 && i < per; ++i) {
@@ -1149,14 +1149,14 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::CloudWidth, 0.0f);   // one steady sine per harmonic: whatever moves is the ripple
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::RippleDepth, static_cast<float>(k));
-            e.setParam(ParamId::RippleSpeed, 1.5f);
-            e.setParam(ParamId::RippleDecay, 8.0f);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 0.0f);   // one steady sine per harmonic: whatever moves is the ripple
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::RIPPLE_DEPTH, static_cast<float>(k));
+            e.setParam(ParamIdE::RIPPLE_SPEED, 1.5f);
+            e.setParam(ParamIdE::RIPPLE_DECAY, 8.0f);
             if (!openOffline(e, false, 131)) return 1;
             e.noteOn(50, 0.8f, 0);
             std::vector<float> lr = render(e, 1.0);
@@ -1190,17 +1190,17 @@ int main()
         auto run = [&](float chaos, float input, bool conductor, std::vector<float>& seq) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::AutoRate, 5.0f);
-            e.setParam(ParamId::Brightness, 0.5f);
-            e.setParam(ParamId::ReservoirChaos, chaos);
-            e.setParam(ParamId::ReservoirInput, input);
-            e.setParam(ParamId::ReservoirMemory, 1.0f);
-            e.setModRow(0, { ModSource::Reservoir1, static_cast<int>(ParamId::Brightness), 0.5f });
+            e.setParam(ParamIdE::AUTO_RATE, 5.0f);
+            e.setParam(ParamIdE::BRIGHTNESS, 0.5f);
+            e.setParam(ParamIdE::RESERVOIR_CHAOS, chaos);
+            e.setParam(ParamIdE::RESERVOIR_INPUT, input);
+            e.setParam(ParamIdE::RESERVOIR_MEMORY, 1.0f);
+            e.setModRow(0, { ModSourceE::RESERVOIR1, static_cast<int>(ParamIdE::BRIGHTNESS), 0.5f });
             if (!openOffline(e, conductor, 137)) return false;
             render(e, 10.0);
             for (int k = 0; k < 60; ++k) {
                 render(e, 0.5);
-                seq.push_back(e.playedNorm(ParamId::Brightness));
+                seq.push_back(e.playedNorm(ParamIdE::BRIGHTNESS));
             }
             return true;
         };
@@ -1226,13 +1226,13 @@ int main()
         for (int k = 0; k < 3; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.005f);
-            e.setParam(ParamId::Release, 0.03f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::MeltMix, k == 0 ? 0.0f : 1.0f);
-            e.setParam(ParamId::MeltToFar, 0.0f);
-            e.setParam(ParamId::MeltTime, 20.0f);
-            e.setParam(ParamId::MeltSpread, k == 2 ? 1.5f : 0.0f);
+            e.setParam(ParamIdE::ATTACK, 0.005f);
+            e.setParam(ParamIdE::RELEASE, 0.03f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::MELT_MIX, k == 0 ? 0.0f : 1.0f);
+            e.setParam(ParamIdE::MELT_TO_FAR, 0.0f);
+            e.setParam(ParamIdE::MELT_TIME, 20.0f);
+            e.setParam(ParamIdE::MELT_SPREAD, k == 2 ? 1.5f : 0.0f);
             if (!openOffline(e, false, 139)) return 1;
             e.noteOn(50, 0.8f, 0);
             std::vector<float> lr = render(e, 3.0);
@@ -1262,13 +1262,13 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.2f);
-        e.setParam(ParamId::Tilt, 0.6f);
-        e.setParam(ParamId::Brightness, 0.9f);
-        e.setParam(ParamId::CloudWidth, 10.0f);
-        e.setParam(ParamId::Motion, 4.0f);   // Breathe
-        e.setParam(ParamId::MotionDepth, 0.8f);
-        e.setParam(ParamId::Scale, 0.0f);    // 12-TET
+        e.setParam(ParamIdE::ATTACK, 0.2f);
+        e.setParam(ParamIdE::TILT, 0.6f);
+        e.setParam(ParamIdE::BRIGHTNESS, 0.9f);
+        e.setParam(ParamIdE::CLOUD_WIDTH, 10.0f);
+        e.setParam(ParamIdE::MOTION, 4.0f);   // Breathe
+        e.setParam(ParamIdE::MOTION_DEPTH, 0.8f);
+        e.setParam(ParamIdE::SCALE, 0.0f);    // 12-TET
         if (!openOffline(e, false, 141)) return 1;
         e.noteOn(50, 0.8f, 0);
         e.noteOn(57, 0.8f, 0);
@@ -1286,33 +1286,33 @@ int main()
         };
         double stepA = 0.0, stepGlide = 0.0, stepB = 0.0;
         for (int k = 0; k < 10; ++k) window(stepA);
-        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
+        const ParamDesc& tilt = paramDesc(ParamIdE::TILT);
         e.beginMorph(4.0);
-        e.setParam(ParamId::Tilt, 2.0f);
-        e.setParam(ParamId::Brightness, 0.4f);
-        e.setParam(ParamId::CloudWidth, 40.0f);
-        e.setParam(ParamId::FilterModel, 3.0f);   // LP 24
-        e.setParam(ParamId::Cutoff, 600.0f);
-        e.setParam(ParamId::Motion, 6.0f);        // Aurora
-        e.setParam(ParamId::MotionDepth, 0.6f);
-        e.setParam(ParamId::Scale, 3.0f);         // JI 7-limit
+        e.setParam(ParamIdE::TILT, 2.0f);
+        e.setParam(ParamIdE::BRIGHTNESS, 0.4f);
+        e.setParam(ParamIdE::CLOUD_WIDTH, 40.0f);
+        e.setParam(ParamIdE::FILTER_MODEL, 3.0f);   // LP 24
+        e.setParam(ParamIdE::CUTOFF, 600.0f);
+        e.setParam(ParamIdE::MOTION, 6.0f);        // Aurora
+        e.setParam(ParamIdE::MOTION_DEPTH, 0.6f);
+        e.setParam(ParamIdE::SCALE, 3.0f);         // JI 7-limit
         double worstTilt = 0.0, worstMix = 0.0, depthMid = 1.0;
         bool switchedAtMiddle = true;
         for (int k = 0; k < 45; ++k) {   // until it arrives (the request is served by the next block)
             window(stepGlide);
             const float w = morphCurve(e.morphProgress());
             const float want = fromNorm(tilt, toNorm(tilt, 0.6f) + (toNorm(tilt, 2.0f) - toNorm(tilt, 0.6f)) * w);
-            worstTilt = std::max(worstTilt, static_cast<double>(std::fabs(e.soundValue(ParamId::Tilt) - want)));
+            worstTilt = std::max(worstTilt, static_cast<double>(std::fabs(e.soundValue(ParamIdE::TILT) - want)));
             worstMix = std::max(worstMix, static_cast<double>(std::fabs(e.soundFilterMix() - (e.morphProgress() < 1.0f ? w : 1.0f))));
-            if (std::fabs(w - 0.5f) < 0.06f) depthMid = std::min(depthMid, static_cast<double>(e.soundValue(ParamId::MotionDepth)));
-            const bool aurora = std::lround(e.soundValue(ParamId::Motion)) == 6;
-            const bool pure = std::lround(e.soundValue(ParamId::Scale)) == 3;
+            if (std::fabs(w - 0.5f) < 0.06f) depthMid = std::min(depthMid, static_cast<double>(e.soundValue(ParamIdE::MOTION_DEPTH)));
+            const bool aurora = std::lround(e.soundValue(ParamIdE::MOTION)) == 6;
+            const bool pure = std::lround(e.soundValue(ParamIdE::SCALE)) == 3;
             if (e.morphProgress() < 1.0f && (aurora != (w >= 0.5f) || pure != (w >= 0.5f))) switchedAtMiddle = false;
             if (e.morphProgress() >= 1.0f) break;
         }
-        const bool arrived = e.morphProgress() >= 1.0f && e.soundValue(ParamId::Tilt) == 2.0f && e.soundValue(ParamId::Cutoff) == 600.0f
-                          && e.soundFilterMix() == 1.0f && e.soundValue(ParamId::Motion) == 6.0f && e.soundValue(ParamId::MotionDepth) == 0.6f
-                          && e.soundValue(ParamId::Scale) == 3.0f;
+        const bool arrived = e.morphProgress() >= 1.0f && e.soundValue(ParamIdE::TILT) == 2.0f && e.soundValue(ParamIdE::CUTOFF) == 600.0f
+                          && e.soundFilterMix() == 1.0f && e.soundValue(ParamIdE::MOTION) == 6.0f && e.soundValue(ParamIdE::MOTION_DEPTH) == 0.6f
+                          && e.soundValue(ParamIdE::SCALE) == 3.0f;
         for (int k = 0; k < 60; ++k) window(stepB);
         check(arrived && worstTilt < 1.0e-4 && worstMix < 1.0e-4 && depthMid < 0.1 && switchedAtMiddle && stepGlide < std::max(stepA, stepB) + 1.5,
               "morph: a glide from one sound into another",
@@ -1327,34 +1327,34 @@ int main()
         Engine e;
         quietEffects(e);
         if (!openOffline(e, false, 143)) return 1;
-        float a[kNumParams], b[kNumParams];
-        for (const ParamDesc& d : paramTable()) a[static_cast<size_t>(d.id)] = b[static_cast<size_t>(d.id)] = d.def;
-        a[static_cast<size_t>(ParamId::Tilt)] = 0.5f;
-        b[static_cast<size_t>(ParamId::Tilt)] = 2.5f;
-        b[static_cast<size_t>(ParamId::FilterModel)] = 2.0f;   // LP 12
-        b[static_cast<size_t>(ParamId::Cutoff)] = 800.0f;
+        float a[NumParams], b[NumParams];
+        for (const ParamDesc& d : paramTable()) a[static_cast<size_t>(d.m_id)] = b[static_cast<size_t>(d.m_id)] = d.m_def;
+        a[static_cast<size_t>(ParamIdE::TILT)] = 0.5f;
+        b[static_cast<size_t>(ParamIdE::TILT)] = 2.5f;
+        b[static_cast<size_t>(ParamIdE::FILTER_MODEL)] = 2.0f;   // LP 12
+        b[static_cast<size_t>(ParamIdE::CUTOFF)] = 800.0f;
         e.setMorphSlot(0, a, "lfo1>cutoff:0.3");
         e.setMorphSlot(1, b, "lfo2>brightness:0.4");
-        e.setParam(ParamId::MorphPos, 0.25f);
-        e.setParam(ParamId::MorphActive, 1.0f);
+        e.setParam(ParamIdE::MORPH_POS, 0.25f);
+        e.setParam(ParamIdE::MORPH_ACTIVE, 1.0f);
         e.noteOn(55, 0.8f, 0);
         render(e, 1.5);   // switching on glides a second
-        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
+        const ParamDesc& tilt = paramDesc(ParamIdE::TILT);
         const float want = fromNorm(tilt, toNorm(tilt, 0.5f) + (toNorm(tilt, 2.5f) - toNorm(tilt, 0.5f)) * 0.25f);
-        const float tiltQuarter = e.soundValue(ParamId::Tilt), mixQuarter = e.soundFilterMix();
+        const float tiltQuarter = e.soundValue(ParamIdE::TILT), mixQuarter = e.soundFilterMix();
         const bool quarter = std::fabs(tiltQuarter - want) < 1.0e-4f && std::fabs(mixQuarter - 0.25f) < 1.0e-4f
-                          && e.soundValue(ParamId::FilterModel) == 2.0f;
-        e.setParam(ParamId::MorphPos, 1.0f);
+                          && e.soundValue(ParamIdE::FILTER_MODEL) == 2.0f;
+        e.setParam(ParamIdE::MORPH_POS, 1.0f);
         render(e, 0.1);
-        const bool atB = e.soundValue(ParamId::Tilt) == 2.5f && e.soundFilterMix() == 1.0f;
-        e.setParam(ParamId::MorphActive, 0.0f);
+        const bool atB = e.soundValue(ParamIdE::TILT) == 2.5f && e.soundFilterMix() == 1.0f;
+        e.setParam(ParamIdE::MORPH_ACTIVE, 0.0f);
         render(e, 0.5);
-        const float halfway = e.soundValue(ParamId::Tilt);
+        const float halfway = e.soundValue(ParamIdE::TILT);
         render(e, 1.0);
-        const bool back = e.soundValue(ParamId::Tilt) == e.param(ParamId::Tilt) && halfway != e.param(ParamId::Tilt) && halfway != 2.5f;
+        const bool back = e.soundValue(ParamIdE::TILT) == e.param(ParamIdE::TILT) && halfway != e.param(ParamIdE::TILT) && halfway != 2.5f;
         check(quarter && atB && back, "morph: A/B between two slots, gliding on and off",
               fmt("at 0.25 tilt %.3f (want %.3f), filter share %.2f; at B %s; off: %.3f half a second later, then the knob's %.3f",
-                  tiltQuarter, want, mixQuarter, atB ? "exact" : "NOT", halfway, e.param(ParamId::Tilt)));
+                  tiltQuarter, want, mixQuarter, atB ? "exact" : "NOT", halfway, e.param(ParamIdE::TILT)));
     }
 
     // 46. The journeys: every one that comes with the instrument reads, names presets the bank has
@@ -1364,10 +1364,10 @@ int main()
         int bad = 0, unknown = 0, steps = 0;
         for (int i = 0; i < numBuiltinJourneys(); ++i) {
             Journey j, k;
-            if (!j.parse(builtinJourneyText(i)) || j.steps.empty() || !k.parse(j.text().c_str()) || k.steps.size() != j.steps.size()) ++bad;
-            for (const JourneyStep& st : j.steps) {
+            if (!j.parse(builtinJourneyText(i)) || j.m_steps.empty() || !k.parse(j.text().c_str()) || k.m_steps.size() != j.m_steps.size()) ++bad;
+            for (const JourneyStep& st : j.m_steps) {
                 ++steps;
-                if (findPreset(st.preset.c_str()) < 0) ++unknown;
+                if (findPreset(st.m_preset.c_str()) < 0) ++unknown;
             }
         }
         Journey j;
@@ -1380,7 +1380,7 @@ int main()
             JourneyStep s1, s2;
             double f1 = 0.0, f2 = 0.0;
             const bool b1 = p1.advance(0.5, s1, f1), b2 = p2.advance(0.5, s2, f2);
-            if (b1 != b2 || (b1 && (s1.preset != s2.preset || f1 != f2))) same = false;
+            if (b1 != b2 || (b1 && (s1.m_preset != s2.m_preset || f1 != f2))) same = false;
         }
         // Played: each step's preset reached (its tilt and its master gain) before the next begins.
         Engine e;
@@ -1394,17 +1394,17 @@ int main()
             double fade = 0.0;
             if (p.advance(0.1, st, fade)) {
                 if (current >= 0 && checked) ++reached;
-                current = findPreset(st.preset.c_str());
+                current = findPreset(st.m_preset.c_str());
                 e.loadPreset(current, fade);
                 ++begun;
                 checked = false;
             }
             render(e, 0.1);
             if (!checked && current >= 0 && e.morphProgress() >= 1.0f) {
-                float values[kNumParams];
+                float values[NumParams];
                 presetValues(current, values, nullptr);
-                checked = e.soundValue(ParamId::Tilt) == values[static_cast<size_t>(ParamId::Tilt)]
-                       && e.soundValue(ParamId::MasterGain) == values[static_cast<size_t>(ParamId::MasterGain)];
+                checked = e.soundValue(ParamIdE::TILT) == values[static_cast<size_t>(ParamIdE::TILT)]
+                       && e.soundValue(ParamIdE::MASTER_GAIN) == values[static_cast<size_t>(ParamIdE::MASTER_GAIN)];
             }
         }
         check(bad == 0 && unknown == 0 && numBuiltinJourneys() >= 68 && same && begun >= 4 && reached >= 3 && p.passes() >= 1,
@@ -1420,11 +1420,11 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::CloudWidth, 4.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::Scale, 0.0f);
-            e.setParam(ParamId::Stretch, k == 0 ? 1200.0f : 1260.0f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::SCALE, 0.0f);
+            e.setParam(ParamIdE::STRETCH, k == 0 ? 1200.0f : 1260.0f);
             if (!openOffline(e, false, 151)) return 1;
             e.noteOn(48, 0.8f, 0);
             const std::vector<float> lr = render(e, 2.0);
@@ -1434,11 +1434,11 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::CloudWidth, 4.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::Scale, 0.0f);
-            e.setParam(ParamId::Shift, k == 0 ? 0.0f : 50.0f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::SCALE, 0.0f);
+            e.setParam(ParamIdE::SHIFT, k == 0 ? 0.0f : 50.0f);
             if (!openOffline(e, false, 153)) return 1;
             e.noteOn(48, 0.8f, 0);
             const std::vector<float> lr = render(e, 2.0);
@@ -1458,13 +1458,13 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::CloudWidth, 4.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::CombDepth, static_cast<float>(k));
-            e.setParam(ParamId::CombDensity, 1.0f);
-            e.setParam(ParamId::CombSweep, 0.0f);
-            e.setParam(ParamId::CombStereo, 0.0f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::COMB_DEPTH, static_cast<float>(k));
+            e.setParam(ParamIdE::COMB_DENSITY, 1.0f);
+            e.setParam(ParamIdE::COMB_SWEEP, 0.0f);
+            e.setParam(ParamIdE::COMB_STEREO, 0.0f);
             if (!openOffline(e, false, 157)) return 1;
             e.noteOn(48, 0.8f, 0);
             const std::vector<float> lr = render(e, 2.0);
@@ -1474,9 +1474,9 @@ int main()
                 // Against the same note without the comb: how far apart the harmonics are cut.
                 Engine o;
                 quietEffects(o);
-                o.setParam(ParamId::Motion, 0.0f);
-                o.setParam(ParamId::CloudWidth, 4.0f);
-                o.setParam(ParamId::Shimmer, 0.0f);
+                o.setParam(ParamIdE::MOTION, 0.0f);
+                o.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+                o.setParam(ParamIdE::SHIMMER, 0.0f);
                 if (!openOffline(o, false, 157)) return 1;
                 o.noteOn(48, 0.8f, 0);
                 const std::vector<float> ref = render(o, 2.0);
@@ -1493,13 +1493,13 @@ int main()
         for (int k = 0; k < 2; ++k) {   // the same note, the same seed, with and without a sweeping comb
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::CloudWidth, 4.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::CombDepth, static_cast<float>(k));
-            e.setParam(ParamId::CombDensity, 1.0f);
-            e.setParam(ParamId::CombSweep, 0.25f);
-            e.setParam(ParamId::CombStereo, 0.0f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::COMB_DEPTH, static_cast<float>(k));
+            e.setParam(ParamIdE::COMB_DENSITY, 1.0f);
+            e.setParam(ParamIdE::COMB_SWEEP, 0.25f);
+            e.setParam(ParamIdE::COMB_STEREO, 0.0f);
             if (!openOffline(e, false, 159)) return 1;
             e.noteOn(48, 0.8f, 0);
             const std::vector<float> lr = render(e, 9.0);
@@ -1527,19 +1527,19 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::CloudWidth, 4.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::Motion, k == 0 ? 0.0f : 6.0f);   // None, Aurora
-            e.setParam(ParamId::MotionDepth, 1.0f);
-            e.setParam(ParamId::Landscape, static_cast<float>(kUserLandscape));
+            e.setParam(ParamIdE::CLOUD_WIDTH, 4.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::MOTION, k == 0 ? 0.0f : 6.0f);   // None, Aurora
+            e.setParam(ParamIdE::MOTION_DEPTH, 1.0f);
+            e.setParam(ParamIdE::LANDSCAPE, static_cast<float>(UserLandscape));
             Landscape l;
-            l.columns = 256;
-            l.rows = 64;
-            l.rowSeconds = 0.5f;
-            l.amps.assign(static_cast<size_t>(l.columns) * l.rows, 0.01f);
-            for (int r = 0; r < l.rows; ++r)
-                for (int c = 0; c < l.columns; ++c)
-                    if (std::fabs(std::log2(landscapeColumnHz(c, l.columns) / 1000.0f)) < 0.25f) l.amps[static_cast<size_t>(r) * l.columns + c] = 1.0f;
+            l.m_columns = 256;
+            l.m_rows = 64;
+            l.m_rowSeconds = 0.5f;
+            l.m_amps.assign(static_cast<size_t>(l.m_columns) * l.m_rows, 0.01f);
+            for (int r = 0; r < l.m_rows; ++r)
+                for (int c = 0; c < l.m_columns; ++c)
+                    if (std::fabs(std::log2(landscapeColumnHz(c, l.m_columns) / 1000.0f)) < 0.25f) l.m_amps[static_cast<size_t>(r) * l.m_columns + c] = 1.0f;
             e.setUserLandscape(l);
             if (!openOffline(e, false, 161)) return 1;
             e.noteOn(48, 0.8f, 0);
@@ -1561,11 +1561,11 @@ int main()
             auto play = [&](std::vector<float>& f3, std::vector<float>& f6) {
                 Engine e;
                 quietEffects(e);
-                e.setParam(ParamId::Attack, 0.5f);
-                e.setParam(ParamId::LifeMode, static_cast<float>(mode));
-                e.setParam(ParamId::LifeDepth, 0.7f);
-                e.setParam(ParamId::LifeRate, 0.5f);
-                e.setParam(ParamId::LifeTurn, 1.0f);
+                e.setParam(ParamIdE::ATTACK, 0.5f);
+                e.setParam(ParamIdE::LIFE_MODE, static_cast<float>(mode));
+                e.setParam(ParamIdE::LIFE_DEPTH, 0.7f);
+                e.setParam(ParamIdE::LIFE_RATE, 0.5f);
+                e.setParam(ParamIdE::LIFE_TURN, 1.0f);
                 if (!openOffline(e, false, 163)) return std::vector<float>();
                 for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
                 std::vector<float> lr = render(e, 3.0);
@@ -1587,9 +1587,9 @@ int main()
                 finite = finite && std::isfinite(a6[i]);
             }
             moved /= std::max<size_t>(1, a3.size());
-            const bool ok = a3.size() == static_cast<size_t>(kLifeW * kLifeH) && finite && moved > 0.005 && std::fabs(level - level0) < 2.0 && a == b;
+            const bool ok = a3.size() == static_cast<size_t>(LifeW * LifeH) && finite && moved > 0.005 && std::fabs(level - level0) < 2.0 && a == b;
             good = good && ok;
-            report += fmt("%s %.3f %.1f%s%s; ", kLifeModeNames[mode], moved, level, a == b ? "" : " NOT identical", ok ? "" : " (FAILED)");
+            report += fmt("%s %.3f %.1f%s%s; ", LifeModeNames[mode], moved, level, a == b ? "" : " NOT identical", ok ? "" : " (FAILED)");
         }
         check(good, "life: the animated pictures move, keep the level, repeat", fmt("free %.1f dBFS; moved a cell, dBFS: ", level0) + report);
     }
@@ -1603,44 +1603,44 @@ int main()
         presetMapPosition(100, x, y);
         MorphState at;
         MapNeighbours nb;
-        blender.blend(x, y, paramDesc(ParamId::MapRadius).def, at, &nb);
-        float values[kNumParams];
+        blender.blend(x, y, paramDesc(ParamIdE::MAP_RADIUS).m_def, at, &nb);
+        float values[NumParams];
         presetValues(100, values, nullptr);
         double worst = 0.0;   // what carries the sound (an amount whose choice is off may differ: it is not heard)
-        for (ParamId id : { ParamId::Tilt, ParamId::Brightness, ParamId::CloudWidth, ParamId::Shimmer, ParamId::Attack, ParamId::Release,
-                            ParamId::MasterGain, ParamId::Depth, ParamId::FarLevel, ParamId::Drift }) {
+        for (ParamIdE id : { ParamIdE::TILT, ParamIdE::BRIGHTNESS, ParamIdE::CLOUD_WIDTH, ParamIdE::SHIMMER, ParamIdE::ATTACK, ParamIdE::RELEASE,
+                            ParamIdE::MASTER_GAIN, ParamIdE::DEPTH, ParamIdE::FAR_LEVEL, ParamIdE::DRIFT }) {
             const ParamDesc& d = paramDesc(id);
-            worst = std::max(worst, static_cast<double>(std::fabs(toNorm(d, at.values[static_cast<size_t>(id)]) - toNorm(d, values[static_cast<size_t>(id)]))));
+            worst = std::max(worst, static_cast<double>(std::fabs(toNorm(d, at.m_values[static_cast<size_t>(id)]) - toNorm(d, values[static_cast<size_t>(id)]))));
         }
-        const bool onPoint = nb.index[0] == 100 && nb.weight[0] > 0.95f && worst < 0.03;
+        const bool onPoint = nb.m_index[0] == 100 && nb.m_weight[0] > 0.95f && worst < 0.03;
         // Half way to the nearest other preset, a wide blend: the tilt between the two (or equal).
-        const int other = nb.index[1];
+        const int other = nb.m_index[1];
         float ox = 0.0f, oy = 0.0f;
         presetMapPosition(other, ox, oy);
         MorphState mid;
         blender.blend(0.5f * (x + ox), 0.5f * (y + oy), 1.0f, mid);
-        float vo[kNumParams];
+        float vo[NumParams];
         presetValues(other, vo, nullptr);
-        const float ta = values[static_cast<size_t>(ParamId::Tilt)], tb = vo[static_cast<size_t>(ParamId::Tilt)], tm = mid.values[static_cast<size_t>(ParamId::Tilt)];
+        const float ta = values[static_cast<size_t>(ParamIdE::TILT)], tb = vo[static_cast<size_t>(ParamIdE::TILT)], tm = mid.m_values[static_cast<size_t>(ParamIdE::TILT)];
         const bool between = tm >= std::min(ta, tb) - 1.0e-3f && tm <= std::max(ta, tb) + 1.0e-3f;
         // The engine follows the target.
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::MapGlide, 0.3f);
+        e.setParam(ParamIdE::MAP_GLIDE, 0.3f);
         if (!openOffline(e, false, 165)) return 1;
         e.noteOn(55, 0.8f, 0);
         render(e, 0.5);
         e.setMapTarget(mid);
-        e.setParam(ParamId::MapActive, 1.0f);
+        e.setParam(ParamIdE::MAP_ACTIVE, 1.0f);
         render(e, 3.0);
-        const ParamDesc& tilt = paramDesc(ParamId::Tilt);
-        const bool follows = std::fabs(toNorm(tilt, e.soundValue(ParamId::Tilt)) - toNorm(tilt, tm)) < 1.0e-3f;
+        const ParamDesc& tilt = paramDesc(ParamIdE::TILT);
+        const bool follows = std::fabs(toNorm(tilt, e.soundValue(ParamIdE::TILT)) - toNorm(tilt, tm)) < 1.0e-3f;
         // The routes.
         int bad = 0;
         for (int i = 0; i < numRoutePresets(); ++i) {
             Route r, back;
             char buf[4096];
-            if (!r.parse(routePreset(i).points) || r.count() < 3 || r.write(buf, sizeof(buf)) <= 0 || !back.parse(buf) || back.count() != r.count()) ++bad;
+            if (!r.parse(routePreset(i).m_points) || r.count() < 3 || r.write(buf, sizeof(buf)) <= 0 || !back.parse(buf) || back.count() != r.count()) ++bad;
         }
         Route r;
         r.parse("0.2,0.2|1|1|0.5;0.8,0.6|2|1|1.5");
@@ -1655,7 +1655,7 @@ int main()
         check(onPoint && between && follows && bad == 0 && reachedA && reachedB && looped && r.running(), "map: blends, follows, and routes walk",
               fmt("on its point: preset %d weight %.3f, off by %.1e; half way the tilt %.2f between %.2f and %.2f; followed: %s; "
                   "%d routes, %d unreadable; walked A %s, B %s, round again %s",
-                  nb.index[0], nb.weight[0], worst, tm, ta, tb, follows ? "yes" : "NO", numRoutePresets(), bad,
+                  nb.m_index[0], nb.m_weight[0], worst, tm, ta, tb, follows ? "yes" : "NO", numRoutePresets(), bad,
                   reachedA ? "yes" : "NO", reachedB ? "yes" : "NO", looped ? "yes" : "NO"));
     }
 
@@ -1668,27 +1668,27 @@ int main()
     {
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Attack, 0.2f);
-        e.setParam(ParamId::Motion, 4.0f);        // Breathe
-        e.setParam(ParamId::MotionDepth, 0.5f);
-        e.setParam(ParamId::Lfo1Shape, 0.0f);     // sine
-        e.setParam(ParamId::Lfo1Rate, 0.3f);
-        e.setParam(ParamId::Lfo2Shape, 1.0f);     // triangle
-        e.setParam(ParamId::Lfo2Rate, 0.2f);
-        e.setParam(ParamId::Macro1, 1.0f);       // a constant push on the depth: at the change it must be faded too
+        e.setParam(ParamIdE::ATTACK, 0.2f);
+        e.setParam(ParamIdE::MOTION, 4.0f);        // Breathe
+        e.setParam(ParamIdE::MOTION_DEPTH, 0.5f);
+        e.setParam(ParamIdE::LFO1_SHAPE, 0.0f);     // sine
+        e.setParam(ParamIdE::LFO1_RATE, 0.3f);
+        e.setParam(ParamIdE::LFO2_SHAPE, 1.0f);     // triangle
+        e.setParam(ParamIdE::LFO2_RATE, 0.2f);
+        e.setParam(ParamIdE::MACRO1, 1.0f);       // a constant push on the depth: at the change it must be faded too
         e.setModText("lfo1>brightness:0.4;macro1>motion_depth:0.3");
         if (!openOffline(e, false, 167)) return 1;
         e.noteOn(50, 0.8f, 0);
         e.noteOn(57, 0.8f, 0);
         std::vector<float> L(128), R(128);
         // The played value of a number: modulated, or as it stands.
-        auto played = [&](ParamId id) {
+        auto played = [&](ParamIdE id) {
             const float n = e.playedNorm(id);
             return std::isnan(n) ? toNorm(paramDesc(id), e.soundValue(id)) : n;
         };
         // Each number's largest move per block: before (A's slow sine on the brightness), gliding,
         // after (B's quick steps on the width).
-        const ParamId watched[] = { ParamId::Brightness, ParamId::CloudWidth };
+        const ParamIdE watched[] = { ParamIdE::BRIGHTNESS, ParamIdE::CLOUD_WIDTH };
         float last[2] = {};
         double before[2] = {}, gliding[2] = {}, after[2] = {}, ignore[2] = {};
         auto step = [&](double* worst) {
@@ -1701,47 +1701,47 @@ int main()
         };
         for (int k = 0; k < 1500; ++k) step(k < 10 ? ignore : before);   // 4 s
         e.beginMorph(4.0);
-        e.setParam(ParamId::Motion, 6.0f);        // Aurora
-        e.setParam(ParamId::MotionDepth, 0.6f);
-        e.setParam(ParamId::Lfo1Shape, 6.0f);     // steps
-        e.setParam(ParamId::Lfo1Rate, 2.0f);
+        e.setParam(ParamIdE::MOTION, 6.0f);        // Aurora
+        e.setParam(ParamIdE::MOTION_DEPTH, 0.6f);
+        e.setParam(ParamIdE::LFO1_SHAPE, 6.0f);     // steps
+        e.setParam(ParamIdE::LFO1_RATE, 2.0f);
         e.setModText("lfo1>cloud_width:0.4;macro1>motion_depth:0.3");
         double depthAtSwitch = 0.0;
         int prevMotion = 4;
         for (int k = 0; k < 1700; ++k) {          // the glide and a little
             step(gliding);
-            const int motion = static_cast<int>(std::lround(e.soundValue(ParamId::Motion)));
-            if (motion != prevMotion) depthAtSwitch = std::max(depthAtSwitch, static_cast<double>(played(ParamId::MotionDepth)));
+            const int motion = static_cast<int>(std::lround(e.soundValue(ParamIdE::MOTION)));
+            if (motion != prevMotion) depthAtSwitch = std::max(depthAtSwitch, static_cast<double>(played(ParamIdE::MOTION_DEPTH)));
             prevMotion = motion;
         }
         for (int k = 0; k < 1500; ++k) step(after);
         // The map: on, then its target far away -- the other end of the bank.
-        float va[kNumParams], vb[kNumParams];
+        float va[NumParams], vb[NumParams];
         std::string ma, mb;
         presetValues(0, va, &ma);
         presetValues(numPresets() - 1, vb, &mb);
-        ModRow ra[kModRows], rb[kModRows];
+        ModRow ra[ModRows], rb[ModRows];
         MorphState here, yonder;
-        here.set(va, ra, modRowsFromText(ma, ra, kModRows));
-        yonder.set(vb, rb, modRowsFromText(mb, rb, kModRows));
-        here.values[static_cast<size_t>(ParamId::Partials)] = 2000.0f;   // far apart in what can only step
-        yonder.values[static_cast<size_t>(ParamId::Partials)] = 20000.0f;
-        e.setParam(ParamId::MapGlide, 2.0f);
+        here.set(va, ra, modRowsFromText(ma, ra, ModRows));
+        yonder.set(vb, rb, modRowsFromText(mb, rb, ModRows));
+        here.m_values[static_cast<size_t>(ParamIdE::PARTIALS)] = 2000.0f;   // far apart in what can only step
+        yonder.m_values[static_cast<size_t>(ParamIdE::PARTIALS)] = 20000.0f;
+        e.setParam(ParamIdE::MAP_GLIDE, 2.0f);
         e.setMapTarget(here);
-        e.setParam(ParamId::MapActive, 1.0f);
+        e.setParam(ParamIdE::MAP_ACTIVE, 1.0f);
         for (int k = 0; k < 2000; ++k) e.process(L.data(), R.data(), 128);   // the map takes over, gliding
         e.setMapTarget(yonder);
         double partialsJump = 0.0, amountAtSwitch = 0.0;
-        float prevPartials = e.soundValue(ParamId::Partials);
-        int prevKind[3] = { static_cast<int>(std::lround(e.soundValue(ParamId::Motion))), static_cast<int>(std::lround(e.soundValue(ParamId::LifeMode))),
-                            static_cast<int>(std::lround(e.soundValue(ParamId::FieldMode))) };
-        const ParamId amounts[3] = { ParamId::MotionDepth, ParamId::LifeDepth, ParamId::FieldStrength };
-        const ParamId kinds[3] = { ParamId::Motion, ParamId::LifeMode, ParamId::FieldMode };
-        const float partialsSpan = paramDesc(ParamId::Partials).max - paramDesc(ParamId::Partials).min;
+        float prevPartials = e.soundValue(ParamIdE::PARTIALS);
+        int prevKind[3] = { static_cast<int>(std::lround(e.soundValue(ParamIdE::MOTION))), static_cast<int>(std::lround(e.soundValue(ParamIdE::LIFE_MODE))),
+                            static_cast<int>(std::lround(e.soundValue(ParamIdE::FIELD_MODE))) };
+        const ParamIdE amounts[3] = { ParamIdE::MOTION_DEPTH, ParamIdE::LIFE_DEPTH, ParamIdE::FIELD_STRENGTH };
+        const ParamIdE kinds[3] = { ParamIdE::MOTION, ParamIdE::LIFE_MODE, ParamIdE::FIELD_MODE };
+        const float partialsSpan = paramDesc(ParamIdE::PARTIALS).m_max - paramDesc(ParamIdE::PARTIALS).m_min;
         for (int k = 0; k < 4000; ++k) {
             const float amountBefore[3] = { played(amounts[0]), played(amounts[1]), played(amounts[2]) };
             e.process(L.data(), R.data(), 128);
-            const float p = e.soundValue(ParamId::Partials);
+            const float p = e.soundValue(ParamIdE::PARTIALS);
             partialsJump = std::max(partialsJump, static_cast<double>(std::fabs(p - prevPartials) / partialsSpan));
             prevPartials = p;
             for (int j = 0; j < 3; ++j) {
@@ -1756,23 +1756,23 @@ int main()
         {
             Engine f;
             quietEffects(f);
-            f.setParam(ParamId::LifeMode, 3.0f);   // Kaleidoscope
-            f.setParam(ParamId::LifeDepth, 0.8f);
-            f.setParam(ParamId::Landscape, 0.0f);
-            f.setParam(ParamId::Macro1, 1.0f);
+            f.setParam(ParamIdE::LIFE_MODE, 3.0f);   // Kaleidoscope
+            f.setParam(ParamIdE::LIFE_DEPTH, 0.8f);
+            f.setParam(ParamIdE::LANDSCAPE, 0.0f);
+            f.setParam(ParamIdE::MACRO1, 1.0f);
             f.setModText("macro1>life_depth:0.2");
             if (!openOffline(f, false, 169)) return 1;
             f.noteOn(55, 0.8f, 0);
             for (int k = 0; k < 400; ++k) f.process(L.data(), R.data(), 128);
             f.beginMorph(2.0);
-            f.setParam(ParamId::Landscape, 2.0f);
+            f.setParam(ParamIdE::LANDSCAPE, 2.0f);
             int land = 0;
             for (int k = 0; k < 1000; ++k) {
                 f.process(L.data(), R.data(), 128);
-                const int now = static_cast<int>(std::lround(f.soundValue(ParamId::Landscape)));
+                const int now = static_cast<int>(std::lround(f.soundValue(ParamIdE::LANDSCAPE)));
                 if (now != land) {
-                    const float n = f.playedNorm(ParamId::LifeDepth);
-                    lifeAtSwitch = std::isnan(n) ? f.soundValue(ParamId::LifeDepth) : n;
+                    const float n = f.playedNorm(ParamIdE::LIFE_DEPTH);
+                    lifeAtSwitch = std::isnan(n) ? f.soundValue(ParamIdE::LIFE_DEPTH) : n;
                 }
                 land = now;
             }
@@ -1797,24 +1797,24 @@ int main()
     //     against each other), when they part they scatter round the circle.
     {
         struct Watch {
-            std::vector<std::vector<float>> amp;   // per watched member its loudness over time
-            std::vector<float> hz;                 // its last frequency
+            std::vector<std::vector<float>> m_amp;   // per watched member its loudness over time
+            std::vector<float> m_hz;                 // its last frequency
         };
         auto watch = [&](int mode, float coupling, float spread, float swarm, float reach, Watch& w) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.05f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::SyncDepth, 1.0f);
-            e.setParam(ParamId::SyncRate, 0.5f);
-            e.setParam(ParamId::SyncSpread, spread);
-            e.setParam(ParamId::SyncCoupling, coupling);
-            e.setParam(ParamId::SyncMode, static_cast<float>(mode));
-            e.setParam(ParamId::SyncSwarm, swarm);
-            e.setParam(ParamId::SyncReach, reach);
-            e.setParam(ParamId::SyncLag, 0.47f);
+            e.setParam(ParamIdE::ATTACK, 0.05f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::SYNC_DEPTH, 1.0f);
+            e.setParam(ParamIdE::SYNC_RATE, 0.5f);
+            e.setParam(ParamIdE::SYNC_SPREAD, spread);
+            e.setParam(ParamIdE::SYNC_COUPLING, coupling);
+            e.setParam(ParamIdE::SYNC_MODE, static_cast<float>(mode));
+            e.setParam(ParamIdE::SYNC_SWARM, swarm);
+            e.setParam(ParamIdE::SYNC_REACH, reach);
+            e.setParam(ParamIdE::SYNC_LAG, 0.47f);
             if (!openOffline(e, false, 171)) return false;
             e.noteOn(84, 0.8f, 0);
             std::vector<float> L(128), R(128), dots;
@@ -1829,12 +1829,12 @@ int main()
                     if (members == 0) {
                         while (members + 1 < per && d[2 * (members + 1)] < 1.5f * d[0]) ++members;
                         ++members;
-                        w.amp.assign(static_cast<size_t>(members), {});
+                        w.m_amp.assign(static_cast<size_t>(members), {});
                     }
-                    w.hz.assign(static_cast<size_t>(members), 0.0f);
+                    w.m_hz.assign(static_cast<size_t>(members), 0.0f);
                     for (int j = 0; j < members; ++j) {
-                        w.amp[static_cast<size_t>(j)].push_back(d[2 * j + 1]);
-                        w.hz[static_cast<size_t>(j)] = d[2 * j];
+                        w.m_amp[static_cast<size_t>(j)].push_back(d[2 * j + 1]);
+                        w.m_hz[static_cast<size_t>(j)] = d[2 * j];
                     }
                     break;
                 }
@@ -1844,9 +1844,9 @@ int main()
         // The share of neighbouring watched members whose loudness correlates over 0.8 (and under 0.5).
         auto together = [](const Watch& w, double* apart = nullptr) {
             int pairs = 0, alike = 0, unlike = 0;
-            for (size_t j = 0; j + 1 < w.amp.size(); ++j) {
-                const std::vector<float>& a = w.amp[j];
-                const std::vector<float>& b = w.amp[j + 1];
+            for (size_t j = 0; j + 1 < w.m_amp.size(); ++j) {
+                const std::vector<float>& a = w.m_amp[j];
+                const std::vector<float>& b = w.m_amp[j + 1];
                 const size_t n = std::min(a.size(), b.size());
                 double ma = 0.0, mb = 0.0;
                 for (size_t i = 0; i < n; ++i) { ma += a[i]; mb += b[i]; }
@@ -1870,8 +1870,8 @@ int main()
         // The swarm's pitch against the same cloud without it: cents per watched member.
         auto offsets = [&](const Watch& w, double& spread, double& widest) {
             std::vector<double> d;
-            for (size_t j = 0; j < w.hz.size() && j < base.hz.size(); ++j)
-                if (w.hz[j] > 0.0f && base.hz[j] > 0.0f) d.push_back(1200.0 * std::log2(static_cast<double>(w.hz[j]) / base.hz[j]));
+            for (size_t j = 0; j < w.m_hz.size() && j < base.m_hz.size(); ++j)
+                if (w.m_hz[j] > 0.0f && base.m_hz[j] > 0.0f) d.push_back(1200.0 * std::log2(static_cast<double>(w.m_hz[j]) / base.m_hz[j]));
             double m = 0.0;
             for (double x : d) m += x;
             m /= std::max<double>(1.0, static_cast<double>(d.size()));
@@ -1903,12 +1903,12 @@ int main()
                        std::vector<float>& out) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::LifeMode, static_cast<float>(mode));
-            e.setParam(ParamId::LifeDepth, 0.8f);
-            e.setParam(ParamId::LifeRate, 1.0f);
-            e.setParam(ParamId::LifeCharacter, character);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::LIFE_MODE, static_cast<float>(mode));
+            e.setParam(ParamIdE::LIFE_DEPTH, 0.8f);
+            e.setParam(ParamIdE::LIFE_RATE, 1.0f);
+            e.setParam(ParamIdE::LIFE_CHARACTER, character);
             if (!openOffline(e, false, 173)) return false;
             for (int note : { 45, 57, 64 }) e.noteOn(note, 0.8f, 0);
             std::vector<float> L(128), R(128), dots;
@@ -1923,7 +1923,7 @@ int main()
                     e.lifeSnapshot(late);
                 }
             }
-            return early.size() == static_cast<size_t>(kLifeW * kLifeH) && late.size() == early.size();
+            return early.size() == static_cast<size_t>(LifeW * LifeH) && late.size() == early.size();
         };
         // The Fluid.
         std::vector<float> early, late, out1, out2, e2, l2;
@@ -1932,16 +1932,16 @@ int main()
         // The ink atNotes the notes' columns (a fundamental and its octave each, +-3 cells) against the rest, at five seconds.
         double atNotes = 0.0, rest = 0.0;
         int atNotesCells = 0, restCells = 0;
-        std::vector<bool> column(static_cast<size_t>(kLifeW), false);
+        std::vector<bool> column(static_cast<size_t>(LifeW), false);
         for (int note : { 45, 57, 64 }) {
             const double hz = 440.0 * std::pow(2.0, (note - 69) / 12.0);
             for (double f : { hz, 2.0 * hz }) {
-                const int x = static_cast<int>(std::log2(f / 20.0) / std::log2(1000.0) * kLifeW);
-                for (int d = -3; d <= 3; ++d) column[static_cast<size_t>((x + d) & (kLifeW - 1))] = true;
+                const int x = static_cast<int>(std::log2(f / 20.0) / std::log2(1000.0) * LifeW);
+                for (int d = -3; d <= 3; ++d) column[static_cast<size_t>((x + d) & (LifeW - 1))] = true;
             }
         }
-        for (int i = 0; fluidRan && i < kLifeW * kLifeH; ++i) {
-            if (column[static_cast<size_t>(i & (kLifeW - 1))]) { atNotes += early[static_cast<size_t>(i)]; ++atNotesCells; }
+        for (int i = 0; fluidRan && i < LifeW * LifeH; ++i) {
+            if (column[static_cast<size_t>(i & (LifeW - 1))]) { atNotes += early[static_cast<size_t>(i)]; ++atNotesCells; }
             else { rest += early[static_cast<size_t>(i)]; ++restCells; }
         }
         atNotes /= std::max(1, atNotesCells);
@@ -1954,9 +1954,9 @@ int main()
         // The Islands: borders along the rows (where the field crosses its middle).
         auto borders = [](const std::vector<float>& f) {
             int n = 0;
-            for (int y = 0; y < kLifeH; ++y)
-                for (int x = 0; x < kLifeW; ++x)
-                    n += (f[static_cast<size_t>(y * kLifeW + x)] > 0.5f) != (f[static_cast<size_t>(y * kLifeW + ((x + 1) & (kLifeW - 1)))] > 0.5f);
+            for (int y = 0; y < LifeH; ++y)
+                for (int x = 0; x < LifeW; ++x)
+                    n += (f[static_cast<size_t>(y * LifeW + x)] > 0.5f) != (f[static_cast<size_t>(y * LifeW + ((x + 1) & (LifeW - 1)))] > 0.5f);
             return n;
         };
         std::vector<float> ie, il, iout;
@@ -1983,15 +1983,15 @@ int main()
     //     chord's climbs far less; turned off, the spectrum settles back.
     {
         // The centroid in octaves above 20 Hz, averaged over the snapshots of a stretch, and the level.
-        struct Heard { double centroid = 0.0, db = 0.0, back = 0.0; };
+        struct Heard { double m_centroid = 0.0, m_db = 0.0, m_back = 0.0; };
         auto listen = [&](float turbulence, float velocity, bool thenOff, Heard& h) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.3f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Tilt, 1.2f);
-            e.setParam(ParamId::Turbulence, turbulence);
-            e.setParam(ParamId::TurbulenceTime, 4.0f);
+            e.setParam(ParamIdE::ATTACK, 0.3f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::TILT, 1.2f);
+            e.setParam(ParamIdE::TURBULENCE, turbulence);
+            e.setParam(ParamIdE::TURBULENCE_TIME, 4.0f);
             if (!openOffline(e, false, 175)) return false;
             for (int note : { 48, 55, 60, 64 }) e.noteOn(note, velocity, 0);
             std::vector<float> L(128), R(128), dots, lr;
@@ -1999,7 +1999,7 @@ int main()
             double sum = 0.0, back = 0.0;
             int count = 0, backCount = 0;
             for (int k = 0; k < 375 * 30; ++k) {   // 30 s; off at 10 s when asked
-                if (thenOff && k == 375 * 10) e.setParam(ParamId::Turbulence, 0.0f);
+                if (thenOff && k == 375 * 10) e.setParam(ParamIdE::TURBULENCE, 0.0f);
                 e.process(L.data(), R.data(), 128);
                 if (k >= 375 * 8 && k < 375 * 10)
                     for (int i = 0; i < 128; ++i) { lr.push_back(L[static_cast<size_t>(i)]); lr.push_back(R[static_cast<size_t>(i)]); }
@@ -2015,19 +2015,19 @@ int main()
                 if (k >= 375 * 8 && k < 375 * 10) { sum += m / w; ++count; }
                 if (k >= 375 * 28) { back += m / w; ++backCount; }
             }
-            h.centroid = count > 0 ? sum / count : 0.0;
-            h.back = backCount > 0 ? back / backCount : 0.0;
-            h.db = rmsDb(lr, 0, lr.size() / 2);
+            h.m_centroid = count > 0 ? sum / count : 0.0;
+            h.m_back = backCount > 0 ? back / backCount : 0.0;
+            h.m_db = rmsDb(lr, 0, lr.size() / 2);
             return count > 0;
         };
         Heard plain, loud, soft, softPlain, settled;
         const bool ran = listen(0.0f, 0.9f, false, plain) && listen(1.0f, 0.9f, false, loud) && listen(1.0f, 0.15f, false, soft)
                       && listen(0.0f, 0.15f, false, softPlain) && listen(1.0f, 0.9f, true, settled);
-        const double rise = loud.centroid - plain.centroid, softRise = soft.centroid - softPlain.centroid;
-        check(ran && rise > 0.3 && std::fabs(loud.db - plain.db) < 1.5 && softRise < 0.6 * rise && std::fabs(settled.back - plain.centroid) < 0.1,
+        const double rise = loud.m_centroid - plain.m_centroid, softRise = soft.m_centroid - softPlain.m_centroid;
+        check(ran && rise > 0.3 && std::fabs(loud.m_db - plain.m_db) < 1.5 && softRise < 0.6 * rise && std::fabs(settled.m_back - plain.m_centroid) < 0.1,
               "turbulence: a loud chord's energy climbs, a soft one's hardly",
               fmt("centroid %.2f octaves higher loud (%.1f against %.1f dBFS), %.2f soft; turned off, %.2f octaves from the plain chord after 20 s",
-                  rise, loud.db, plain.db, softRise, settled.back - plain.centroid));
+                  rise, loud.m_db, plain.m_db, softRise, settled.m_back - plain.m_centroid));
     }
 
     // 56. The filter morphs by transport (Phase 16d): a glide from a low pass at 300 Hz into a high
@@ -2040,16 +2040,16 @@ int main()
         auto take = [&](bool filtered, std::vector<float>& start, std::vector<float>& middle, std::vector<float>& end) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.05f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::KeyTrack, 0.0f);
-            e.setParam(ParamId::FilterEnv, 0.0f);
-            e.setParam(ParamId::FilterDrift, 0.0f);
-            e.setParam(ParamId::FilterModel, filtered ? 3.0f : 0.0f);   // LP 24
-            e.setParam(ParamId::Cutoff, 300.0f);
-            e.setParam(ParamId::Resonance, 0.2f);
+            e.setParam(ParamIdE::ATTACK, 0.05f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::KEY_TRACK, 0.0f);
+            e.setParam(ParamIdE::FILTER_ENV, 0.0f);
+            e.setParam(ParamIdE::FILTER_DRIFT, 0.0f);
+            e.setParam(ParamIdE::FILTER_MODEL, filtered ? 3.0f : 0.0f);   // LP 24
+            e.setParam(ParamIdE::CUTOFF, 300.0f);
+            e.setParam(ParamIdE::RESONANCE, 0.2f);
             if (!openOffline(e, false, 177)) return false;
             e.noteOn(31, 0.8f, 0);
             std::vector<float> L(128), R(128), dots;
@@ -2059,8 +2059,8 @@ int main()
                 if (e.partialSnapshot(dots, per)) start = dots;
             }
             e.beginMorph(6.0);
-            e.setParam(ParamId::FilterModel, filtered ? 4.0f : 0.0f);   // HP 12
-            e.setParam(ParamId::Cutoff, 3000.0f);
+            e.setParam(ParamIdE::FILTER_MODEL, filtered ? 4.0f : 0.0f);   // HP 12
+            e.setParam(ParamIdE::CUTOFF, 3000.0f);
             bool half = false;
             for (int k = 0; k < 375 * 8; ++k) {
                 e.process(L.data(), R.data(), 128);
@@ -2107,14 +2107,14 @@ int main()
         auto pitches = [](const Engine& e) {
             std::vector<double> hz;
             for (int i = 0; i < 16; ++i)
-                if (e.voiceView(i).hz > 0.0f && e.voiceView(i).source == 0) hz.push_back(e.voiceView(i).hz);
+                if (e.voiceView(i).m_hz > 0.0f && e.voiceView(i).m_source == 0) hz.push_back(e.voiceView(i).m_hz);
             std::sort(hz.begin(), hz.end());
             return hz;
         };
         Engine e;
         quietEffects(e);
-        e.setParam(ParamId::Motion, 0.0f);
-        e.setParam(ParamId::Release, 2.0f);
+        e.setParam(ParamIdE::MOTION, 0.0f);
+        e.setParam(ParamIdE::RELEASE, 2.0f);
         bool good = openOffline(e, false, 179);
         e.noteOn(60, 0.8f, 0, 1);
         e.noteOn(67, 0.8f, 0, 2);
@@ -2141,12 +2141,12 @@ int main()
         auto play = [&](float press, float slide, double& db, double& centroid) {
             Engine x;
             quietEffects(x);
-            x.setParam(ParamId::Motion, 0.0f);
-            x.setParam(ParamId::MpePress, static_cast<float>(MpeTarget::Level));
-            x.setParam(ParamId::MpePressDepth, 0.5f);
-            x.setParam(ParamId::MpeSlide, static_cast<float>(MpeTarget::Brightness));
-            x.setParam(ParamId::MpeSlideDepth, 1.0f);
-            x.setParam(ParamId::Brightness, 0.4f);
+            x.setParam(ParamIdE::MOTION, 0.0f);
+            x.setParam(ParamIdE::MPE_PRESS, static_cast<float>(MpeTargetE::LEVEL));
+            x.setParam(ParamIdE::MPE_PRESS_DEPTH, 0.5f);
+            x.setParam(ParamIdE::MPE_SLIDE, static_cast<float>(MpeTargetE::BRIGHTNESS));
+            x.setParam(ParamIdE::MPE_SLIDE_DEPTH, 1.0f);
+            x.setParam(ParamIdE::BRIGHTNESS, 0.4f);
             if (!openOffline(x, false, 181)) return false;
             x.setChannelPressure(3, press);
             x.setChannelSlide(3, slide);
@@ -2178,19 +2178,19 @@ int main()
     //     pitches. Growing, the hall's tail after the chord dies more slowly than a new hall's; eroding,
     //     faster. The memory brought out of the engine and put into a new one rings as the trained hall.
     {
-        struct Tail { double slope = 0.0, level = 0.0; };   // dB a second, dBFS
+        struct Tail { double m_slope = 0.0, m_level = 0.0; };   // dB a second, dBFS
         std::vector<float> learnt;
         double age = 0.0;
         double readBack = 1.0;   // the largest difference of the memory read back after a restore, of its value
         auto play = [&](float grow, double train, const std::vector<float>* memory, bool keep, Tail& t) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::ModalLevel, 1.0f);
-            e.setParam(ParamId::ModalDecay, 6.0f);
-            e.setParam(ParamId::ModalBreath, 0.0f);   // its decays the same at every time: only the memory changes them
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::HallGrow, grow);
-            e.setParam(ParamId::HallMemory, memory != nullptr ? 14400.0f : 60.0f);
+            e.setParam(ParamIdE::MODAL_LEVEL, 1.0f);
+            e.setParam(ParamIdE::MODAL_DECAY, 6.0f);
+            e.setParam(ParamIdE::MODAL_BREATH, 0.0f);   // its decays the same at every time: only the memory changes them
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::HALL_GROW, grow);
+            e.setParam(ParamIdE::HALL_MEMORY, memory != nullptr ? 14400.0f : 60.0f);
             if (!openOffline(e, false, 177)) return false;
             if (memory != nullptr) e.setHallMemory(*memory, 60.0);
             for (int note : { 48, 55, 60, 64 }) e.noteOn(note, 0.8f, 0);
@@ -2207,24 +2207,24 @@ int main()
             for (int note : { 48, 55, 60, 64 }) e.noteOff(note, 0);
             const std::vector<float> lr = render(e, 2.5);
             const double a = rmsDb(lr, 12000, 36000), b = rmsDb(lr, 84000, 108000);   // 0.25 .. 0.75 s, 1.75 .. 2.25 s after
-            t.slope = (a - b) / 1.5;
-            t.level = a;
+            t.m_slope = (a - b) / 1.5;
+            t.m_level = a;
             return true;
         };
         Tail plain, grown, eroded, restored;
         const bool ran = play(0.0f, 6.0, nullptr, false, plain) && play(1.0f, 60.0, nullptr, true, grown) && play(-1.0f, 60.0, nullptr, false, eroded)
                       && play(1.0f, 6.0, &learnt, false, restored);
         // The memory: the chord's root (C3, 130.8 Hz) heard far above the average, the most of the bands below it.
-        const int root = static_cast<int>(std::log2(130.81 / 20.0) / 9.96578428 * kHallBins);
+        const int root = static_cast<int>(std::log2(130.81 / 20.0) / 9.96578428 * HallBins);
         double below = 0.0;
         for (int b = 0; b < root - 40; ++b) below = std::max(below, static_cast<double>(learnt.empty() ? 1.0f : learnt[static_cast<size_t>(b)]));
         const double atRoot = learnt.empty() ? 0.0 : *std::max_element(learnt.begin() + root - 3, learnt.begin() + root + 4);
-        check(ran && atRoot > 2.0 && below < 0.5 && std::fabs(age - 60.0) < 2.0 && grown.slope < 0.7 * plain.slope && eroded.slope > 1.25 * plain.slope
-                  && restored.slope < 0.7 * plain.slope && readBack < 0.02,
+        check(ran && atRoot > 2.0 && below < 0.5 && std::fabs(age - 60.0) < 2.0 && grown.m_slope < 0.7 * plain.m_slope && eroded.m_slope > 1.25 * plain.m_slope
+                  && restored.m_slope < 0.7 * plain.m_slope && readBack < 0.02,
               "hall: it grows into what it hears, erodes, and is kept",
               fmt("memory %.1f at the root, %.2f below it, %.0f s learnt; the tail falls %.1f dB/s new, %.1f grown, %.1f eroded; "
                   "restored into a new engine %.1f, read back within %.2f %%",
-                  atRoot, below, age, plain.slope, grown.slope, eroded.slope, restored.slope, 100.0 * readBack));
+                  atRoot, below, age, plain.m_slope, grown.m_slope, eroded.m_slope, restored.m_slope, 100.0 * readBack));
     }
 
     // 59. The partials' own time (Phase 17b): where the spectrum is dense their drift slows (Time Bend
@@ -2237,14 +2237,14 @@ int main()
         for (int k = 0; k < 3; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::Drift, 30.0f);
-            e.setParam(ParamId::DriftRate, 0.3f);
-            e.setParam(ParamId::Doppler, 0.0f);
-            e.setParam(ParamId::Breath, 0.0f);
-            e.setParam(ParamId::TimeBend, bends[k]);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 30.0f);
+            e.setParam(ParamIdE::DRIFT_RATE, 0.3f);
+            e.setParam(ParamIdE::DOPPLER, 0.0f);
+            e.setParam(ParamIdE::BREATH, 0.0f);
+            e.setParam(ParamIdE::TIME_BEND, bends[k]);
             if (!openOffline(e, false, 179)) return 1;
             for (int note : { 48, 55, 60, 64 }) e.noteOn(note, 0.8f, 0);
             render(e, 2.0);
@@ -2283,18 +2283,18 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Attack, 0.2f);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::Shimmer, 0.0f);
-            e.setParam(ParamId::Drift, 0.0f);
-            e.setParam(ParamId::CloudWidth, 0.0f);
-            e.setParam(ParamId::Doppler, 0.0f);
-            e.setParam(ParamId::Breath, 0.0f);
-            e.setParam(ParamId::FieldMode, k == 0 ? 0.0f : static_cast<float>(FieldMode::Orbit));
-            e.setParam(ParamId::FieldStrength, 0.5f);
-            e.setParam(ParamId::FieldRadius, 20.0f);   // orbits of about 10 cents: within the well (wider ones hop to the next pitch)
-            e.setParam(ParamId::FieldSpring, 0.2f);
-            e.setParam(ParamId::FieldRate, 0.2f);
+            e.setParam(ParamIdE::ATTACK, 0.2f);
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::SHIMMER, 0.0f);
+            e.setParam(ParamIdE::DRIFT, 0.0f);
+            e.setParam(ParamIdE::CLOUD_WIDTH, 0.0f);
+            e.setParam(ParamIdE::DOPPLER, 0.0f);
+            e.setParam(ParamIdE::BREATH, 0.0f);
+            e.setParam(ParamIdE::FIELD_MODE, k == 0 ? 0.0f : static_cast<float>(FieldModeE::ORBIT));
+            e.setParam(ParamIdE::FIELD_STRENGTH, 0.5f);
+            e.setParam(ParamIdE::FIELD_RADIUS, 20.0f);   // orbits of about 10 cents: within the well (wider ones hop to the next pitch)
+            e.setParam(ParamIdE::FIELD_SPRING, 0.2f);
+            e.setParam(ParamIdE::FIELD_RATE, 0.2f);
             if (!openOffline(e, false, 181)) return 1;
             e.noteOn(60, 0.8f, 0);
             render(e, 2.0);
@@ -2335,21 +2335,21 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, 0.0f);
-            e.setParam(ParamId::RippleDepth, 1.0f);
-            e.setParam(ParamId::RippleSpeed, 1.5f);
-            e.setParam(ParamId::RippleDecay, 8.0f);
-            e.setParam(ParamId::RippleBend, static_cast<float>(k));
+            e.setParam(ParamIdE::MOTION, 0.0f);
+            e.setParam(ParamIdE::RIPPLE_DEPTH, 1.0f);
+            e.setParam(ParamIdE::RIPPLE_SPEED, 1.5f);
+            e.setParam(ParamIdE::RIPPLE_DECAY, 8.0f);
+            e.setParam(ParamIdE::RIPPLE_BEND, static_cast<float>(k));
             if (!openOffline(e, false, 183)) return 1;
             e.noteOn(50, 0.8f, 0);
-            float u[kRippleCells];
-            constexpr float perOctave = static_cast<float>(kRippleCells - 1) / 9.96578428f;
+            float u[RippleCells];
+            constexpr float perOctave = static_cast<float>(RippleCells - 1) / 9.96578428f;
             const float c1 = std::log2(146.83f / 20.0f) * perOctave;
             auto atRoot = [&](double& energy) {   // the string's height at the fundamental, and its whole energy
                 e.rippleString(u);
                 double peak = 0.0;
                 energy = 0.0;
-                for (int i = 0; i < kRippleCells; ++i) {
+                for (int i = 0; i < RippleCells; ++i) {
                     if (std::fabs(static_cast<float>(i) - c1) <= 3.0f) peak = std::max(peak, std::fabs(static_cast<double>(u[i])));
                     energy += static_cast<double>(u[i]) * u[i];
                 }
@@ -2375,30 +2375,30 @@ int main()
     //     against doublings and crowding keep spreading the chord).
     {
         Landscape band;
-        band.columns = 128;
-        band.rows = 64;
-        band.rowSeconds = 0.5f;
-        band.amps.assign(static_cast<size_t>(band.columns) * band.rows, 0.02f);
-        for (int r = 0; r < band.rows; ++r)
-            for (int c = 0; c < band.columns; ++c) {
-                const float hz = landscapeColumnHz(c, band.columns);
-                if (hz >= 200.0f && hz <= 400.0f) band.amps[static_cast<size_t>(r) * band.columns + c] = 1.0f;
+        band.m_columns = 128;
+        band.m_rows = 64;
+        band.m_rowSeconds = 0.5f;
+        band.m_amps.assign(static_cast<size_t>(band.m_columns) * band.m_rows, 0.02f);
+        for (int r = 0; r < band.m_rows; ++r)
+            for (int c = 0; c < band.m_columns; ++c) {
+                const float hz = landscapeColumnHz(c, band.m_columns);
+                if (hz >= 200.0f && hz <= 400.0f) band.m_amps[static_cast<size_t>(r) * band.m_columns + c] = 1.0f;
             }
         double share[2] = { 0.0, 0.0 };
         int seen[2] = { 0, 0 };
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::Motion, static_cast<float>(MotionKind::Aurora));
-            e.setParam(ParamId::MotionDepth, 1.0f);
-            e.setParam(ParamId::Landscape, static_cast<float>(kUserLandscape));
-            e.setParam(ParamId::AutoMode, 0.0f);   // Free: notes come and go on their own timers
-            e.setParam(ParamId::BrainRate, 2.0f);
-            e.setParam(ParamId::BrainHoldMin, 1.0f);
-            e.setParam(ParamId::BrainHoldMax, 3.0f);
-            e.setParam(ParamId::BrainLow, 36.0f);
-            e.setParam(ParamId::BrainHigh, 84.0f);
-            e.setParam(ParamId::BrainLight, static_cast<float>(k));
+            e.setParam(ParamIdE::MOTION, static_cast<float>(MotionKindE::AURORA));
+            e.setParam(ParamIdE::MOTION_DEPTH, 1.0f);
+            e.setParam(ParamIdE::LANDSCAPE, static_cast<float>(UserLandscape));
+            e.setParam(ParamIdE::AUTO_MODE, 0.0f);   // Free: notes come and go on their own timers
+            e.setParam(ParamIdE::BRAIN_RATE, 2.0f);
+            e.setParam(ParamIdE::BRAIN_HOLD_MIN, 1.0f);
+            e.setParam(ParamIdE::BRAIN_HOLD_MAX, 3.0f);
+            e.setParam(ParamIdE::BRAIN_LOW, 36.0f);
+            e.setParam(ParamIdE::BRAIN_HIGH, 84.0f);
+            e.setParam(ParamIdE::BRAIN_LIGHT, static_cast<float>(k));
             e.setUserLandscape(band);
             if (!openOffline(e, true, 191)) return 1;
             std::vector<float> L(256), R(256);
@@ -2406,11 +2406,11 @@ int main()
             for (int b = 0; b < 187 * 120; ++b) {   // two minutes, a look every second
                 e.process(L.data(), R.data(), 256);
                 if (b % 187 != 0 || b < 187 * 10) continue;
-                for (int i = 0; i < kMaxViewVoices; ++i) {
+                for (int i = 0; i < MaxViewVoices; ++i) {
                     const VoiceView v = e.voiceView(i);
-                    if (v.source != 1 || v.hz <= 0.0f || v.gain <= 0.0f) continue;
+                    if (v.m_source != 1 || v.m_hz <= 0.0f || v.m_gain <= 0.0f) continue;
                     ++all;
-                    if (v.hz >= 190.0f && v.hz <= 420.0f) ++inBand;
+                    if (v.m_hz >= 190.0f && v.m_hz <= 420.0f) ++inBand;
                 }
             }
             seen[k] = all;
@@ -2427,14 +2427,14 @@ int main()
     auto measureLike = [&](const float* values, const std::string& mod, Description& d, double& db) {
         Engine e;
         e.setRealtime(false);
-        for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+        for (int i = 0; i < NumParams; ++i) e.setParam(static_cast<ParamIdE>(i), values[i]);
         e.setModText(mod);
-        e.setParam(ParamId::BrainOn, 0.0f);
-        e.setParam(ParamId::Attack, std::min(values[static_cast<int>(ParamId::Attack)], 0.5f));
-        e.setParam(ParamId::MasterGain, 0.0f);
+        e.setParam(ParamIdE::BRAIN_ON, 0.0f);
+        e.setParam(ParamIdE::ATTACK, std::min(values[static_cast<int>(ParamIdE::ATTACK)], 0.5f));
+        e.setParam(ParamIdE::MASTER_GAIN, 0.0f);
         EngineConfig c;
-        c.maxHostBlock = 512;
-        c.realtimeGpuClass = false;
+        c.m_maxHostBlock = 512;
+        c.m_realtimeGpuClass = false;
         std::string error;
         if (!e.prepare(c, &error)) return false;
         for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
@@ -2466,7 +2466,7 @@ int main()
     //     that moves something by 1.23 a quarter step and touches no knob at nothing.
     {
         const int index = 64;   // Choirs' first
-        float values[kNumParams], up[kNumParams], wide[kNumParams], calm[kNumParams];
+        float values[NumParams], up[NumParams], wide[NumParams], calm[NumParams];
         std::string mod;
         presetValues(index, values, &mod);
         const float wantB = nudge(values, 0, 1.0f, 0.5f, up);
@@ -2475,22 +2475,22 @@ int main()
         Description d0, d1, d2;
         double l0 = 0.0, l1 = 0.0, l2 = 0.0;
         const bool ran = measureLike(values, mod, d0, l0) && measureLike(up, mod, d1, l1) && measureLike(wide, mod, d2, l2);
-        const double gotB = (d1.brightness - d0.brightness) / measureSpread(Measure::Brightness);
-        const double gotW = (d2.width - d0.width) / measureSpread(Measure::Width);
+        const double gotB = (d1.m_brightness - d0.m_brightness) / measureSpread(MeasureE::BRIGHTNESS);
+        const double gotW = (d2.m_width - d0.m_width) / measureSpread(MeasureE::WIDTH);
         // The rule: rates down by 1.23 (within their ranges), nothing that was at nothing moved.
-        bool rule = values[static_cast<int>(ParamId::MotionRate)] > 0.0f;
-        for (ParamId id : { ParamId::MotionRate, ParamId::DriftRate, ParamId::ShimmerRate }) {
+        bool rule = values[static_cast<int>(ParamIdE::MOTION_RATE)] > 0.0f;
+        for (ParamIdE id : { ParamIdE::MOTION_RATE, ParamIdE::DRIFT_RATE, ParamIdE::SHIMMER_RATE }) {
             const float v = values[static_cast<int>(id)], c = calm[static_cast<int>(id)];
-            if (v > 0.0f && paramHeard(id, values)) rule = rule && (std::fabs(c - std::max(v / std::exp2(0.3f), paramDesc(id).min)) < 1.0e-4f);
+            if (v > 0.0f && paramHeard(id, values)) rule = rule && (std::fabs(c - std::max(v / std::exp2(0.3f), paramDesc(id).m_min)) < 1.0e-4f);
         }
-        for (int i = 0; i < kNumParams; ++i)
-            if (values[i] == 0.0f && paramDesc(static_cast<ParamId>(i)).min == 0.0f) rule = rule && calm[i] == 0.0f && up[i] == 0.0f && wide[i] == 0.0f;
+        for (int i = 0; i < NumParams; ++i)
+            if (values[i] == 0.0f && paramDesc(static_cast<ParamIdE>(i)).m_min == 0.0f) rule = rule && calm[i] == 0.0f && up[i] == 0.0f && wide[i] == 0.0f;
         std::string movedB, movedW;   // the knobs each moved, for the report
         for (int pass = 0; pass < 2; ++pass) {
             const float* to = pass == 0 ? up : wide;
             std::string& s = pass == 0 ? movedB : movedW;
-            for (int i = 0; i < kNumParams; ++i)
-                if (to[i] != values[i]) s += fmt("%s %+.2f ", paramTable()[static_cast<size_t>(i)].key,
+            for (int i = 0; i < NumParams; ++i)
+                if (to[i] != values[i]) s += fmt("%s %+.2f ", paramTable()[static_cast<size_t>(i)].m_key,
                                                  toNorm(paramTable()[static_cast<size_t>(i)], to[i]) - toNorm(paramTable()[static_cast<size_t>(i)], values[i]));
         }
         check(ran && rule && wantB > 0.2f && gotB > 0.4 * wantB && wantW > 0.2f && gotW > 0.4 * wantW && std::fabs(l1 - l0) < 1.5 && std::fabs(l2 - l0) < 1.5,
@@ -2502,23 +2502,23 @@ int main()
     // 64. Variations: the same dice give the same variation, other dice another; a few heard shaping
     //     knobs move (four to eight), nothing else but the master that holds the level.
     {
-        float values[kNumParams], a[kNumParams], b[kNumParams], c[kNumParams];
+        float values[NumParams], a[NumParams], b[NumParams], c[NumParams];
         presetValues(64, values, nullptr);
         vary(values, 0.4f, 7, a);
         vary(values, 0.4f, 7, b);
         vary(values, 0.4f, 8, c);
         int count = 0;
-        const ParamId* shaping = nullptr;
+        const ParamIdE* shaping = nullptr;
         int shapingCount = 0;
         shaping = shapingParams(shapingCount);
         bool onlyShaping = true, onlyHeard = true;
-        for (int i = 0; i < kNumParams; ++i) {
-            if (a[i] == values[i] || static_cast<ParamId>(i) == ParamId::MasterGain) continue;
+        for (int i = 0; i < NumParams; ++i) {
+            if (a[i] == values[i] || static_cast<ParamIdE>(i) == ParamIdE::MASTER_GAIN) continue;
             ++count;
-            onlyShaping = onlyShaping && std::find(shaping, shaping + shapingCount, static_cast<ParamId>(i)) != shaping + shapingCount;
-            onlyHeard = onlyHeard && paramHeard(static_cast<ParamId>(i), values);
+            onlyShaping = onlyShaping && std::find(shaping, shaping + shapingCount, static_cast<ParamIdE>(i)) != shaping + shapingCount;
+            onlyHeard = onlyHeard && paramHeard(static_cast<ParamIdE>(i), values);
         }
-        const bool same = std::equal(a, a + kNumParams, b), differ = !std::equal(a, a + kNumParams, c);
+        const bool same = std::equal(a, a + NumParams, b), differ = !std::equal(a, a + NumParams, c);
         check(same && differ && count >= 1 && count <= 8 && onlyShaping && onlyHeard, "variations: repeatable, different, a few heard knobs",
               fmt("%d knobs moved, %s, %s, %s", count, same ? "the same dice the same" : "NOT repeatable", differ ? "other dice another" : "other dice the SAME",
                   onlyShaping && onlyHeard ? "all heard shaping knobs" : "some NOT heard or not shaping"));
@@ -2531,22 +2531,22 @@ int main()
         quietEffects(e);
         if (!openOffline(e, false, 199)) return 1;
         MacroLesson lesson;
-        float zero[kNumParams] = {}, moved[kNumParams] = {};
-        moved[static_cast<int>(ParamId::Tilt)] = -0.2f;
-        moved[static_cast<int>(ParamId::Shimmer)] = 0.1f;
+        float zero[NumParams] = {}, moved[NumParams] = {};
+        moved[static_cast<int>(ParamIdE::TILT)] = -0.2f;
+        moved[static_cast<int>(ParamIdE::SHIMMER)] = 0.1f;
         lesson.set(0.0f, zero);
         lesson.set(1.0f, moved);
         e.setMacroLesson(0, lesson);
-        const float tilt0 = toNorm(paramDesc(ParamId::Tilt), e.param(ParamId::Tilt));
-        e.setParam(ParamId::Macro1, 0.5f);
+        const float tilt0 = toNorm(paramDesc(ParamIdE::TILT), e.param(ParamIdE::TILT));
+        e.setParam(ParamIdE::MACRO1, 0.5f);
         render(e, 0.5);
-        const float half = e.playedNorm(ParamId::Tilt);
-        e.setParam(ParamId::Macro1, 1.0f);
+        const float half = e.playedNorm(ParamIdE::TILT);
+        e.setParam(ParamIdE::MACRO1, 1.0f);
         render(e, 0.5);
-        const float whole = e.playedNorm(ParamId::Tilt);
-        e.setParam(ParamId::Macro1, 0.0f);
+        const float whole = e.playedNorm(ParamIdE::TILT);
+        e.setParam(ParamIdE::MACRO1, 0.0f);
         render(e, 0.5);
-        const float none = e.playedNorm(ParamId::Tilt);
+        const float none = e.playedNorm(ParamIdE::TILT);
         check(std::fabs(half - (tilt0 - 0.1f)) < 0.005f && std::fabs(whole - (tilt0 - 0.2f)) < 0.005f && (std::isnan(none) || std::fabs(none - tilt0) < 0.005f)
                   && lesson.knobs() == 2,
               "macro: taught by example, it glides between its places",
@@ -2556,7 +2556,7 @@ int main()
     // 66. Search by example: a preset measured as the bank was measured is found, nearest first.
     {
         const int index = 100;
-        float values[kNumParams];
+        float values[NumParams];
         std::string mod;
         presetValues(index, values, &mod);
         Description d;
@@ -2569,8 +2569,8 @@ int main()
         for (int i = 0; i < n; ++i)
             if (found[i] == index) rank = i;
         check(ran && rank >= 0 && rank < 3 && dist[rank] < 0.05f, "find: a preset is found by its own sound",
-              fmt("%s found %s (distance %.3f); nearest: %s", preset(index).name, rank >= 0 ? fmt("at %d", rank + 1).c_str() : "NOT", rank >= 0 ? dist[rank] : -1.0f,
-                  n > 0 ? preset(found[0]).name : "-"));
+              fmt("%s found %s (distance %.3f); nearest: %s", preset(index).m_name, rank >= 0 ? fmt("at %d", rank + 1).c_str() : "NOT", rank >= 0 ? dist[rank] : -1.0f,
+                  n > 0 ? preset(found[0]).m_name : "-"));
     }
 
     // 67. Foundation: with it the lowest sounding note is the root's, in the lowest octave of the
@@ -2582,13 +2582,13 @@ int main()
         for (int k = 0; k < 2; ++k) {
             Engine e;
             quietEffects(e);
-            e.setParam(ParamId::AutoMode, 1.0f);   // Chords, as nearly every preset plays
-            e.setParam(ParamId::AutoRate, 4.0f);
-            e.setParam(ParamId::AutoRootMove, 0.6f);
-            e.setParam(ParamId::BrainDensity, 5.0f);
-            e.setParam(ParamId::BrainLow, 36.0f);
-            e.setParam(ParamId::BrainHigh, 79.0f);
-            e.setParam(ParamId::BrainFoundation, k == 0 ? 0.0f : 0.7f);
+            e.setParam(ParamIdE::AUTO_MODE, 1.0f);   // Chords, as nearly every preset plays
+            e.setParam(ParamIdE::AUTO_RATE, 4.0f);
+            e.setParam(ParamIdE::AUTO_ROOT_MOVE, 0.6f);
+            e.setParam(ParamIdE::BRAIN_DENSITY, 5.0f);
+            e.setParam(ParamIdE::BRAIN_LOW, 36.0f);
+            e.setParam(ParamIdE::BRAIN_HIGH, 79.0f);
+            e.setParam(ParamIdE::BRAIN_FOUNDATION, k == 0 ? 0.0f : 0.7f);
             if (!openOffline(e, true, 67)) return 1;
             std::vector<float> L(256), R(256);
             int rootLowest = 0;
@@ -2597,11 +2597,11 @@ int main()
                 if (b % 187 != 0 || b < 187 * 15) continue;
                 int lowest = 128, notes = 0;
                 std::vector<int> all;
-                for (int i = 0; i < kMaxViewVoices; ++i) {
+                for (int i = 0; i < MaxViewVoices; ++i) {
                     const VoiceView v = e.voiceView(i);
-                    if (v.source != 1 || v.hz <= 0.0f || v.gain < 0.3f || v.note < 0) continue;
-                    lowest = std::min(lowest, v.note);
-                    all.push_back(v.note);
+                    if (v.m_source != 1 || v.m_hz <= 0.0f || v.m_gain < 0.3f || v.m_note < 0) continue;
+                    lowest = std::min(lowest, v.m_note);
+                    all.push_back(v.m_note);
                     ++notes;
                 }
                 if (notes == 0) continue;

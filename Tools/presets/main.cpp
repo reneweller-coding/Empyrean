@@ -78,34 +78,34 @@ fs::path repoRoot()
  * @param overrides  knobs set after the preset's (the sensitivity mode)
  * @return         dBFS RMS of the loudest second; NaN on failure
  */
-double measure(int index, double seconds, std::string* error, Description* desc, const std::vector<std::pair<ParamId, float>>& overrides = {})
+double measure(int index, double seconds, std::string* error, Description* desc, const std::vector<std::pair<ParamIdE, float>>& overrides = {})
 {
     Engine e;
     e.setRealtime(false);
-    float values[kNumParams];
+    float values[NumParams];
     std::string mod;
     presetValues(index, values, &mod);
     for (const auto& [id, v] : overrides) values[static_cast<int>(id)] = v;
-    for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+    for (int i = 0; i < NumParams; ++i) e.setParam(static_cast<ParamIdE>(i), values[i]);
     e.setModText(mod);
-    e.setParam(ParamId::BrainOn, 0.0f);
-    e.setParam(ParamId::Attack, std::min(values[static_cast<int>(ParamId::Attack)], 0.5f));
-    e.setParam(ParamId::MasterGain, 0.0f);
+    e.setParam(ParamIdE::BRAIN_ON, 0.0f);
+    e.setParam(ParamIdE::ATTACK, std::min(values[static_cast<int>(ParamIdE::ATTACK)], 0.5f));
+    e.setParam(ParamIdE::MASTER_GAIN, 0.0f);
     EngineConfig c;
-    c.maxHostBlock = 512;
-    c.realtimeGpuClass = false;
+    c.m_maxHostBlock = 512;
+    c.m_realtimeGpuClass = false;
     if (!e.prepare(c, error)) return std::nan("");
     for (int note : { 50, 57, 62, 66 }) e.noteOn(note, 0.8f, 0);
     // The loudest second: a pad's sustain, a bell's strike -- what a listener levels by. (The
     // last eight seconds measured the bells' and the glass's decay, 20 dB under their strike.)
     const int n = 512;
-    const int blocks = static_cast<int>(seconds * c.sampleRate / n);
-    const int perSecond = static_cast<int>(c.sampleRate / n);
+    const int blocks = static_cast<int>(seconds * c.m_sampleRate / n);
+    const int perSecond = static_cast<int>(c.m_sampleRate / n);
     std::vector<float> L(n), R(n);
     double sq = 0.0, loudest = 0.0;
     int inWindow = 0;
     // The last eight seconds kept for the description.
-    const int keepFrom = std::max(0, blocks - static_cast<int>(8.0 * c.sampleRate / n));
+    const int keepFrom = std::max(0, blocks - static_cast<int>(8.0 * c.m_sampleRate / n));
     std::vector<float> keptL, keptR;
     for (int b = 0; b < blocks; ++b) {
         e.process(L.data(), R.data(), n);
@@ -120,24 +120,24 @@ double measure(int index, double seconds, std::string* error, Description* desc,
             inWindow = 0;
         }
     }
-    if (desc != nullptr) *desc = describe(keptL, keptR, c.sampleRate);
+    if (desc != nullptr) *desc = describe(keptL, keptR, c.m_sampleRate);
     return 10.0 * std::log10(std::max(loudest, 1e-20));
 }
 
 /** @brief The knobs the sensitivity mode nudges: those that shape the sound and that a preset sets. */
-const ParamId kSensed[] = {
-    ParamId::Tilt, ParamId::Brightness, ParamId::OddEven, ParamId::Inharmonic, ParamId::CloudWidth, ParamId::WidthSlope, ParamId::Drift,
-    ParamId::DriftRate, ParamId::Shimmer, ParamId::ShimmerRate, ParamId::Stereo, ParamId::Air, ParamId::AirCenter, ParamId::AirWidth,
-    ParamId::AirJitter, ParamId::Turbulence, ParamId::MotionRate, ParamId::MotionDepth, ParamId::FieldStrength, ParamId::Dispersion,
-    ParamId::TimeBend, ParamId::LifeDepth, ParamId::LifeRate, ParamId::SyncDepth, ParamId::SyncCoupling, ParamId::SyncRate,
-    ParamId::RippleDepth, ParamId::Cutoff, ParamId::Resonance, ParamId::FilterEnv, ParamId::CombDepth, ParamId::CombSweep,
-    ParamId::Presence, ParamId::PadLowCut, ParamId::FarLevel, ParamId::Depth, ParamId::Breath, ParamId::StereoWidth, ParamId::DelayMix,
-    ParamId::ModalLevel, ParamId::SpecMix, ParamId::MeltMix, ParamId::MemoryLevel, ParamId::EarlyLevel, ParamId::NearMix,
-    ParamId::Purity, ParamId::TuneGravity,
+const ParamIdE Sensed[] = {
+    ParamIdE::TILT, ParamIdE::BRIGHTNESS, ParamIdE::ODD_EVEN, ParamIdE::INHARMONIC, ParamIdE::CLOUD_WIDTH, ParamIdE::WIDTH_SLOPE, ParamIdE::DRIFT,
+    ParamIdE::DRIFT_RATE, ParamIdE::SHIMMER, ParamIdE::SHIMMER_RATE, ParamIdE::STEREO, ParamIdE::AIR, ParamIdE::AIR_CENTER, ParamIdE::AIR_WIDTH,
+    ParamIdE::AIR_JITTER, ParamIdE::TURBULENCE, ParamIdE::MOTION_RATE, ParamIdE::MOTION_DEPTH, ParamIdE::FIELD_STRENGTH, ParamIdE::DISPERSION,
+    ParamIdE::TIME_BEND, ParamIdE::LIFE_DEPTH, ParamIdE::LIFE_RATE, ParamIdE::SYNC_DEPTH, ParamIdE::SYNC_COUPLING, ParamIdE::SYNC_RATE,
+    ParamIdE::RIPPLE_DEPTH, ParamIdE::CUTOFF, ParamIdE::RESONANCE, ParamIdE::FILTER_ENV, ParamIdE::COMB_DEPTH, ParamIdE::COMB_SWEEP,
+    ParamIdE::PRESENCE, ParamIdE::PAD_LOW_CUT, ParamIdE::FAR_LEVEL, ParamIdE::DEPTH, ParamIdE::BREATH, ParamIdE::STEREO_WIDTH, ParamIdE::DELAY_MIX,
+    ParamIdE::MODAL_LEVEL, ParamIdE::SPEC_MIX, ParamIdE::MELT_MIX, ParamIdE::MEMORY_LEVEL, ParamIdE::EARLY_LEVEL, ParamIdE::NEAR_MIX,
+    ParamIdE::PURITY, ParamIdE::TUNE_GRAVITY,
 };
 
 /**
- * @brief The sensitivity mode: per preset its measure, then each knob of kSensed moved by 0.15 of its
+ * @brief The sensitivity mode: per preset its measure, then each knob of Sensed moved by 0.15 of its
  *        travel (down when it stands high) and the preset measured again; per knob the change of the
  *        five measures (brightness, motion, width, noise, level) for a whole travel, one JSON line each.
  * @param which    the presets
@@ -155,26 +155,26 @@ int sensitivity(const std::vector<int>& which, double seconds, const fs::path& o
         Description d0;
         const double l0 = measure(i, seconds, &error, &d0);
         if (std::isnan(l0)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
-        float values[kNumParams];
+        float values[NumParams];
         presetValues(i, values, nullptr);
-        f << "{\"preset\": \"" << preset(i).name << "\", \"group\": " << preset(i).group << ", \"base\": [" << d0.brightness << ", " << d0.motion << ", "
-          << d0.width << ", " << d0.noise << ", " << l0 << "], \"d\": {";
+        f << "{\"preset\": \"" << preset(i).m_name << "\", \"group\": " << preset(i).m_group << ", \"base\": [" << d0.m_brightness << ", " << d0.m_motion << ", "
+          << d0.m_width << ", " << d0.m_noise << ", " << l0 << "], \"d\": {";
         bool first = true;
-        for (ParamId id : kSensed) {
+        for (ParamIdE id : Sensed) {
             const ParamDesc& pd = paramDesc(id);
             const float n0 = toNorm(pd, values[static_cast<int>(id)]);
             const float step = n0 <= 0.85f ? 0.15f : -0.15f;
             Description d1;
             const double l1 = measure(i, seconds, &error, &d1, { { id, fromNorm(pd, n0 + step) } });
             if (std::isnan(l1)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
-            f << (first ? "" : ", ") << "\"" << pd.key << "\": [" << (d1.brightness - d0.brightness) / step << ", " << (d1.motion - d0.motion) / step << ", "
-              << (d1.width - d0.width) / step << ", " << (d1.noise - d0.noise) / step << ", " << (l1 - l0) / step << ", " << n0 << "]";
+            f << (first ? "" : ", ") << "\"" << pd.m_key << "\": [" << (d1.m_brightness - d0.m_brightness) / step << ", " << (d1.m_motion - d0.m_motion) / step << ", "
+              << (d1.m_width - d0.m_width) / step << ", " << (d1.m_noise - d0.m_noise) / step << ", " << (l1 - l0) / step << ", " << n0 << "]";
             first = false;
         }
         f << "}}\n";
         f.flush();
         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        std::printf("  %2zu / %zu  %-24s %5.0f s\n", k + 1, which.size(), preset(i).name, s);
+        std::printf("  %2zu / %zu  %-24s %5.0f s\n", k + 1, which.size(), preset(i).m_name, s);
         std::fflush(stdout);
     }
     return 0;
@@ -189,26 +189,26 @@ int sensitivity(const std::vector<int>& which, double seconds, const fs::path& o
  */
 int nudgeCheck(const std::vector<int>& which, double seconds)
 {
-    static const char* const kNames[4] = { "brightness", "motion", "width", "noise" };
+    static const char* const Names[4] = { "brightness", "motion", "width", "noise" };
     for (int i : which) {
         std::string error;
         Description d0;
         const double l0 = measure(i, seconds, &error, &d0);
         if (std::isnan(l0)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
-        float values[kNumParams], out[kNumParams];
+        float values[NumParams], out[NumParams];
         presetValues(i, values, nullptr);
-        std::printf("%s\n", preset(i).name);
-        for (int a = 0; a < kNudgeAxes; ++a)
+        std::printf("%s\n", preset(i).m_name);
+        for (int a = 0; a < NudgeAxes; ++a)
             for (float sign : { -1.0f, 1.0f }) {
                 const float want = nudge(values, a, sign, 0.25f, out);
-                std::vector<std::pair<ParamId, float>> set;
-                for (int k = 0; k < kNumParams; ++k)
-                    if (out[k] != values[k]) set.emplace_back(static_cast<ParamId>(k), out[k]);
+                std::vector<std::pair<ParamIdE, float>> set;
+                for (int k = 0; k < NumParams; ++k)
+                    if (out[k] != values[k]) set.emplace_back(static_cast<ParamIdE>(k), out[k]);
                 Description d1;
                 const double l1 = measure(i, seconds, &error, &d1, set);
-                const double got[4] = { d1.brightness - d0.brightness, d1.motion - d0.motion, d1.width - d0.width, d1.noise - d0.noise };
-                std::printf("  %-10s %+.0f  predicted %+.2f  measured %+.2f spreads  level %+.1f dB  (%zu knobs)\n", kNames[a], sign, want,
-                            got[a] / measureSpread(static_cast<Measure>(a)), l1 - l0, set.size());
+                const double got[4] = { d1.m_brightness - d0.m_brightness, d1.m_motion - d0.m_motion, d1.m_width - d0.m_width, d1.m_noise - d0.m_noise };
+                std::printf("  %-10s %+.0f  predicted %+.2f  measured %+.2f spreads  level %+.1f dB  (%zu knobs)\n", Names[a], sign, want,
+                            got[a] / measureSpread(static_cast<MeasureE>(a)), l1 - l0, set.size());
                 std::fflush(stdout);
             }
     }
@@ -223,7 +223,7 @@ int nudgeCheck(const std::vector<int>& which, double seconds)
  * @param overrides  knobs set after the preset's
  * @return           0 on success
  */
-int registerMode(const std::vector<int>& which, double seconds, const fs::path& out, const std::vector<std::pair<ParamId, float>>& overrides)
+int registerMode(const std::vector<int>& which, double seconds, const fs::path& out, const std::vector<std::pair<ParamIdE, float>>& overrides)
 {
     std::ofstream f(out);
     const auto t0 = std::chrono::steady_clock::now();
@@ -233,23 +233,23 @@ int registerMode(const std::vector<int>& which, double seconds, const fs::path& 
         const int index = which[k];
         Engine e;
         e.setRealtime(false);
-        float values[kNumParams];
+        float values[NumParams];
         std::string mod, error;
         presetValues(index, values, &mod);
         for (const auto& [id, v] : overrides) values[static_cast<int>(id)] = v;
-        for (int i = 0; i < kNumParams; ++i) e.setParam(static_cast<ParamId>(i), values[i]);
+        for (int i = 0; i < NumParams; ++i) e.setParam(static_cast<ParamIdE>(i), values[i]);
         e.setModText(mod);
-        e.setParam(ParamId::BrainOn, 1.0f);
-        e.setParam(ParamId::MasterGain, 0.0f);
+        e.setParam(ParamIdE::BRAIN_ON, 1.0f);
+        e.setParam(ParamIdE::MASTER_GAIN, 0.0f);
         EngineConfig c;
-        c.maxHostBlock = 2048;
-        c.realtimeGpuClass = false;
+        c.m_maxHostBlock = 2048;
+        c.m_realtimeGpuClass = false;
         if (!e.prepare(c, &error)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
         e.requestFill();   // as a preset chosen on the panel: the chord within seconds
-        const int n = 2048, blocks = static_cast<int>(seconds * c.sampleRate / n), warm = static_cast<int>(20.0 * c.sampleRate / n);
+        const int n = 2048, blocks = static_cast<int>(seconds * c.m_sampleRate / n), warm = static_cast<int>(20.0 * c.m_sampleRate / n);
         std::vector<float> L(n), R(n);
         // The power below 150 Hz: a second-order low pass on each side (RBJ, Q 0.707).
-        const double w0 = 2.0 * 3.14159265358979 * 150.0 / c.sampleRate, alpha = std::sin(w0) / (2.0 * 0.7071), cw = std::cos(w0);
+        const double w0 = 2.0 * 3.14159265358979 * 150.0 / c.m_sampleRate, alpha = std::sin(w0) / (2.0 * 0.7071), cw = std::cos(w0);
         const double a0 = 1.0 + alpha, b0 = (1.0 - cw) / 2.0 / a0, b1 = (1.0 - cw) / a0, b2 = b0, a1 = -2.0 * cw / a0, a2 = (1.0 - alpha) / a0;
         double zl[2] = { 0.0, 0.0 }, zr[2] = { 0.0, 0.0 };
         double low = 0.0, all = 0.0;
@@ -274,10 +274,10 @@ int registerMode(const std::vector<int>& which, double seconds, const fs::path& 
             // The conductors' notes that sound (a block is 43 ms: every sixth one, a quarter second).
             if (b % 6 != 0) continue;
             int lo = 128, count = 0;
-            for (int v = 0; v < kMaxViewVoices; ++v) {
+            for (int v = 0; v < MaxViewVoices; ++v) {
                 const VoiceView vv = e.voiceView(v);
-                if (vv.hz <= 0.0f || vv.gain < 0.25f || (vv.source != 1 && vv.source != 2) || vv.note < 0) continue;
-                lo = std::min(lo, vv.note);
+                if (vv.m_hz <= 0.0f || vv.m_gain < 0.25f || (vv.m_source != 1 && vv.m_source != 2) || vv.m_note < 0) continue;
+                lo = std::min(lo, vv.m_note);
                 ++count;
             }
             if (count == 0) continue;
@@ -299,13 +299,13 @@ int registerMode(const std::vector<int>& which, double seconds, const fs::path& 
         std::snprintf(line, sizeof line,
                       "{\"preset\": \"%s\", \"group\": %d, \"low\": %d, \"high\": %d, \"median_lowest\": %d, \"bass_share\": %.3f, \"root_share\": %.3f, "
                       "\"notes\": %.2f, \"below150\": %.4f, \"level\": %.2f}\n",
-                      preset(index).name, preset(index).group, static_cast<int>(values[static_cast<int>(ParamId::BrainLow)]),
-                      static_cast<int>(values[static_cast<int>(ParamId::BrainHigh)]), median, bass, root, ticks > 0 ? static_cast<double>(notesSum) / ticks : 0.0, band,
+                      preset(index).m_name, preset(index).m_group, static_cast<int>(values[static_cast<int>(ParamIdE::BRAIN_LOW)]),
+                      static_cast<int>(values[static_cast<int>(ParamIdE::BRAIN_HIGH)]), median, bass, root, ticks > 0 ? static_cast<double>(notesSum) / ticks : 0.0, band,
                       10.0 * std::log10(std::max(all / (2.0 * std::max(1.0, static_cast<double>(blocks - warm)) * n), 1e-20)));
         f << line;
         f.flush();
         const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
-        std::printf("  %3zu / %zu  %-24s lowest %3d  bass %4.0f %%  root %4.0f %%  below 150 Hz %5.1f %%   %5.0f s\n", k + 1, which.size(), preset(index).name,
+        std::printf("  %3zu / %zu  %-24s lowest %3d  bass %4.0f %%  root %4.0f %%  below 150 Hz %5.1f %%   %5.0f s\n", k + 1, which.size(), preset(index).m_name,
                     median, 100.0 * bass, 100.0 * root, 100.0 * band, s);
         std::fflush(stdout);
     }
@@ -370,14 +370,14 @@ int main(int argc, char** argv)
         for (int i = from; i <= to; i += step) which.push_back(i);
     }
     if (!registerFile.empty()) {
-        std::vector<std::pair<ParamId, float>> overrides;
+        std::vector<std::pair<ParamIdE, float>> overrides;
         size_t at = 0;
         while (at < setText.size()) {   // "key=value;key=value"
             const size_t end = std::min(setText.find(';', at), setText.size());
             const std::string item = setText.substr(at, end - at);
             const size_t eq = item.find('=');
             if (eq != std::string::npos)
-                if (const ParamDesc* d = findParam(item.substr(0, eq).c_str())) overrides.emplace_back(d->id, static_cast<float>(std::atof(item.c_str() + eq + 1)));
+                if (const ParamDesc* d = findParam(item.substr(0, eq).c_str())) overrides.emplace_back(d->m_id, static_cast<float>(std::atof(item.c_str() + eq + 1)));
             at = end + 1;
         }
         return registerMode(which, seconds, registerFile, overrides);
@@ -393,14 +393,14 @@ int main(int argc, char** argv)
         std::string error;
         Description desc;
         const double db = measure(i, seconds, &error, describeFile.empty() ? nullptr : &desc);
-        if (!describeFile.empty()) descriptions.emplace_back(preset(i).name, desc);
+        if (!describeFile.empty()) descriptions.emplace_back(preset(i).m_name, desc);
         if (std::isnan(db)) { std::fprintf(stderr, "additiv_presets: %s\n", error.c_str()); return 1; }
-        levels.emplace_back(preset(i).name, db);
+        levels.emplace_back(preset(i).m_name, db);
         lo = std::min(lo, db);
         hi = std::max(hi, db);
         if (k % 64 == 63 || k + 1 == which.size())
-            std::printf("  %4zu / %zu  %-14s %-24s %6.1f dBFS (so far %.1f .. %.1f)\n", k + 1, which.size(), kPresetGroupNames[preset(i).group],
-                        preset(i).name, db, lo, hi);
+            std::printf("  %4zu / %zu  %-14s %-24s %6.1f dBFS (so far %.1f .. %.1f)\n", k + 1, which.size(), PresetGroupNames[preset(i).m_group],
+                        preset(i).m_name, db, lo, hi);
         std::fflush(stdout);
     }
     // Merged into what the file already holds, so one group can be measured again on its own.
@@ -442,8 +442,8 @@ int main(int argc, char** argv)
         for (size_t i = 0; i < descriptions.size(); ++i) {
             const Description& d = descriptions[i].second;
             char line[256];
-            std::snprintf(line, sizeof line, "  \"%s\": [%.5f, %.5f, %.5f, %.5f, %.2f]%s\n", descriptions[i].first.c_str(), d.brightness, d.motion, d.width,
-                          d.noise, levels[i].second, i + 1 < descriptions.size() || !kept.empty() ? "," : "");
+            std::snprintf(line, sizeof line, "  \"%s\": [%.5f, %.5f, %.5f, %.5f, %.2f]%s\n", descriptions[i].first.c_str(), d.m_brightness, d.m_motion, d.m_width,
+                          d.m_noise, levels[i].second, i + 1 < descriptions.size() || !kept.empty() ? "," : "");
             df << line;
         }
         for (size_t i = 0; i < kept.size(); ++i) df << kept[i] << (i + 1 < kept.size() ? ",\n" : "\n");

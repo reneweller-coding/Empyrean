@@ -142,7 +142,7 @@ def presets():
     text = open(os.path.join(ROOT, "Core", "src", "Presets.inc"), encoding="utf-8").read()
     for name, g in re.findall(r'^\s*\{ "([^"]+)", (\d+),', text, re.M):
         groups.setdefault(int(g), []).append(name)
-    names = re.search(r"kPresetGroupNames\[kNumPresetGroups\]\s*=\s*\{(.*?)\};",
+    names = re.search(r"PresetGroupNames\[NumPresetGroups\]\s*=\s*\{(.*?)\};",
                       open(os.path.join(ROOT, "Core", "src", "Presets.cpp"), encoding="utf-8").read(), re.S)
     titles = re.findall(r'"([^"]+)"', names.group(1)) if names else []
     return [(titles[g] if g < len(titles) else "Group %d" % g, groups[g]) for g in sorted(groups)]

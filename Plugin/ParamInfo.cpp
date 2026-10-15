@@ -10,12 +10,12 @@ namespace {
 
 /** @brief A parameter's key and its sentence. */
 struct Info {
-    const char* key;    ///< the key
-    const char* text;   ///< the sentence
+    const char* m_key;    ///< the key
+    const char* m_text;   ///< the sentence
 };
 
 /** @brief Every parameter's sentence, in the table's order. */
-const Info kInfo[] = {
+const Info InfoTable[] = {
     { "master_gain", "The instrument's level after everything; a preset sets it so that the bank sounds equally loud." },
     { "partials", "How many sine waves make each voice: its harmonics' clouds share them (20000 is the full cloud)." },
     { "tilt", "How fast the upper harmonics fall away: higher is darker and rounder, lower brighter and thinner." },
@@ -233,7 +233,7 @@ const Info kInfo[] = {
 
 juce::String paramInfo(const char* key)
 {
-    for (const Info& i : kInfo)
-        if (std::strcmp(i.key, key) == 0) return juce::String(i.text);
+    for (const Info& i : InfoTable)
+        if (std::strcmp(i.m_key, key) == 0) return juce::String(i.m_text);
     return {};
 }

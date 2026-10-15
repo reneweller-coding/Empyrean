@@ -15,280 +15,280 @@
 namespace additiv {
 
 /** @brief Every parameter, in table order. */
-enum class ParamId : int {
+enum class ParamIdE : int {
     // Master
-    MasterGain,     ///< output level, dB
+    MASTER_GAIN,     ///< output level, dB
     // Cloud: the voice's spectrum and its own life
-    Partials,       ///< partials per voice
-    Tilt,           ///< spectral tilt: harmonic h at h^-tilt
-    Brightness,     ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (1 keeps them all)
-    OddEven,        ///< -1 .. 1: odd against even harmonics
-    Inharmonic,     ///< 0 .. 1: the stiff string's stretch
-    CloudWidth,     ///< the cloud around harmonic 1, cents
-    WidthSlope,     ///< how the cloud widens with the harmonic number
-    Drift,          ///< each partial's own pitch wander, cents
-    DriftRate,      ///< its speed, Hz
-    Shimmer,        ///< each partial's own amplitude wander, 0 .. 1
-    ShimmerRate,    ///< its speed, Hz
-    Stereo,         ///< how far the partials scatter across the field
+    PARTIALS,       ///< partials per voice
+    TILT,           ///< spectral tilt: harmonic h at h^-tilt
+    BRIGHTNESS,     ///< 0 .. 1: harmonics above 1 + b^2 * 200 fade out (1 keeps them all)
+    ODD_EVEN,        ///< -1 .. 1: odd against even harmonics
+    INHARMONIC,     ///< 0 .. 1: the stiff string's stretch
+    CLOUD_WIDTH,     ///< the cloud around harmonic 1, cents
+    WIDTH_SLOPE,     ///< how the cloud widens with the harmonic number
+    DRIFT,          ///< each partial's own pitch wander, cents
+    DRIFT_RATE,      ///< its speed, Hz
+    SHIMMER,        ///< each partial's own amplitude wander, 0 .. 1
+    SHIMMER_RATE,    ///< its speed, Hz
+    STEREO,         ///< how far the partials scatter across the field
     // Air: a band of noise made of partials
-    Air,            ///< the band's level against the voice's, 0 .. 1
-    AirCenter,      ///< its centre, times the fundamental
-    AirWidth,       ///< its width, cents
-    AirJitter,      ///< how fast its partials flicker, Hz
+    AIR,            ///< the band's level against the voice's, 0 .. 1
+    AIR_CENTER,      ///< its centre, times the fundamental
+    AIR_WIDTH,       ///< its width, cents
+    AIR_JITTER,      ///< how fast its partials flicker, Hz
     // Filter: read as a frequency response at every partial
-    FilterModel,    ///< kFilterModelNames
-    Cutoff,         ///< Hz
-    Resonance,      ///< 0 .. 1
-    FilterEnv,      ///< octaves the voice's envelope moves the cutoff
-    KeyTrack,       ///< 0 .. 1: how far the cutoff follows the note
-    FilterDrift,    ///< 0 .. 1: the cutoff's own slow wander, up to an octave
+    FILTER_MODEL,    ///< FilterModelNames
+    CUTOFF,         ///< Hz
+    RESONANCE,      ///< 0 .. 1
+    FILTER_ENV,      ///< octaves the voice's envelope moves the cutoff
+    KEY_TRACK,       ///< 0 .. 1: how far the cutoff follows the note
+    FILTER_DRIFT,    ///< 0 .. 1: the cutoff's own slow wander, up to an octave
     // Motion: the envelope lanes, as a scene
-    Motion,         ///< which motion the partials' envelopes make (kMotionNames)
-    MotionRate,     ///< how fast the motion runs, times its own speed
-    MotionDepth,    ///< how deep it reaches, times its own depth
-    Landscape,      ///< which landscape the Aurora motion reads (kLandscapeNames)
+    MOTION,         ///< which motion the partials' envelopes make (MotionNames)
+    MOTION_RATE,     ///< how fast the motion runs, times its own speed
+    MOTION_DEPTH,    ///< how deep it reaches, times its own depth
+    LANDSCAPE,      ///< which landscape the Aurora motion reads (LandscapeNames)
     // Envelope of every voice
-    Attack,         ///< seconds
-    Decay,          ///< seconds
-    Sustain,        ///< 0 .. 1
-    Release,        ///< seconds
+    ATTACK,         ///< seconds
+    DECAY,          ///< seconds
+    SUSTAIN,        ///< 0 .. 1
+    RELEASE,        ///< seconds
     // Tuning
-    Scale,          ///< kScaleNames
-    RootNote,       ///< the scale's root, a pitch class (kRootNames)
-    KeyMap,         ///< Snap to 12 keys or consecutive degrees
-    RefPitch,       ///< A4 in Hz
-    Purity,         ///< 0 = 12-TET, 1 = the scale; the clouds narrow with it so pure intervals can lock
-    Tide,           ///< cents the whole instrument leans on a minute-scale curve
-    TidePeriod,     ///< minutes per swing
+    SCALE,          ///< ScaleNames
+    ROOT_NOTE,       ///< the scale's root, a pitch class (RootNames)
+    KEY_MAP,         ///< Snap to 12 keys or consecutive degrees
+    REF_PITCH,       ///< A4 in Hz
+    PURITY,         ///< 0 = 12-TET, 1 = the scale; the clouds narrow with it so pure intervals can lock
+    TIDE,           ///< cents the whole instrument leans on a minute-scale curve
+    TIDE_PERIOD,     ///< minutes per swing
     // Conductor
-    BrainOn,        ///< the conductor plays
-    AutoMode,       ///< Free or Chords (Autoplay), kBrainModeNames
-    BrainRate,      ///< Free: mean seconds between events
-    AutoRate,       ///< Chords: seconds between exchanges ("Every")
-    BrainDensity,   ///< notes sounding at once
-    BrainHoldMin,   ///< Free: shortest hold, seconds
-    BrainHoldMax,   ///< Free: longest hold, seconds
-    BrainLow,       ///< lowest note the conductor chooses
-    BrainHigh,      ///< highest note
-    BrainConsonance,///< 0 anything goes .. 1 strictly consonant
-    BrainWander,    ///< how often the root moves (Free)
-    AutoLead,       ///< Chords: how far the exchanged voice may move, semitones
-    AutoTension,    ///< Chords: 0 = the new note must fit the chord, 1 = anything goes
-    AutoRootMove,   ///< Chords: how often an exchange moves the root too
-    BrainTimbre,    ///< how much consonance is judged from the cloud's own spectrum (Sethares)
-    AutoStep,       ///< Autoplay: a rising edge exchanges a voice now
-    Brain2On,       ///< the second conductor, in the background
-    Brain2Interval, ///< its root against the first one's, semitones
-    Brain2Density,  ///< its notes at once
-    Brain2Rate,     ///< seconds between its events
-    Brain2Depth,    ///< where its notes stand, 0 near .. 1 far
+    BRAIN_ON,        ///< the conductor plays
+    AUTO_MODE,       ///< Free or Chords (Autoplay), BrainModeNames
+    BRAIN_RATE,      ///< Free: mean seconds between events
+    AUTO_RATE,       ///< Chords: seconds between exchanges ("Every")
+    BRAIN_DENSITY,   ///< notes sounding at once
+    BRAIN_HOLD_MIN,   ///< Free: shortest hold, seconds
+    BRAIN_HOLD_MAX,   ///< Free: longest hold, seconds
+    BRAIN_LOW,       ///< lowest note the conductor chooses
+    BRAIN_HIGH,      ///< highest note
+    BRAIN_CONSONANCE,///< 0 anything goes .. 1 strictly consonant
+    BRAIN_WANDER,    ///< how often the root moves (Free)
+    AUTO_LEAD,       ///< Chords: how far the exchanged voice may move, semitones
+    AUTO_TENSION,    ///< Chords: 0 = the new note must fit the chord, 1 = anything goes
+    AUTO_ROOT_MOVE,   ///< Chords: how often an exchange moves the root too
+    BRAIN_TIMBRE,    ///< how much consonance is judged from the cloud's own spectrum (Sethares)
+    AUTO_STEP,       ///< Autoplay: a rising edge exchanges a voice now
+    BRAIN2_ON,       ///< the second conductor, in the background
+    BRAIN2_INTERVAL, ///< its root against the first one's, semitones
+    BRAIN2_DENSITY,  ///< its notes at once
+    BRAIN2_RATE,     ///< seconds between its events
+    BRAIN2_DEPTH,    ///< where its notes stand, 0 near .. 1 far
     // Space
-    Depth,          ///< how deep the conductor's notes sit (near/far planes)
-    KeysDepth,      ///< where played notes sit, 0 at the ear .. 1 far
-    FarLevel,       ///< the far plane's reverb level
-    FarSize,        ///< the far reverb's size
-    FarDecay,       ///< its decay, seconds
-    FarDamp,        ///< its damping
-    Presence,       ///< dB: the 2-5 kHz bell on the near plane
-    PadLowCut,      ///< Hz: below it the clouds fall 12 dB/oct, leaving the bottom free
-    Breath,         ///< 0 .. 1: every voice's distance wanders
-    BreathRate,     ///< Hz
-    Doppler,        ///< 0 .. 1: a voice coming closer rises, one receding falls
-    BassMono,       ///< below this the mix is mono, Hz
-    StereoWidth,    ///< the master's width
+    DEPTH,          ///< how deep the conductor's notes sit (near/far planes)
+    KEYS_DEPTH,      ///< where played notes sit, 0 at the ear .. 1 far
+    FAR_LEVEL,       ///< the far plane's reverb level
+    FAR_SIZE,        ///< the far reverb's size
+    FAR_DECAY,       ///< its decay, seconds
+    FAR_DAMP,        ///< its damping
+    PRESENCE,       ///< dB: the 2-5 kHz bell on the near plane
+    PAD_LOW_CUT,      ///< Hz: below it the clouds fall 12 dB/oct, leaving the bottom free
+    BREATH,         ///< 0 .. 1: every voice's distance wanders
+    BREATH_RATE,     ///< Hz
+    DOPPLER,        ///< 0 .. 1: a voice coming closer rises, one receding falls
+    BASS_MONO,       ///< below this the mix is mono, Hz
+    STEREO_WIDTH,    ///< the master's width
     // Modulation: the sources' own settings (the matrix rows are data, Modulation.h)
-    Lfo1Shape,      ///< kLfoShapeNames
-    Lfo1Rate,       ///< Hz
-    Lfo2Shape,      ///< kLfoShapeNames
-    Lfo2Rate,       ///< Hz
-    Lfo3Shape,      ///< kLfoShapeNames
-    Lfo3Rate,       ///< Hz
-    Lfo4Shape,      ///< kLfoShapeNames
-    Lfo4Rate,       ///< Hz
-    Env1Shape,      ///< a factory shape (Shapes.h)
-    Env1Rate,       ///< how fast it runs, times its own speed
-    Env2Shape,      ///< a factory shape
-    Env2Rate,       ///< how fast it runs
-    Macro1,         ///< 0 .. 1
-    Macro2,         ///< 0 .. 1
-    Macro3,         ///< 0 .. 1
-    Macro4,         ///< 0 .. 1
+    LFO1_SHAPE,      ///< LfoShapeNames
+    LFO1_RATE,       ///< Hz
+    LFO2_SHAPE,      ///< LfoShapeNames
+    LFO2_RATE,       ///< Hz
+    LFO3_SHAPE,      ///< LfoShapeNames
+    LFO3_RATE,       ///< Hz
+    LFO4_SHAPE,      ///< LfoShapeNames
+    LFO4_RATE,       ///< Hz
+    ENV1_SHAPE,      ///< a factory shape (Shapes.h)
+    ENV1_RATE,       ///< how fast it runs, times its own speed
+    ENV2_SHAPE,      ///< a factory shape
+    ENV2_RATE,       ///< how fast it runs
+    MACRO1,         ///< 0 .. 1
+    MACRO2,         ///< 0 .. 1
+    MACRO3,         ///< 0 .. 1
+    MACRO4,         ///< 0 .. 1
     // Echo: Noctuary's two asymmetric delays, the second in series after the first (12.10.2026)
-    DelayMix,       ///< the echoes on the near plane, 0 .. 1
-    DelayTimeL,     ///< s
-    DelayTimeR,     ///< s
-    DelayFeedback,  ///< 0 .. 0.95
-    DelayCross,     ///< 0 .. 1: how much of each side's feedback comes from the other
-    DelayDamp,      ///< 0 .. 1: the loop's low pass
-    DelayAbsorb,    ///< 0 .. 1: the loop narrows to a band as the feedback rises
-    DelayDuck,      ///< 0 .. 1: the loop darkens while the input is loud
-    DelayToFar,     ///< 0 .. 1: the echoes receding into the far plane
-    Delay2Mix,      ///< the second echo, 0 .. 1
-    Delay2TimeL,    ///< s
-    Delay2TimeR,    ///< s
-    Delay2Feedback, ///< 0 .. 0.95
-    Delay2Damp,     ///< 0 .. 1
-    Delay2ToFar,    ///< 0 .. 1
+    DELAY_MIX,       ///< the echoes on the near plane, 0 .. 1
+    DELAY_TIME_L,     ///< s
+    DELAY_TIME_R,     ///< s
+    DELAY_FEEDBACK,  ///< 0 .. 0.95
+    DELAY_CROSS,     ///< 0 .. 1: how much of each side's feedback comes from the other
+    DELAY_DAMP,      ///< 0 .. 1: the loop's low pass
+    DELAY_ABSORB,    ///< 0 .. 1: the loop narrows to a band as the feedback rises
+    DELAY_DUCK,      ///< 0 .. 1: the loop darkens while the input is loud
+    DELAY_TO_FAR,     ///< 0 .. 1: the echoes receding into the far plane
+    DELAY2_MIX,      ///< the second echo, 0 .. 1
+    DELAY2_TIME_L,    ///< s
+    DELAY2_TIME_R,    ///< s
+    DELAY2_FEEDBACK, ///< 0 .. 0.95
+    DELAY2_DAMP,     ///< 0 .. 1
+    DELAY2_TO_FAR,    ///< 0 .. 1
     // Room: the near plane's early reflections and small reverb
-    EarlyLevel,     ///< 0 .. 1
-    EarlySize,      ///< m
-    EarlyAbsorb,    ///< 0 .. 1
-    NearMix,        ///< the near reverb, 0 .. 1 wet
-    NearDecay,      ///< s
-    NearDamp,       ///< 0 .. 1
+    EARLY_LEVEL,     ///< 0 .. 1
+    EARLY_SIZE,      ///< m
+    EARLY_ABSORB,    ///< 0 .. 1
+    NEAR_MIX,        ///< the near reverb, 0 .. 1 wet
+    NEAR_DECAY,      ///< s
+    NEAR_DAMP,       ///< 0 .. 1
     // The far hall, more of Noctuary's
-    FarDiffuse,     ///< 0 .. 1: the swell in front of the far reverb
-    FarPreDelay,    ///< ms
-    FarUnmask,      ///< 0 .. 1: the far hall steps aside for the near plane, band by band
-    FarMode,        ///< kFarModeNames
-    FarFreeze,      ///< the far hall held
+    FAR_DIFFUSE,     ///< 0 .. 1: the swell in front of the far reverb
+    FAR_PRE_DELAY,    ///< ms
+    FAR_UNMASK,      ///< 0 .. 1: the far hall steps aside for the near plane, band by band
+    FAR_MODE,        ///< FarModeNames
+    FAR_FREEZE,      ///< the far hall held
     // The modal hall: tens of thousands of decaying resonances on the GPU
-    ModalLevel,     ///< 0 .. 1
-    ModalDecay,     ///< s to -60 dB, at and below 250 Hz
-    ModalDamp,      ///< 0 .. 1: how much faster the upper octaves die
-    ModalTune,      ///< 0 .. 1: the share of the modes tuned to the scale
-    ModalSpread,    ///< ct: how far a tuned mode lies from its note
-    ModalDrift,     ///< ct: every mode's slow wander
-    ModalWidth,     ///< 0 .. 1: mono .. every mode its own place
-    ModalLow,       ///< Hz: the lowest mode
-    ModalFreeze,    ///< the modal hall held, its input shut
-    ModalBreath,    ///< 0 .. 1: every mode's decay wanders, slowly
+    MODAL_LEVEL,     ///< 0 .. 1
+    MODAL_DECAY,     ///< s to -60 dB, at and below 250 Hz
+    MODAL_DAMP,      ///< 0 .. 1: how much faster the upper octaves die
+    MODAL_TUNE,      ///< 0 .. 1: the share of the modes tuned to the scale
+    MODAL_SPREAD,    ///< ct: how far a tuned mode lies from its note
+    MODAL_DRIFT,     ///< ct: every mode's slow wander
+    MODAL_WIDTH,     ///< 0 .. 1: mono .. every mode its own place
+    MODAL_LOW,       ///< Hz: the lowest mode
+    MODAL_FREEZE,    ///< the modal hall held, its input shut
+    MODAL_BREATH,    ///< 0 .. 1: every mode's decay wanders, slowly
     // The field on the partials and the dispersion of their clocks (Cloud.h SpectralField)
-    FieldMode,      ///< kFieldModeNames
-    FieldStrength,  ///< 0 .. 1: how fast the partials may move (600 x^2 cents a second)
-    FieldRadius,    ///< ct: an attractor's reach; the Scale field's stiffness
-    FieldSpring,    ///< 0 .. 1: the pull back home (4 x^2 per second)
-    FieldRate,      ///< how fast the attractors wander (time of the Lorenz system per second)
-    FieldCount,     ///< 1 .. 8 attractors
-    Dispersion,     ///< s: the lowest partials' clock late (positive) or the highest (negative)
+    FIELD_MODE,      ///< FieldModeNames
+    FIELD_STRENGTH,  ///< 0 .. 1: how fast the partials may move (600 x^2 cents a second)
+    FIELD_RADIUS,    ///< ct: an attractor's reach; the Scale field's stiffness
+    FIELD_SPRING,    ///< 0 .. 1: the pull back home (4 x^2 per second)
+    FIELD_RATE,      ///< how fast the attractors wander (time of the Lorenz system per second)
+    FIELD_COUNT,     ///< 1 .. 8 attractors
+    DISPERSION,     ///< s: the lowest partials' clock late (positive) or the highest (negative)
     // Phase 9 (12.10.2026)
-    Binaural,       ///< the near plane placed round the head (headphones)
-    BinauralSpan,   ///< 0 .. 1: the places over the front half .. all round
-    BinauralHeight, ///< 0 .. 1: the elevations' spread
-    BinauralOrbit,  ///< Hz: the whole cloud turning round the head (negative: the other way)
-    MemoryLevel,    ///< 0 .. 1: the ghosts of the notes let go
-    MemoryTime,     ///< s: how long a ghost takes to fade by 60 dB
-    MemoryBloom,    ///< s: how long it takes to rise
-    MemoryBlur,     ///< 0 .. 1: how far it widens, drifts and darkens as it fades
-    MemorySink,     ///< 0 .. 1: how far it recedes into the far plane
-    TuneGravity,    ///< 0 .. 1: self-tuning: voices whose harmonics nearly meet pull together
-    TuneReach,      ///< ct: how near they must be
-    TuneAnchor,     ///< 0 .. 1: the pull back to the scale
-    ModalPaint,     ///< 0 .. 1: the modal hall heard through the landscape
-    SpecMix,        ///< 0 .. 1: the spectral echo on the near plane
-    SpecTime,       ///< s: its bands' middle delay
-    SpecTilt,       ///< -1 .. 1: the highs later (positive) or earlier
-    SpecScatter,    ///< 0 .. 1: each band a time of its own
-    SpecFeedback,   ///< 0 .. 0.95
-    SpecDamp,       ///< 0 .. 1: less feedback towards the top
-    SpecToFar,      ///< 0 .. 1: its share into the far plane
+    BINAURAL,       ///< the near plane placed round the head (headphones)
+    BINAURAL_SPAN,   ///< 0 .. 1: the places over the front half .. all round
+    BINAURAL_HEIGHT, ///< 0 .. 1: the elevations' spread
+    BINAURAL_ORBIT,  ///< Hz: the whole cloud turning round the head (negative: the other way)
+    MEMORY_LEVEL,    ///< 0 .. 1: the ghosts of the notes let go
+    MEMORY_TIME,     ///< s: how long a ghost takes to fade by 60 dB
+    MEMORY_BLOOM,    ///< s: how long it takes to rise
+    MEMORY_BLUR,     ///< 0 .. 1: how far it widens, drifts and darkens as it fades
+    MEMORY_SINK,     ///< 0 .. 1: how far it recedes into the far plane
+    TUNE_GRAVITY,    ///< 0 .. 1: self-tuning: voices whose harmonics nearly meet pull together
+    TUNE_REACH,      ///< ct: how near they must be
+    TUNE_ANCHOR,     ///< 0 .. 1: the pull back to the scale
+    MODAL_PAINT,     ///< 0 .. 1: the modal hall heard through the landscape
+    SPEC_MIX,        ///< 0 .. 1: the spectral echo on the near plane
+    SPEC_TIME,       ///< s: its bands' middle delay
+    SPEC_TILT,       ///< -1 .. 1: the highs later (positive) or earlier
+    SPEC_SCATTER,    ///< 0 .. 1: each band a time of its own
+    SPEC_FEEDBACK,   ///< 0 .. 0.95
+    SPEC_DAMP,       ///< 0 .. 1: less feedback towards the top
+    SPEC_TO_FAR,      ///< 0 .. 1: its share into the far plane
     // Phase 10a: Noctuary's modulators
-    Coherence,      ///< 0 .. 1: the Kuramoto bank's coupling (free .. in step)
-    CoherenceRate,  ///< x: its speed (natural periods 23, 31, 41, 53 s)
-    LeniaRate,      ///< Hz: Lenia fields per second
-    LeniaGrowth,    ///< Lenia's growth centre (mu)
-    ChaosPeriod,    ///< s: about a Lorenz lobe change and a Roessler turn
-    BrainCascade,   ///< 0 .. 1: the conductor's events breed events (a Hawkes clock)
+    COHERENCE,      ///< 0 .. 1: the Kuramoto bank's coupling (free .. in step)
+    COHERENCE_RATE,  ///< x: its speed (natural periods 23, 31, 41, 53 s)
+    LENIA_RATE,      ///< Hz: Lenia fields per second
+    LENIA_GROWTH,    ///< Lenia's growth centre (mu)
+    CHAOS_PERIOD,    ///< s: about a Lorenz lobe change and a Roessler turn
+    BRAIN_CASCADE,   ///< 0 .. 1: the conductor's events breed events (a Hawkes clock)
     // Phase 10b: the living landscape
-    LifeMode,       ///< kLifeModeNames
-    LifeDepth,      ///< 0 .. 1: how far the partials' loudness follows the field
-    LifeRate,       ///< 0 .. 1: how fast it lives
-    LifeCharacter,  ///< 0 .. 1: Lenia's growth; the Turing field's way from spots to mazes
-    LifeZoom,       ///< 0.25 .. 1: how much of the field's width the range spans
+    LIFE_MODE,       ///< LifeModeNames
+    LIFE_DEPTH,      ///< 0 .. 1: how far the partials' loudness follows the field
+    LIFE_RATE,       ///< 0 .. 1: how fast it lives
+    LIFE_CHARACTER,  ///< 0 .. 1: Lenia's growth; the Turing field's way from spots to mazes
+    LIFE_ZOOM,       ///< 0.25 .. 1: how much of the field's width the range spans
     // Phase 10c: partial sync
-    SyncDepth,      ///< 0 .. 1: how far each partial's loudness follows its oscillator
-    SyncCoupling,   ///< 0 .. 1: how strongly the members of a harmonic pull each other into step
-    SyncRate,       ///< Hz: the oscillators' middle rate
-    SyncSpread,     ///< 0 .. 1: how far their own rates scatter
+    SYNC_DEPTH,      ///< 0 .. 1: how far each partial's loudness follows its oscillator
+    SYNC_COUPLING,   ///< 0 .. 1: how strongly the members of a harmonic pull each other into step
+    SYNC_RATE,       ///< Hz: the oscillators' middle rate
+    SYNC_SPREAD,     ///< 0 .. 1: how far their own rates scatter
     // Phase 10f: the ripple
-    RippleDepth,    ///< 0 .. 1: how far the partials' loudness follows the wave
-    RippleSpeed,    ///< octaves a second the wave runs along the spectrum
-    RippleDecay,    ///< s: how long a strike rings on the string
+    RIPPLE_DEPTH,    ///< 0 .. 1: how far the partials' loudness follows the wave
+    RIPPLE_SPEED,    ///< octaves a second the wave runs along the spectrum
+    RIPPLE_DECAY,    ///< s: how long a strike rings on the string
     // Phase 10g: the reservoir
-    ReservoirChaos, ///< its coupling's spectral radius: below 1 it forgets, about 1 the edge of chaos
-    ReservoirMemory,///< s: how slowly its state moves
-    ReservoirInput, ///< how strongly it hears the music
+    RESERVOIR_CHAOS, ///< its coupling's spectral radius: below 1 it forgets, about 1 the edge of chaos
+    RESERVOIR_MEMORY,///< s: how slowly its state moves
+    RESERVOIR_INPUT, ///< how strongly it hears the music
     // Phase 10h: the melt
-    MeltMix,        ///< 0 .. 1: the melt on the near plane
-    MeltTime,       ///< s: how long the melted sound lingers (to -60 dB)
-    MeltSpread,     ///< octaves: how far a held sound has spread after a second
-    MeltToFar,      ///< 0 .. 1: its share into the far plane
+    MELT_MIX,        ///< 0 .. 1: the melt on the near plane
+    MELT_TIME,       ///< s: how long the melted sound lingers (to -60 dB)
+    MELT_SPREAD,     ///< octaves: how far a held sound has spread after a second
+    MELT_TO_FAR,      ///< 0 .. 1: its share into the far plane
     // Phase 11: morph and journeys (the player's: presets never set them, Presets.h keptByPresets)
-    MorphActive,    ///< the sound is the blend of the morph's slots A and B (Morph.h)
-    MorphPos,       ///< 0 (A) .. 1 (B): where between them
-    PresetGlide,    ///< s: a preset chosen glides from the sound before it (0: it comes at once)
+    MORPH_ACTIVE,    ///< the sound is the blend of the morph's slots A and B (Morph.h)
+    MORPH_POS,       ///< 0 (A) .. 1 (B): where between them
+    PRESET_GLIDE,    ///< s: a preset chosen glides from the sound before it (0: it comes at once)
     // Phase 13: the partials' ratios
-    Stretch,        ///< cents an octave of the harmonics spans (1200: harmonic; Sethares' stretched timbres)
-    Shift,          ///< Hz every partial is moved by (a frequency shifter: harmonic ratios become inharmonic)
-    LifeSides,      ///< animated pictures: mirror wedges, spiral arms, grating lines
-    LifeTurn,       ///< animated pictures: turns a minute (negative: the other way)
-    CombDepth,      ///< 0 .. 1: the spectral comb's notches (0: none)
-    CombDensity,    ///< notches an octave
-    CombSweep,      ///< notches a second the comb travels (positive: up, an endless rise)
-    CombStereo,     ///< 0 .. 1: left and right combed apart
+    STRETCH,        ///< cents an octave of the harmonics spans (1200: harmonic; Sethares' stretched timbres)
+    SHIFT,          ///< Hz every partial is moved by (a frequency shifter: harmonic ratios become inharmonic)
+    LIFE_SIDES,      ///< animated pictures: mirror wedges, spiral arms, grating lines
+    LIFE_TURN,       ///< animated pictures: turns a minute (negative: the other way)
+    COMB_DEPTH,      ///< 0 .. 1: the spectral comb's notches (0: none)
+    COMB_DENSITY,    ///< notches an octave
+    COMB_SWEEP,      ///< notches a second the comb travels (positive: up, an endless rise)
+    COMB_STEREO,     ///< 0 .. 1: left and right combed apart
     // Phase 14: the preset map (the player's: presets never set them)
-    MapActive,      ///< the sound is the blend of the presets round the map's cursor (PresetMap.h)
-    MapX,           ///< the cursor across, 0 .. 1 (dark to bright)
-    MapY,           ///< the cursor up, 0 .. 1 (still to moving)
-    MapRadius,      ///< the blend's width on the map
-    MapGlide,       ///< s: how fast the sound follows the cursor
-    RouteSpeed,     ///< times: how fast a route is walked (its travel and hold times divided by it)
+    MAP_ACTIVE,      ///< the sound is the blend of the presets round the map's cursor (PresetMap.h)
+    MAP_X,           ///< the cursor across, 0 .. 1 (dark to bright)
+    MAP_Y,           ///< the cursor up, 0 .. 1 (still to moving)
+    MAP_RADIUS,      ///< the blend's width on the map
+    MAP_GLIDE,       ///< s: how fast the sound follows the cursor
+    ROUTE_SPEED,     ///< times: how fast a route is walked (its travel and hold times divided by it)
     // Phase 16 (14.10.2026): swarms and chimeras, turbulence, MPE
-    SyncMode,       ///< how the partials' oscillators couple: Global (Kuramoto), Chimera (to their neighbours), Swarm (swarmalators)
-    SyncSwarm,      ///< -1 .. 1: Swarm: how a partial's place follows its phase (positive: like phases gather, negative: they part)
-    SyncReach,      ///< cents: Swarm: how far a partial wanders in pitch (and with it across the field) on its circle
-    SyncLag,        ///< 0 .. 1: Chimera: the coupling's phase lag (more: more of the cloud falls out of step)
-    Turbulence,     ///< 0 .. 1: the energy cascade: a loud harmonic hands its energy upwards, the louder the more
-    TurbulenceTime, ///< s: how long the cascade takes to settle back when the sound grows soft
-    MpeOn,          ///< MPE: notes on channels 2 .. 16 carry their own bend, pressure and slide (the lower zone)
-    MpeBend,        ///< semitones: a member channel's full bend (48 by the MPE standard; an RPN 0 from the controller sets it)
-    MpePress,       ///< what a note's pressure moves (kMpeTargetNames)
-    MpePressDepth,  ///< 0 .. 1: how far
-    MpeSlide,       ///< what a note's slide (CC 74 on its channel) moves
-    MpeSlideDepth,  ///< 0 .. 1: how far
+    SYNC_MODE,       ///< how the partials' oscillators couple: Global (Kuramoto), Chimera (to their neighbours), Swarm (swarmalators)
+    SYNC_SWARM,      ///< -1 .. 1: Swarm: how a partial's place follows its phase (positive: like phases gather, negative: they part)
+    SYNC_REACH,      ///< cents: Swarm: how far a partial wanders in pitch (and with it across the field) on its circle
+    SYNC_LAG,        ///< 0 .. 1: Chimera: the coupling's phase lag (more: more of the cloud falls out of step)
+    TURBULENCE,     ///< 0 .. 1: the energy cascade: a loud harmonic hands its energy upwards, the louder the more
+    TURBULENCE_TIME, ///< s: how long the cascade takes to settle back when the sound grows soft
+    MPE_ON,          ///< MPE: notes on channels 2 .. 16 carry their own bend, pressure and slide (the lower zone)
+    MPE_BEND,        ///< semitones: a member channel's full bend (48 by the MPE standard; an RPN 0 from the controller sets it)
+    MPE_PRESS,       ///< what a note's pressure moves (MpeTargetNames)
+    MPE_PRESS_DEPTH,  ///< 0 .. 1: how far
+    MPE_SLIDE,       ///< what a note's slide (CC 74 on its channel) moves
+    MPE_SLIDE_DEPTH,  ///< 0 .. 1: how far
     // Phase 17 (14.10.2026): the growing hall, the partials' own time, the ripple's bend
-    HallGrow,       ///< -1 .. 1: the modal hall's memory of what it heard: positive, those pitches ring longer (growth); negative, shorter (erosion)
-    HallMemory,     ///< s: how slowly the hall's memory forms (a minute .. four hours)
-    TimeBend,       ///< -1 .. 1: each partial's clock (its drift, shimmer, sync) slower where the spectrum is dense (positive) or faster
-    RippleBend,     ///< 0 .. 1: the ripple's speed falls where the spectrum is loud: its waves linger at the notes
+    HALL_GROW,       ///< -1 .. 1: the modal hall's memory of what it heard: positive, those pitches ring longer (growth); negative, shorter (erosion)
+    HALL_MEMORY,     ///< s: how slowly the hall's memory forms (a minute .. four hours)
+    TIME_BEND,       ///< -1 .. 1: each partial's clock (its drift, shimmer, sync) slower where the spectrum is dense (positive) or faster
+    RIPPLE_BEND,     ///< 0 .. 1: the ripple's speed falls where the spectrum is loud: its waves linger at the notes
     // Phase 19 (14.10.2026)
-    BrainLight,     ///< 0 .. 1: the conductors prefer notes whose harmonics fall where the landscape (or the living field) is bright
-    BrainFoundation,///< 0 .. 1: a voice on the conductor's root in the octave from C2 (or Lowest, when lower), held while the root stands (its level; 0 none)
-    Count           ///< number of parameters
+    BRAIN_LIGHT,     ///< 0 .. 1: the conductors prefer notes whose harmonics fall where the landscape (or the living field) is bright
+    BRAIN_FOUNDATION,///< 0 .. 1: a voice on the conductor's root in the octave from C2 (or Lowest, when lower), held while the root stands (its level; 0 none)
+    COUNT           ///< number of parameters
 };
 
-constexpr int kNumParams = static_cast<int>(ParamId::Count);   ///< rows of the table
+constexpr int NumParams = static_cast<int>(ParamIdE::COUNT);   ///< rows of the table
 
 /** @brief How a parameter's value is read. */
-enum class ParamKind {
-    Float,   ///< continuous, with a skew
-    Int,     ///< whole numbers, linear
-    Bool,    ///< 0 or 1
-    Choice   ///< an index into `choices`
+enum class ParamKindE {
+    FLOAT,   ///< continuous, with a skew
+    INT,     ///< whole numbers, linear
+    BOOL,    ///< 0 or 1
+    CHOICE   ///< an index into `choices`
 };
 
 /** @brief One row of the parameter table. */
 struct ParamDesc {
-    ParamId     id;          ///< the parameter; rows are ordered by it
-    const char* key;         ///< stable identifier (automation, presets)
-    const char* name;        ///< display name
-    const char* section;     ///< grouping for editors
-    ParamKind   kind;        ///< how the value is read
-    float       min;         ///< the lowest value, in the parameter's unit
-    float       max;         ///< the highest value
-    float       def;         ///< the default
-    float       skew;        ///< 1 = linear, < 1 = more resolution at the low end
-    const char* unit;        ///< "Hz", "s", "dB", "ct", "st" or ""
-    const char* const* choices;   ///< ParamKind::Choice only
-    int         numChoices;  ///< entries of `choices`
+    ParamIdE     m_id;          ///< the parameter; rows are ordered by it
+    const char* m_key;         ///< stable identifier (automation, presets)
+    const char* m_name;        ///< display name
+    const char* m_section;     ///< grouping for editors
+    ParamKindE   m_kind;        ///< how the value is read
+    float       m_min;         ///< the lowest value, in the parameter's unit
+    float       m_max;         ///< the highest value
+    float       m_def;         ///< the default
+    float       m_skew;        ///< 1 = linear, < 1 = more resolution at the low end
+    const char* m_unit;        ///< "Hz", "s", "dB", "ct", "st" or ""
+    const char* const* m_choices;   ///< ParamKind::Choice only
+    int         m_numChoices;  ///< entries of `choices`
 };
 
-/** @brief The table, ordered by ParamId. @return kNumParams rows */
-const std::array<ParamDesc, kNumParams>& paramTable();
+/** @brief The table, ordered by ParamId. @return NumParams rows */
+const std::array<ParamDesc, NumParams>& paramTable();
 
 /** @brief The row of one parameter. @param id the parameter @return its description */
-inline const ParamDesc& paramDesc(ParamId id) { return paramTable()[static_cast<size_t>(id)]; }
+inline const ParamDesc& paramDesc(ParamIdE id) { return paramTable()[static_cast<size_t>(id)]; }
 
 /** @brief Looks a parameter up by its key. @param key the stable identifier @return the row, or nullptr */
 const ParamDesc* findParam(const char* key);
@@ -306,31 +306,31 @@ float toNorm(const ParamDesc& d, float v);
 /** @brief Back from the normalised domain. @param d the row @param n 0 .. 1 @return the value in its unit */
 float fromNorm(const ParamDesc& d, float n);
 
-constexpr int kNumScaleChoices = 13;   ///< entries of kScaleNames: eleven tables, the user slot and the timbre scale
-constexpr int kUserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
-constexpr int kTimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
-extern const char* const kScaleNames[kNumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
-constexpr int kNumLifeModes = 13;   ///< entries of kLifeModeNames
-extern const char* const kLifeModeNames[kNumLifeModes];     ///< "Off", "Lenia", "Turing", the animated pictures, "Fluid", "Islands" (Cloud.h LifeMode)
-constexpr int kNumSyncModes = 3;   ///< entries of kSyncModeNames
-extern const char* const kSyncModeNames[kNumSyncModes];     ///< "Global", "Chimera", "Swarm" (Cloud.h SyncMode)
-constexpr int kNumMpeTargets = 8;  ///< entries of kMpeTargetNames
-extern const char* const kMpeTargetNames[kNumMpeTargets];   ///< "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion"
+constexpr int NumScaleChoices = 13;   ///< entries of ScaleNames: eleven tables, the user slot and the timbre scale
+constexpr int UserScaleIndex = 11;    ///< the Scala slot, the first choice that is not a table (Tuning.cpp checks it)
+constexpr int TimbreScaleIndex = 12;  ///< the scale computed from the spectrum (Sethares)
+extern const char* const ScaleNames[NumScaleChoices];   ///< "12-TET", "JI Major (Ptolemy)", ... (as in Noctuary)
+constexpr int NumLifeModes = 13;   ///< entries of LifeModeNames
+extern const char* const LifeModeNames[NumLifeModes];     ///< "Off", "Lenia", "Turing", the animated pictures, "Fluid", "Islands" (Cloud.h LifeMode)
+constexpr int NumSyncModes = 3;   ///< entries of SyncModeNames
+extern const char* const SyncModeNames[NumSyncModes];     ///< "Global", "Chimera", "Swarm" (Cloud.h SyncMode)
+constexpr int NumMpeTargets = 8;  ///< entries of MpeTargetNames
+extern const char* const MpeTargetNames[NumMpeTargets];   ///< "Off", "Level", "Filter", "Brightness", "Width", "Nearer", "Shimmer", "Motion"
 
-/** @brief What a note's pressure or slide moves (MPE), in kMpeTargetNames' order. */
-enum class MpeTarget : int { Off = 0, Level, Filter, Brightness, Width, Nearer, Shimmer, Motion };
-constexpr int kNumFieldModes = 6;   ///< entries of kFieldModeNames
-extern const char* const kFieldModeNames[kNumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" (Cloud.h FieldMode)
-constexpr int kNumFarModes = 4;   ///< entries of kFarModeNames
-extern const char* const kFarModeNames[kNumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
-extern const char* const kRootNames[12];                  ///< "C" .. "B"
-extern const char* const kKeyMapNames[2];                 ///< "Snap to 12 keys", "Consecutive degrees"
+/** @brief What a note's pressure or slide moves (MPE), in MpeTargetNames' order. */
+enum class MpeTargetE : int { OFF = 0, LEVEL, FILTER, BRIGHTNESS, WIDTH, NEARER, SHIMMER, MOTION };
+constexpr int NumFieldModes = 6;   ///< entries of FieldModeNames
+extern const char* const FieldModeNames[NumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" (Cloud.h FieldMode)
+constexpr int NumFarModes = 4;   ///< entries of FarModeNames
+extern const char* const FarModeNames[NumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
+extern const char* const RootNames[12];                  ///< "C" .. "B"
+extern const char* const KeyMapNames[2];                 ///< "Snap to 12 keys", "Consecutive degrees"
 
-constexpr int kNumMotions = 7;                       ///< entries of kMotionNames
-extern const char* const kMotionNames[kNumMotions];  ///< None, Random, Wave, Pendulum, Breathe, Glissando, Aurora
-extern const char* const kFilterModelNames[];        ///< Off, LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak, Formant (Cloud.h FilterModel)
-constexpr int kNumLfoShapes = 7;                     ///< entries of kLfoShapeNames
-extern const char* const kLfoShapeNames[kNumLfoShapes];   ///< Sine, Triangle, Ramp Up, Ramp Down, Square, Random, Steps
-extern const char* const kEnvShapeNames[];           ///< the factory shapes' names, for the envelopes' choice (Shapes.h)
+constexpr int NumMotions = 7;                       ///< entries of MotionNames
+extern const char* const MotionNames[NumMotions];  ///< None, Random, Wave, Pendulum, Breathe, Glissando, Aurora
+extern const char* const FilterModelNames[];        ///< Off, LP 6, LP 12, LP 24, HP 12, BP 12, Notch, Peak, Formant (Cloud.h FilterModel)
+constexpr int NumLfoShapes = 7;                     ///< entries of LfoShapeNames
+extern const char* const LfoShapeNames[NumLfoShapes];   ///< Sine, Triangle, Ramp Up, Ramp Down, Square, Random, Steps
+extern const char* const EnvShapeNames[];           ///< the factory shapes' names, for the envelopes' choice (Shapes.h)
 
 } // namespace additiv

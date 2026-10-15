@@ -38,37 +38,37 @@
 
 namespace additiv {
 
-constexpr int kMorphRows = 64;     ///< weighted matrix rows a sound can hold (a blend of blends merges and, past this, drops the weakest)
-constexpr int kMorphSetups = 16;   ///< sounds' own modulators a blend can hold (a seventh sound's rows share the first's)
-constexpr int kMorphGates = 3;     ///< the choices with an amount that have a gate: the motion, the living landscape, the field
-constexpr int kMorphFilters = 9;   ///< the voice filters a sound can hold: one a model, Off included
+constexpr int MorphRows = 64;     ///< weighted matrix rows a sound can hold (a blend of blends merges and, past this, drops the weakest)
+constexpr int MorphSetups = 16;   ///< sounds' own modulators a blend can hold (a seventh sound's rows share the first's)
+constexpr int MorphGates = 3;     ///< the choices with an amount that have a gate: the motion, the living landscape, the field
+constexpr int MorphFilters = 9;   ///< the voice filters a sound can hold: one a model, Off included
 
 /** @brief One of a sound's voice filters, and its weight in the sound. */
 struct MorphFilter {
-    int model = 0;            ///< FilterModel
-    float cutoff = 1000.0f;   ///< Hz: of the blended ones of this model, the weighted mean in the knob's domain
-    float resonance = 0.0f;   ///< 0 .. 1, likewise
-    float weight = 0.0f;      ///< 0 .. 1: its share of the sound (the shares add up to 1)
+    int m_model = 0;            ///< FilterModel
+    float m_cutoff = 1000.0f;   ///< Hz: of the blended ones of this model, the weighted mean in the knob's domain
+    float m_resonance = 0.0f;   ///< 0 .. 1, likewise
+    float m_weight = 0.0f;      ///< 0 .. 1: its share of the sound (the shares add up to 1)
 };
 
 /** @brief The amounts the gates multiply, in gate order (the filter's is filterMix). */
-constexpr ParamId kGatedAmounts[kMorphGates] = { ParamId::MotionDepth, ParamId::LifeDepth, ParamId::FieldStrength };
+constexpr ParamIdE GatedAmounts[MorphGates] = { ParamIdE::MOTION_DEPTH, ParamIdE::LIFE_DEPTH, ParamIdE::FIELD_STRENGTH };
 
 /** @brief A sound as the engine plays it before the matrix: every parameter, the filter's share and the weighted rows. */
 struct MorphState {
-    float values[kNumParams] = {};   ///< every parameter, in its own units
-    float filterMix = 1.0f;          ///< 0 .. 1: the share of the filters that are not Off (for the panel)
-    int filterCount = 0;             ///< voice filters in the list
-    MorphFilter filters[kMorphFilters];   ///< the voice filters with their weights (the knobs show the heaviest that is not Off)
-    float gate[kMorphGates] = { 1.0f, 1.0f, 1.0f };   ///< 0 .. 1: each gated amount, the matrix's push included, is multiplied by this (0 where its kind changes)
-    int setupCount = 0;              ///< setups in use
-    ModSetup setups[kMorphSetups];   ///< the LFOs and envelopes of the sounds in it
-    int rowCount = 0;                ///< rows in use
-    ModRow rows[kMorphRows];         ///< the matrix, each depth already weighted, each with its setup
+    float m_values[NumParams] = {};   ///< every parameter, in its own units
+    float m_filterMix = 1.0f;          ///< 0 .. 1: the share of the filters that are not Off (for the panel)
+    int m_filterCount = 0;             ///< voice filters in the list
+    MorphFilter m_filters[MorphFilters];   ///< the voice filters with their weights (the knobs show the heaviest that is not Off)
+    float m_gate[MorphGates] = { 1.0f, 1.0f, 1.0f };   ///< 0 .. 1: each gated amount, the matrix's push included, is multiplied by this (0 where its kind changes)
+    int m_setupCount = 0;              ///< setups in use
+    ModSetup m_setups[MorphSetups];   ///< the LFOs and envelopes of the sounds in it
+    int m_rowCount = 0;                ///< rows in use
+    ModRow m_rows[MorphRows];         ///< the matrix, each depth already weighted, each with its setup
 
     /**
      * @brief Takes parameters and plain rows as they stand: the filter at full share.
-     * @param v      kNumParams values
+     * @param v      NumParams values
      * @param r      the rows (rows with no source, no target or no depth are left out)
      * @param count  how many
      */

@@ -27,7 +27,7 @@
 class VariationTile final : public juce::Component {
 public:
     /** @brief Tile @p k of @p proc's variations. @param proc the processor @param k 0 .. 5 */
-    VariationTile(AdditivProcessor& proc, int k) : proc_(proc), k_(k) {}
+    VariationTile(AdditivProcessor& proc, int k) : m_proc(proc), m_k(k) {}
     /** @brief Its number and what it changes. */
     void paint(juce::Graphics& g) override;
     /** @brief Listens to it. @param e the press */
@@ -35,18 +35,18 @@ public:
     /** @brief Back to the sound before. @param e the release */
     void mouseUp(const juce::MouseEvent& e) override;
     /** @brief It was listened to (its Keep is shown). */
-    std::function<void(int)> onHeard;
+    std::function<void(int)> m_onHeard;
 
 private:
-    AdditivProcessor& proc_;   ///< whose variations
-    int k_;                    ///< which
+    AdditivProcessor& m_proc;   ///< whose variations
+    int m_k;                    ///< which
 };
 
 /** @brief The Focus page (see the file comment). */
 class FocusPage final : public juce::Component, public juce::FileDragAndDropTarget, private juce::Timer {
 public:
     /** @brief A change made from the page as one undo step: its name, and the change. */
-    using Undoable = std::function<void(const juce::String&, std::function<void()>)>;
+    using UndoableT = std::function<void(const juce::String&, std::function<void()>)>;
     /**
      * @brief Builds the page.
      * @param proc      the processor
@@ -55,7 +55,7 @@ public:
      * @param undoable  wraps a change into one undo step (the editor's history)
      * @param picture   the partials as the picture shows them now, small (a snapshot's)
      */
-    FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, Undoable undoable,
+    FocusPage(AdditivProcessor& proc, const frame::ControlActions& actions, frame::LiveRings* live, UndoableT undoable,
               std::function<juce::Image()> picture);
     /** @brief The height the page needs at a width. @param w pixels @return pixels */
     int heightFor(int w) const;
@@ -74,7 +74,7 @@ private:
     /** @brief The focus anew when what matters changed; the statuses. */
     void timerCallback() override;
     /** @brief The focus box's knobs anew. @param ids the knobs */
-    void rebuildFocus(const std::vector<additiv::ParamId>& ids);
+    void rebuildFocus(const std::vector<additiv::ParamIdE>& ids);
     /** @brief Searches the presets like a recording. @param f the file */
     void find(const juce::File& f);
     /** @brief The search's results into their buttons. */
@@ -84,38 +84,38 @@ private:
     /** @brief A snapshot's tile: its picture; a click recalls it, a right-click offers A, B, forget. */
     class SnapshotTile;
 
-    AdditivProcessor& proc_;                       ///< the processor
-    const frame::ControlActions& actions_;         ///< the knobs' menu
-    frame::LiveRings* live_;                       ///< the live rings
-    Undoable undoable_;                            ///< one undo step
-    std::function<juce::Image()> picture_;         ///< the partials now, small
-    juce::TextButton snap_{ "Snapshot" };          ///< keeps the sound now
-    std::vector<std::unique_ptr<SnapshotTile>> snapTiles_;   ///< eight tiles
-    std::array<juce::TextButton, 4> lower_;        ///< darker, calmer, narrower, purer
-    std::array<juce::TextButton, 4> higher_;       ///< brighter, livelier, wider, airier
-    juce::Label nudgeStatus_;                      ///< what the last nudge did
-    std::unique_ptr<ParamPage> focus_;             ///< the knobs that matter
-    std::vector<additiv::ParamId> focusIds_;       ///< which
-    juce::TextButton make_{ "Variations" };        ///< six new ones
-    juce::TextButton back_{ "Back" };              ///< the sound before the last kept
-    juce::Slider far_;                             ///< how far
-    juce::Label farName_;                          ///< its name
-    std::vector<std::unique_ptr<VariationTile>> tiles_;   ///< six tiles
-    std::array<juce::TextButton, 6> keep_;         ///< keep that one
-    std::vector<std::unique_ptr<frame::Knob>> macro_;   ///< the macros, large knobs
-    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> macroLinks_;   ///< to their parameters
-    std::array<juce::Label, 4> macroName_;         ///< their names
-    std::array<juce::TextButton, 4> teach_;        ///< begin teaching
-    std::array<juce::TextButton, 4> here_;         ///< the sound now is the macro's place here
-    std::array<juce::TextButton, 4> forget_;       ///< forget the lesson (a small x, once taught)
-    std::array<juce::TextButton, 4> cancel_;       ///< end the teaching without a new place
-    std::array<bool, 6> heard_{};                  ///< which variations were listened to (their Keep shown)
-    int generation_ = -1;                          ///< the variations' generation the tiles show
-    double pulse_ = 0.0;                           ///< the teaching's pulse, seconds
-    std::array<juce::Label, 4> teachStatus_;       ///< what each was taught
-    juce::TextButton open_{ "Open a recording ..." };   ///< the search's file
-    juce::Label findStatus_;                       ///< what was searched
-    std::array<juce::TextButton, 8> results_;      ///< the presets found, nearest first
-    std::unique_ptr<juce::FileChooser> chooser_;   ///< the open dialog while it is open
-    int tick_ = 0;                                 ///< timer ticks
+    AdditivProcessor& m_proc;                       ///< the processor
+    const frame::ControlActions& m_actions;         ///< the knobs' menu
+    frame::LiveRings* m_live;                       ///< the live rings
+    UndoableT m_undoable;                            ///< one undo step
+    std::function<juce::Image()> m_picture;         ///< the partials now, small
+    juce::TextButton m_snap{ "Snapshot" };          ///< keeps the sound now
+    std::vector<std::unique_ptr<SnapshotTile>> m_snapTiles;   ///< eight tiles
+    std::array<juce::TextButton, 4> m_lower;        ///< darker, calmer, narrower, purer
+    std::array<juce::TextButton, 4> m_higher;       ///< brighter, livelier, wider, airier
+    juce::Label m_nudgeStatus;                      ///< what the last nudge did
+    std::unique_ptr<ParamPage> m_focus;             ///< the knobs that matter
+    std::vector<additiv::ParamIdE> m_focusIds;       ///< which
+    juce::TextButton m_make{ "Variations" };        ///< six new ones
+    juce::TextButton m_back{ "Back" };              ///< the sound before the last kept
+    juce::Slider m_far;                             ///< how far
+    juce::Label m_farName;                          ///< its name
+    std::vector<std::unique_ptr<VariationTile>> m_tiles;   ///< six tiles
+    std::array<juce::TextButton, 6> m_keep;         ///< keep that one
+    std::vector<std::unique_ptr<frame::Knob>> m_macro;   ///< the macros, large knobs
+    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_macroLinks;   ///< to their parameters
+    std::array<juce::Label, 4> m_macroName;         ///< their names
+    std::array<juce::TextButton, 4> m_teach;        ///< begin teaching
+    std::array<juce::TextButton, 4> m_here;         ///< the sound now is the macro's place here
+    std::array<juce::TextButton, 4> m_forget;       ///< forget the lesson (a small x, once taught)
+    std::array<juce::TextButton, 4> m_cancel;       ///< end the teaching without a new place
+    std::array<bool, 6> m_heard{};                  ///< which variations were listened to (their Keep shown)
+    int m_generation = -1;                          ///< the variations' generation the tiles show
+    double m_pulse = 0.0;                           ///< the teaching's pulse, seconds
+    std::array<juce::Label, 4> m_teachStatus;       ///< what each was taught
+    juce::TextButton m_open{ "Open a recording ..." };   ///< the search's file
+    juce::Label m_findStatus;                       ///< what was searched
+    std::array<juce::TextButton, 8> m_results;      ///< the presets found, nearest first
+    std::unique_ptr<juce::FileChooser> m_chooser;   ///< the open dialog while it is open
+    int m_tick = 0;                                 ///< timer ticks
 };

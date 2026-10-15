@@ -45,20 +45,20 @@ private:
     /** @brief The status line: name, age, what Grow does with it. @return the text */
     juce::String statusText() const;
 
-    AdditivProcessor& proc_;                       ///< the processor
-    std::vector<float> memory_;                    ///< the memory as last fetched, kHallBins bands, 1 the average
-    double age_ = 0.0;                             ///< its seconds learnt
-    bool painting_ = false;                        ///< a stroke is under way: the memory is not fetched over it
-    double paintedAt_ = 0.0;                       ///< when the last stroke ended (ms): the engine takes it at its next block
-    juce::Point<float> last_;                      ///< where the stroke was
-    juce::String note_;                            ///< what the painting did besides (Grow switched on ...)
+    AdditivProcessor& m_proc;                       ///< the processor
+    std::vector<float> m_memory;                    ///< the memory as last fetched, HallBins bands, 1 the average
+    double m_age = 0.0;                             ///< its seconds learnt
+    bool m_painting = false;                        ///< a stroke is under way: the memory is not fetched over it
+    double m_paintedAt = 0.0;                       ///< when the last stroke ended (ms): the engine takes it at its next block
+    juce::Point<float> m_last;                      ///< where the stroke was
+    juce::String m_note;                            ///< what the painting did besides (Grow switched on ...)
     /** @brief Saves the hall. */
-    frame::IconButton save_{ frame::IconButton::Icon::Save, "Writes the hall's memory into Documents/Empyrean/Halls under a name" };
+    frame::IconButton m_save{ frame::IconButton::IconE::SAVE, "Writes the hall's memory into Documents/Empyrean/Halls under a name" };
     /** @brief Loads a hall. */
-    frame::IconButton load_{ frame::IconButton::Icon::Open, "Loads a hall's memory from a file: the hall rings as that one had grown" };
-    juce::TextButton new_{ "New hall" };           ///< forgets everything: every band at the average
-    juce::Label status_;                           ///< name, age, what Grow does
-    std::unique_ptr<juce::FileChooser> chooser_;   ///< the dialog while it is open
+    frame::IconButton m_load{ frame::IconButton::IconE::OPEN, "Loads a hall's memory from a file: the hall rings as that one had grown" };
+    juce::TextButton m_new{ "New hall" };           ///< forgets everything: every band at the average
+    juce::Label m_status;                           ///< name, age, what Grow does
+    std::unique_ptr<juce::FileChooser> m_chooser;   ///< the dialog while it is open
 };
 
 /** @brief The Hall page: the modal hall's knobs and its growth above, the memory below. */
@@ -79,6 +79,6 @@ public:
     juce::String describe() const;
 
 private:
-    ParamPage params_;    ///< Modal Hall; Growth
-    HallView view_;       ///< the memory
+    ParamPage m_params;    ///< Modal Hall; Growth
+    HallView m_view;       ///< the memory
 };

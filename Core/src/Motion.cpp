@@ -8,75 +8,75 @@
 
 namespace additiv {
 
-void applyMotion(MotionKind kind, CloudVoice& v, float rate, float depth)
+void applyMotion(MotionKindE kind, CloudVoice& v, float rate, float depth)
 {
-    v.amp = EnvLane{};
-    v.pitch = EnvLane{};
-    v.pan = EnvLane{};
+    v.m_amp = EnvLane{};
+    v.m_pitch = EnvLane{};
+    v.m_pan = EnvLane{};
     switch (kind) {
-    case MotionKind::None:
+    case MotionKindE::NONE:
         break;
-    case MotionKind::Random:
-        v.amp.amount = 1.0f;
-        v.amp.shape = kSwell;
-        v.amp.shapeSpread = 4;
-        v.amp.shapeBy = MapSource::Random;
-        v.amp.chaos = 1.0f;
+    case MotionKindE::RANDOM:
+        v.m_amp.m_amount = 1.0f;
+        v.m_amp.m_shape = SWELL;
+        v.m_amp.m_shapeSpread = 4;
+        v.m_amp.m_shapeBy = MapSourceE::RANDOM;
+        v.m_amp.m_chaos = 1.0f;
         break;
-    case MotionKind::Wave:
-        v.amp.amount = 0.8f;   // a floor under the wave: motion on a carrying sound (12.10.2026)
-        v.amp.shape = kSwell;
-        v.amp.phase = -2.0f;
-        v.amp.phaseBy = MapSource::Pitch;
-        v.amp.delay = 3.0f;
-        v.amp.delayBy = MapSource::Pitch;
-        v.amp.chaos = 0.03f;
+    case MotionKindE::WAVE:
+        v.m_amp.m_amount = 0.8f;   // a floor under the wave: motion on a carrying sound (12.10.2026)
+        v.m_amp.m_shape = SWELL;
+        v.m_amp.m_phase = -2.0f;
+        v.m_amp.m_phaseBy = MapSourceE::PITCH;
+        v.m_amp.m_delay = 3.0f;
+        v.m_amp.m_delayBy = MapSourceE::PITCH;
+        v.m_amp.m_chaos = 0.03f;
         break;
-    case MotionKind::Pendulum:
+    case MotionKindE::PENDULUM:
         // After the user's verdict (12.10.2026: "wird zwischendurch eher dünn"): the depth grows
         // with pitch -- a quarter at 110 Hz, a half near 1 kHz, three quarters at 3.5 kHz -- so
         // the bass carries while the top pulses. (By harmonic number it was tried first: then the
         // strong low harmonics got a fifth of the depth and the pendulum all but vanished.)
-        v.amp.amount = 1.0f;
-        v.amp.shape = kPulse;
-        v.amp.rate = 0.5f;
-        v.amp.rateSpread = 6.0f;
-        v.amp.rateBy = MapSource::Harmonic;
-        v.amp.depthTilt = 1.0f;
-        v.amp.depthBy = MapSource::Pitch;
+        v.m_amp.m_amount = 1.0f;
+        v.m_amp.m_shape = PULSE;
+        v.m_amp.m_rate = 0.5f;
+        v.m_amp.m_rateSpread = 6.0f;
+        v.m_amp.m_rateBy = MapSourceE::HARMONIC;
+        v.m_amp.m_depthTilt = 1.0f;
+        v.m_amp.m_depthBy = MapSourceE::PITCH;
         break;
-    case MotionKind::Breathe:
-        v.amp.amount = 0.8f;
-        v.amp.shape = kSwell;
-        v.amp.rate = 0.7f;
-        v.amp.phase = 1.0f;
-        v.amp.phaseBy = MapSource::Member;
-        v.pan.amount = 0.8f;
-        v.pan.shape = kWobble;
-        v.pan.rate = 0.5f;
-        v.pan.phase = 1.0f;
-        v.pan.phaseBy = MapSource::Member;
-        v.pitch.amount = 6.0f;
-        v.pitch.shape = kWobble;
-        v.pitch.chaos = 1.0f;
+    case MotionKindE::BREATHE:
+        v.m_amp.m_amount = 0.8f;
+        v.m_amp.m_shape = SWELL;
+        v.m_amp.m_rate = 0.7f;
+        v.m_amp.m_phase = 1.0f;
+        v.m_amp.m_phaseBy = MapSourceE::MEMBER;
+        v.m_pan.m_amount = 0.8f;
+        v.m_pan.m_shape = WOBBLE;
+        v.m_pan.m_rate = 0.5f;
+        v.m_pan.m_phase = 1.0f;
+        v.m_pan.m_phaseBy = MapSourceE::MEMBER;
+        v.m_pitch.m_amount = 6.0f;
+        v.m_pitch.m_shape = WOBBLE;
+        v.m_pitch.m_chaos = 1.0f;
         break;
-    case MotionKind::Glissando:
-        v.pitch.amount = 1500.0f;
-        v.pitch.shape = kRiseIn;
-        v.pitch.shapeSpread = 2;
-        v.pitch.shapeBy = MapSource::Random;
-        v.pitch.depthTilt = 1.0f;
-        v.pitch.depthBy = MapSource::Random;
-        v.pitch.chaos = 0.35f;
+    case MotionKindE::GLISSANDO:
+        v.m_pitch.m_amount = 1500.0f;
+        v.m_pitch.m_shape = RISE_IN;
+        v.m_pitch.m_shapeSpread = 2;
+        v.m_pitch.m_shapeBy = MapSourceE::RANDOM;
+        v.m_pitch.m_depthTilt = 1.0f;
+        v.m_pitch.m_depthBy = MapSourceE::RANDOM;
+        v.m_pitch.m_chaos = 0.35f;
         break;
-    case MotionKind::Aurora:
-        v.amp.amount = 1.0f;
-        v.amp.landscape = 1;
+    case MotionKindE::AURORA:
+        v.m_amp.m_amount = 1.0f;
+        v.m_amp.m_landscape = 1;
         break;
     }
-    for (EnvLane* lane : { &v.amp, &v.pitch, &v.pan }) {
-        lane->rate *= rate;
-        lane->amount *= depth;
+    for (EnvLane* lane : { &v.m_amp, &v.m_pitch, &v.m_pan }) {
+        lane->m_rate *= rate;
+        lane->m_amount *= depth;
     }
 }
 

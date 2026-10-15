@@ -19,19 +19,19 @@ namespace additiv {
 
 /** @brief One factory preset. */
 struct Preset {
-    const char* name;      ///< its name
-    int group;             ///< its group, 0 .. kNumPresetGroups-1
-    const char* params;    ///< what it changes: "key=value key=value ..."
-    const char* mod;       ///< its matrix (Modulation.h text form)
+    const char* m_name;      ///< its name
+    int m_group;             ///< its group, 0 .. NumPresetGroups-1
+    const char* m_params;    ///< what it changes: "key=value key=value ..."
+    const char* m_mod;       ///< its matrix (Modulation.h text form)
 };
 
-constexpr int kNumPresetGroups = 96;                              ///< groups of the bank
-constexpr int kNumSoundGroups = 16;                               ///< the first groups, the sounds
-constexpr int kFirstSleepGroup = 32;                              ///< the first of the sleep concerts (the living systems lie between)
-constexpr int kFirstVisionGroup = 48;                             ///< the first of the visions (animated pictures, comb, stretch, shift)
-constexpr int kFirstSwarmGroup = 64;                              ///< the first of the swarms and currents (Phase 16: swarms, chimeras, Fluid, Islands, turbulence, MPE)
-constexpr int kFirstHallGroup = 80;                               ///< the first of the halls and orbits (Phase 17: the growing hall, the partials' own time, the ripple's bend, Orbit)
-extern const char* const kPresetGroupNames[kNumPresetGroups];      ///< "Sleep Concert", "Choirs", ...
+constexpr int NumPresetGroups = 96;                              ///< groups of the bank
+constexpr int NumSoundGroups = 16;                               ///< the first groups, the sounds
+constexpr int FirstSleepGroup = 32;                              ///< the first of the sleep concerts (the living systems lie between)
+constexpr int FirstVisionGroup = 48;                             ///< the first of the visions (animated pictures, comb, stretch, shift)
+constexpr int FirstSwarmGroup = 64;                              ///< the first of the swarms and currents (Phase 16: swarms, chimeras, Fluid, Islands, turbulence, MPE)
+constexpr int FirstHallGroup = 80;                               ///< the first of the halls and orbits (Phase 17: the growing hall, the partials' own time, the ripple's bend, Orbit)
+extern const char* const PresetGroupNames[NumPresetGroups];      ///< "Sleep Concert", "Choirs", ...
 
 /** @brief How many presets there are. @return the count */
 int numPresets();
@@ -42,7 +42,7 @@ const Preset& preset(int i);
 /**
  * @brief Every parameter's value under a preset: the defaults, then what the preset names.
  * @param i        the preset
- * @param values   receives kNumParams values, in ParamId order
+ * @param values   receives NumParams values, in ParamId order
  * @param modText  receives its matrix (may be null)
  * @return         how many of the preset's entries named a known parameter
  */
@@ -55,7 +55,7 @@ int presetValues(int i, float* values, std::string* modText);
  * @param id  the parameter
  * @return    true when a preset does not set it
  */
-bool keptByPresets(ParamId id);
+bool keptByPresets(ParamIdE id);
 
 /** @brief A preset's index within its group (for program change: bank = group, program = this). @param i the preset @return 0 .. */
 int presetIndexInGroup(int i);

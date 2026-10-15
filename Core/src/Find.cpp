@@ -15,20 +15,20 @@ namespace additiv {
 
 namespace {
 #include "Find.inc"
-constexpr int kFound = static_cast<int>(sizeof(kFindFeatures) / sizeof(kFindFeatures[0]));   ///< presets in the table
+constexpr int Found = static_cast<int>(sizeof(FindFeatures) / sizeof(FindFeatures[0]));   ///< presets in the table
 } // namespace
 
 int findLike(const Description& d, int* out, int n, float* distance)
 {
-    const float raw[4] = { static_cast<float>(d.brightness), std::log(static_cast<float>(std::max(d.motion, 0.0)) + 0.01f), static_cast<float>(d.width),
-                           static_cast<float>(d.noise) };
+    const float raw[4] = { static_cast<float>(d.m_brightness), std::log(static_cast<float>(std::max(d.m_motion, 0.0)) + 0.01f), static_cast<float>(d.m_width),
+                           static_cast<float>(d.m_noise) };
     float f[4];
-    for (int k = 0; k < 4; ++k) f[k] = (raw[k] - kFindMean[k]) / kFindSpread[k];
+    for (int k = 0; k < 4; ++k) f[k] = (raw[k] - FindMean[k]) / FindSpread[k];
     std::vector<std::pair<float, int>> all;
-    all.reserve(static_cast<size_t>(std::min(kFound, numPresets())));
-    for (int i = 0; i < kFound && i < numPresets(); ++i) {
+    all.reserve(static_cast<size_t>(std::min(Found, numPresets())));
+    for (int i = 0; i < Found && i < numPresets(); ++i) {
         float s = 0.0f;
-        for (int k = 0; k < 4; ++k) s += (kFindFeatures[i][k] - f[k]) * (kFindFeatures[i][k] - f[k]);
+        for (int k = 0; k < 4; ++k) s += (FindFeatures[i][k] - f[k]) * (FindFeatures[i][k] - f[k]);
         all.emplace_back(std::sqrt(s), i);
     }
     const int m = std::clamp(n, 0, static_cast<int>(all.size()));
@@ -42,8 +42,8 @@ int findLike(const Description& d, int* out, int n, float* distance)
 
 bool presetFeatures(int index, float* out)
 {
-    if (index < 0 || index >= kFound) return false;
-    for (int k = 0; k < 4; ++k) out[k] = kFindFeatures[index][k];
+    if (index < 0 || index >= Found) return false;
+    for (int k = 0; k < 4; ++k) out[k] = FindFeatures[index][k];
     return true;
 }
 

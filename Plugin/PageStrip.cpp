@@ -8,11 +8,11 @@
 
 namespace {
 
-constexpr int kHead = 12;      ///< the headings' row
-constexpr int kGapIn = 2;      ///< between the pages of a section
-constexpr int kGapOut = 22;    ///< between the sections
-constexpr int kDot = 7;        ///< a dot's size
-constexpr int kDotStep = 9;    ///< a dot's place
+constexpr int Head = 12;      ///< the headings' row
+constexpr int GapIn = 2;      ///< between the pages of a section
+constexpr int GapOut = 22;    ///< between the sections
+constexpr int DotSize = 7;        ///< a dot's size
+constexpr int DotStep = 9;    ///< a dot's place
 
 /** @brief The pages' names' font. @return it */
 juce::Font nameFont() { return juce::Font(juce::FontOptions(14.0f)); }
@@ -21,29 +21,29 @@ juce::Font nameFont() { return juce::Font(juce::FontOptions(14.0f)); }
 
 void PageStrip::setPages(juce::StringArray names, std::vector<Section> sections)
 {
-    names_ = std::move(names);
-    sections_ = std::move(sections);
-    status_.assign(static_cast<size_t>(names_.size()), Status{});
-    bounds_.assign(static_cast<size_t>(names_.size()), {});
+    m_names = std::move(names);
+    m_sections = std::move(sections);
+    m_status.assign(static_cast<size_t>(m_names.size()), Status{});
+    m_bounds.assign(static_cast<size_t>(m_names.size()), {});
     resized();
 }
 
 void PageStrip::setCurrent(int page)
 {
-    if (page == current_) return;
-    current_ = page;
+    if (page == m_current) return;
+    m_current = page;
     repaint();
 }
 
 void PageStrip::refresh()
 {
-    if (!statusOf) return;
+    if (!m_statusOf) return;
     bool changed = false;
-    for (int p = 0; p < names_.size(); ++p) {
-        Status s = statusOf(p);
-        Status& was = status_[static_cast<size_t>(p)];
-        bool same = s.badge == was.badge && s.quiet == was.quiet && s.dots.size() == was.dots.size();
-        for (size_t k = 0; same && k < s.dots.size(); ++k) same = s.dots[k].on == was.dots[k].on;
+    for (int p = 0; p < m_names.size(); ++p) {
+        Status s = m_statusOf(p);
+        Status& was = m_status[static_cast<size_t>(p)];
+        bool same = s.m_badge == was.m_badge && s.m_quiet == was.m_quiet && s.m_dots.size() == was.m_dots.size();
+        for (size_t k = 0; same && k < s.m_dots.size(); ++k) same = s.m_dots[k].m_on == was.m_dots[k].m_on;
         if (!same) changed = true;
         was = std::move(s);
     }
@@ -55,135 +55,135 @@ void PageStrip::refresh()
 
 int PageStrip::widthOf(int page) const
 {
-    const Status& s = status_[static_cast<size_t>(page)];
-    int w = juce::GlyphArrangement::getStringWidthInt(nameFont(), names_[page]) + 20;
-    if (!s.dots.empty()) w += 4 + static_cast<int>(s.dots.size()) * kDotStep;
-    if (s.badge.isNotEmpty()) w += 6 + juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(10.5f, juce::Font::bold)), s.badge) + 8;
+    const Status& s = m_status[static_cast<size_t>(page)];
+    int w = juce::GlyphArrangement::getStringWidthInt(nameFont(), m_names[page]) + 20;
+    if (!s.m_dots.empty()) w += 4 + static_cast<int>(s.m_dots.size()) * DotStep;
+    if (s.m_badge.isNotEmpty()) w += 6 + juce::GlyphArrangement::getStringWidthInt(juce::Font(juce::FontOptions(10.5f, juce::Font::bold)), s.m_badge) + 8;
     return w;
 }
 
 int PageStrip::idealWidth() const
 {
     int w = 0;
-    for (const Section& sec : sections_) {
-        for (int p : sec.pages) w += widthOf(p) + kGapIn;
-        w += kGapOut;
+    for (const Section& sec : m_sections) {
+        for (int p : sec.m_pages) w += widthOf(p) + GapIn;
+        w += GapOut;
     }
     return w;
 }
 
 void PageStrip::resized()
 {
-    heads_.clear();
+    m_heads.clear();
     int x = 0;
-    for (const Section& sec : sections_) {
+    for (const Section& sec : m_sections) {
         const int x0 = x;
-        for (int p : sec.pages) {
+        for (int p : sec.m_pages) {
             const int w = widthOf(p);
-            bounds_[static_cast<size_t>(p)] = { x, kHead, w, getHeight() - kHead };
-            x += w + kGapIn;
+            m_bounds[static_cast<size_t>(p)] = { x, Head, w, getHeight() - Head };
+            x += w + GapIn;
         }
-        heads_.emplace_back(x0, 0, x - kGapIn - x0, kHead);
-        x += kGapOut - kGapIn;
+        m_heads.emplace_back(x0, 0, x - GapIn - x0, Head);
+        x += GapOut - GapIn;
     }
 }
 
 void PageStrip::paint(juce::Graphics& g)
 {
     const frame::Skin& skin = additivui::skin();
-    g.setColour(skin.edge);
+    g.setColour(skin.m_edge);
     g.fillRect(0, getHeight() - 1, getWidth(), 1);
     // The headings: small capitals over their pages, a hairline from the name to the section's end.
-    for (size_t i = 0; i < sections_.size() && i < heads_.size(); ++i) {
-        if (sections_[i].name.isEmpty()) continue;
-        const auto h = heads_[i];
+    for (size_t i = 0; i < m_sections.size() && i < m_heads.size(); ++i) {
+        if (m_sections[i].m_name.isEmpty()) continue;
+        const auto h = m_heads[i];
         const juce::Font f(juce::FontOptions(10.0f, juce::Font::bold));
-        const juce::String text = sections_[i].name.toUpperCase();
+        const juce::String text = m_sections[i].m_name.toUpperCase();
         const int tw = juce::GlyphArrangement::getStringWidthInt(f, text);
-        g.setColour(skin.dim.withAlpha(0.8f));
+        g.setColour(skin.m_dim.withAlpha(0.8f));
         g.setFont(f);
         g.drawText(text, h.getX() + 8, h.getY(), tw + 2, h.getHeight(), juce::Justification::centredLeft);
-        g.setColour(skin.edge);
+        g.setColour(skin.m_edge);
         g.fillRect(h.getX() + 8 + tw + 6, h.getCentreY(), std::max(0, h.getRight() - 8 - (h.getX() + 8 + tw + 6)), 1);
     }
-    for (int p = 0; p < names_.size(); ++p) {
-        const auto r = bounds_[static_cast<size_t>(p)];
-        const Status& s = status_[static_cast<size_t>(p)];
-        const bool front = p == current_, hover = p == hover_;
+    for (int p = 0; p < m_names.size(); ++p) {
+        const auto r = m_bounds[static_cast<size_t>(p)];
+        const Status& s = m_status[static_cast<size_t>(p)];
+        const bool front = p == m_current, hover = p == m_hover;
         if (front) {
-            g.setColour(skin.panel);
+            g.setColour(skin.m_panel);
             g.fillRect(r);
-            g.setColour(skin.accent);
+            g.setColour(skin.m_accent);
             g.fillRect(static_cast<float>(r.getX()) + 6.0f, static_cast<float>(r.getBottom()) - 2.5f, static_cast<float>(r.getWidth()) - 12.0f, 2.5f);
         } else if (hover) {
-            g.setColour(skin.group.withAlpha(0.8f));
+            g.setColour(skin.m_group.withAlpha(0.8f));
             g.fillRect(r);
         }
-        juce::Colour text = front ? skin.accent : (hover ? skin.ink : skin.dim);
-        if (s.quiet && !front) text = text.withAlpha(0.5f);
+        juce::Colour text = front ? skin.m_accent : (hover ? skin.m_ink : skin.m_dim);
+        if (s.m_quiet && !front) text = text.withAlpha(0.5f);
         g.setColour(text);
         g.setFont(nameFont());
-        const int nameW = juce::GlyphArrangement::getStringWidthInt(nameFont(), names_[p]);
+        const int nameW = juce::GlyphArrangement::getStringWidthInt(nameFont(), m_names[p]);
         int x = r.getX() + 10;
-        g.drawText(names_[p], x, r.getY(), nameW + 2, r.getHeight() - 3, juce::Justification::centredLeft);
+        g.drawText(m_names[p], x, r.getY(), nameW + 2, r.getHeight() - 3, juce::Justification::centredLeft);
         x += nameW + 4;
         // The groups: lit while awake, a faint ring while resting.
         const float cy = static_cast<float>(r.getY()) + static_cast<float>(r.getHeight() - 3) * 0.5f;
-        for (const Dot& d : s.dots) {
-            const juce::Rectangle<float> dot(static_cast<float>(x) + 1.0f, cy - kDot * 0.5f, kDot, kDot);
-            if (d.on) {
-                g.setColour(d.colour);
+        for (const Dot& d : s.m_dots) {
+            const juce::Rectangle<float> dot(static_cast<float>(x) + 1.0f, cy - DotSize * 0.5f, DotSize, DotSize);
+            if (d.m_on) {
+                g.setColour(d.m_colour);
                 g.fillEllipse(dot);
             } else {
-                g.setColour(skin.faint);
+                g.setColour(skin.m_faint);
                 g.drawEllipse(dot.reduced(0.5f), 1.0f);
             }
-            x += kDotStep;
+            x += DotStep;
         }
-        if (s.badge.isNotEmpty()) {
+        if (s.m_badge.isNotEmpty()) {
             const juce::Font f(juce::FontOptions(10.5f, juce::Font::bold));
-            const int bw = juce::GlyphArrangement::getStringWidthInt(f, s.badge) + 8;
+            const int bw = juce::GlyphArrangement::getStringWidthInt(f, s.m_badge) + 8;
             const juce::Rectangle<float> b(static_cast<float>(x) + 4.0f, cy - 7.0f, static_cast<float>(bw), 14.0f);
-            g.setColour(skin.accent.withAlpha(0.25f));
+            g.setColour(skin.m_accent.withAlpha(0.25f));
             g.fillRoundedRectangle(b, 7.0f);
-            g.setColour(skin.ink);
+            g.setColour(skin.m_ink);
             g.setFont(f);
-            g.drawText(s.badge, b, juce::Justification::centred);
+            g.drawText(s.m_badge, b, juce::Justification::centred);
         }
     }
 }
 
 int PageStrip::pageAt(juce::Point<int> p) const
 {
-    for (size_t i = 0; i < bounds_.size(); ++i)
-        if (bounds_[i].contains(p)) return static_cast<int>(i);
+    for (size_t i = 0; i < m_bounds.size(); ++i)
+        if (m_bounds[i].contains(p)) return static_cast<int>(i);
     return -1;
 }
 
 void PageStrip::mouseDown(const juce::MouseEvent& e)
 {
     const int p = pageAt(e.getPosition());
-    if (p >= 0 && onSelect) onSelect(p);
+    if (p >= 0 && m_onSelect) m_onSelect(p);
 }
 
 void PageStrip::mouseMove(const juce::MouseEvent& e)
 {
     const int p = pageAt(e.getPosition());
-    if (p != hover_) {
-        hover_ = p;
+    if (p != m_hover) {
+        m_hover = p;
         repaint();
     }
 }
 
 void PageStrip::mouseExit(const juce::MouseEvent&)
 {
-    hover_ = -1;
+    m_hover = -1;
     repaint();
 }
 
 juce::String PageStrip::getTooltip()
 {
-    if (hover_ < 0 || static_cast<size_t>(hover_) >= status_.size()) return {};
-    const Status& s = status_[static_cast<size_t>(hover_)];
-    return names_[hover_] + (s.tip.isNotEmpty() ? ": " + s.tip : juce::String());
+    if (m_hover < 0 || static_cast<size_t>(m_hover) >= m_status.size()) return {};
+    const Status& s = m_status[static_cast<size_t>(m_hover)];
+    return m_names[m_hover] + (s.m_tip.isNotEmpty() ? ": " + s.m_tip : juce::String());
 }

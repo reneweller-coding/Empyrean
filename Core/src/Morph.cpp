@@ -14,23 +14,23 @@ namespace additiv {
 
 void MorphState::set(const float* v, const ModRow* r, int count)
 {
-    std::copy(v, v + kNumParams, values);
-    filterMix = 1.0f;
-    for (float& g : gate) g = 1.0f;
-    filterCount = 1;
-    filters[0].model = static_cast<int>(std::lround(v[static_cast<size_t>(ParamId::FilterModel)]));
-    filters[0].cutoff = v[static_cast<size_t>(ParamId::Cutoff)];
-    filters[0].resonance = v[static_cast<size_t>(ParamId::Resonance)];
-    filters[0].weight = 1.0f;
-    filterMix = filters[0].model == 0 ? 0.0f : 1.0f;
-    setupCount = 1;
-    setups[0] = modSetupFrom(v);
-    rowCount = 0;
-    for (int i = 0; i < count && rowCount < kMorphRows; ++i)
-        if (r[i].source != ModSource::Off && r[i].target >= 0 && r[i].depth != 0.0f) {
-            rows[rowCount] = r[i];
-            rows[rowCount].setup = 0;
-            ++rowCount;
+    std::copy(v, v + NumParams, m_values);
+    m_filterMix = 1.0f;
+    for (float& g : m_gate) g = 1.0f;
+    m_filterCount = 1;
+    m_filters[0].m_model = static_cast<int>(std::lround(v[static_cast<size_t>(ParamIdE::FILTER_MODEL)]));
+    m_filters[0].m_cutoff = v[static_cast<size_t>(ParamIdE::CUTOFF)];
+    m_filters[0].m_resonance = v[static_cast<size_t>(ParamIdE::RESONANCE)];
+    m_filters[0].m_weight = 1.0f;
+    m_filterMix = m_filters[0].m_model == 0 ? 0.0f : 1.0f;
+    m_setupCount = 1;
+    m_setups[0] = modSetupFrom(v);
+    m_rowCount = 0;
+    for (int i = 0; i < count && m_rowCount < MorphRows; ++i)
+        if (r[i].m_source != ModSourceE::OFF && r[i].m_target >= 0 && r[i].m_depth != 0.0f) {
+            m_rows[m_rowCount] = r[i];
+            m_rows[m_rowCount].m_setup = 0;
+            ++m_rowCount;
         }
 }
 
@@ -43,14 +43,14 @@ float lerpParam(const ParamDesc& d, float a, float b, float w)
     if (w >= 1.0f) return b;
     const float n = toNorm(d, a) + (toNorm(d, b) - toNorm(d, a)) * w;
     const float v = fromNorm(d, n);
-    return d.kind == ParamKind::Int ? std::round(v) : v;
+    return d.m_kind == ParamKindE::INT ? std::round(v) : v;
 }
 
 /** @brief The side a choice is taken from while it changes, its amount (normalised) there and its gate. */
 struct Side {
-    const MorphState* from;   ///< whose choice and companions; null: the choice is the same on both
-    float amount;             ///< the amount, 0 .. 1 of its range
-    float gate;               ///< the share the amount, modulation included, is heard at
+    const MorphState* m_from;   ///< whose choice and companions; null: the choice is the same on both
+    float m_amount;             ///< the amount, 0 .. 1 of its range
+    float m_gate;               ///< the share the amount, modulation included, is heard at
 };
 
 /**
@@ -80,72 +80,72 @@ Side side(int ca, int cb, float na, float nb, float ga, float gb, int off, bool 
 }
 
 /** @brief A parameter's value as an index. @param s the sound @param id the parameter @return it rounded */
-int choiceOf(const MorphState& s, ParamId id) { return static_cast<int>(std::lround(s.values[static_cast<size_t>(id)])); }
+int choiceOf(const MorphState& s, ParamIdE id) { return static_cast<int>(std::lround(s.m_values[static_cast<size_t>(id)])); }
 
 /** @brief A parameter normalised. @param s the sound @param id the parameter @return 0 .. 1 */
-float normOf(const MorphState& s, ParamId id) { return toNorm(paramDesc(id), s.values[static_cast<size_t>(id)]); }
+float normOf(const MorphState& s, ParamIdE id) { return toNorm(paramDesc(id), s.m_values[static_cast<size_t>(id)]); }
 
 /** @brief One of the choices with an amount: what it is made of. */
 struct Pair {
-    ParamId choice;             ///< the choice
-    ParamId amount;             ///< its amount (the filter's is filterMix: ParamId::Count)
-    int gate;                   ///< its gate in MorphState::gate, -1 for the filter (filterMix is its own gate)
-    ParamId companions[2];      ///< what goes with the choice's side
-    int companionCount;         ///< how many
+    ParamIdE m_choice;             ///< the choice
+    ParamIdE m_amount;             ///< its amount (the filter's is filterMix: ParamId::Count)
+    int m_gate;                   ///< its gate in MorphState::gate, -1 for the filter (filterMix is its own gate)
+    ParamIdE m_companions[2];      ///< what goes with the choice's side
+    int m_companionCount;         ///< how many
 };
 
 /** @brief The choices with an amount, in the order blendMorph and approachMorph take them. */
-const Pair kPairs[] = {
-    { ParamId::Motion, ParamId::MotionDepth, 0, { ParamId::Motion, ParamId::Motion }, 0 },
-    { ParamId::LifeMode, ParamId::LifeDepth, 1, { ParamId::LifeMode, ParamId::LifeMode }, 0 },
-    { ParamId::FieldMode, ParamId::FieldStrength, 2, { ParamId::FieldMode, ParamId::FieldMode }, 0 },
+const Pair Pairs[] = {
+    { ParamIdE::MOTION, ParamIdE::MOTION_DEPTH, 0, { ParamIdE::MOTION, ParamIdE::MOTION }, 0 },
+    { ParamIdE::LIFE_MODE, ParamIdE::LIFE_DEPTH, 1, { ParamIdE::LIFE_MODE, ParamIdE::LIFE_MODE }, 0 },
+    { ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, 2, { ParamIdE::FIELD_MODE, ParamIdE::FIELD_MODE }, 0 },
 };
 
 /** @brief Whether a pair's kind reads the landscape (Aurora, the animated pictures). @param p the pair @param kind its choice @return true then */
 bool readsLandscape(const Pair& p, int kind)
 {
-    if (p.choice == ParamId::Motion) return motionUsesLandscape(static_cast<MotionKind>(kind));
-    if (p.choice == ParamId::LifeMode) return lifeIsPicture(static_cast<LifeMode>(kind));
+    if (p.m_choice == ParamIdE::MOTION) return motionUsesLandscape(static_cast<MotionKindE>(kind));
+    if (p.m_choice == ParamIdE::LIFE_MODE) return lifeIsPicture(static_cast<LifeModeE>(kind));
     return false;
 }
 
 /** @brief Whether the landscape changes between two sounds for a pair that reads it on either side. @param p the pair @param a one @param b the other @return true then */
 bool landChanges(const Pair& p, const MorphState& a, const MorphState& b)
 {
-    return choiceOf(a, ParamId::Landscape) != choiceOf(b, ParamId::Landscape)
-        && (readsLandscape(p, choiceOf(a, p.choice)) || readsLandscape(p, choiceOf(b, p.choice)));
+    return choiceOf(a, ParamIdE::LANDSCAPE) != choiceOf(b, ParamIdE::LANDSCAPE)
+        && (readsLandscape(p, choiceOf(a, p.m_choice)) || readsLandscape(p, choiceOf(b, p.m_choice)));
 }
 
 /** @brief Whether two sounds have the same kind for a pair (and the same landscape, if it reads one). @param p the pair @param a one @param b the other @return true then */
 bool sameKind(const Pair& p, const MorphState& a, const MorphState& b)
 {
-    return choiceOf(a, p.choice) == choiceOf(b, p.choice) && !landChanges(p, a, b);
+    return choiceOf(a, p.m_choice) == choiceOf(b, p.m_choice) && !landChanges(p, a, b);
 }
 
 /** @brief A pair's amount, normalised. @param p the pair @param s the sound @return 0 .. 1 */
-float amountOf(const Pair& p, const MorphState& s) { return p.gate < 0 ? s.filterMix : normOf(s, p.amount); }
+float amountOf(const Pair& p, const MorphState& s) { return p.m_gate < 0 ? s.m_filterMix : normOf(s, p.m_amount); }
 
 /** @brief A pair's gate. @param p the pair @param s the sound @return 0 .. 1 */
-float gateOf(const Pair& p, const MorphState& s) { return p.gate < 0 ? s.filterMix : s.gate[p.gate]; }
+float gateOf(const Pair& p, const MorphState& s) { return p.m_gate < 0 ? s.m_filterMix : s.m_gate[p.m_gate]; }
 
 /** @brief Sets a pair's amount (normalised) and gate. @param p the pair @param s the sound @param amount 0 .. 1 @param gate 0 .. 1 */
 void setAmount(const Pair& p, MorphState& s, float amount, float gate)
 {
-    if (p.gate < 0) { s.filterMix = amount; return; }
-    s.values[static_cast<size_t>(p.amount)] = fromNorm(paramDesc(p.amount), amount);
-    s.gate[p.gate] = gate;
+    if (p.m_gate < 0) { s.m_filterMix = amount; return; }
+    s.m_values[static_cast<size_t>(p.m_amount)] = fromNorm(paramDesc(p.m_amount), amount);
+    s.m_gate[p.m_gate] = gate;
 }
 
 /** @brief Takes a pair's choice and companions from a sound. @param p the pair @param from where from @param out where to */
 void takeKind(const Pair& p, const MorphState& from, MorphState& out)
 {
-    out.values[static_cast<size_t>(p.choice)] = from.values[static_cast<size_t>(p.choice)];
-    for (int k = 0; k < p.companionCount; ++k)
-        out.values[static_cast<size_t>(p.companions[k])] = from.values[static_cast<size_t>(p.companions[k])];
+    out.m_values[static_cast<size_t>(p.m_choice)] = from.m_values[static_cast<size_t>(p.m_choice)];
+    for (int k = 0; k < p.m_companionCount; ++k)
+        out.m_values[static_cast<size_t>(p.m_companions[k])] = from.m_values[static_cast<size_t>(p.m_companions[k])];
 }
 
 /** @brief Whether a row reads a sound's own modulators (its source or its via). @param r the row @return true then */
-bool readsOwn(const ModRow& r) { return isOwnSource(r.source) || isOwnSource(r.via); }
+bool readsOwn(const ModRow& r) { return isOwnSource(r.m_source) || isOwnSource(r.m_via); }
 
 /**
  * @brief A setup's place in a sound: the one that is equal, or a new one (the first when full).
@@ -155,11 +155,11 @@ bool readsOwn(const ModRow& r) { return isOwnSource(r.source) || isOwnSource(r.v
  */
 int addSetup(MorphState& out, const ModSetup& s)
 {
-    for (int i = 0; i < out.setupCount; ++i)
-        if (out.setups[i] == s) return i;
-    if (out.setupCount < kMorphSetups) {
-        out.setups[out.setupCount] = s;
-        return out.setupCount++;
+    for (int i = 0; i < out.m_setupCount; ++i)
+        if (out.m_setups[i] == s) return i;
+    if (out.m_setupCount < MorphSetups) {
+        out.m_setups[out.m_setupCount] = s;
+        return out.m_setupCount++;
     }
     return 0;
 }
@@ -167,7 +167,7 @@ int addSetup(MorphState& out, const ModSetup& s)
 /** @brief Whether two rows move the same thing the same way (their depths add): on the same modulators, if they read a sound's own. @param x one @param y the other @return true then */
 bool sameRow(const ModRow& x, const ModRow& y)
 {
-    return x.source == y.source && x.target == y.target && x.via == y.via && (!readsOwn(x) || x.setup == y.setup);
+    return x.m_source == y.m_source && x.m_target == y.m_target && x.m_via == y.m_via && (!readsOwn(x) || x.m_setup == y.m_setup);
 }
 
 /**
@@ -180,35 +180,35 @@ bool sameRow(const ModRow& x, const ModRow& y)
  */
 void addRow(MorphState& out, const MorphState& from, const ModRow& r, float k)
 {
-    const float depth = r.depth * k;
+    const float depth = r.m_depth * k;
     if (depth == 0.0f) return;
     ModRow s = r;
-    s.depth = depth;
-    s.setup = readsOwn(r) && r.setup >= 0 && r.setup < from.setupCount ? addSetup(out, from.setups[r.setup]) : 0;
-    for (int i = 0; i < out.rowCount; ++i)
-        if (sameRow(out.rows[i], s)) { out.rows[i].depth += depth; return; }
-    if (out.rowCount < kMorphRows) { out.rows[out.rowCount++] = s; return; }
+    s.m_depth = depth;
+    s.m_setup = readsOwn(r) && r.m_setup >= 0 && r.m_setup < from.m_setupCount ? addSetup(out, from.m_setups[r.m_setup]) : 0;
+    for (int i = 0; i < out.m_rowCount; ++i)
+        if (sameRow(out.m_rows[i], s)) { out.m_rows[i].m_depth += depth; return; }
+    if (out.m_rowCount < MorphRows) { out.m_rows[out.m_rowCount++] = s; return; }
     int weakest = 0;
-    for (int i = 1; i < out.rowCount; ++i)
-        if (std::fabs(out.rows[i].depth) < std::fabs(out.rows[weakest].depth)) weakest = i;
-    if (std::fabs(depth) > std::fabs(out.rows[weakest].depth)) out.rows[weakest] = s;
+    for (int i = 1; i < out.m_rowCount; ++i)
+        if (std::fabs(out.m_rows[i].m_depth) < std::fabs(out.m_rows[weakest].m_depth)) weakest = i;
+    if (std::fabs(depth) > std::fabs(out.m_rows[weakest].m_depth)) out.m_rows[weakest] = s;
 }
 
 /** @brief Drops the setups no row reads any more, the rows' indices following. @param s the sound */
 void compactSetups(MorphState& s)
 {
-    int map[kMorphSetups];
-    bool used[kMorphSetups] = {};
-    for (int i = 0; i < s.rowCount; ++i)
-        if (readsOwn(s.rows[i]) && s.rows[i].setup < s.setupCount) used[s.rows[i].setup] = true;
+    int map[MorphSetups];
+    bool used[MorphSetups] = {};
+    for (int i = 0; i < s.m_rowCount; ++i)
+        if (readsOwn(s.m_rows[i]) && s.m_rows[i].m_setup < s.m_setupCount) used[s.m_rows[i].m_setup] = true;
     int n = 0;
-    for (int k = 0; k < s.setupCount; ++k) {
+    for (int k = 0; k < s.m_setupCount; ++k) {
         map[k] = n;
-        if (used[k]) s.setups[n++] = s.setups[k];
+        if (used[k]) s.m_setups[n++] = s.m_setups[k];
     }
-    for (int i = 0; i < s.rowCount; ++i)
-        s.rows[i].setup = readsOwn(s.rows[i]) && s.rows[i].setup < s.setupCount ? map[s.rows[i].setup] : 0;
-    s.setupCount = n;
+    for (int i = 0; i < s.m_rowCount; ++i)
+        s.m_rows[i].m_setup = readsOwn(s.m_rows[i]) && s.m_rows[i].m_setup < s.m_setupCount ? map[s.m_rows[i].m_setup] : 0;
+    s.m_setupCount = n;
 }
 
 /**
@@ -220,22 +220,22 @@ void compactSetups(MorphState& s)
  */
 void addFilter(MorphState& out, const MorphFilter& f, float k)
 {
-    const float w = f.weight * k;
+    const float w = f.m_weight * k;
     if (w <= 0.0f) return;
-    for (int i = 0; i < out.filterCount; ++i) {
-        MorphFilter& e = out.filters[i];
-        if (e.model != f.model) continue;
-        const float sum = e.weight + w;
-        const ParamDesc& cd = paramDesc(ParamId::Cutoff);
-        e.cutoff = fromNorm(cd, (e.weight * toNorm(cd, e.cutoff) + w * toNorm(cd, f.cutoff)) / sum);
-        e.resonance = (e.weight * e.resonance + w * f.resonance) / sum;
-        e.weight = sum;
+    for (int i = 0; i < out.m_filterCount; ++i) {
+        MorphFilter& e = out.m_filters[i];
+        if (e.m_model != f.m_model) continue;
+        const float sum = e.m_weight + w;
+        const ParamDesc& cd = paramDesc(ParamIdE::CUTOFF);
+        e.m_cutoff = fromNorm(cd, (e.m_weight * toNorm(cd, e.m_cutoff) + w * toNorm(cd, f.m_cutoff)) / sum);
+        e.m_resonance = (e.m_weight * e.m_resonance + w * f.m_resonance) / sum;
+        e.m_weight = sum;
         return;
     }
-    if (out.filterCount < kMorphFilters) {
-        out.filters[out.filterCount] = f;
-        out.filters[out.filterCount].weight = w;
-        ++out.filterCount;
+    if (out.m_filterCount < MorphFilters) {
+        out.m_filters[out.m_filterCount] = f;
+        out.m_filters[out.m_filterCount].m_weight = w;
+        ++out.m_filterCount;
     }
 }
 
@@ -248,27 +248,27 @@ void finishFilters(MorphState& s)
 {
     int keep = 0;
     float sum = 0.0f;
-    for (int i = 0; i < s.filterCount; ++i)
-        if (s.filters[i].weight > 1.0e-5f) { s.filters[keep++] = s.filters[i]; sum += s.filters[i].weight; }
-    s.filterCount = keep;
+    for (int i = 0; i < s.m_filterCount; ++i)
+        if (s.m_filters[i].m_weight > 1.0e-5f) { s.m_filters[keep++] = s.m_filters[i]; sum += s.m_filters[i].m_weight; }
+    s.m_filterCount = keep;
     if (keep == 0) {
-        s.filterCount = 1;
-        s.filters[0] = MorphFilter{};
-        s.filters[0].weight = 1.0f;
+        s.m_filterCount = 1;
+        s.m_filters[0] = MorphFilter{};
+        s.m_filters[0].m_weight = 1.0f;
         sum = 1.0f;
     }
     int heaviest = -1;
-    s.filterMix = 0.0f;
-    for (int i = 0; i < s.filterCount; ++i) {
-        s.filters[i].weight /= sum;
-        if (s.filters[i].model == 0) continue;
-        s.filterMix += s.filters[i].weight;
-        if (heaviest < 0 || s.filters[i].weight > s.filters[heaviest].weight) heaviest = i;
+    s.m_filterMix = 0.0f;
+    for (int i = 0; i < s.m_filterCount; ++i) {
+        s.m_filters[i].m_weight /= sum;
+        if (s.m_filters[i].m_model == 0) continue;
+        s.m_filterMix += s.m_filters[i].m_weight;
+        if (heaviest < 0 || s.m_filters[i].m_weight > s.m_filters[heaviest].m_weight) heaviest = i;
     }
-    s.values[static_cast<size_t>(ParamId::FilterModel)] = heaviest >= 0 ? static_cast<float>(s.filters[heaviest].model) : 0.0f;
+    s.m_values[static_cast<size_t>(ParamIdE::FILTER_MODEL)] = heaviest >= 0 ? static_cast<float>(s.m_filters[heaviest].m_model) : 0.0f;
     if (heaviest >= 0) {
-        s.values[static_cast<size_t>(ParamId::Cutoff)] = s.filters[heaviest].cutoff;
-        s.values[static_cast<size_t>(ParamId::Resonance)] = s.filters[heaviest].resonance;
+        s.m_values[static_cast<size_t>(ParamIdE::CUTOFF)] = s.m_filters[heaviest].m_cutoff;
+        s.m_values[static_cast<size_t>(ParamIdE::RESONANCE)] = s.m_filters[heaviest].m_resonance;
     }
 }
 
@@ -287,24 +287,24 @@ void approachMorph(const MorphState& cur, const MorphState& target, float coef, 
 {
     coef = std::clamp(coef, 0.0f, 1.0f);
     for (const ParamDesc& d : paramTable()) {
-        const size_t i = static_cast<size_t>(d.id);
-        out.values[i] = d.kind == ParamKind::Float || d.kind == ParamKind::Int ? follow(d, cur.values[i], target.values[i], coef) : target.values[i];
+        const size_t i = static_cast<size_t>(d.m_id);
+        out.m_values[i] = d.m_kind == ParamKindE::FLOAT || d.m_kind == ParamKindE::INT ? follow(d, cur.m_values[i], target.m_values[i], coef) : target.m_values[i];
     }
-    for (int g = 0; g < kMorphGates; ++g) out.gate[g] = cur.gate[g] + (target.gate[g] - cur.gate[g]) * coef;
+    for (int g = 0; g < MorphGates; ++g) out.m_gate[g] = cur.m_gate[g] + (target.m_gate[g] - cur.m_gate[g]) * coef;
     // The filters: both lists, weighted (the card transports one into the other).
-    out.filterCount = 0;
-    for (int i = 0; i < cur.filterCount; ++i) addFilter(out, cur.filters[i], 1.0f - coef);
-    for (int i = 0; i < target.filterCount; ++i) addFilter(out, target.filters[i], coef);
+    out.m_filterCount = 0;
+    for (int i = 0; i < cur.m_filterCount; ++i) addFilter(out, cur.m_filters[i], 1.0f - coef);
+    for (int i = 0; i < target.m_filterCount; ++i) addFilter(out, target.m_filters[i], coef);
     finishFilters(out);
     // A kind that differs: its amount and gate fade out (twice the pace), its companions stay; it
     // changes when nothing of it is heard. From off it changes at once, with nothing of it yet.
     // The landscape changes when nothing that reads it is heard: until then those that read it
     // stay at nothing.
     const float fade = std::max(0.0f, 1.0f - 2.0f * coef);
-    out.values[static_cast<size_t>(ParamId::Landscape)] = cur.values[static_cast<size_t>(ParamId::Landscape)];
-    for (const Pair& p : kPairs) {
+    out.m_values[static_cast<size_t>(ParamIdE::LANDSCAPE)] = cur.m_values[static_cast<size_t>(ParamIdE::LANDSCAPE)];
+    for (const Pair& p : Pairs) {
         if (sameKind(p, cur, target)) continue;
-        if (choiceOf(cur, p.choice) == 0) {
+        if (choiceOf(cur, p.m_choice) == 0) {
             takeKind(p, target, out);
             setAmount(p, out, 0.0f, 0.0f);
             continue;
@@ -312,25 +312,25 @@ void approachMorph(const MorphState& cur, const MorphState& target, float coef, 
         const float gate = gateOf(p, cur) * fade;
         if (gate < 0.005f) {
             takeKind(p, target, out);
-            setAmount(p, out, 0.0f, choiceOf(target, p.choice) == 0 ? gateOf(p, target) : 0.0f);
+            setAmount(p, out, 0.0f, choiceOf(target, p.m_choice) == 0 ? gateOf(p, target) : 0.0f);
         } else {
             takeKind(p, cur, out);
             setAmount(p, out, amountOf(p, cur) * fade, gate);
         }
     }
     bool heard = false;
-    for (const Pair& p : kPairs)
-        heard = heard || (readsLandscape(p, choiceOf(out, p.choice)) && gateOf(p, out) >= 0.005f);
-    if (!heard) out.values[static_cast<size_t>(ParamId::Landscape)] = target.values[static_cast<size_t>(ParamId::Landscape)];
-    out.rowCount = 0;
-    out.setupCount = 0;
-    for (int i = 0; i < cur.rowCount; ++i) addRow(out, cur, cur.rows[i], 1.0f - coef);
-    for (int i = 0; i < target.rowCount; ++i) addRow(out, target, target.rows[i], coef);
+    for (const Pair& p : Pairs)
+        heard = heard || (readsLandscape(p, choiceOf(out, p.m_choice)) && gateOf(p, out) >= 0.005f);
+    if (!heard) out.m_values[static_cast<size_t>(ParamIdE::LANDSCAPE)] = target.m_values[static_cast<size_t>(ParamIdE::LANDSCAPE)];
+    out.m_rowCount = 0;
+    out.m_setupCount = 0;
+    for (int i = 0; i < cur.m_rowCount; ++i) addRow(out, cur, cur.m_rows[i], 1.0f - coef);
+    for (int i = 0; i < target.m_rowCount; ++i) addRow(out, target, target.m_rows[i], coef);
     // Rows the target no longer has fade geometrically: drop them once they are nothing.
     int keep = 0;
-    for (int i = 0; i < out.rowCount; ++i)
-        if (std::fabs(out.rows[i].depth) > 1.0e-4f) out.rows[keep++] = out.rows[i];
-    out.rowCount = keep;
+    for (int i = 0; i < out.m_rowCount; ++i)
+        if (std::fabs(out.m_rows[i].m_depth) > 1.0e-4f) out.m_rows[keep++] = out.m_rows[i];
+    out.m_rowCount = keep;
     compactSetups(out);
 }
 
@@ -339,30 +339,30 @@ void blendMorph(const MorphState& a, const MorphState& b, float w, MorphState& o
     w = std::clamp(w, 0.0f, 1.0f);
     // Every parameter: numbers glide, choices and switches change at the middle.
     for (const ParamDesc& d : paramTable()) {
-        const size_t i = static_cast<size_t>(d.id);
-        out.values[i] = d.kind == ParamKind::Float || d.kind == ParamKind::Int ? lerpParam(d, a.values[i], b.values[i], w)
-                                                                                : (w < 0.5f ? a.values[i] : b.values[i]);
+        const size_t i = static_cast<size_t>(d.m_id);
+        out.m_values[i] = d.m_kind == ParamKindE::FLOAT || d.m_kind == ParamKindE::INT ? lerpParam(d, a.m_values[i], b.m_values[i], w)
+                                                                                : (w < 0.5f ? a.m_values[i] : b.m_values[i]);
     }
     // The choices with an amount (the motion, the living landscape, the field): the amount and the
     // gate by the rule, the kind from the side in use. Where the landscape changes (at the middle, a
     // plain choice), those that read it pass through nothing there, even from or to off.
-    for (const Pair& p : kPairs) {
-        const Side s = side(choiceOf(a, p.choice), choiceOf(b, p.choice), amountOf(p, a), amountOf(p, b), gateOf(p, a), gateOf(p, b), 0,
+    for (const Pair& p : Pairs) {
+        const Side s = side(choiceOf(a, p.m_choice), choiceOf(b, p.m_choice), amountOf(p, a), amountOf(p, b), gateOf(p, a), gateOf(p, b), 0,
                             sameKind(p, a, b), landChanges(p, a, b), w, a, b);
-        setAmount(p, out, s.amount, s.gate);
-        if (s.from != nullptr) takeKind(p, *s.from, out);
+        setAmount(p, out, s.m_amount, s.m_gate);
+        if (s.m_from != nullptr) takeKind(p, *s.m_from, out);
     }
     // The voice filters: both lists, weighted; the same model blends its numbers, different ones
     // stand side by side (the card transports one into the other).
-    out.filterCount = 0;
-    for (int i = 0; i < a.filterCount; ++i) addFilter(out, a.filters[i], 1.0f - w);
-    for (int i = 0; i < b.filterCount; ++i) addFilter(out, b.filters[i], w);
+    out.m_filterCount = 0;
+    for (int i = 0; i < a.m_filterCount; ++i) addFilter(out, a.m_filters[i], 1.0f - w);
+    for (int i = 0; i < b.m_filterCount; ++i) addFilter(out, b.m_filters[i], w);
     finishFilters(out);
     // The matrix: both, weighted, each row with the modulators it came with.
-    out.rowCount = 0;
-    out.setupCount = 0;
-    for (int i = 0; i < a.rowCount; ++i) addRow(out, a, a.rows[i], 1.0f - w);
-    for (int i = 0; i < b.rowCount; ++i) addRow(out, b, b.rows[i], w);
+    out.m_rowCount = 0;
+    out.m_setupCount = 0;
+    for (int i = 0; i < a.m_rowCount; ++i) addRow(out, a, a.m_rows[i], 1.0f - w);
+    for (int i = 0; i < b.m_rowCount; ++i) addRow(out, b, b.m_rows[i], w);
 }
 
 } // namespace additiv

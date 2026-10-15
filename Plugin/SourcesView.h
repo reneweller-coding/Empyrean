@@ -23,7 +23,7 @@ public:
      * @param proc   the processor
      * @param shown  the sources drawn, in order (empty: every one)
      */
-    explicit SourcesView(AdditivProcessor& proc, std::vector<additiv::ModSource> shown = {});
+    explicit SourcesView(AdditivProcessor& proc, std::vector<additiv::ModSourceE> shown = {});
     /** @brief Lets the engine stop computing what no row reads. */
     ~SourcesView() override;
     /** @brief The traces in a grid. */
@@ -31,11 +31,11 @@ public:
     /** @brief A click on a trace chooses its source. @param e the click */
     void mouseDown(const juce::MouseEvent& e) override;
     /** @brief A source clicked. */
-    std::function<void(additiv::ModSource)> onChoose;
+    std::function<void(additiv::ModSourceE)> m_onChoose;
     /** @brief The source marked (the inspector's). @param s the source */
-    void setChosen(additiv::ModSource s)
+    void setChosen(additiv::ModSourceE s)
     {
-        chosen_ = s;
+        m_chosen = s;
         repaint();
     }
     /**
@@ -45,17 +45,17 @@ public:
      * @param count  the sources drawn
      * @return       pixels
      */
-    static int heightFor(int w, int count = additiv::kNumModSources - 1);
+    static int heightFor(int w, int count = additiv::NumModSources - 1);
 
 private:
-    static constexpr int kHistory = 120;          ///< samples a trace holds: four seconds at 30 a second
-    static constexpr int kCellW = 150;            ///< a cell's least width
-    static constexpr int kCellH = 42;             ///< a cell's height, as it likes it
-    static constexpr int kCellMinW = 120;         ///< a cell's least width, when the grid is pressed for height
-    static constexpr int kCellMinH = 32;          ///< a cell's least height
-    static constexpr int kCellMaxH = 60;          ///< a cell's greatest height
-    static constexpr int kGap = 6;                ///< between the cells
-    static constexpr int kHead = 26;              ///< the heading's height
+    static constexpr int History = 120;          ///< samples a trace holds: four seconds at 30 a second
+    static constexpr int CellW = 150;            ///< a cell's least width
+    static constexpr int CellH = 42;             ///< a cell's height, as it likes it
+    static constexpr int CellMinW = 120;         ///< a cell's least width, when the grid is pressed for height
+    static constexpr int CellMinH = 32;          ///< a cell's least height
+    static constexpr int CellMaxH = 60;          ///< a cell's greatest height
+    static constexpr int Gap = 6;                ///< between the cells
+    static constexpr int Head = 26;              ///< the heading's height
 
     /** @brief Samples every source (while the window is open, so a trace is full when the page is opened); repaints when on screen. */
     void timerCallback() override;
@@ -72,9 +72,9 @@ private:
      */
     static std::pair<int, int> grid(int w, int h, int count);
 
-    AdditivProcessor& proc_;                                                            ///< whose engine
-    std::array<std::array<float, kHistory>, additiv::kNumModSources> history_{};       ///< per source its last values, a ring
-    int head_ = 0;                                                                      ///< where the next sample goes
-    std::vector<additiv::ModSource> shown_;                                             ///< the sources drawn, in order
-    additiv::ModSource chosen_ = additiv::ModSource::Off;                               ///< the source marked
+    AdditivProcessor& m_proc;                                                            ///< whose engine
+    std::array<std::array<float, History>, additiv::NumModSources> m_history{};       ///< per source its last values, a ring
+    int m_head = 0;                                                                      ///< where the next sample goes
+    std::vector<additiv::ModSourceE> m_shown;                                             ///< the sources drawn, in order
+    additiv::ModSourceE m_chosen = additiv::ModSourceE::OFF;                               ///< the source marked
 };

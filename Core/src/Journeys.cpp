@@ -10,11 +10,11 @@ namespace additiv {
 
 namespace {
 #include "Journeys.inc"
-constexpr int kCount = static_cast<int>(sizeof(kJourneys) / sizeof(kJourneys[0]));   ///< journeys in the table
+constexpr int Count = static_cast<int>(sizeof(Journeys) / sizeof(Journeys[0]));   ///< journeys in the table
 } // namespace
 
-int numBuiltinJourneys() { return kCount; }
+int numBuiltinJourneys() { return Count; }
 
-const char* builtinJourneyText(int i) { return kJourneys[std::clamp(i, 0, kCount - 1)]; }
+const char* builtinJourneyText(int i) { return Journeys[std::clamp(i, 0, Count - 1)]; }
 
 } // namespace additiv

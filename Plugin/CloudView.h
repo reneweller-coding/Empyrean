@@ -34,15 +34,15 @@ public:
     /** @brief Reads the voices and the parameters it draws with and repaints (the editor's timer). */
     void refresh();
     /** @brief The page in front, whose overlay it draws. @param page the tab's name */
-    void setPage(const juce::String& page) { page_ = page; }
+    void setPage(const juce::String& page) { m_page = page; }
     /** @brief The whole window, or the strip above the pages. @param on canvas */
     void setCanvas(bool on);
     /** @brief The partials as the picture shows them now, small (a snapshot's picture). @param w width @param h height @return the image */
     juce::Image thumbnail(int w, int h) const;
     /** @brief Whether it is the canvas. @return true then */
-    bool canvas() const { return canvas_; }
+    bool canvas() const { return m_canvas; }
     /** @brief Called on a double click in the spectrum (the editor switches the canvas). */
-    std::function<void()> onDoubleClick;
+    std::function<void()> m_onDoubleClick;
     /** @brief Draws the clouds and the landscape, and the page's overlay. */
     void paint(juce::Graphics& g) override;
     /** @brief The macros' faders in the canvas. */
@@ -60,7 +60,7 @@ public:
 
 private:
     /** @brief What can be taken in the picture. */
-    enum class Handle { None, Filter, AirCentre, AirEdge, Brightness, RegisterLow, RegisterHigh, HallLowest, Count };
+    enum class HandleE { NONE, FILTER, AIR_CENTRE, AIR_EDGE, BRIGHTNESS, REGISTER_LOW, REGISTER_HIGH, HALL_LOWEST, COUNT };
 
     /** @brief Remakes the landscape's picture when the choice changed. */
     void refreshLandscape();
@@ -83,49 +83,49 @@ private:
     /** @brief The page's overlay, and where its handles are. @param g where @param spec the spectrum @param keys the keys' strip */
     void paintOverlay(juce::Graphics& g, juce::Rectangle<float> spec, juce::Rectangle<float> keys);
     /** @brief A handle as a ring, brighter while held or under the mouse. @param g where @param h which @param at where @param c its colour */
-    void paintHandle(juce::Graphics& g, Handle h, juce::Point<float> at, juce::Colour c);
+    void paintHandle(juce::Graphics& g, HandleE h, juce::Point<float> at, juce::Colour c);
     /** @brief The handle near a point, on the page in front. @param p the point @return it, or None */
-    Handle handleAt(juce::Point<float> p) const;
+    HandleE handleAt(juce::Point<float> p) const;
     /** @brief The fundamental the cloud page's overlay is drawn for: the lowest sounding voice's, or C3. @return Hz */
     float referenceHz() const;
     /** @brief A parameter's value. @param id the parameter @return its value */
-    float value(additiv::ParamId id) const { return proc_.value(static_cast<int>(id)); }
+    float value(additiv::ParamIdE id) const { return m_proc.value(static_cast<int>(id)); }
     /** @brief Sets a parameter (within its range). @param id the parameter @param v the value */
-    void set(additiv::ParamId id, float v) { proc_.setValue(static_cast<int>(id), v); }
+    void set(additiv::ParamIdE id, float v) { m_proc.setValue(static_cast<int>(id), v); }
     /** @brief The parameters a handle moves. @param h the handle @return them (one or two) */
-    static std::vector<additiv::ParamId> paramsOf(Handle h);
+    static std::vector<additiv::ParamIdE> paramsOf(HandleE h);
     /** @brief The key under a place in the spectrum. @param x pixels @return the MIDI note, 21 .. 108 */
     int keyAt(float x) const;
 
-    AdditivProcessor& proc_;                                            ///< whose voices
-    std::array<additiv::VoiceView, additiv::kMaxViewVoices> views_{};  ///< the voices as the last block left them
-    int landChoice_ = -1;                                               ///< the landscape pictured
-    int landVersion_ = -1;                                              ///< the player's landscape pictured (its version)
-    juce::Rectangle<float> landArea_;                                   ///< where the landscape is drawn (a click there opens a file)
-    std::unique_ptr<juce::FileChooser> chooser_;                        ///< the open dialog while it is open
-    juce::Image land_;                                                  ///< its picture: time left to right, low at the bottom
-    float landLoop_ = 30.0f;                                            ///< its loop, seconds
-    std::vector<float> snap_;                                           ///< the partials' snapshot: (Hz, amplitude) per point
-    int snapPer_ = 0;                                                   ///< its points per voice
-    std::vector<float> glow_;                                           ///< the trails: red, green, blue per pixel, fading
-    juce::Image dots_;                                                  ///< the trails as a picture
-    juce::Rectangle<int> dotsArea_;                                     ///< where the points are drawn (the spectrum's area)
-    std::vector<float> lifeCells_;                                      ///< the living field of the last snapshot, empty when off
-    juce::Image life_;                                                  ///< its picture
-    juce::String page_;                                                 ///< the page in front
-    bool canvas_ = false;                                               ///< the whole window
-    juce::Rectangle<float> spec_;                                       ///< the spectrum's area as last drawn
-    std::array<juce::Point<float>, static_cast<size_t>(Handle::Count)> handles_{};   ///< where each handle was drawn
-    std::array<bool, static_cast<size_t>(Handle::Count)> shown_{};                    ///< whether it was drawn
-    Handle held_ = Handle::None;                                        ///< the handle being dragged
-    Handle hover_ = Handle::None;                                       ///< the handle under the mouse
-    float heldResonance_ = 0.0f;                                        ///< the resonance when the filter's point was taken
-    float heldY_ = 0.0f;                                                ///< and where
-    int playing_ = -1;                                                  ///< the key the canvas plays, -1 none
-    std::vector<float> ripple_;                                         ///< the ripple's string at the last snapshot
-    std::vector<float> hall_;                                           ///< the hall's memory as last fetched
-    double hallAge_ = 0.0;                                              ///< its seconds learnt
-    std::array<juce::Slider, 4> macros_;                                ///< the four macros as knobs, in the canvas
-    std::array<juce::Label, 4> macroNames_;                             ///< their names
-    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> macroLinks_;   ///< the faders to the parameters
+    AdditivProcessor& m_proc;                                            ///< whose voices
+    std::array<additiv::VoiceView, additiv::MaxViewVoices> m_views{};  ///< the voices as the last block left them
+    int m_landChoice = -1;                                               ///< the landscape pictured
+    int m_landVersion = -1;                                              ///< the player's landscape pictured (its version)
+    juce::Rectangle<float> m_landArea;                                   ///< where the landscape is drawn (a click there opens a file)
+    std::unique_ptr<juce::FileChooser> m_chooser;                        ///< the open dialog while it is open
+    juce::Image m_land;                                                  ///< its picture: time left to right, low at the bottom
+    float m_landLoop = 30.0f;                                            ///< its loop, seconds
+    std::vector<float> m_snap;                                           ///< the partials' snapshot: (Hz, amplitude) per point
+    int m_snapPer = 0;                                                   ///< its points per voice
+    std::vector<float> m_glow;                                           ///< the trails: red, green, blue per pixel, fading
+    juce::Image m_dots;                                                  ///< the trails as a picture
+    juce::Rectangle<int> m_dotsArea;                                     ///< where the points are drawn (the spectrum's area)
+    std::vector<float> m_lifeCells;                                      ///< the living field of the last snapshot, empty when off
+    juce::Image m_life;                                                  ///< its picture
+    juce::String m_page;                                                 ///< the page in front
+    bool m_canvas = false;                                               ///< the whole window
+    juce::Rectangle<float> m_spec;                                       ///< the spectrum's area as last drawn
+    std::array<juce::Point<float>, static_cast<size_t>(HandleE::COUNT)> m_handles{};   ///< where each handle was drawn
+    std::array<bool, static_cast<size_t>(HandleE::COUNT)> m_shown{};                    ///< whether it was drawn
+    HandleE m_held = HandleE::NONE;                                        ///< the handle being dragged
+    HandleE m_hover = HandleE::NONE;                                       ///< the handle under the mouse
+    float m_heldResonance = 0.0f;                                        ///< the resonance when the filter's point was taken
+    float m_heldY = 0.0f;                                                ///< and where
+    int m_playing = -1;                                                  ///< the key the canvas plays, -1 none
+    std::vector<float> m_ripple;                                         ///< the ripple's string at the last snapshot
+    std::vector<float> m_hall;                                           ///< the hall's memory as last fetched
+    double m_hallAge = 0.0;                                              ///< its seconds learnt
+    std::array<juce::Slider, 4> m_macros;                                ///< the four macros as knobs, in the canvas
+    std::array<juce::Label, 4> m_macroNames;                             ///< their names
+    std::vector<std::unique_ptr<juce::SliderParameterAttachment>> m_macroLinks;   ///< the faders to the parameters
 };

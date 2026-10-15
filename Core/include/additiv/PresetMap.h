@@ -29,11 +29,11 @@ void presetMapPosition(int index, float& x, float& y);
 
 /** @brief The presets around a place and their weights. */
 struct MapNeighbours {
-    static constexpr int kMax = 6;   ///< the closest presets that take part
-    int count = 0;                   ///< how many are valid
-    int index[kMax] = {};            ///< presets, closest first
-    float weight[kMax] = {};         ///< normalised weights, the closest heaviest
-    float sigma = 0.0f;              ///< the Gaussian's width there, in map units (the radius times the spacing)
+    static constexpr int Max = 6;   ///< the closest presets that take part
+    int m_count = 0;                   ///< how many are valid
+    int m_index[Max] = {};            ///< presets, closest first
+    float m_weight[Max] = {};         ///< normalised weights, the closest heaviest
+    float m_sigma = 0.0f;              ///< the Gaussian's width there, in map units (the radius times the spacing)
 };
 
 /**
@@ -74,7 +74,7 @@ public:
     const MorphState& state(int index);
 
 private:
-    std::unordered_map<int, MorphState> cache_;   ///< the presets read so far
+    std::unordered_map<int, MorphState> m_cache;   ///< the presets read so far
 };
 
 } // namespace additiv

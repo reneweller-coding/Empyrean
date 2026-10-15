@@ -16,12 +16,12 @@ class Tour final : public juce::Component {
 public:
     /** @brief One step: what is lit, and what is said about it. */
     struct Step {
-        juce::Component::SafePointer<juce::Component> target;   ///< the control lit
-        juce::String title;                                       ///< its name
-        juce::String text;                                        ///< what it does
+        juce::Component::SafePointer<juce::Component> m_target;   ///< the control lit
+        juce::String m_title;                                       ///< its name
+        juce::String m_text;                                        ///< what it does
     };
     /** @brief Called when the tour ends (done or skipped). */
-    std::function<void()> onDone;
+    std::function<void()> m_onDone;
     /** @brief A tour, not yet shown. */
     Tour();
     /** @brief Begins it. @param steps its steps */
@@ -41,8 +41,8 @@ private:
     /** @brief Ends it. */
     void finish();
 
-    std::vector<Step> steps_;                 ///< the steps
-    size_t at_ = 0;                           ///< the one shown
-    juce::TextButton next_{ "Next" };         ///< on
-    juce::TextButton skip_{ "Skip" };         ///< ends it
+    std::vector<Step> m_steps;                 ///< the steps
+    size_t m_at = 0;                           ///< the one shown
+    juce::TextButton m_next{ "Next" };         ///< on
+    juce::TextButton m_skip{ "Skip" };         ///< ends it
 };

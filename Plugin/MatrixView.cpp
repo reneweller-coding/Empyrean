@@ -9,45 +9,45 @@
 #include "additiv/Modulation.h"
 
 using additiv::ModRow;
-using additiv::ModSource;
-using additiv::ParamId;
+using additiv::ModSourceE;
+using additiv::ParamIdE;
 
-MatrixView::MatrixView(AdditivProcessor& proc) : proc_(proc)
+MatrixView::MatrixView(AdditivProcessor& proc) : m_proc(proc)
 {
-    for (int i = 0; i < additiv::kNumParams; ++i)
-        if (additiv::isModTarget(static_cast<ParamId>(i))) targets_.push_back(i);
-    for (int i = 0; i < additiv::kModRows; ++i) {
+    for (int i = 0; i < additiv::NumParams; ++i)
+        if (additiv::isModTarget(static_cast<ParamIdE>(i))) m_targets.push_back(i);
+    for (int i = 0; i < additiv::ModRows; ++i) {
         auto row = std::make_unique<Row>();
-        for (int s = 0; s < additiv::kNumModSources; ++s) {
-            if (s == static_cast<int>(ModSource::Lenia1)) { row->source.addSectionHeading("Fields and chaos"); row->via.addSectionHeading("Fields and chaos"); }
-            if (s == static_cast<int>(ModSource::Beat)) { row->source.addSectionHeading("The piece"); row->via.addSectionHeading("The piece"); }
-            if (s == static_cast<int>(ModSource::Loudness)) { row->source.addSectionHeading("What it hears"); row->via.addSectionHeading("What it hears"); }
-            if (s == static_cast<int>(ModSource::Reservoir1)) { row->source.addSectionHeading("Reservoir"); row->via.addSectionHeading("Reservoir"); }
-            row->source.addItem(additiv::kModSourceNames[s], s + 1);
-            row->via.addItem(s == 0 ? juce::String("-") : juce::String(additiv::kModSourceNames[s]), s + 1);
+        for (int s = 0; s < additiv::NumModSources; ++s) {
+            if (s == static_cast<int>(ModSourceE::LENIA1)) { row->m_source.addSectionHeading("Fields and chaos"); row->m_via.addSectionHeading("Fields and chaos"); }
+            if (s == static_cast<int>(ModSourceE::BEAT)) { row->m_source.addSectionHeading("The piece"); row->m_via.addSectionHeading("The piece"); }
+            if (s == static_cast<int>(ModSourceE::LOUDNESS)) { row->m_source.addSectionHeading("What it hears"); row->m_via.addSectionHeading("What it hears"); }
+            if (s == static_cast<int>(ModSourceE::RESERVOIR1)) { row->m_source.addSectionHeading("Reservoir"); row->m_via.addSectionHeading("Reservoir"); }
+            row->m_source.addItem(additiv::ModSourceNames[s], s + 1);
+            row->m_via.addItem(s == 0 ? juce::String("-") : juce::String(additiv::ModSourceNames[s]), s + 1);
         }
-        row->target.addItem("-", 1);
+        row->m_target.addItem("-", 1);
         juce::String section;
-        for (size_t k = 0; k < targets_.size(); ++k) {
-            const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamId>(targets_[k]));
-            if (section != d.section) { section = d.section; row->target.addSectionHeading(section); }
-            row->target.addItem(d.name, static_cast<int>(k) + 2);
+        for (size_t k = 0; k < m_targets.size(); ++k) {
+            const additiv::ParamDesc& d = additiv::paramDesc(static_cast<ParamIdE>(m_targets[k]));
+            if (section != d.m_section) { section = d.m_section; row->m_target.addSectionHeading(section); }
+            row->m_target.addItem(d.m_name, static_cast<int>(k) + 2);
         }
-        row->depth.setSliderStyle(juce::Slider::LinearHorizontal);
-        row->depth.setTextBoxStyle(juce::Slider::TextBoxRight, false, 52, 20);
-        row->depth.setRange(-1.0, 1.0, 0.01);
-        row->depth.setDoubleClickReturnValue(true, 0.0);
-        row->depth.setColour(juce::Slider::trackColourId, additivui::skin().family(frame::Family::Motion));
-        row->source.onChange = [this, i] { push(i); };
-        row->target.onChange = [this, i] { push(i); };
-        row->via.onChange = [this, i] { push(i); };
-        row->via.setTooltip("Via: a second source whose amount (0 .. 1) scales the depth");
-        row->depth.onValueChange = [this, i] { push(i); };
-        addAndMakeVisible(row->source);
-        addAndMakeVisible(row->target);
-        addAndMakeVisible(row->via);
-        addAndMakeVisible(row->depth);
-        rows_.push_back(std::move(row));
+        row->m_depth.setSliderStyle(juce::Slider::LinearHorizontal);
+        row->m_depth.setTextBoxStyle(juce::Slider::TextBoxRight, false, 52, 20);
+        row->m_depth.setRange(-1.0, 1.0, 0.01);
+        row->m_depth.setDoubleClickReturnValue(true, 0.0);
+        row->m_depth.setColour(juce::Slider::trackColourId, additivui::skin().family(frame::FamilyE::MOTION));
+        row->m_source.onChange = [this, i] { push(i); };
+        row->m_target.onChange = [this, i] { push(i); };
+        row->m_via.onChange = [this, i] { push(i); };
+        row->m_via.setTooltip("Via: a second source whose amount (0 .. 1) scales the depth");
+        row->m_depth.onValueChange = [this, i] { push(i); };
+        addAndMakeVisible(row->m_source);
+        addAndMakeVisible(row->m_target);
+        addAndMakeVisible(row->m_via);
+        addAndMakeVisible(row->m_depth);
+        m_rows.push_back(std::move(row));
     }
     timerCallback();
     startTimerHz(4);
@@ -55,65 +55,65 @@ MatrixView::MatrixView(AdditivProcessor& proc) : proc_(proc)
 
 void MatrixView::push(int i)
 {
-    if (updating_) return;
-    const Row& r = *rows_[static_cast<size_t>(i)];
+    if (m_updating) return;
+    const Row& r = *m_rows[static_cast<size_t>(i)];
     ModRow m;
-    m.source = static_cast<ModSource>(std::max(r.source.getSelectedId() - 1, 0));
-    const int t = r.target.getSelectedId() - 2;
-    m.target = t >= 0 && t < static_cast<int>(targets_.size()) ? targets_[static_cast<size_t>(t)] : -1;
-    m.depth = static_cast<float>(r.depth.getValue());
-    m.via = static_cast<ModSource>(std::max(r.via.getSelectedId() - 1, 0));
-    proc_.engine().setModRow(i, m);
+    m.m_source = static_cast<ModSourceE>(std::max(r.m_source.getSelectedId() - 1, 0));
+    const int t = r.m_target.getSelectedId() - 2;
+    m.m_target = t >= 0 && t < static_cast<int>(m_targets.size()) ? m_targets[static_cast<size_t>(t)] : -1;
+    m.m_depth = static_cast<float>(r.m_depth.getValue());
+    m.m_via = static_cast<ModSourceE>(std::max(r.m_via.getSelectedId() - 1, 0));
+    m_proc.engine().setModRow(i, m);
 }
 
 void MatrixView::timerCallback()
 {
-    updating_ = true;
-    for (int i = 0; i < additiv::kModRows; ++i) {
-        const ModRow m = proc_.engine().modRow(i);
-        Row& r = *rows_[static_cast<size_t>(i)];
-        r.source.setSelectedId(static_cast<int>(m.source) + 1, juce::dontSendNotification);
+    m_updating = true;
+    for (int i = 0; i < additiv::ModRows; ++i) {
+        const ModRow m = m_proc.engine().modRow(i);
+        Row& r = *m_rows[static_cast<size_t>(i)];
+        r.m_source.setSelectedId(static_cast<int>(m.m_source) + 1, juce::dontSendNotification);
         int item = 1;
-        for (size_t k = 0; k < targets_.size(); ++k)
-            if (targets_[k] == m.target) item = static_cast<int>(k) + 2;
-        r.target.setSelectedId(item, juce::dontSendNotification);
-        r.via.setSelectedId(static_cast<int>(m.via) + 1, juce::dontSendNotification);
-        if (!r.depth.isMouseButtonDown()) r.depth.setValue(m.depth, juce::dontSendNotification);
+        for (size_t k = 0; k < m_targets.size(); ++k)
+            if (m_targets[k] == m.m_target) item = static_cast<int>(k) + 2;
+        r.m_target.setSelectedId(item, juce::dontSendNotification);
+        r.m_via.setSelectedId(static_cast<int>(m.m_via) + 1, juce::dontSendNotification);
+        if (!r.m_depth.isMouseButtonDown()) r.m_depth.setValue(m.m_depth, juce::dontSendNotification);
     }
-    updating_ = false;
+    m_updating = false;
 }
 
 void MatrixView::resized()
 {
-    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 28 : 30;
+    const int cols = columns(), per = additiv::ModRows / cols, pitch = cols == 1 ? 28 : 30;
     const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
-    for (int i = 0; i < additiv::kModRows; ++i) {
-        Row& r = *rows_[static_cast<size_t>(i)];
+    for (int i = 0; i < additiv::ModRows; ++i) {
+        Row& r = *m_rows[static_cast<size_t>(i)];
         const int x = 10 + (i / per) * (colW + 10) + 26, y = 28 + (i % per) * pitch;
         const int w = colW - 26;
-        r.source.setBounds(x, y, w * 22 / 100, 24);
-        r.target.setBounds(x + w * 23 / 100, y, w * 31 / 100, 24);
-        r.via.setBounds(x + w * 55 / 100, y, w * 17 / 100, 24);
-        r.depth.setBounds(x + w * 73 / 100, y, w * 27 / 100, 24);
+        r.m_source.setBounds(x, y, w * 22 / 100, 24);
+        r.m_target.setBounds(x + w * 23 / 100, y, w * 31 / 100, 24);
+        r.m_via.setBounds(x + w * 55 / 100, y, w * 17 / 100, 24);
+        r.m_depth.setBounds(x + w * 73 / 100, y, w * 27 / 100, 24);
     }
 }
 
 void MatrixView::paint(juce::Graphics& g)
 {
     const frame::Skin& skin = additivui::skin();
-    g.setColour(skin.group.withAlpha(0.92f));
-    g.fillRoundedRectangle(getLocalBounds().toFloat(), skin.radius);
-    g.setColour(skin.edge);
-    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), skin.radius, 1.0f);
-    g.setColour(skin.family(frame::Family::Motion));
+    g.setColour(skin.m_group.withAlpha(0.92f));
+    g.fillRoundedRectangle(getLocalBounds().toFloat(), skin.m_radius);
+    g.setColour(skin.m_edge);
+    g.drawRoundedRectangle(getLocalBounds().toFloat().reduced(0.5f), skin.m_radius, 1.0f);
+    g.setColour(skin.family(frame::FamilyE::MOTION));
     g.setFont(juce::FontOptions(13.0f, juce::Font::bold));
     g.drawFittedText("Matrix: source -> target x depth (of the target's range), scaled by a via source", 18, 4, getWidth() - 30, 20,
                      juce::Justification::centredLeft, 1, 0.85f);
-    g.setColour(skin.dim);
+    g.setColour(skin.m_dim);
     g.setFont(juce::FontOptions(11.0f));
-    const int cols = columns(), per = additiv::kModRows / cols, pitch = cols == 1 ? 28 : 30;
+    const int cols = columns(), per = additiv::ModRows / cols, pitch = cols == 1 ? 28 : 30;
     const int colW = (getWidth() - 20 - (cols - 1) * 10) / cols;
-    for (int i = 0; i < additiv::kModRows; ++i)
+    for (int i = 0; i < additiv::ModRows; ++i)
         g.drawText(juce::String(i + 1), 10 + (i / per) * (colW + 10), 28 + (i % per) * pitch, 22, 24, juce::Justification::centredRight);
 }
 
@@ -121,12 +121,12 @@ juce::String MatrixView::describe() const
 {
     juce::String s("Matrix rows:\n");
     int n = 0;
-    for (int i = 0; i < additiv::kModRows; ++i) {
-        const ModRow m = proc_.engine().modRow(i);
-        if (m.source == ModSource::Off || m.target < 0) continue;
-        s << "    " << additiv::kModSourceNames[static_cast<int>(m.source)] << " -> " << additiv::paramDesc(static_cast<ParamId>(m.target)).name
-          << " x " << juce::String(m.depth, 2);
-        if (m.via != ModSource::Off) s << " via " << additiv::kModSourceNames[static_cast<int>(m.via)];
+    for (int i = 0; i < additiv::ModRows; ++i) {
+        const ModRow m = m_proc.engine().modRow(i);
+        if (m.m_source == ModSourceE::OFF || m.m_target < 0) continue;
+        s << "    " << additiv::ModSourceNames[static_cast<int>(m.m_source)] << " -> " << additiv::paramDesc(static_cast<ParamIdE>(m.m_target)).m_name
+          << " x " << juce::String(m.m_depth, 2);
+        if (m.m_via != ModSourceE::OFF) s << " via " << additiv::ModSourceNames[static_cast<int>(m.m_via)];
         s << "\n";
         ++n;
     }

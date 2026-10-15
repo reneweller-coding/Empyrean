@@ -16,32 +16,32 @@
 /** @brief The pages' strip (see the file comment). */
 class PageStrip final : public juce::Component, public juce::SettableTooltipClient {
 public:
-    static constexpr int kHeight = 38;   ///< the strip's height: the headings and the pages
+    static constexpr int Height = 38;   ///< the strip's height: the headings and the pages
 
     /** @brief One group's mark. */
     struct Dot {
-        juce::Colour colour;   ///< its group's colour
-        bool on = false;       ///< awake
+        juce::Colour m_colour;   ///< its group's colour
+        bool m_on = false;       ///< awake
     };
     /** @brief A page's state. */
     struct Status {
-        std::vector<Dot> dots;   ///< its groups with main controls
-        juce::String badge;      ///< a count, "" none
-        bool quiet = false;      ///< everything on it rests
-        juce::String tip;        ///< which groups are on, which off
+        std::vector<Dot> m_dots;   ///< its groups with main controls
+        juce::String m_badge;      ///< a count, "" none
+        bool m_quiet = false;      ///< everything on it rests
+        juce::String m_tip;        ///< which groups are on, which off
     };
     /** @brief A section: its heading ("" none) and its pages, by their index. */
     struct Section {
-        juce::String name;       ///< the heading
-        std::vector<int> pages;  ///< the pages
+        juce::String m_name;       ///< the heading
+        std::vector<int> m_pages;  ///< the pages
     };
 
     /** @brief The pages and their sections. @param names every page's name, by index @param sections the sections, in order */
     void setPages(juce::StringArray names, std::vector<Section> sections);
     /** @brief A page's state, asked for on refresh(). */
-    std::function<Status(int)> statusOf;
+    std::function<Status(int)> m_statusOf;
     /** @brief A page was clicked. */
-    std::function<void(int)> onSelect;
+    std::function<void(int)> m_onSelect;
     /** @brief The page in front. @param page its index */
     void setCurrent(int page);
     /** @brief Asks every page's state anew; repaints when one changed. */
@@ -68,11 +68,11 @@ private:
     /** @brief The page at a point. @param p the point @return its index, -1 none */
     int pageAt(juce::Point<int> p) const;
 
-    juce::StringArray names_;                       ///< the pages' names
-    std::vector<Section> sections_;                 ///< the sections
-    std::vector<Status> status_;                    ///< every page's state as last asked
-    std::vector<juce::Rectangle<int>> bounds_;      ///< every page's place
-    std::vector<juce::Rectangle<int>> heads_;       ///< every section's heading's place
-    int current_ = 0;                               ///< the page in front
-    int hover_ = -1;                                ///< the page under the mouse
+    juce::StringArray m_names;                       ///< the pages' names
+    std::vector<Section> m_sections;                 ///< the sections
+    std::vector<Status> m_status;                    ///< every page's state as last asked
+    std::vector<juce::Rectangle<int>> m_bounds;      ///< every page's place
+    std::vector<juce::Rectangle<int>> m_heads;       ///< every section's heading's place
+    int m_current = 0;                               ///< the page in front
+    int m_hover = -1;                                ///< the page under the mouse
 };

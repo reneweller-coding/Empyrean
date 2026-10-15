@@ -36,12 +36,12 @@ private:
     float rootHz0() const;
     /** @brief Lets every note go. */
     void releaseAll();
-    int playing_ = -1;              ///< the note the mouse plays, -1 none
-    std::vector<int> held_;         ///< the notes held with Shift
+    int m_playing = -1;              ///< the note the mouse plays, -1 none
+    std::vector<int> m_held;         ///< the notes held with Shift
     /** @brief Fifteen times a second while it is seen. */
     void timerCallback() override;
 
-    AdditivProcessor& proc_;   ///< whose engine
+    AdditivProcessor& m_proc;   ///< whose engine
 };
 
 /** @brief The Tuning page: its knobs at the top, the tuning's picture below. */
@@ -62,6 +62,6 @@ public:
     juce::String describe() const;
 
 private:
-    ParamPage params_;    ///< Tuning, Tide, Self-Tune
-    TuningView view_;     ///< the picture
+    ParamPage m_params;    ///< Tuning, Tide, Self-Tune
+    TuningView m_view;     ///< the picture
 };

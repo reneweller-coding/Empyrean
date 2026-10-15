@@ -76,7 +76,7 @@ private:
     /** @brief The settings menu under its button. */
     void showSettings();
     /** @brief Whether this is the standalone. @return true there */
-    bool standalone() const { return proc_.wrapperType == juce::AudioProcessor::wrapperType_Standalone; }
+    bool standalone() const { return m_proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone; }
     /** @brief The standalone's full screen on or off. */
     void toggleFullScreen();
     /** @brief The canvas on or off: the picture takes the whole window, the pages step aside. @param on canvas */
@@ -96,7 +96,7 @@ private:
      */
     bool revealParam(int id);
     /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
-    void bindChoice(frame::Choice& box, additiv::ParamId id);
+    void bindChoice(frame::Choice& box, additiv::ParamIdE id);
     /**
      * @brief The window's first size: the size it was left at, where that still fits a screen (any of them: it
      *        may have been on a larger one than the main screen); else three quarters of the screen's width at
@@ -109,12 +109,12 @@ private:
     void restoreWindow(juce::ResizableWindow& window);
     /** @brief Keeps the standalone window's state (where, how large, maximised) in the player's settings whenever it moves. */
     struct WindowKeeper final : public juce::ComponentListener {
-        AdditivEditor* owner = nullptr;                               ///< whose settings
-        juce::Component::SafePointer<juce::ResizableWindow> window;   ///< the standalone's window (none in a host)
+        AdditivEditor* m_owner = nullptr;                               ///< whose settings
+        juce::Component::SafePointer<juce::ResizableWindow> m_window;   ///< the standalone's window (none in a host)
         /** @brief The window moved or was resized: its state written. @param c the window @param moved ignored @param resized ignored */
         void componentMovedOrResized(juce::Component& c, bool moved, bool resized) override;
     };
-    WindowKeeper windowKeeper_;                                ///< the standalone window's state, kept
+    WindowKeeper m_windowKeeper;                                ///< the standalone window's state, kept
     /**
      * @brief A page's state for its strip: its groups on and off, the matrix's rows, a journey or route running.
      * @param tab  the page
@@ -122,22 +122,22 @@ private:
      */
     PageStrip::Status pageStatus(int tab);
     /** @brief A source chosen in the dock (or dropped on a knob): the inspector shows it, open. @param s the source @param toggle a second click on it shuts the inspector */
-    void chooseSource(additiv::ModSource s, bool toggle);
+    void chooseSource(additiv::ModSourceE s, bool toggle);
     /** @brief The inspector open or shut (docked: remembered; over the pages: until shut). @param open open */
     void setInspector(bool open);
 
-    AdditivProcessor& proc_;                                   ///< the instrument
-    frame::LookAndFeel lnf_{ additivui::skin() };              ///< first, so it outlives every component that uses it
-    juce::TooltipWindow tooltips_{ nullptr, 700 };             ///< tooltips after 700 ms
-    frame::ControlActions actions_;                            ///< the controls' right-click menu
-    frame::Backdrop backdrop_;                                 ///< the window's background
-    juce::Rectangle<float> logo_;                              ///< where the logo is drawn
-    TitleComponent title_;                                     ///< the name
-    frame::IconButton play_{ frame::IconButton::Icon::Play, "Autoplay: start the conductor" };   ///< Autoplay on and off
-    juce::TextButton step_{ "Step" };                          ///< Autoplay: exchange a voice now
-    juce::TextButton prevPreset_{ "<" };                       ///< the preset before
-    juce::TextButton presetName_;                              ///< the preset playing; a click opens the bank
-    juce::TextButton nextPreset_{ ">" };                       ///< the preset after
+    AdditivProcessor& m_proc;                                   ///< the instrument
+    frame::LookAndFeel m_lnf{ additivui::skin() };              ///< first, so it outlives every component that uses it
+    juce::TooltipWindow m_tooltips{ nullptr, 700 };             ///< tooltips after 700 ms
+    frame::ControlActions m_actions;                            ///< the controls' right-click menu
+    frame::Backdrop m_backdrop;                                 ///< the window's background
+    juce::Rectangle<float> m_logo;                              ///< where the logo is drawn
+    TitleComponent m_title;                                     ///< the name
+    frame::IconButton m_play{ frame::IconButton::IconE::PLAY, "Autoplay: start the conductor" };   ///< Autoplay on and off
+    juce::TextButton m_step{ "Step" };                          ///< Autoplay: exchange a voice now
+    juce::TextButton m_prevPreset{ "<" };                       ///< the preset before
+    juce::TextButton m_presetName;                              ///< the preset playing; a click opens the bank
+    juce::TextButton m_nextPreset{ ">" };                       ///< the preset after
     /** @brief The bank as a menu of its groups. */
     void showPresets();
     /** @brief The Save menu: save, save as, back to the preset, the folder. */
@@ -151,91 +151,91 @@ private:
      * @param index  the preset
      */
     void loadPreset(int index);
-    frame::Choice mode_{ &actions_, static_cast<int>(additiv::ParamId::AutoMode) };      ///< Free or Chords
-    frame::Choice scale_{ &actions_, static_cast<int>(additiv::ParamId::Scale) };        ///< the scale
-    frame::Choice root_{ &actions_, static_cast<int>(additiv::ParamId::RootNote) };      ///< its root
-    frame::Choice motion_{ &actions_, static_cast<int>(additiv::ParamId::Motion) };      ///< the motion
-    frame::Choice landscape_{ &actions_, static_cast<int>(additiv::ParamId::Landscape) };///< the landscape
-    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> headerAttach_;      ///< the header's choosers to their parameters
-    juce::Label status_;                                       ///< voices, root, GPU, latency, device
-    frame::IconButton undo_{ frame::IconButton::Icon::Undo, "Undo (Ctrl+Z)" };          ///< undo
-    frame::IconButton redo_{ frame::IconButton::Icon::Redo, "Redo (Ctrl+Y)" };          ///< redo
-    frame::IconButton help_{ frame::IconButton::Icon::Help, "Help (F1)" };              ///< the help
+    frame::Choice m_mode{ &m_actions, static_cast<int>(additiv::ParamIdE::AUTO_MODE) };      ///< Free or Chords
+    frame::Choice m_scale{ &m_actions, static_cast<int>(additiv::ParamIdE::SCALE) };        ///< the scale
+    frame::Choice m_root{ &m_actions, static_cast<int>(additiv::ParamIdE::ROOT_NOTE) };      ///< its root
+    frame::Choice m_motion{ &m_actions, static_cast<int>(additiv::ParamIdE::MOTION) };      ///< the motion
+    frame::Choice m_landscape{ &m_actions, static_cast<int>(additiv::ParamIdE::LANDSCAPE) };///< the landscape
+    std::vector<std::unique_ptr<juce::ComboBoxParameterAttachment>> m_headerAttach;      ///< the header's choosers to their parameters
+    juce::Label m_status;                                       ///< voices, root, GPU, latency, device
+    frame::IconButton m_undo{ frame::IconButton::IconE::UNDO, "Undo (Ctrl+Z)" };          ///< undo
+    frame::IconButton m_redo{ frame::IconButton::IconE::REDO, "Redo (Ctrl+Y)" };          ///< redo
+    frame::IconButton m_help{ frame::IconButton::IconE::HELP, "Help (F1)" };              ///< the help
     /** @brief Save the sound as one's own preset (Ctrl+S), back to the preset, the presets' folder. */
-    frame::IconButton save_{ frame::IconButton::Icon::Save, "Your presets: save the sound (Ctrl+S), save it as ..., back to the preset" };
-    std::unique_ptr<juce::AlertWindow> askName_;               ///< the name dialog while it is open
-    frame::IconButton settings_{ frame::IconButton::Icon::Settings, "Settings" };       ///< the settings
-    CloudView cloud_{ proc_ };                                 ///< the picture
-    ViewButton canvasButton_{ ViewButton::Glyph::Canvas, "Canvas: the partials and the landscape alone, the whole window (again, or Esc: back)" };   ///< the picture alone
-    ViewButton searchButton_{ ViewButton::Glyph::Search, "Search (Ctrl+K): any knob, preset or action by a few letters" };   ///< the command palette
-    ViewButton compare_{ ViewButton::Glyph::Compare, "Hold to hear the preset as it was; let go for your sound" };   ///< hold: the preset
-    frame::IconButton midi_{ frame::IconButton::Icon::MidiLearn, "Show the MIDI controllers learned on the knobs" };   ///< MIDI marks on the knobs
-    OutputMeter meter_;                                        ///< the output
-    CommandPalette palette_;                                   ///< the command palette, over everything while open
-    PresetBrowser browser_{ proc_ };                           ///< the preset browser, over everything while open
-    std::unique_ptr<InfoLine> info_;                           ///< the info line at the bottom: what the control under the mouse does
-    ViewButton nightButton_{ ViewButton::Glyph::Night, "Night: the window dim and warm for a dark room, the picture calmer" };   ///< the night mode
-    bool night_ = false;                                       ///< the night mode is on: the window dim and warm
-    bool tourAsked_ = false;                                   ///< the first start's tour was considered
-    double lastActivity_ = 0.0;                                ///< when the mouse or a key last moved (ms)
-    int refreshTick_ = 0;                                      ///< timer ticks (the night refreshes the picture half as often)
+    frame::IconButton m_save{ frame::IconButton::IconE::SAVE, "Your presets: save the sound (Ctrl+S), save it as ..., back to the preset" };
+    std::unique_ptr<juce::AlertWindow> m_askName;               ///< the name dialog while it is open
+    frame::IconButton m_settings{ frame::IconButton::IconE::SETTINGS, "Settings" };       ///< the settings
+    CloudView m_cloud{ m_proc };                                 ///< the picture
+    ViewButton m_canvasButton{ ViewButton::GlyphE::CANVAS, "Canvas: the partials and the landscape alone, the whole window (again, or Esc: back)" };   ///< the picture alone
+    ViewButton m_searchButton{ ViewButton::GlyphE::SEARCH, "Search (Ctrl+K): any knob, preset or action by a few letters" };   ///< the command palette
+    ViewButton m_compare{ ViewButton::GlyphE::COMPARE, "Hold to hear the preset as it was; let go for your sound" };   ///< hold: the preset
+    frame::IconButton m_midi{ frame::IconButton::IconE::MIDI_LEARN, "Show the MIDI controllers learned on the knobs" };   ///< MIDI marks on the knobs
+    OutputMeter m_meter;                                        ///< the output
+    CommandPalette m_palette;                                   ///< the command palette, over everything while open
+    PresetBrowser m_browser{ m_proc };                           ///< the preset browser, over everything while open
+    std::unique_ptr<InfoLine> m_info;                           ///< the info line at the bottom: what the control under the mouse does
+    ViewButton m_nightButton{ ViewButton::GlyphE::NIGHT, "Night: the window dim and warm for a dark room, the picture calmer" };   ///< the night mode
+    bool m_night = false;                                       ///< the night mode is on: the window dim and warm
+    bool m_tourAsked = false;                                   ///< the first start's tour was considered
+    double m_lastActivity = 0.0;                                ///< when the mouse or a key last moved (ms)
+    int m_refreshTick = 0;                                      ///< timer ticks (the night refreshes the picture half as often)
     /** @brief Notes every move of the mouse in the window (the night's canvas fades when left alone). */
     struct Activity final : public juce::MouseListener {
-        double* last = nullptr;   ///< where the time goes
+        double* m_last = nullptr;   ///< where the time goes
         /** @brief A move. @param e ignored */
-        void mouseMove(const juce::MouseEvent&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+        void mouseMove(const juce::MouseEvent&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
         /** @brief A press. @param e ignored */
-        void mouseDown(const juce::MouseEvent&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+        void mouseDown(const juce::MouseEvent&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
         /** @brief A wheel. @param e ignored @param w ignored */
-        void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override { *last = juce::Time::getMillisecondCounterHiRes(); }
+        void mouseWheelMove(const juce::MouseEvent&, const juce::MouseWheelDetails&) override { *m_last = juce::Time::getMillisecondCounterHiRes(); }
     };
-    Activity activity_;                                        ///< the mouse's moves
+    Activity m_activity;                                        ///< the mouse's moves
     /** @brief The night's veil: over the window, under the palette, the browser and the tour; the mouse goes through it. */
     struct Veil final : public juce::Component {
-        float alpha = 0.0f;   ///< how dark
+        float m_alpha = 0.0f;   ///< how dark
         /** @brief Dark and warm: little blue for eyes used to the dark. @param g where */
-        void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xff0c0703).withAlpha(alpha)); }
+        void paint(juce::Graphics& g) override { g.fillAll(juce::Colour(0xff0c0703).withAlpha(m_alpha)); }
     };
-    Veil veil_;                                                ///< the night's veil
-    Tour tour_;                                                ///< the first steps
-    bool canvas_ = false;                                      ///< the canvas is shown
-    frame::LiveRings live_{ [this](int id) { return proc_.engine().playedNorm(static_cast<additiv::ParamId>(id)); } };   ///< where modulated knobs play
-    juce::TabbedComponent tabs_{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages
-    std::vector<std::function<juce::String()>> describe_;     ///< per page its parameters in words, for the help
-    std::unique_ptr<frame::HelpView> helpView_;                ///< the help, while it is open
-    frame::UndoHistory history_;                               ///< undo and redo
-    bool applying_ = false;                                    ///< an undo is being applied: record nothing
-    int headerBottom_ = 0;                                     ///< where the header ends, for the backdrop
-    juce::String shotPrefix_;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png (ADDITIV_PRESET first), then the standalone quits
-    int shotTick_ = 0;                                         ///< timer ticks since the screenshots were asked for
-    juce::MemoryBlock shotSaved_;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
-    int logTick_ = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
-    bool layoutChecked_ = false;                               ///< ADDITIV_LAYOUT: the pages were measured
-    bool rememberSize_ = false;                                ///< the window's size is kept for the next start (not in the shot or layout modes)
-    PageStrip strip_;                                          ///< the pages' strip
+    Veil m_veil;                                                ///< the night's veil
+    Tour m_tour;                                                ///< the first steps
+    bool m_canvas = false;                                      ///< the canvas is shown
+    frame::LiveRings m_live{ [this](int id) { return m_proc.engine().playedNorm(static_cast<additiv::ParamIdE>(id)); } };   ///< where modulated knobs play
+    juce::TabbedComponent m_tabs{ juce::TabbedButtonBar::TabsAtTop };   ///< the pages
+    std::vector<std::function<juce::String()>> m_describe;     ///< per page its parameters in words, for the help
+    std::unique_ptr<frame::HelpView> m_helpView;                ///< the help, while it is open
+    frame::UndoHistory m_history;                               ///< undo and redo
+    bool m_applying = false;                                    ///< an undo is being applied: record nothing
+    int m_headerBottom = 0;                                     ///< where the header ends, for the backdrop
+    juce::String m_shotPrefix;                                  ///< ADDITIV_SHOT: every page as <prefix>-<n>-<page>.png (ADDITIV_PRESET first), then the standalone quits
+    int m_shotTick = 0;                                         ///< timer ticks since the screenshots were asked for
+    juce::MemoryBlock m_shotSaved;                              ///< the state the screenshots found, given back before the standalone quits (it saves its state then)
+    int m_logTick = 0;                                          ///< timer ticks, for the ADDITIV_LOG diagnostics
+    bool m_layoutChecked = false;                               ///< ADDITIV_LAYOUT: the pages were measured
+    bool m_rememberSize = false;                                ///< the window's size is kept for the next start (not in the shot or layout modes)
+    PageStrip m_strip;                                          ///< the pages' strip
     /** @brief A source dropped on a knob: the inspector shows it (or all rows are taken). @param s the source @param id the parameter @param row the row, -1 none */
-    void modDropped(additiv::ModSource s, int id, int row) override;
+    void modDropped(additiv::ModSourceE s, int id, int row) override;
     /** @brief The parameter pages on a page, as they are now. @param tab the page @return them */
     std::vector<ParamPage*> pagesOn(int tab);
-    std::unique_ptr<ModDock> dock_;                            ///< the sources along the bottom
-    std::unique_ptr<SourceInspector> inspector_;               ///< one source seen whole
-    juce::Component* matrixPage_ = nullptr;                    ///< the Modulation page (owned by its tab), to mark the source chosen
-    bool inspectorOpen_ = true;                                ///< the docked inspector is wanted (remembered)
-    bool overlayOpen_ = false;                                 ///< the inspector is open over the pages (a small window)
-    bool inspectorDocked_ = false;                             ///< the window is tall enough to dock it
-    float hostScale_ = 1.0f;                                   ///< the scale the host asked for
-    float zoom_ = 1.0f;                                        ///< the player's zoom: the controls larger (player.settings "zoom")
+    std::unique_ptr<ModDock> m_dock;                            ///< the sources along the bottom
+    std::unique_ptr<SourceInspector> m_inspector;               ///< one source seen whole
+    juce::Component* m_matrixPage = nullptr;                    ///< the Modulation page (owned by its tab), to mark the source chosen
+    bool m_inspectorOpen = true;                                ///< the docked inspector is wanted (remembered)
+    bool m_overlayOpen = false;                                 ///< the inspector is open over the pages (a small window)
+    bool m_inspectorDocked = false;                             ///< the window is tall enough to dock it
+    float m_hostScale = 1.0f;                                   ///< the scale the host asked for
+    float m_zoom = 1.0f;                                        ///< the player's zoom: the controls larger (player.settings "zoom")
     /** @brief The zoom anew (kept in the player's settings). @param z 1 .. 1.5 */
     void setZoom(float z);
-    int altRow_ = -1;                                          ///< the matrix row an Alt-drag on a knob sets, -1 none
-    float altDepth_ = 0.0f;                                    ///< its depth when the drag began
-    float stepLeft_ = -1.0f;                                   ///< the share of the conductor's wait still to come, -1 none (the line under Step)
-    juce::String lastMatrix_;                                  ///< the matrix as the undo history last knew it
-    juce::String pendingBefore_;                               ///< a matrix edit outside an undo step: the matrix before it
-    double pendingAt_ = 0.0;                                   ///< when it last moved (ms); a step once it rests
-    juce::String presetKey_;                                   ///< the preset playing, as the matrix's watch last saw it
+    int m_altRow = -1;                                          ///< the matrix row an Alt-drag on a knob sets, -1 none
+    float m_altDepth = 0.0f;                                    ///< its depth when the drag began
+    float m_stepLeft = -1.0f;                                   ///< the share of the conductor's wait still to come, -1 none (the line under Step)
+    juce::String m_lastMatrix;                                  ///< the matrix as the undo history last knew it
+    juce::String m_pendingBefore;                               ///< a matrix edit outside an undo step: the matrix before it
+    double m_pendingAt = 0.0;                                   ///< when it last moved (ms); a step once it rests
+    juce::String m_presetKey;                                   ///< the preset playing, as the matrix's watch last saw it
     /** @brief The matrix as text, the rest of an undo step's state. @return it */
-    juce::String matrixText() const { return juce::String(proc_.engine().modText()); }
+    juce::String matrixText() const { return juce::String(m_proc.engine().modText()); }
     /** @brief Closes an undo step with the matrix as it is now. */
     void endStep();
     /** @brief The matrix watched: an edit made outside an undo step (a dropped chip, the inspector, the matrix page, a knob's menu) becomes one once it rests. */

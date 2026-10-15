@@ -70,22 +70,22 @@ private:
     /** @brief The preset whose point is within reach of a screen point. @param p the point @param reach pixels @return its index, -1 none */
     int presetAt(juce::Point<float> p, float reach) const;
 
-    AdditivProcessor& proc_;            ///< whose bank and cursor
-    juce::Image points_;                ///< the points in the view (and their names), drawn when the view or the size changes
-    juce::Image overview_;              ///< every preset's point, small, for the overview
-    juce::Rectangle<float> view_{ 0.0f, 0.0f, 1.0f, 1.0f };   ///< the part of the map shown (x, y up, its size)
-    juce::Rectangle<float> panFrom_;    ///< the view when the right button took it
-    juce::Rectangle<float> target_;     ///< where the view glides after the cursor
-    juce::Point<float> lastFocus_{ -1.0f, -1.0f };    ///< what the view follows, where it was a tick ago
-    juce::uint32 viewChanged_ = 0;      ///< when the view last moved (ms)
-    bool panning_ = false;              ///< the right or middle button moves the view
-    bool overviewDrag_ = false;         ///< the mouse moves the view on the overview
-    bool gliding_ = false;              ///< the view glides after the cursor
-    bool focusInside_ = true;           ///< what the view follows was in the view a tick ago
-    bool named_ = true;                 ///< the cache has the names of the view at rest
-    juce::TextButton whole_{ "Whole map" };   ///< back to the whole map (shown while zoomed in)
-    int hover_ = -1;                    ///< the preset under the mouse, -1 none
-    int dragPoint_ = -1;                ///< the waypoint being moved, -1 none
+    AdditivProcessor& m_proc;            ///< whose bank and cursor
+    juce::Image m_points;                ///< the points in the view (and their names), drawn when the view or the size changes
+    juce::Image m_overview;              ///< every preset's point, small, for the overview
+    juce::Rectangle<float> m_view{ 0.0f, 0.0f, 1.0f, 1.0f };   ///< the part of the map shown (x, y up, its size)
+    juce::Rectangle<float> m_panFrom;    ///< the view when the right button took it
+    juce::Rectangle<float> m_target;     ///< where the view glides after the cursor
+    juce::Point<float> m_lastFocus{ -1.0f, -1.0f };    ///< what the view follows, where it was a tick ago
+    juce::uint32 m_viewChanged = 0;      ///< when the view last moved (ms)
+    bool m_panning = false;              ///< the right or middle button moves the view
+    bool m_overviewDrag = false;         ///< the mouse moves the view on the overview
+    bool m_gliding = false;              ///< the view glides after the cursor
+    bool m_focusInside = true;           ///< what the view follows was in the view a tick ago
+    bool m_named = true;                 ///< the cache has the names of the view at rest
+    juce::TextButton m_whole{ "Whole map" };   ///< back to the whole map (shown while zoomed in)
+    int m_hover = -1;                    ///< the preset under the mouse, -1 none
+    int m_dragPoint = -1;                ///< the waypoint being moved, -1 none
     /** @brief The waypoint at a point. @param p pixels @return its index, -1 none */
     int waypointAt(juce::Point<float> p) const;
 };
@@ -107,11 +107,11 @@ public:
 private:
     /** @brief One waypoint's row. */
     struct Row {
-        juce::Label name;              ///< its number and preset (or place)
-        juce::TextEditor travel;       ///< the time to travel there, m:ss
-        juce::TextEditor hold;         ///< the time to stay, m:ss
-        juce::TextEditor radius;       ///< its blend radius
-        juce::TextButton remove{ "x" };   ///< removes it
+        juce::Label m_name;              ///< its number and preset (or place)
+        juce::TextEditor m_travel;       ///< the time to travel there, m:ss
+        juce::TextEditor m_hold;         ///< the time to stay, m:ss
+        juce::TextEditor m_radius;       ///< its blend radius
+        juce::TextButton m_remove{ "x" };   ///< removes it
     };
     /** @brief Status, and the rows rebuilt when the route changed. */
     void timerCallback() override;
@@ -124,27 +124,27 @@ private:
     /** @brief Asks for a name and writes the route into the routes folder. */
     void save();
 
-    AdditivProcessor& proc_;                                   ///< whose route
-    juce::ComboBox routes_;                                    ///< the routes to choose
-    std::vector<AdditivProcessor::RouteEntry> entries_;        ///< what the box's items are (id = index + 1)
+    AdditivProcessor& m_proc;                                   ///< whose route
+    juce::ComboBox m_routes;                                    ///< the routes to choose
+    std::vector<AdditivProcessor::RouteEntry> m_entries;        ///< what the box's items are (id = index + 1)
     /** @brief Starts the route. */
-    frame::IconButton play_{ frame::IconButton::Icon::Play, "Walks the route from where the cursor is: each waypoint reached over its travel time, held for its hold time" };
+    frame::IconButton m_play{ frame::IconButton::IconE::PLAY, "Walks the route from where the cursor is: each waypoint reached over its travel time, held for its hold time" };
     /** @brief Stops it. */
-    frame::IconButton stop_{ frame::IconButton::Icon::Stop, "Stops the route; the cursor stays" };
-    juce::ToggleButton loop_{ "Loop" };                        ///< starts over after the last point
-    juce::Label status_;                                       ///< where the route is
-    juce::Label heads_;                                        ///< the columns' names
-    std::vector<std::unique_ptr<Row>> rows_;                   ///< one a waypoint
-    juce::TextButton addCursor_{ "+ Cursor" };                 ///< the cursor's place as a waypoint
-    juce::TextButton addPreset_{ "+ Preset" };                 ///< the preset playing as a waypoint
-    juce::TextButton clear_{ "Clear" };                        ///< empties the route
+    frame::IconButton m_stop{ frame::IconButton::IconE::STOP, "Stops the route; the cursor stays" };
+    juce::ToggleButton m_loop{ "Loop" };                        ///< starts over after the last point
+    juce::Label m_status;                                       ///< where the route is
+    juce::Label m_heads;                                        ///< the columns' names
+    std::vector<std::unique_ptr<Row>> m_rows;                   ///< one a waypoint
+    juce::TextButton m_addCursor{ "+ Cursor" };                 ///< the cursor's place as a waypoint
+    juce::TextButton m_addPreset{ "+ Preset" };                 ///< the preset playing as a waypoint
+    juce::TextButton m_clear{ "Clear" };                        ///< empties the route
     /** @brief Saves the route. */
-    frame::IconButton save_{ frame::IconButton::Icon::Save, "Writes the route into Documents/Empyrean/Routes under a name" };
+    frame::IconButton m_save{ frame::IconButton::IconE::SAVE, "Writes the route into Documents/Empyrean/Routes under a name" };
     /** @brief Opens the routes folder. */
-    frame::IconButton folder_{ frame::IconButton::Icon::Open, "Opens the routes folder: routes are plain text, a waypoint a line (preset or x,y | travel s | hold s | radius)" };
-    std::unique_ptr<juce::FileChooser> chooser_;               ///< the save dialog while it is open
-    juce::String shown_;                                       ///< the route the rows show (its text)
-    int tick_ = 0;                                             ///< timer ticks
+    frame::IconButton m_folder{ frame::IconButton::IconE::OPEN, "Opens the routes folder: routes are plain text, a waypoint a line (preset or x,y | travel s | hold s | radius)" };
+    std::unique_ptr<juce::FileChooser> m_chooser;               ///< the save dialog while it is open
+    juce::String m_shown;                                       ///< the route the rows show (its text)
+    int m_tick = 0;                                             ///< timer ticks
 };
 
 /** @brief The Map page: the map on the left, its knobs and the route editor beside it. */
@@ -165,7 +165,7 @@ public:
     juce::String describe() const;
 
 private:
-    ParamPage params_;    ///< Map, Radius, Map Glide, Route Speed
-    MapView map_;         ///< the map
-    RouteView route_;     ///< the routes
+    ParamPage m_params;    ///< Map, Radius, Map Glide, Route Speed
+    MapView m_map;         ///< the map
+    RouteView m_route;     ///< the routes
 };

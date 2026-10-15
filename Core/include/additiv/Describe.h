@@ -19,10 +19,10 @@ namespace additiv {
 
 /** @brief What a sound sounds like (see the file comment). */
 struct Description {
-    double brightness = 0.0;   ///< the spectral centroid, octaves above 40 Hz
-    double motion = 0.0;       ///< the spectrum's change as a share of itself, over three lags
-    double width = 0.0;        ///< 1 - the correlation of left and right
-    double noise = 0.0;        ///< the bands' spectral flatness, 0 (lines) .. 1 (noise)
+    double m_brightness = 0.0;   ///< the spectral centroid, octaves above 40 Hz
+    double m_motion = 0.0;       ///< the spectrum's change as a share of itself, over three lags
+    double m_width = 0.0;        ///< 1 - the correlation of left and right
+    double m_noise = 0.0;        ///< the bands' spectral flatness, 0 (lines) .. 1 (noise)
 };
 
 /**

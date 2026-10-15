@@ -71,8 +71,8 @@ public:
      */
     bool open(const fs::path& path, int sampleRate)
     {
-        f_.open(path, std::ios::binary | std::ios::trunc);
-        frames_ = 0;
+        m_f.open(path, std::ios::binary | std::ios::trunc);
+        m_frames = 0;
         const std::uint32_t sr = static_cast<std::uint32_t>(sampleRate);
         unsigned char h[44] = {};
         auto put = [&](int at, const char* s) { std::memcpy(h + at, s, 4); };
@@ -80,46 +80,46 @@ public:
         auto u16 = [&](int at, std::uint16_t x) { h[at] = static_cast<unsigned char>(x); h[at + 1] = static_cast<unsigned char>(x >> 8); };
         put(0, "RIFF"); put(8, "WAVE"); put(12, "fmt "); u32(16, 16); u16(20, 1); u16(22, 2); u32(24, sr); u32(28, sr * 6); u16(32, 6); u16(34, 24);
         put(36, "data");
-        f_.write(reinterpret_cast<const char*>(h), 44);
-        return static_cast<bool>(f_);
+        m_f.write(reinterpret_cast<const char*>(h), 44);
+        return static_cast<bool>(m_f);
     }
     /** @brief Appends frames. @param L left @param R right @param n frames */
     void write(const float* L, const float* R, int n)
     {
-        buf_.resize(static_cast<size_t>(n) * 6);
+        m_buf.resize(static_cast<size_t>(n) * 6);
         for (int i = 0; i < n; ++i)
             for (int c = 0; c < 2; ++c) {
                 const float x = c == 0 ? L[i] : R[i];
                 const std::int32_t q = static_cast<std::int32_t>(std::lround(std::clamp(x, -1.0f, 1.0f) * 8388607.0f));
-                unsigned char* o = &buf_[static_cast<size_t>(i) * 6 + static_cast<size_t>(c) * 3];
+                unsigned char* o = &m_buf[static_cast<size_t>(i) * 6 + static_cast<size_t>(c) * 3];
                 o[0] = static_cast<unsigned char>(q); o[1] = static_cast<unsigned char>(q >> 8); o[2] = static_cast<unsigned char>(q >> 16);
             }
-        f_.write(reinterpret_cast<const char*>(buf_.data()), static_cast<std::streamsize>(buf_.size()));
-        frames_ += n;
+        m_f.write(reinterpret_cast<const char*>(m_buf.data()), static_cast<std::streamsize>(m_buf.size()));
+        m_frames += n;
     }
     /** @brief Sets the lengths in the header and closes. @return true when everything was written */
     bool close()
     {
-        const std::uint32_t data = static_cast<std::uint32_t>(frames_ * 6);
+        const std::uint32_t data = static_cast<std::uint32_t>(m_frames * 6);
         auto u32 = [&](std::streamoff at, std::uint32_t x) {
             unsigned char b[4];
             for (int i = 0; i < 4; ++i) b[i] = static_cast<unsigned char>(x >> (8 * i));
-            f_.seekp(at);
-            f_.write(reinterpret_cast<const char*>(b), 4);
+            m_f.seekp(at);
+            m_f.write(reinterpret_cast<const char*>(b), 4);
         };
         u32(4, 36 + data);
         u32(40, data);
-        const bool ok = static_cast<bool>(f_);
-        f_.close();
+        const bool ok = static_cast<bool>(m_f);
+        m_f.close();
         return ok;
     }
     /** @brief Frames written so far. @return the count */
-    std::int64_t frames() const { return frames_; }
+    std::int64_t frames() const { return m_frames; }
 
 private:
-    std::ofstream f_;                       ///< the file
-    std::int64_t frames_ = 0;               ///< frames written
-    std::vector<unsigned char> buf_;        ///< a block's bytes
+    std::ofstream m_f;                       ///< the file
+    std::int64_t m_frames = 0;               ///< frames written
+    std::vector<unsigned char> m_buf;        ///< a block's bytes
 };
 
 /**
@@ -135,14 +135,14 @@ bool applySet(Engine& e, const std::string& arg)
     const std::string key = arg.substr(0, eq), val = arg.substr(eq + 1);
     const ParamDesc* d = findParam(key.c_str());
     if (!d) return false;
-    if (d->kind == ParamKind::Choice)
-        for (int i = 0; i < d->numChoices; ++i)
-            if (val == d->choices[i]) { e.setParam(d->id, static_cast<float>(i)); return true; }
-    if (d->kind == ParamKind::Bool && (val == "on" || val == "off")) { e.setParam(d->id, val == "on" ? 1.0f : 0.0f); return true; }
+    if (d->m_kind == ParamKindE::CHOICE)
+        for (int i = 0; i < d->m_numChoices; ++i)
+            if (val == d->m_choices[i]) { e.setParam(d->m_id, static_cast<float>(i)); return true; }
+    if (d->m_kind == ParamKindE::BOOL && (val == "on" || val == "off")) { e.setParam(d->m_id, val == "on" ? 1.0f : 0.0f); return true; }
     char* end = nullptr;
     const float x = std::strtof(val.c_str(), &end);
     if (end == val.c_str()) return false;
-    e.setParam(d->id, x);
+    e.setParam(d->m_id, x);
     return true;
 }
 
@@ -164,15 +164,15 @@ std::string jsonString(const char* s)
 /** @brief Writes every row of the parameter table as JSON to stdout (key, name, section, kind, range, default, skew, unit, choices). */
 void dumpParams()
 {
-    static const char* const kKinds[] = { "float", "int", "bool", "choice" };
+    static const char* const Kinds[] = { "float", "int", "bool", "choice" };
     std::printf("[\n");
     const auto& table = paramTable();
     for (size_t i = 0; i < table.size(); ++i) {
         const ParamDesc& d = table[i];
         std::printf("  {\"key\": %s, \"name\": %s, \"section\": %s, \"kind\": \"%s\", \"min\": %g, \"max\": %g, \"default\": %g, \"skew\": %g, \"unit\": %s, \"choices\": [",
-                    jsonString(d.key).c_str(), jsonString(d.name).c_str(), jsonString(d.section).c_str(), kKinds[static_cast<int>(d.kind)],
-                    static_cast<double>(d.min), static_cast<double>(d.max), static_cast<double>(d.def), static_cast<double>(d.skew), jsonString(d.unit).c_str());
-        for (int c = 0; c < d.numChoices; ++c) std::printf("%s%s", c ? ", " : "", jsonString(d.choices[c]).c_str());
+                    jsonString(d.m_key).c_str(), jsonString(d.m_name).c_str(), jsonString(d.m_section).c_str(), Kinds[static_cast<int>(d.m_kind)],
+                    static_cast<double>(d.m_min), static_cast<double>(d.m_max), static_cast<double>(d.m_def), static_cast<double>(d.m_skew), jsonString(d.m_unit).c_str());
+        for (int c = 0; c < d.m_numChoices; ++c) std::printf("%s%s", c ? ", " : "", jsonString(d.m_choices[c]).c_str());
         std::printf("]}%s\n", i + 1 < table.size() ? "," : "");
     }
     std::printf("]\n");
@@ -203,9 +203,9 @@ bool findJourney(const std::string& what, Journey& j)
 {
     for (int i = 0; i < numBuiltinJourneys(); ++i) {
         Journey b;
-        if (b.parse(builtinJourneyText(i)) && b.name == what) { j = b; return true; }
+        if (b.parse(builtinJourneyText(i)) && b.m_name == what) { j = b; return true; }
     }
-    return j.load(what.c_str()) && !j.steps.empty();
+    return j.load(what.c_str()) && !j.m_steps.empty();
 }
 
 } // namespace
@@ -266,7 +266,7 @@ int main(int argc, char** argv)
     if (!presetName.empty()) {
         const int index = applyPreset(e, presetName);
         if (index < 0) { std::fprintf(stderr, "empy_render: no preset %s\n", presetName.c_str()); return 1; }
-        std::printf("preset %d: %s (%s)\n", index, preset(index).name, kPresetGroupNames[preset(index).group]);
+        std::printf("preset %d: %s (%s)\n", index, preset(index).m_name, PresetGroupNames[preset(index).m_group]);
     }
     Journey journey;
     JourneyPlayer player;
@@ -275,11 +275,11 @@ int main(int argc, char** argv)
         player.start(journey, journeySeed);
         JourneyStep st;
         double glide = 0.0;
-        if (player.advance(0.0, st, glide) && findPreset(st.preset.c_str()) >= 0) {   // the first at once
-            e.loadPreset(findPreset(st.preset.c_str()));
-            e.setParam(ParamId::BrainOn, 1.0f);   // a journey keeps the conductor playing (as the instrument does)
+        if (player.advance(0.0, st, glide) && findPreset(st.m_preset.c_str()) >= 0) {   // the first at once
+            e.loadPreset(findPreset(st.m_preset.c_str()));
+            e.setParam(ParamIdE::BRAIN_ON, 1.0f);   // a journey keeps the conductor playing (as the instrument does)
         }
-        std::printf("journey %s: %zu steps, a pass about %s\n", journey.name.c_str(), journey.steps.size(), Journey::timeText(journey.meanLength()).c_str());
+        std::printf("journey %s: %zu steps, a pass about %s\n", journey.m_name.c_str(), journey.m_steps.size(), Journey::timeText(journey.meanLength()).c_str());
     }
     Route route;
     MapBlender blender;
@@ -287,7 +287,7 @@ int main(int argc, char** argv)
     if (!routeName.empty()) {
         std::string text;
         for (int i = 0; i < numRoutePresets() && text.empty(); ++i)
-            if (routeName == routePreset(i).name) text = routePreset(i).points;
+            if (routeName == routePreset(i).m_name) text = routePreset(i).m_points;
         if (text.empty()) {
             std::ifstream f(routeName, std::ios::binary);
             std::stringstream ss;
@@ -297,33 +297,33 @@ int main(int argc, char** argv)
         if (!route.parse(text.c_str())) { std::fprintf(stderr, "empy_render: no route %s\n", routeName.c_str()); return 1; }
         // Starting on the first waypoint's preset, the map on.
         const Waypoint& w = route.point(0);
-        if (w.preset >= 0) e.loadPreset(w.preset);
-        e.setParam(ParamId::BrainOn, 1.0f);   // a route keeps the conductor playing (as the instrument does)
-        route.start(w.x, w.y, w.radius, true);
-        e.setParam(ParamId::MapActive, 1.0f);
+        if (w.m_preset >= 0) e.loadPreset(w.m_preset);
+        e.setParam(ParamIdE::BRAIN_ON, 1.0f);   // a route keeps the conductor playing (as the instrument does)
+        route.start(w.m_x, w.m_y, w.m_radius, true);
+        e.setParam(ParamIdE::MAP_ACTIVE, 1.0f);
         std::printf("route %s: %d waypoints\n", routeName.c_str(), route.count());
     }
     for (const std::string& s : sets)
         if (!applySet(e, s)) { std::fprintf(stderr, "empy_render: cannot apply --set %s\n", s.c_str()); return 1; }
     if (!modRows.empty()) e.setModText(modRows);   // replaces the preset's matrix
-    if (!brain) e.setParam(ParamId::BrainOn, 0.0f);
+    if (!brain) e.setParam(ParamIdE::BRAIN_ON, 0.0f);
     EngineConfig c;
-    c.sampleRate = 48000.0;
-    c.maxHostBlock = 512;
-    c.realtimeGpuClass = false;
-    c.seed = seed;
+    c.m_sampleRate = 48000.0;
+    c.m_maxHostBlock = 512;
+    c.m_realtimeGpuClass = false;
+    c.m_seed = seed;
     std::string error;
     if (!e.prepare(c, &error)) { std::fprintf(stderr, "empy_render: %s\n", error.c_str()); return 1; }
     if (fill) e.requestFill();
     std::printf("%s, latency %d samples, scale %s, motion %s, autoplay %s, %.0f s\n", e.deviceName().c_str(), e.latencySamples(),
-                kScaleNames[static_cast<int>(e.param(ParamId::Scale))], kMotionNames[static_cast<int>(e.param(ParamId::Motion))],
-                e.param(ParamId::BrainOn) >= 0.5f ? kBrainModeNames[static_cast<int>(e.param(ParamId::AutoMode))] : "off", seconds);
+                ScaleNames[static_cast<int>(e.param(ParamIdE::SCALE))], MotionNames[static_cast<int>(e.param(ParamIdE::MOTION))],
+                e.param(ParamIdE::BRAIN_ON) >= 0.5f ? BrainModeNames[static_cast<int>(e.param(ParamIdE::AUTO_MODE))] : "off", seconds);
     for (int note : chord) e.noteOn(note, 0.8f, 0);
 
     const int n = 512;
-    const std::int64_t total = static_cast<std::int64_t>(seconds * c.sampleRate);
+    const std::int64_t total = static_cast<std::int64_t>(seconds * c.m_sampleRate);
     // Beyond an hour, a file an hour: name-01.wav, name-02.wav, ...
-    const std::int64_t perFile = static_cast<std::int64_t>(3600.0 * c.sampleRate);
+    const std::int64_t perFile = static_cast<std::int64_t>(3600.0 * c.m_sampleRate);
     const bool parts = total > perFile;
     fs::create_directories(out.parent_path());
     auto partPath = [&](int k) {
@@ -334,21 +334,21 @@ int main(int argc, char** argv)
     };
     WavStream wav;
     int part = 1;
-    if (!wav.open(partPath(part), static_cast<int>(c.sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
+    if (!wav.open(partPath(part), static_cast<int>(c.m_sampleRate))) { std::fprintf(stderr, "empy_render: cannot write %s\n", partPath(part).string().c_str()); return 1; }
     std::vector<float> L(n), R(n);
     double sq = 0.0, peak = 0.0, gpu = 0.0;
     int blocks = 0;
     bool released = chord.empty();
     const auto t0 = std::chrono::steady_clock::now();
     for (std::int64_t done = 0; done < total; done += n) {
-        if (!released && hold >= 0.0 && done >= static_cast<std::int64_t>(hold * c.sampleRate)) {
+        if (!released && hold >= 0.0 && done >= static_cast<std::int64_t>(hold * c.m_sampleRate)) {
             for (int note : chord) e.noteOff(note, 0);
             released = true;
         }
         if (route.running()) {   // the route moves the cursor; a moved cursor is blended anew
             const int seg = route.segment();
             float x = 0.0f, y = 0.0f, r = 0.0f;
-            route.update(static_cast<float>(n / c.sampleRate * routeSpeed), x, y, r);
+            route.update(static_cast<float>(n / c.m_sampleRate * routeSpeed), x, y, r);
             if (x != mapX || y != mapY || r != mapR) {
                 MorphState s;
                 blender.blend(x, y, r, s);
@@ -359,22 +359,22 @@ int main(int argc, char** argv)
             }
             if (route.segment() != seg) {
                 const Waypoint& w = route.point(route.segment());
-                std::printf("  %5.0f s: towards %d, %s\n", done / c.sampleRate, route.segment() + 1, w.preset >= 0 ? preset(w.preset).name : "a place");
+                std::printf("  %5.0f s: towards %d, %s\n", done / c.m_sampleRate, route.segment() + 1, w.m_preset >= 0 ? preset(w.m_preset).m_name : "a place");
             }
         }
         if (player.running()) {   // the journey: a step glides into its preset
             JourneyStep st;
             double glide = 0.0;
-            if (player.advance(n / c.sampleRate, st, glide)) {
-                const int index = findPreset(st.preset.c_str());
-                if (index >= 0) { e.loadPreset(index, std::max(glide, 0.5)); e.setParam(ParamId::BrainOn, 1.0f); }
-                std::printf("  %5.0f s: step %d, %s, glide %.0f s\n", done / c.sampleRate, player.step() + 1, st.preset.c_str(), glide);
+            if (player.advance(n / c.m_sampleRate, st, glide)) {
+                const int index = findPreset(st.m_preset.c_str());
+                if (index >= 0) { e.loadPreset(index, std::max(glide, 0.5)); e.setParam(ParamIdE::BRAIN_ON, 1.0f); }
+                std::printf("  %5.0f s: step %d, %s, glide %.0f s\n", done / c.m_sampleRate, player.step() + 1, st.m_preset.c_str(), glide);
             }
         }
         e.process(L.data(), R.data(), n);
         if (wav.frames() >= perFile) {
             wav.close();
-            wav.open(partPath(++part), static_cast<int>(c.sampleRate));
+            wav.open(partPath(++part), static_cast<int>(c.m_sampleRate));
         }
         wav.write(L.data(), R.data(), n);
         for (int i = 0; i < n; ++i) {
@@ -384,10 +384,10 @@ int main(int argc, char** argv)
         gpu += e.lastGpuMs();
         ++blocks;
         const std::int64_t now = done + n;
-        if (now % (static_cast<std::int64_t>(c.sampleRate) * 10) < n) {
+        if (now % (static_cast<std::int64_t>(c.m_sampleRate) * 10) < n) {
             const double rms = std::sqrt(sq / (blocks * static_cast<double>(n)));
             std::printf("  %5.0f s: %6.1f dBFS RMS, peak %6.1f dBFS, %2d voices, root %3d, GPU %.3f ms/block\n",
-                        now / c.sampleRate, 20.0 * std::log10(std::max(rms, 1e-9)), 20.0 * std::log10(std::max(peak, 1e-9)),
+                        now / c.m_sampleRate, 20.0 * std::log10(std::max(rms, 1e-9)), 20.0 * std::log10(std::max(peak, 1e-9)),
                         e.soundingVoices(), e.brainRoot(), gpu / blocks);
             sq = 0.0; peak = 0.0; gpu = 0.0; blocks = 0;
         }

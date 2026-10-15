@@ -26,21 +26,21 @@ public:
     /** @brief Shows a line of its own (an Alt-drag's depth). @param text the line */
     void showText(const juce::String& text)
     {
-        name_.clear();
-        text_ = text;
+        m_name.clear();
+        m_text = text;
         repaint();
     }
 
 private:
     /** @brief Follows the mouse over every component of the window (a listener of its own: the line is no parent of them). */
     struct Tracker final : public juce::MouseListener {
-        InfoLine* line = nullptr;   ///< whose
+        InfoLine* m_line = nullptr;   ///< whose
         /** @brief Over a component. @param e the move */
-        void mouseMove(const juce::MouseEvent& e) override { line->over(e.eventComponent); }
+        void mouseMove(const juce::MouseEvent& e) override { m_line->over(e.eventComponent); }
         /** @brief Into a component. @param e the entry */
-        void mouseEnter(const juce::MouseEvent& e) override { line->over(e.eventComponent); }
+        void mouseEnter(const juce::MouseEvent& e) override { m_line->over(e.eventComponent); }
         /** @brief Turning a knob: its value follows. @param e the drag */
-        void mouseDrag(const juce::MouseEvent& e) override { line->over(e.eventComponent); }
+        void mouseDrag(const juce::MouseEvent& e) override { m_line->over(e.eventComponent); }
     };
     /** @brief The line for a component: a control's parameter, or its tooltip. @param c what the mouse is over */
     void over(juce::Component* c);
@@ -49,10 +49,10 @@ private:
     /** @brief The text for a parameter. @param id the parameter @param name receives its name @return the rest */
     juce::String describe(int id, juce::String& name) const;
 
-    AdditivProcessor& proc_;        ///< the processor
-    juce::Component& watched_;      ///< the window
-    Tracker tracker_;               ///< the mouse's follower
-    int id_ = -1;                   ///< the parameter shown, -1 none
-    juce::String name_;             ///< its name (or nothing for a tooltip)
-    juce::String text_;             ///< the rest of the line
+    AdditivProcessor& m_proc;        ///< the processor
+    juce::Component& m_watched;      ///< the window
+    Tracker m_tracker;               ///< the mouse's follower
+    int m_id = -1;                   ///< the parameter shown, -1 none
+    juce::String m_name;             ///< its name (or nothing for a tooltip)
+    juce::String m_text;             ///< the rest of the line
 };
