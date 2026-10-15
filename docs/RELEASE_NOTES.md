@@ -23,6 +23,8 @@ a dream of what was played, the conductor's notes heard coming -- and timbres th
 - **8192 presets:** sixteen new groups of dreams and phantoms (Phantom Choirs, Inner Voices, Talbot Carpets, Bloch
   Tides, Glass Forests, Bamboo Groves, Wind Tubes, Temple Winds, Storm Gardens, Dreaming Rooms, Night Memories,
   Premonitions, Breathing In, Phantom Gardens, Lucid Dreams, Elsewhere); the presets before are as they were.
+- **Icon:** the program carries the icon drawn for every size (Deploy/empyrean.ico); a build could keep the old one,
+  JUCE making it only when CMake configures.
 
 ## 0.16.0 (15.10.2026, not released)
 
