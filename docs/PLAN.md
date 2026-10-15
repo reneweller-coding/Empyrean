@@ -219,7 +219,10 @@ Dateidialog der GUI (Phase 3); Z-Plane und Strike als Modalsynthese.
 ## Phase 3: die Oberfläche (gebaut, 12.10.2026)
 
 Auf dem Rahmen der Familie (`Plugin/Frame.h/.cpp`, unverändert aus Totality, in allen fünf Repos gleich):
-- **Skin** "Aurora bei Nacht" (Nachtblau, Türkis, Violett; Logo: ein Ring aus Partials), Fenster 1280 x 860.
+- **Skin** "Aurora bei Nacht" (Nachtblau, Türkis, Violett), Fenster 1280 x 860. Seit 15.10.2026 als Logo die
+  Obertonleiter (zehn Partials als Lichter auf Stielen, Höhen wie die Obertonreihe; vorher ein Ring aus Partials, der
+  Phosphenes Mandala zu ähnlich war) und als Bild hinter dem Panel ein Wolkenmeer bei Nacht unter Strömen aus
+  Lichtpunkten (`Plugin/Resources/backdrop.jpg`, Gemini 2.5 Flash Image wie bei den Geschwistern).
 - **Kopfzeile:** Autoplay Start/Stopp (Leertaste im Standalone), Modus, Step, Skala, Grundton, Bewegung, Landschaft;
   Statuszeile (Stimmen nach Herkunft, Grundton, GPU-Zeit, Latenz, Gerät, Unterläufe); Rückgängig, Wiederholen,
   Hilfe (F1, Text aus `Plugin/Resources/chapters.txt` plus "Diese Seite" mit allen Parametern), Einstellungen.

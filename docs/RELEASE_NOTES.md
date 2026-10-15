@@ -89,6 +89,9 @@ presets.
   drifted by several dB); the map and the search read the new measures.
 - **The space from above** on the Space page: the voices at their planes and pitches, Breath's wandering as trails;
   Depth and Keys Depth as rings to drag.
+- **Its own look** (15.10.2026): a picture behind the panel, as the siblings have one -- a sea of clouds at night under
+  streams of light -- and a new logo, the overtone ladder (the partials of one tone as lights on stalks, falling as the
+  harmonic series does), in the header, the icon and the setup.
 
 ## 0.14.0 (14.10.2026, not released)
 

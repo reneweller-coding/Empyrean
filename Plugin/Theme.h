@@ -33,7 +33,7 @@ const juce::Colour Bad{ 0xffe06a5f };           ///< a meter over
 const frame::Skin &skin();
 
 /**
- * @brief Draws the logo: a ring of partials of different sizes, brightest at the top.
+ * @brief Draws the logo: the overtone ladder, ten partials as lights on stalks falling as the harmonic series does.
  * @param[in,out] g  where
  * @param[in]     r  the square
  */

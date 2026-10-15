@@ -1,13 +1,12 @@
-"""The icon: the panel's logo (Plugin/Theme.cpp, drawLogo) -- twenty-four partials round a ring, their sizes from a
-fixed die, lit from the top, green turning violet, a small light in the centre -- on the night's blue.
+"""The icon: the panel's logo (Plugin/Theme.cpp, drawLogo) -- the overtone ladder, the partials of one tone as lights on
+stalks, their heights falling as the harmonic series does, mint turning violet, in a soft glow -- on the night's blue.
 
     python Deploy/make_icon.py      -> Deploy/empyrean.ico (16 .. 256 px), empyrean.png (256), empyrean_512.png
 
 The .ico stays committed so the release build needs no Python.
 """
-import math
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parent
 BACK = (7, 9, 15, 255)
@@ -20,26 +19,40 @@ def mix(a, b, t):
     return tuple(int(round(a[i] + (b[i] - a[i]) * t)) for i in range(3))
 
 
-def draw(size):
-    """The logo at one size, drawn four times larger and scaled down (smooth edges)."""
-    s = size * 4
+def ladder(s, count):
+    """The ladder on a transparent square of s pixels: count stalks (small icons get fewer, broader ones)."""
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([0, 0, s - 1, s - 1], radius=s * 0.18, fill=BACK)
-    c = s / 2.0
-    radius = 0.36 * s
-    count = 24 if size >= 48 else 12   # small icons: fewer, larger partials
+    base, broad = 0.76 * s, (10.0 / count) ** 0.6
     for i in range(count):
-        a = 2.0 * math.pi * i / count
-        k = (i * (24 // count) * 2654435761) & 0xFFFFFFFF
-        k ^= k >> 15
-        dot = radius * (0.08 + 0.12 * (k % 1000) / 1000.0) * (1.6 if size < 48 else 1.0)
-        lit = 0.35 + 0.65 * 0.5 * (1.0 + math.cos(a))
-        col = mix(GREEN, VIOLET, 0.5 * (1.0 - math.cos(a)))
-        x, y = c + math.sin(a) * radius, c - math.cos(a) * radius
-        d.ellipse([x - dot / 2, y - dot / 2, x + dot / 2, y + dot / 2], fill=col + (int(255 * lit),))
-    core = radius * 0.22 * (1.5 if size < 48 else 1.0)
-    d.ellipse([c - core / 2, c - core / 2, c + core / 2, c + core / 2], fill=GREEN + (205,))
+        t = i / (count - 1)
+        x = (0.2 + 0.6 * t) * s
+        top = base - 0.52 * s / (i + 1) ** 0.55
+        col = mix(GREEN, VIOLET, t)
+        d.line([(x, base), (x, top)], fill=col + (150,), width=max(1, int(0.018 * s * broad)))
+        r = (0.05 - 0.022 * t) * s * broad
+        d.ellipse([x - r, top - r, x + r, top + r], fill=col + (255,))
+    return img
+
+
+def glow(layer, s):
+    """The layer with a soft glow under it, as the panel draws its lights."""
+    blur = layer.filter(ImageFilter.GaussianBlur(s * 0.022))
+    r, g, b, a = blur.split()
+    blur = Image.merge("RGBA", (r, g, b, a.point(lambda v: min(255, int(v * 1.4)))))
+    out = Image.new("RGBA", layer.size, (0, 0, 0, 0))
+    out.alpha_composite(blur)
+    out.alpha_composite(layer)
+    return out
+
+
+def draw(size):
+    """The icon at one size, drawn four times larger and scaled down (smooth edges)."""
+    s = size * 4
+    img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    ImageDraw.Draw(img).rounded_rectangle([0, 0, s - 1, s - 1], radius=s * 0.18, fill=BACK)
+    count = 10 if size >= 48 else 6 if size >= 24 else 5
+    img.alpha_composite(glow(ladder(s, count), s))
     return img.resize((size, size), Image.LANCZOS)
 
 

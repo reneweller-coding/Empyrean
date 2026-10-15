@@ -18,11 +18,11 @@ juce_add_plugin(Empyrean
     PRODUCT_NAME                "Empyrean"
     ICON_BIG                    "${CMAKE_SOURCE_DIR}/Deploy/empyrean.png")
 target_sources(Empyrean PRIVATE PluginProcessor.cpp PluginEditor.cpp HeaderParts.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp SourcesView.cpp JourneyView.cpp MapView.cpp HallView.cpp KnobMod.cpp ModDock.cpp PageStrip.cpp SpaceView.cpp TuningView.cpp FocusView.cpp Palette.cpp Browser.cpp ParamInfo.cpp InfoLine.cpp Tour.cpp Theme.cpp Frame.cpp Jam.cpp)
-# The help's prose (frame::HelpView).
+# The picture behind the panel (frame::Backdrop) and the help's prose (frame::HelpView).
 juce_add_binary_data(AdditivData
     HEADER_NAME AdditivData.h
     NAMESPACE AdditivData
-    SOURCES Resources/chapters.txt)
+    SOURCES Resources/backdrop.jpg Resources/chapters.txt)
 target_compile_definitions(Empyrean PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

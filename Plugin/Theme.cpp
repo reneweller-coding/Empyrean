@@ -4,6 +4,7 @@
  * @author Rene Weller
  */
 #include "Theme.h"
+#include "AdditivData.h"
 
 #include <cmath>
 
@@ -12,23 +13,27 @@ namespace additivui
 
 void drawLogo( juce::Graphics &g, juce::Rectangle<float> r )
 {
-    const juce::Point<float> c = r.getCentre();
-    const float              radius = 0.38f * std::min( r.getWidth(), r.getHeight() );
-    // Twenty-four partials round a circle, their sizes from a fixed die, the top lit.
-    for ( int i = 0; i < 24; ++i )
+    const float                  side = std::min( r.getWidth(), r.getHeight() );
+    const juce::Rectangle<float> box = r.withSizeKeepingCentre( side, side );
+    const float                  base = box.getY() + 0.86f * side;
+    // The overtone ladder: ten partials of one tone as lights on stalks, their heights falling as the harmonic series
+    // does, mint turning violet, each light in a faint glow. It fills the square as the siblings' logos do (the icon,
+    // Deploy/make_icon.py, draws it smaller inside its rounded square).
+    for ( int i = 0; i < 10; ++i )
     {
-        const float   a = juce::MathConstants<float>::twoPi * static_cast<float>( i ) / 24.0f;
-        std::uint32_t k = static_cast<std::uint32_t>( i ) * 2654435761u;
-        k ^= k >> 15;
-        const float              size = radius * ( 0.08f + 0.12f * static_cast<float>( k % 1000 ) / 1000.0f );
-        const float              lit = 0.35f + 0.65f * 0.5f * ( 1.0f + std::cos( a ) );
-        const juce::Point<float> p = c + juce::Point<float>( std::sin( a ), -std::cos( a ) ) * radius;
-        g.setColour(
-            colour::Accent.interpolatedWith( colour::Violet, 0.5f * ( 1.0f - std::cos( a ) ) ).withAlpha( lit ) );
-        g.fillEllipse( juce::Rectangle<float>( size, size ).withCentre( p ) );
+        const float              t = static_cast<float>( i ) / 9.0f;
+        const float              x = box.getX() + ( 0.07f + 0.76f * t ) * side;
+        const float              top = base - 0.68f * side / std::pow( static_cast<float>( i + 1 ), 0.55f );
+        const float              dot = ( 0.13f - 0.057f * t ) * side;
+        const juce::Colour       c = colour::Accent.interpolatedWith( colour::Violet, t );
+        const juce::Point<float> p( x, top );
+        g.setColour( c.withAlpha( 0.6f ) );
+        g.drawLine( x, base, x, top, std::max( 1.0f, 0.024f * side ) );
+        g.setColour( c.withAlpha( 0.2f ) );
+        g.fillEllipse( juce::Rectangle<float>( 2.2f * dot, 2.2f * dot ).withCentre( p ) );
+        g.setColour( c );
+        g.fillEllipse( juce::Rectangle<float>( dot, dot ).withCentre( p ) );
     }
-    g.setColour( colour::Accent.withAlpha( 0.8f ) );
-    g.fillEllipse( juce::Rectangle<float>( radius * 0.22f, radius * 0.22f ).withCentre( c ) );
 }
 
 const frame::Skin &skin()
@@ -60,6 +65,10 @@ const frame::Skin &skin()
         k.m_typeface = "Segoe UI Light";
         k.m_titleBold = false;
         k.m_glow = true;
+        k.m_backdropData = AdditivData::backdrop_jpg;
+        k.m_backdropSize = AdditivData::backdrop_jpgSize;
+        k.m_backdropTop = 0.8f;
+        k.m_backdropPage = 0.45f;
         k.m_logo = []( juce::Graphics &g, juce::Rectangle<float> r ) { drawLogo( g, r ); };
         return k;
     }();
