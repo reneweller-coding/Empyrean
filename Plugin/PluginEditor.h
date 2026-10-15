@@ -54,7 +54,7 @@ public:
     void resized() override;
     /** @brief The family's keys. @param key the key @return true when it was one */
     bool keyPressed(const juce::KeyPress& key) override;
-    /** @brief In the standalone, the window gets a maximise button beside the other two (Noctuary's, Totality's). */
+    /** @brief In the standalone, the window gets a maximise button beside the other two (Noctuary's, Totality's) and comes back where it was left. */
     void parentHierarchyChanged() override;
     /** @brief The host's scale (a screen's density), the zoom on top of it. @param newScale the host's */
     void setScaleFactor(float newScale) override;
@@ -98,12 +98,23 @@ private:
     /** @brief A header chooser bound to a parameter. @param box the chooser @param id the parameter */
     void bindChoice(frame::Choice& box, additiv::ParamId id);
     /**
-     * @brief The window's first size: the size it was left at, where that still fits the screen; else three
-     *        quarters of the screen's width at the window's proportions, 1280 x 860 at least (less only on
-     *        a screen smaller than that). 1280 x 860 in the screenshot and layout modes.
+     * @brief The window's first size: the size it was left at, where that still fits a screen (any of them: it
+     *        may have been on a larger one than the main screen); else three quarters of the screen's width at
+     *        the window's proportions, 1280 x 860 at least (less only on a screen smaller than that). 1280 x 860
+     *        in the screenshot and layout modes.
      * @return pixels
      */
     juce::Point<int> startSize();
+    /** @brief The standalone's window where it was left -- its place, its size, maximised or not -- and from then on its moves kept. @param window the window */
+    void restoreWindow(juce::ResizableWindow& window);
+    /** @brief Keeps the standalone window's state (where, how large, maximised) in the player's settings whenever it moves. */
+    struct WindowKeeper final : public juce::ComponentListener {
+        AdditivEditor* owner = nullptr;                               ///< whose settings
+        juce::Component::SafePointer<juce::ResizableWindow> window;   ///< the standalone's window (none in a host)
+        /** @brief The window moved or was resized: its state written. @param c the window @param moved ignored @param resized ignored */
+        void componentMovedOrResized(juce::Component& c, bool moved, bool resized) override;
+    };
+    WindowKeeper windowKeeper_;                                ///< the standalone window's state, kept
     /**
      * @brief A page's state for its strip: its groups on and off, the matrix's rows, a journey or route running.
      * @param tab  the page

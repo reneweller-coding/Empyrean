@@ -61,6 +61,11 @@ presets.
 - **By hand:** the hall's memory painted with the mouse (Grow comes on at 0.4 when it was at nothing); the map's
   waypoints dragged (snapping to a preset) and removed with a right-click; a morph slot takes a snapshot of the Focus
   page.
+- **The map zooms:** the wheel (or a pinch) zooms round the mouse up to 32 times, a right- or middle-drag moves the
+  view; an overview in the corner, Whole map, the presets' names where few are in view, and the view follows the cursor
+  (or the preset playing) when it walks out.
+- **The window comes back where it was left:** the standalone keeps its place, its size and whether it was maximised,
+  across screens; a size left on a screen larger than the main one is kept too.
 - **Words in the palette:** "dark calm wide" (or dunkel, ruhig, breit ...) finds the presets measured so.
 - **Zoom** (100 - 150 %) in the settings, beside the window's size; the last page comes back; the foundation's key is
   underlined in the picture.

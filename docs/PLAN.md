@@ -526,6 +526,22 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 25: Die Karte zoomt, das Fenster bleibt, wo es war (gebaut, 15.10.2026, 0.15.0)
+
+Nutzer: „Bitte baue das mit dem Zoom noch ein.“ und „Beim Schließen sollte sich der Synth die Größe und Position merken“:
+- **Karten-Zoom:** `MapView::view_` (Ausschnitt in Kartenkoordinaten), `toScreen`/`toMap` rechnen über ihn, alles
+  andere folgt. Mausrad/Pinch um die Maus (1–32x, ein Rastschritt ≈ 1,4x), Rechts-/Mittel-Ziehen verschiebt
+  (Rechtsklick auf Wegpunkt bleibt dessen Menü), Übersicht oben rechts (Klick/Ziehen), „Whole map“. Punkte-Cache nur
+  für den Ausschnitt, Namen erst in Ruhe (180 ms) und nur bei ≤ 400 sichtbaren Punkten, höchstens 60, von der Mitte
+  aus, ohne Überlappung (bei ~4,5x waren es sonst Hunderte). Der Ausschnitt gleitet dem Fokus nach (Cursor bei Map an,
+  sonst das spielende Preset), wenn dieser von selbst hinausläuft; Randmarke zeigt ihn.
+- **Fenster:** JUCE merkt sich nur windowX/Y und schiebt das Fenster beim Start ganz auf einen Bildschirm; die Größe
+  galt nur, wenn sie auf den *Haupt*bildschirm passte. Jetzt `windowState` (ResizableWindow::getWindowStateAsString,
+  „fs“ = maximiert) bei jeder Bewegung (ComponentListener, nicht minimiert/Vollbild) und `restoreWindowStateFromString`
+  nach dem Start (nur Standalone, nur einmal); Breite/Höhe nicht im maximierten Zustand, Prüfung gegen alle Bildschirme.
+  Geprüft: verschoben + geschlossen + neu gestartet = gleiche Lage. DisplayFusion teilt den 5120er-Bildschirm des
+  Nutzers: „Maximieren“ ergibt dort 1920 breit ohne „fs“ – die Lage kommt trotzdem genau so wieder.
+
 ## Phase 24: Hand anlegen -- Zeitleiste, Hallgedächtnis, Wegpunkte, Hörlineal (gebaut, 15.10.2026, 0.15.0)
 
 Nutzer: „Ja bitte, setze das um.“ (vierte Kritik, mein angepasster Plan; keine Routenvorschau, kein Auto-Füllen):

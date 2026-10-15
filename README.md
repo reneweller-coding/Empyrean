@@ -85,7 +85,7 @@ offline renderer and the manual, and a portable zip.
 - **ASIO** in the standalone, a meter, A | B against the preset, zoom; the tuning and the journeys drawn; words in the
   palette ("dark calm wide").
 - **By hand:** a journey written on its timeline (edges, glides, order), the hall's memory painted, the map's waypoints
-  dragged, the scale's pitches played on the tuning's ruler.
+  dragged, the scale's pitches played on the tuning's ruler; the map zooms and moves, with names at the points.
 - **Sources in sight:** a modulation dock with every source live -- drag one onto any knob; the pages in sections,
   each showing what is on in it; a window as large as the screen allows.
 - **A panel to find one's way in:** your own presets, a preset browser by how they sound, a command palette (Ctrl+K),

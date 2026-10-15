@@ -437,7 +437,8 @@ void AdditivEditor::modDropped(additiv::ModSource s, int, int row)
 
 AdditivEditor::~AdditivEditor()
 {
-    proc_.userSettings().saveIfNeeded();   // the window's size
+    if (windowKeeper_.window != nullptr) windowKeeper_.window->removeComponentListener(&windowKeeper_);
+    proc_.userSettings().saveIfNeeded();   // the window's size and place
     removeMouseListener(&activity_);
     for (auto* p : proc_.getParameters()) p->removeListener(this);
     stopTimer();
@@ -860,8 +861,12 @@ void AdditivEditor::resized()
     dock_->setVisible(!canvas_);
     if (canvas_) inspector_->setVisible(false);
     if (rememberSize_ && juce::Desktop::getInstance().getKioskModeComponent() == nullptr) {
-        proc_.userSettings().setValue("windowWidth", getWidth());
-        proc_.userSettings().setValue("windowHeight", getHeight());
+        // The size it is left at -- not a maximised one: that is kept in the window's state (restoreWindow).
+        const auto* window = findParentComponentOfClass<juce::ResizableWindow>();
+        if (window == nullptr || !window->isFullScreen()) {
+            proc_.userSettings().setValue("windowWidth", getWidth());
+            proc_.userSettings().setValue("windowHeight", getHeight());
+        }
     }
     if (canvas_) {   // the picture is the window
         cloud_.setBounds(area);
@@ -912,7 +917,13 @@ juce::Point<int> AdditivEditor::startSize()
     const auto user = juce::Rectangle<int>(juce::roundToInt(static_cast<float>(screen.getWidth()) / zoom_), juce::roundToInt(static_cast<float>(screen.getHeight()) / zoom_));
     const int maxW = std::max(800, user.getWidth() - 40), maxH = std::max(520, user.getHeight() - 80);   // room for the host's frame
     const int lastW = proc_.userSettings().getIntValue("windowWidth", 0), lastH = proc_.userSettings().getIntValue("windowHeight", 0);
-    if (lastW >= 800 && lastH >= 520 && lastW <= user.getWidth() && lastH <= user.getHeight()) return { lastW, lastH };
+    // The size it was left at, where it fits a screen: any of them, as it may have been on a larger one than the main one.
+    int roomW = user.getWidth(), roomH = user.getHeight();
+    for (const auto& other : juce::Desktop::getInstance().getDisplays().displays) {
+        roomW = std::max(roomW, juce::roundToInt(static_cast<float>(other.userBounds.getWidth()) / zoom_));
+        roomH = std::max(roomH, juce::roundToInt(static_cast<float>(other.userBounds.getHeight()) / zoom_));
+    }
+    if (lastW >= 800 && lastH >= 520 && lastW <= roomW && lastH <= roomH) return { lastW, lastH };
     const int w = std::clamp(juce::roundToInt(static_cast<float>(user.getWidth()) * 0.75f), 1280, 2200);
     const int h = std::max(860, juce::roundToInt(static_cast<float>(w) * 0.625f));
     return { std::max(800, std::min(w, maxW)), std::max(520, std::min(h, maxH)) };
@@ -1031,10 +1042,32 @@ void AdditivEditor::parentHierarchyChanged()
     // when this is called. In a host the plug-in lives in the host's window and this finds nothing.
     juce::MessageManager::callAsync([safe = juce::Component::SafePointer<AdditivEditor>(this)] {
         if (safe == nullptr) return;
-        if (auto* window = safe->findParentComponentOfClass<juce::DocumentWindow>())
+        if (auto* window = safe->findParentComponentOfClass<juce::DocumentWindow>()) {
             window->setTitleBarButtonsRequired(juce::DocumentWindow::minimiseButton | juce::DocumentWindow::maximiseButton
                                                    | juce::DocumentWindow::closeButton, false);
+            safe->restoreWindow(*window);
+        }
     });
+}
+
+void AdditivEditor::restoreWindow(juce::ResizableWindow& window)
+{
+    // Only the standalone's own window, once; never in the screenshot and layout modes.
+    if (!standalone() || !rememberSize_ || windowKeeper_.window != nullptr) return;
+    // JUCE's window has put itself on one screen at the size the editor asked for; the state kept says exactly
+    // where it was -- across two screens, maximised -- and is brought back onto a screen should that one be gone.
+    const juce::String state = proc_.userSettings().getValue("windowState");
+    if (state.isNotEmpty()) window.restoreWindowStateFromString(state);
+    windowKeeper_.owner = this;
+    windowKeeper_.window = &window;
+    window.addComponentListener(&windowKeeper_);
+}
+
+void AdditivEditor::WindowKeeper::componentMovedOrResized(juce::Component&, bool, bool)
+{
+    // Not while minimised or in full screen (the state would be the screen's); maximised is kept as such.
+    if (owner == nullptr || window == nullptr || window->isMinimised() || juce::Desktop::getInstance().getKioskModeComponent() != nullptr) return;
+    owner->proc_.userSettings().setValue("windowState", window->getWindowStateAsString());
 }
 
 void AdditivEditor::setCanvas(bool on)
