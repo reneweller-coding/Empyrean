@@ -53,6 +53,8 @@ static_assert( ( LifeW & ( LifeW - 1 ) ) == 0 && ( LifeH & ( LifeH - 1 ) ) == 0,
 /** @brief Lenia's ring kernel, normalised, set once at open(). */
 __constant__ float cLeniaKernel[( 2 * LifeRadius + 1 ) * ( 2 * LifeRadius + 1 )];
 constexpr float    AirShare = 0.2f;   ///< the share of a voice's partials that become its air band when Air is up
+constexpr int      PhysCells = PhysW * PhysH;                  ///< cells of the physarum's trail (Phase 28)
+constexpr float    PhysCellsPerOctave = PhysW / 9.96578428f;   ///< its trail cells an octave (log2 1000)
 
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
 struct BlockHeader
@@ -82,6 +84,10 @@ struct BlockHeader
     Turbulence    m_turb;             ///< the energy cascade for this block
     ChimeField    m_chimes;           ///< the chime field for this block (Phase 27)
     Dream         m_dream;            ///< the dream for this block (Phase 27)
+    Weather       m_weather;          ///< the weather for this block (Phase 28)
+    Bloom         m_bloom;            ///< the bloom for this block (Phase 28)
+    SwarmSpace    m_swarm;            ///< the swarmalators for this block (Phase 28)
+    Physarum      m_phys;             ///< the physarum for this block (Phase 28)
     std::int32_t  m_lifeParity;       ///< which of the two field buffers holds the field before this block's steps
     std::int32_t  m_lpad0;            ///< keeps the header 16-byte aligned
     std::int32_t  m_lpad1;            ///< likewise
@@ -1519,6 +1525,92 @@ __global__ void cascadeKernel( const BlockHeader *hdr, const CloudVoice *voices,
 }
 
 /**
+ * @brief One block of a physarum agent (Phase 28; Jones 2010): where its partial is on the trail -- its pitch with
+ *        the field's offset across, its place with its own offset from near the left to the right --, it senses the
+ *        trail ahead, ahead left and ahead right (0.7 rad), turns towards the most (a turn of 45 degrees a cell
+ *        moved; at random either way where both sides beat ahead), moves, bounces off the trail's edges and leaves
+ *        trail. Its offsets, drawn back by the spring, are what the partial plays.
+ * @param[in]     P        the physarum
+ * @param[in]     trail    the trail this block (physTrailKernel's)
+ * @param[in]     prev     per partial the agent's state from the last block (heading, place offset, -, -)
+ * @param[out]    next     per partial its state for the next
+ * @param[in,out] deposit  per cell what the agents leave (256 a visit)
+ * @param[in]     me       the partial's index in the tables
+ * @param[in]     logHome  log2 of the partial's own frequency
+ * @param[in]     off      the field's offset, cents
+ * @param[in,out] place    the partial's place, -1 .. 1: moved by the agent's offset
+ * @param[in]     seed     the voice's seed
+ * @param[in]     up       the partial
+ * @param[in]     block    the block's index (the dice for a turn)
+ * @param[in]     restart  a new note: the agent starts where its partial is
+ * @param[in]     dt       the block's length, s
+ * @return the new offset, cents
+ */
+__device__ float physStep( const Physarum &P, const float *trail, const float4 *prev, float4 *next,
+                           unsigned int *deposit, size_t me, float logHome, float off, float &place, std::uint32_t seed,
+                           std::uint32_t up, std::uint32_t block, bool restart, float dt )
+{
+    const bool fresh = restart || P.m_fresh;
+    float4     s = fresh ? make_float4( 6.2831853f * hash01( seed, up, 91 ), 0.0f, 0.0f, 0.0f ) : prev[me];
+    float      h = s.x;
+    float      cx = ( logHome + off * ( 1.0f / 1200.0f ) - 4.32192809f ) * PhysCellsPerOctave;   // log2(20)
+    float      cy = ( fminf( fmaxf( place + s.y, -1.0f ), 1.0f ) + 1.0f ) * ( 0.5f * PhysH );
+    auto       sense = [&]( float a )
+    {
+        float sn, cs;
+        __sincosf( a, &sn, &cs );
+        const int x = min( max( static_cast<int>( cx + P.m_sensor * cs ), 0 ), PhysW - 1 );
+        const int y = min( max( static_cast<int>( cy + P.m_sensor * sn ), 0 ), PhysH - 1 );
+        return trail[y * PhysW + x];
+    };
+    const float SA = 0.7f, RA = fminf( 0.785f * P.m_speed, 0.785f );
+    const float f = sense( h ), l = sense( h + SA ), r = sense( h - SA );
+    if ( f >= l && f >= r )
+    {
+    }
+    else if ( f < l && f < r )
+        h += hash01( seed ^ ( block * 0x9E3779B9U ), up, 92 ) < 0.5f ? RA : -RA;
+    else if ( l > r )
+        h += RA;
+    else
+        h -= RA;
+    float sn, cs;
+    __sincosf( h, &sn, &cs );
+    cx += P.m_speed * cs;
+    cy += P.m_speed * sn;
+    if ( cy < 0.0f )
+    {
+        cy = -cy;
+        h = -h;
+    }
+    else if ( cy > static_cast<float>( PhysH ) )
+    {
+        cy = 2.0f * static_cast<float>( PhysH ) - cy;
+        h = -h;
+    }
+    if ( cx < 0.0f )
+    {
+        cx = -cx;
+        h = 3.1415927f - h;
+    }
+    else if ( cx > static_cast<float>( PhysW ) )
+    {
+        cx = 2.0f * static_cast<float>( PhysW ) - cx;
+        h = 3.1415927f - h;
+    }
+    h -= 6.2831853f * floorf( h * 0.15915494f );
+    atomicAdd( deposit + min( max( static_cast<int>( cy ), 0 ), PhysH - 1 ) * PhysW +
+                   min( max( static_cast<int>( cx ), 0 ), PhysW - 1 ),
+               256U );
+    const float keep = fmaxf( 1.0f - P.m_spring * dt, 0.0f );
+    const float newOff = ( cx / PhysCellsPerOctave + 4.32192809f - logHome ) * 1200.0f * keep;
+    const float py = ( cy * ( 2.0f / static_cast<float>( PhysH ) ) - 1.0f - place ) * keep;
+    next[me] = make_float4( h, py, 0.0f, 0.0f );
+    place = fminf( fmaxf( place + py, -1.0f ), 1.0f );
+    return newOff;
+}
+
+/**
  * @brief The update kernel: every partial's frequency glide, amplitude ramps and start phase for this block.
  * @param[in]     hdr          the block header (device copy)
  * @param[in]     voices       the voices (device copy)
@@ -1551,14 +1643,17 @@ __global__ void cascadeKernel( const BlockHeader *hdr, const CloudVoice *voices,
  * @param[in,out] orbitA       the Orbit field's state, buffer A (even blocks read it)
  * @param[in,out] orbitB       buffer B
  * @param[in]     dreamState   the dream's spectrum, DreamBands (dreamRecallKernel), for a voice of the kind DREAM
+ * @param[in]     swarmView    the swarm as the partials ride it (swarmViewKernel), SwarmN
+ * @param[in]     physTrail    the physarum's trail, both buffers (physTrailKernel wrote this block's)
+ * @param[in,out] physDeposit  per trail cell what the physarum's agents leave this block
  */
 __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, int pcap, const EnvShape *shapes,
                               const float *land, uint4 *run, float4 *amp, float4 *gains, const float *ring,
                               float2 *ampQ, float2 *snap, const float2 *lifeA, const float2 *lifeB, float *theta,
                               float *sx, const float2 *order, size_t plane, float2 *flockA, float2 *flockB,
                               const float *qa, const float *qb, const float *filterTable, unsigned long long *hallHist,
-                              const float *density, float *tau, float4 *orbitA, float4 *orbitB,
-                              const float *dreamState )
+                              const float *density, float *tau, float4 *orbitA, float4 *orbitB, const float *dreamState,
+                              const float4 *swarmView, const float *physTrail, unsigned int *physDeposit )
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1595,7 +1690,8 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     const int  H = cv.m_harmonics, K = cv.m_members, S = cv.m_subClouds;
     const int  HP = cv.m_harmonicPartials;
     const bool isAir = p >= HP;
-    float      phantomTurn = 0.0f;   // the phantom layer: the turn of phase from the left ear to the right
+    float      phantomTurn = 0.0f;          // the phantom layer: the turn of phase from the left ear to the right
+    float      planeDist = cv.m_distance;   // the partial's distance for its planes (the swarm moves it)
     if ( cv.m_kind != VoiceKindE::NOTE )
     {
         // The layers that are not notes (Phase 27). Their partials are heard as they are: no filter, no motion.
@@ -1935,6 +2031,19 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         if ( cv.m_pitch.m_amount != 0.0f ) cents += laneValue( cv.m_pitch, c, 40, true, depth ) * depth;
         if ( cv.m_pan.m_amount != 0.0f )
             place = fminf( fmaxf( place + laneValue( cv.m_pan, c, 50, true, depth ) * depth, -1.0f ), 1.0f );
+        // The swarmalators (Phase 28): the partial rides one -- its place across and from near to far is the
+        // swarmalator's, its loudness pulses with its phase (the phase turning on at the rate).
+        float swarmDist = 0.0f;
+        if ( hdr->m_swarm.m_on && hdr->m_swarm.m_depth > 0.0f )
+        {
+            const SwarmSpace &W = hdr->m_swarm;
+            const float4      sv = swarmView[hash32( seed ^ ( up * 0x9E3779B9U + 0x5A4A0000U ) ) & ( SwarmN - 1 )];
+            place = fminf( fmaxf( place + W.m_depth * ( sv.x - place ), -1.0f ), 1.0f );
+            swarmDist = 0.5f * W.m_depth * sv.y;
+            float heard = sv.z + 6.2831853f * W.m_rate * tp;
+            heard -= 6.2831853f * floorf( heard * 0.15915494f );
+            env *= fmaxf( 0.0f, 1.0f + W.m_depth * __sinf( heard ) ) * rsqrtf( 1.0f + 0.5f * W.m_depth * W.m_depth );
+        }
 
         // The field: the partial's offset moves towards what pulls it, from where it was.
         const float home = centre * exp2f( cents * ( 1.0f / 1200.0f ) );
@@ -1959,6 +2068,19 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                            cv.m_restart != 0, static_cast<float>( n ) / fs, side );
             place = fminf( fmaxf( place + side, -1.0f ), 1.0f );
         }
+        else if ( hdr->m_field.m_mode == FieldModeE::PHYSARUM )
+        {
+            // The physarum: a share of the partials crawl over its trail; the others glide home.
+            const bool  odd = ( hdr->m_blockIndex & 1U ) != 0;
+            const float dtb = static_cast<float>( n ) / fs;
+            if ( hdr->m_phys.m_on && hash01( seed, up, 90 ) < hdr->m_phys.m_share )
+                fieldOff = physStep( hdr->m_phys, physTrail + ( odd ? 0 : PhysCells ), odd ? orbitB : orbitA,
+                                     odd ? orbitA : orbitB, physDeposit, static_cast<size_t>( gid ),
+                                     log2f( fmaxf( home, 1.0f ) ), fieldOff, place, seed, up, hdr->m_blockIndex,
+                                     cv.m_restart != 0, dtb );
+            else
+                fieldOff *= __expf( -2.0f * dtb );
+        }
         else
         {
             fieldOff = fieldStep( hdr->m_field, log2f( fmaxf( home, 1.0f ) ) + fieldOff * ( 1.0f / 1200.0f ), fieldOff,
@@ -1974,7 +2096,8 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         // corner falling from 16 kHz by up to five octaves per unit -- read at this partial's
         // frequency, where in a filter it would have been a whole filter. Taken relative to the
         // corner at the ear, so a partial at distance 0 keeps exactly its level (as in Noctuary).
-        const float dist = fminf( fmaxf( cv.m_distance, 0.0f ), 1.0f );
+        const float dist = fminf( fmaxf( cv.m_distance + swarmDist, 0.0f ), 1.0f );
+        planeDist = dist;
         const float x0 = f * ( 1.0f / 16000.0f );
         const float x = x0 / exp2f( -5.0f * dist * cv.m_airAbsorb );
         const float absorb = sqrtf( ( 1.0f + x0 * x0 ) / ( 1.0f + x * x ) );
@@ -2049,7 +2172,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     // Equal-power pan: the partial's place in the field; equal-power planes: near cos, far sin.
     float gl, gr, gn, gf;
     __sincosf( 0.78539816f * ( 1.0f + place ), &gr, &gl );
-    __sincosf( 1.57079633f * fminf( fmaxf( cv.m_distance, 0.0f ), 1.0f ), &gf, &gn );
+    __sincosf( 1.57079633f * fminf( fmaxf( planeDist, 0.0f ), 1.0f ), &gf, &gn );
     float4 t4 = make_float4( target * gl * gn, target * gr * gn, target * gl * gf, target * gr * gf );
     float2 tq = make_float2( 0.0f, 0.0f );
     if ( cv.m_kind == VoiceKindE::PHANTOM )
@@ -2499,13 +2622,13 @@ __device__ __forceinline__ bool windPost( int x, int y )
 __global__ void windStepKernel( const BlockHeader *hdr, int node, float *a, float *b )
 {
     const ChimeField &C = hdr->m_chimes;
-    if ( !C.m_on ) return;
+    if ( !hdr->m_weather.m_wind ) return;   // blowing for the chimes or the weather (Phase 28)
     const int idx = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
     if ( idx >= WindCells ) return;
     const int    x = idx % WindW, y = idx / WindW;
     const float *src = node == 0 ? a : b;
     float       *dst = node == 0 ? b : a;
-    if ( ( C.m_reset && node == 0 ) || windPost( x, y ) )
+    if ( ( hdr->m_weather.m_windFresh && node == 0 ) || windPost( x, y ) )
     {   // at rest (a post's cells stay so)
         for ( int k = 0; k < 9; ++k ) dst[k * WindCells + idx] = cWindW[k];
         return;
@@ -2998,6 +3121,1099 @@ __global__ void phase27StatsKernel( int *meta, float *stats )
     stats[12] = static_cast<float>( meta[0] );
     stats[13] = static_cast<float>( meta[1] );
     meta[1] = 0;
+}
+
+// ---- Phase 28 (16.10.2026): the weather in the wind, the bloom, the swarmalators, the physarum.
+
+constexpr int   RainThreads = 256;                             ///< drops per CUDA block of the rain kernel
+constexpr int   RainBlocks = RainSlots / RainThreads;          ///< CUDA blocks of the rain kernel
+constexpr int   LeafThreads = 256;                             ///< clusters per CUDA block of the leaf kernel
+constexpr int   LeafBlocks = LeafClusters / LeafThreads;       ///< CUDA blocks of the leaf kernel
+constexpr int   WeatherTile = 128;                             ///< samples the weather's kernels sum per pass
+constexpr int   WeatherBlocks = RainBlocks + LeafBlocks + 1;   ///< the weather's scratch: rain, leaves, the sea
+constexpr int   BloomThreads = 256;                            ///< modes per CUDA block of the bloom kernel
+constexpr int   BloomBlocks = BloomModes / BloomThreads;       ///< CUDA blocks of the bloom kernel
+constexpr int   BloomTile = 128;                               ///< samples the bloom kernel sums per pass
+constexpr float BloomLow = 30.0f;                              ///< the bloom's lowest mode that sounds, Hz
+constexpr float BloomHigh = 18000.0f;                          ///< its highest, Hz
+constexpr int   SwarmThreads = 256;                            ///< swarmalators per CUDA block
+constexpr int   StatsFloats = 32;                              ///< the stats brought down every block
+static_assert( RainSlots % RainThreads == 0 && LeafClusters % LeafThreads == 0, "whole CUDA blocks" );
+static_assert( BloomModes % BloomThreads == 0 && SwarmN % SwarmThreads == 0, "whole CUDA blocks" );
+static_assert( SwarmN == 1024, "the swarm's view is reduced by one CUDA block of 1024" );
+
+/**
+ * @brief The wind where a cell of its lattice is: its velocity, lattice units a step.
+ * @param[in] wind  the lattice (buffer A, after the block's steps)
+ * @param[in] idx   the cell
+ * @return across and from near to far
+ */
+__device__ __forceinline__ float2 windAt( const float *wind, int idx )
+{
+    float rho = 0.0f, ux = 0.0f, uy = 0.0f;
+    for ( int k = 0; k < 9; ++k )
+    {
+        const float f = wind[k * WindCells + idx];
+        rho += f;
+        ux += static_cast<float>( cWindX[k] ) * f;
+        uy += static_cast<float>( cWindY[k] ) * f;
+    }
+    return rho > 1.0e-3f ? make_float2( ux / rho, uy / rho ) : make_float2( 0.0f, 0.0f );
+}
+
+/**
+ * @brief The showers (Phase 28): the rain's density over the field, carried by the wind -- semi-Lagrangian, from
+ *        where the wind brought it, bilinear on the torus -- and fed at the windward side (the left) by the host's
+ *        slow randoms, drifting back to even slowly. Two buffers, by the block's parity.
+ * @param[in]     hdr      the block header
+ * @param[in]     wind     the wind's lattice after this block's steps
+ * @param[in,out] showers  two buffers of WindCells
+ */
+__global__ void rainFieldKernel( const BlockHeader *hdr, const float *wind, float *showers )
+{
+    const Weather &W = hdr->m_weather;
+    if ( !W.m_rainOn ) return;
+    const int idx = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
+    if ( idx >= WindCells ) return;
+    const bool   odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float *src = showers + ( odd ? WindCells : 0 );
+    float       *dst = showers + ( odd ? 0 : WindCells );
+    const int    x = idx % WindW, y = idx / WindW;
+    float        c = 1.0f;
+    if ( !W.m_reset && !W.m_rainFresh )
+    {
+        const float2 u = windAt( wind, idx );
+        const float  sx = static_cast<float>( x ) - 2.0f * W.m_advect * u.x;
+        const float  sy = static_cast<float>( y ) - 2.0f * W.m_advect * u.y;
+        const float  fx = floorf( sx ), fy = floorf( sy );
+        const int    x0 = static_cast<int>( fx ) & ( WindW - 1 ), y0 = static_cast<int>( fy ) & ( WindH - 1 );
+        const int    x1 = ( x0 + 1 ) & ( WindW - 1 ), y1 = ( y0 + 1 ) & ( WindH - 1 );
+        const float  ax = sx - fx, ay = sy - fy;
+        const float  top = src[y0 * WindW + x0] + ( src[y0 * WindW + x1] - src[y0 * WindW + x0] ) * ax;
+        const float  bottom = src[y1 * WindW + x0] + ( src[y1 * WindW + x1] - src[y1 * WindW + x0] ) * ax;
+        c = top + ( bottom - top ) * ay;
+        c += ( 1.0f - c ) *
+             0.00002f;   // back to even over two minutes (at 5 s a shower died before a quarter of the field)
+    }
+    if ( x < 2 )
+    {   // the windward side: fed by the slow randoms, from near to far
+        const float fy = static_cast<float>( y ) * ( 3.0f / static_cast<float>( WindH - 1 ) );
+        const int   i0 = min( static_cast<int>( fy ), 2 );
+        const float g = W.m_shower[i0] + ( W.m_shower[i0 + 1] - W.m_shower[i0] ) * ( fy - static_cast<float>( i0 ) );
+        c = 1.0f + 2.0f * W.m_showers * g;   // at the top: no rain to three times the rain
+    }
+    dst[idx] = fminf( fmaxf( c, 0.0f ), 3.0f );
+}
+
+/** @brief A drop's dice: the block it fell in, made a seed. @param[in] block the block @return the seed */
+__device__ __forceinline__ std::uint32_t dropSeed( int block )
+{
+    return static_cast<std::uint32_t>( block ) * 0x9E3779B9U + 0x4A1E5EEDU;
+}
+
+/** @brief A drop as it sounds: worked out from its dice every block (nothing of it is stored but its state). */
+struct DropSpec
+{
+    float m_amp;          ///< its ring's amplitude
+    float m_omega;        ///< its ring's angular step a sample at its start
+    float m_dOmega;       ///< the step's rise a sample (a bubble rising)
+    float m_r;            ///< its ring's decay a sample
+    float m_click;        ///< its impact's amplitude
+    float m_clickDecay;   ///< the impact's decay a sample
+    float m_g[4];         ///< its gains: near left, near right, far left, far right
+    float m_gClick[4];    ///< the impact's, darker with distance
+};
+
+/**
+ * @brief A drop's sound from its dice: where it fell, what it fell on, how big it was (Phase 28).
+ * @param[in] W     the weather
+ * @param[in] slot  its slot
+ * @param[in] born  the block it fell in
+ * @param[in] fs    the sample rate
+ * @return the drop
+ */
+__device__ DropSpec dropSpec( const Weather &W, int slot, int born, float fs )
+{
+    const std::uint32_t ds = dropSeed( born ), us = static_cast<std::uint32_t>( slot );
+    DropSpec            d;
+    const float         gx = static_cast<float>( WindW ) * hash01( ds, us, 1 );
+    const float         gy = static_cast<float>( WindH ) * hash01( ds, us, 2 );
+    const float         u = hash01( ds, us, 5 ), v = hash01( ds, us, 6 ), w = hash01( ds, us, 7 );
+    const bool          tuned = W.m_pitchCount > 0 && hash01( ds, us, 8 ) < W.m_tune;
+    const float         pitch =
+        W.m_pitchCount > 0
+            ? W.m_pitch[hash32( ds ^ ( us * 0x85EBCA6BU ) ) % static_cast<std::uint32_t>( W.m_pitchCount )]
+            : 1000.0f;
+    float f = 1000.0f, tau = 0.01f, chirp = 0.0f;
+    switch ( W.m_surface )
+    {
+    case 1:   // leaves: a tick, a leaf's own ring
+        f = 1200.0f * __expf( 1.32f * u );
+        tau = 0.008f + 0.017f * v;
+        d.m_amp = 0.25f;
+        d.m_click = 0.3f * ( 0.5f + w );
+        d.m_clickDecay = __expf( -1.0f / ( 0.00015f * fs ) );
+        break;
+    case 2:   // stone: a click and a glint
+        f = 6000.0f * __expf( 0.7f * u );
+        tau = 0.0015f;
+        d.m_amp = 0.15f;
+        d.m_click = 0.6f * ( 0.5f + w );
+        d.m_clickDecay = __expf( -1.0f / ( 0.0001f * fs ) );
+        break;
+    case 3:   // a tin roof: the sheet rings where the drop fell
+        f = tuned ? pitch : 300.0f * __expf( 2.08f * u );
+        tau = 0.08f + 0.27f * v;
+        d.m_amp = 0.2f;
+        d.m_click = 0.25f * ( 0.5f + w );
+        d.m_clickDecay = __expf( -1.0f / ( 0.0002f * fs ) );
+        break;
+    default:
+    {   // water: a bubble trapped -- Minnaert's ring, 3.26 kHz over its radius in mm, damped as van den Doel
+        // measured, rising as it rises -- or only the splash
+        const float rmm = 0.25f * __expf( 2.485f * powf( u, 1.4f ) );
+        f = tuned ? pitch : 3260.0f / rmm;
+        const float delta = 0.043f * f + 0.0014f * f * sqrtf( f );
+        tau = 1.0f / delta;
+        chirp = ( 0.1f + 0.4f * v ) * delta;
+        d.m_amp = hash01( ds, us, 9 ) < 0.6f ? 0.5f * sqrtf( rmm ) * ( 0.5f + w ) : 0.0f;
+        d.m_click = 0.15f * ( 0.5f + w );
+        d.m_clickDecay = __expf( -1.0f / ( 0.00025f * fs ) );
+        break;
+    }
+    }
+    f = fminf( f, 0.42f * fs );
+    d.m_omega = 6.2831853f * f / fs;
+    d.m_dOmega = d.m_omega * chirp / fs;
+    d.m_r = __expf( -1.0f / ( tau * fs ) );
+    const float place = 2.0f * gx / static_cast<float>( WindW ) - 1.0f, dist = gy / static_cast<float>( WindH );
+    float       gl, gr, gn, gf;
+    __sincosf( 0.78539816f * ( 1.0f + place ), &gr, &gl );
+    __sincosf( 1.57079633f * dist, &gf, &gn );
+    const float a = W.m_rainLevel * __expf( -dist * f * ( 1.0f / 9000.0f ) );
+    const float c = W.m_rainLevel * __expf( -dist * 0.8f );
+    d.m_g[0] = gl * gn * a;
+    d.m_g[1] = gr * gn * a;
+    d.m_g[2] = gl * gf * a;
+    d.m_g[3] = gr * gf * a;
+    d.m_gClick[0] = gl * gn * c;
+    d.m_gClick[1] = gr * gn * c;
+    d.m_gClick[2] = gl * gf * c;
+    d.m_gClick[3] = gr * gf * c;
+    return d;
+}
+
+/**
+ * @brief The rain (Phase 28): one thread a slot, RainSlots of them. A free slot may catch a drop -- where it would
+ *        fall, as likely as the showers are there, so that the field's drops a second come to the rate --, rings it
+ *        out (a complex one-pole turned every sample, its step rising for a bubble) with its impact's click, and is
+ *        free again once both are under -60 dB. A CUDA block of free slots writes nothing but silence.
+ * @param[in]     hdr      the block header
+ * @param[in]     showers  the showers' density, both buffers (this block's is read: rainFieldKernel's)
+ * @param[in,out] drop     per slot its ring (re, im, step, samples since it fell)
+ * @param[in,out] birth    per slot the block it fell in (-1 free) and its sample there
+ * @param[out]    scratch  per CUDA block four channels of sums (near L, R, far L, R)
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] meta     the counters: [4] drops sounding this block, [5] the last block's, [6] drops born
+ */
+__global__ void __launch_bounds__( RainThreads ) rainKernel( const BlockHeader *hdr, const float *showers, float4 *drop,
+                                                             int2 *birth, float *scratch, int maxN, int *meta )
+{
+    __shared__ float sAcc[RainThreads / 32][4][WeatherTile];
+    const Weather   &W = hdr->m_weather;
+    const int        n = hdr->m_n;
+    const int        slot = static_cast<int>( blockIdx.x ) * RainThreads + static_cast<int>( threadIdx.x );
+    const int        blk = static_cast<int>( hdr->m_blockIndex & 0x3FFFFFFFU );
+    float           *out = scratch + static_cast<size_t>( blockIdx.x ) * 4 * maxN;
+    const float      fs = hdr->m_sampleRate;
+    int2             b = ( W.m_reset || !W.m_rainOn ) ? make_int2( -1, 0 ) : birth[slot];
+    float4           d = drop[slot];
+    if ( b.x < 0 && W.m_rainOn && W.m_rainRate > 0.0f && !W.m_reset )
+    {   // free: a drop may fall into it, where the showers are
+        const int           busy = min( max( meta[5], 0 ), RainSlots - 1 );
+        const float         q = W.m_rainRate * static_cast<float>( n ) / fs / static_cast<float>( RainSlots - busy );
+        const std::uint32_t ds = dropSeed( blk ), us = static_cast<std::uint32_t>( slot );
+        const int   gx = min( static_cast<int>( static_cast<float>( WindW ) * hash01( ds, us, 1 ) ), WindW - 1 );
+        const int   gy = min( static_cast<int>( static_cast<float>( WindH ) * hash01( ds, us, 2 ) ), WindH - 1 );
+        const float c = showers[( ( hdr->m_blockIndex & 1U ) ? 0 : WindCells ) + gy * WindW + gx];   // this block's
+        if ( hash01( ds, us, 3 ) < q * c )
+        {
+            b = make_int2( blk, min( static_cast<int>( static_cast<float>( n ) * hash01( ds, us, 4 ) ), n - 1 ) );
+            atomicAdd( meta + 6, 1 );
+        }
+    }
+    const bool alive = b.x >= 0;
+    if ( !__syncthreads_or( alive ) )
+    {
+        birth[slot] = b;
+        for ( int s = threadIdx.x; s < n; s += RainThreads )
+            for ( int ch = 0; ch < 4; ++ch ) out[ch * maxN + s] = 0.0f;
+        return;
+    }
+    DropSpec spec{};
+    int      at = -1;   // the sample it falls at in this block
+    if ( alive )
+    {
+        spec = dropSpec( W, slot, b.x, fs );
+        if ( b.x == blk ) at = b.y;
+    }
+    const int lane = static_cast<int>( threadIdx.x ) & 31, warp = static_cast<int>( threadIdx.x ) >> 5;
+    for ( int t0 = 0; t0 < n; t0 += WeatherTile )
+    {
+        const int tn = min( WeatherTile, n - t0 );
+        for ( int i = 0; i < tn; ++i )
+        {
+            float vb = 0.0f, vc = 0.0f;
+            if ( alive )
+            {
+                if ( t0 + i == at ) d = make_float4( spec.m_amp, 0.0f, spec.m_omega, 0.0f );
+                if ( at < 0 || t0 + i >= at )
+                {
+                    vb = d.y;
+                    const float tc = d.w;
+                    if ( tc < 400.0f )
+                        vc = spec.m_click * __powf( spec.m_clickDecay, tc ) *
+                             ( 2.0f *
+                                   hash01( dropSeed( b.x ),
+                                           static_cast<std::uint32_t>( slot ) * 512U + static_cast<std::uint32_t>( tc ),
+                                           11 ) -
+                               1.0f );
+                    float sn, cs;
+                    __sincosf( d.z, &sn, &cs );
+                    const float re = spec.m_r * ( d.x * cs - d.y * sn );
+                    const float im = spec.m_r * ( d.x * sn + d.y * cs );
+                    d = make_float4( re, im, d.z + spec.m_dOmega, tc + 1.0f );
+                }
+            }
+            float v[4];
+            for ( int ch = 0; ch < 4; ++ch )
+            {
+                v[ch] = vb * spec.m_g[ch] + vc * spec.m_gClick[ch];
+                for ( int off = 16; off > 0; off >>= 1 ) v[ch] += __shfl_down_sync( 0xFFFFFFFFU, v[ch], off );
+            }
+            if ( lane == 0 )
+                for ( int ch = 0; ch < 4; ++ch ) sAcc[warp][ch][i] = v[ch];
+        }
+        __syncthreads();
+        for ( int s = threadIdx.x; s < 4 * tn; s += RainThreads )
+        {
+            const int ch = s / tn, i = s - ch * tn;
+            float     a = 0.0f;
+            for ( int wv = 0; wv < RainThreads / 32; ++wv ) a += sAcc[wv][ch][i];
+            out[ch * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    if ( alive )
+    {   // rung out (-60 dB and the click done): free again
+        if ( d.w > 400.0f && d.x * d.x + d.y * d.y < 1.0e-6f * spec.m_amp * spec.m_amp + 1.0e-14f )
+            b = make_int2( -1, 0 );
+        else
+            atomicAdd( meta + 4, 1 );
+    }
+    birth[slot] = b;
+    drop[slot] = d;
+}
+
+/** @brief A foliage's leaves: their ring's band, its decay, their clicks a second at full wind, their loudness. */
+struct FoliageSpec
+{
+    float m_lo;     ///< the lowest ring, Hz
+    float m_hi;     ///< the highest, Hz
+    float m_tau;    ///< a click's ring, s
+    float m_rate;   ///< clicks a second a cluster at full wind
+    float m_amp;    ///< the foliage's loudness against the others
+};
+
+/** @brief The foliages (FoliageE): broad leaves, pine needles, grass, dry leaves. */
+__constant__ FoliageSpec cFoliage[4] = { { 1500.0f, 4000.0f, 0.0005f, 3000.0f, 1.0f },
+                                         { 4000.0f, 9000.0f, 0.00015f, 8000.0f, 0.8f },
+                                         { 800.0f, 2500.0f, 0.0005f, 2000.0f, 0.8f },
+                                         { 2000.0f, 7000.0f, 0.0008f, 400.0f, 1.3f } };
+
+/**
+ * @brief The leaves (Phase 28): LeafClusters clusters over the field (64 x 64, jittered), each rustling as the wind
+ *        where it stands blows -- its speed and its gusting part (the wind against the cluster's slow average of
+ *        it), squared: a rustle's power. Every leaf is a click, a cluster a complex one-pole at its own pitch in its
+ *        foliage's band. A CUDA block of clusters in calm air that rings no more writes nothing but silence.
+ * @param[in]     hdr      the block header
+ * @param[in]     wind     the wind's lattice after this block's steps
+ * @param[in,out] state    per cluster (re, im, slow wind across, slow wind from near to far)
+ * @param[out]    scratch  the weather's scratch (the leaves' CUDA blocks after the rain's)
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] meta     the counters: [7] the clusters' rustle, thousandths, summed
+ */
+__global__ void __launch_bounds__( LeafThreads )
+    leafKernel( const BlockHeader *hdr, const float *wind, float4 *state, float *scratch, int maxN, int *meta )
+{
+    __shared__ float    sAcc[LeafThreads / 32][4][WeatherTile];
+    const Weather      &W = hdr->m_weather;
+    const int           n = hdr->m_n;
+    const int           c = static_cast<int>( blockIdx.x ) * LeafThreads + static_cast<int>( threadIdx.x );
+    float              *out = scratch + static_cast<size_t>( RainBlocks + blockIdx.x ) * 4 * maxN;
+    const float         fs = hdr->m_sampleRate;
+    const std::uint32_t uc = static_cast<std::uint32_t>( c );
+    float4              s = ( W.m_leavesOn && !W.m_reset ) ? state[c] : make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+    const float         gx = static_cast<float>( ( c % 64 ) * 2 ) + 2.0f * hash01( 0x1EAF5EEDU, uc, 1 );
+    const float         gy = static_cast<float>( c / 64 ) + hash01( 0x1EAF5EEDU, uc, 2 );
+    float               p = 0.0f, I = 0.0f;
+    if ( W.m_leavesOn && W.m_wind )
+    {
+        const int idx = ( static_cast<int>( gy ) & ( WindH - 1 ) ) * WindW + ( static_cast<int>( gx ) & ( WindW - 1 ) );
+        const float2 u = windAt( wind, idx );
+        const float  dt = static_cast<float>( n ) / fs;
+        s.z += ( u.x - s.z ) * fminf( dt * 0.5f, 1.0f );
+        s.w += ( u.y - s.w ) * fminf( dt * 0.5f, 1.0f );
+        const float gust = sqrtf( ( u.x - s.z ) * ( u.x - s.z ) + ( u.y - s.w ) * ( u.y - s.w ) );
+        const float speed = sqrtf( u.x * u.x + u.y * u.y );
+        const float k = ( speed + 2.0f * gust ) / fmaxf( W.m_windRef, 1.0e-5f );
+        I = fminf( k * k, 4.0f );
+        p = fminf( cFoliage[min( max( W.m_foliage, 0 ), 3 )].m_rate * I / fs, 0.5f );
+    }
+    const bool alive = W.m_leavesOn && ( p > 1.0e-7f || s.x * s.x + s.y * s.y > 1.0e-12f );
+    if ( !__syncthreads_or( alive ) )
+    {
+        state[c] = make_float4( 0.0f, 0.0f, s.z, s.w );
+        for ( int t = threadIdx.x; t < n; t += LeafThreads )
+            for ( int ch = 0; ch < 4; ++ch ) out[ch * maxN + t] = 0.0f;
+        return;
+    }
+    const FoliageSpec &F = cFoliage[min( max( W.m_foliage, 0 ), 3 )];
+    const float        f = F.m_lo * exp2f( log2f( F.m_hi / F.m_lo ) * hash01( 0x1EAF5EEDU, uc, 3 ) );
+    const float        r = __expf( -1.0f / ( F.m_tau * fs ) );
+    float              sw, cw;
+    __sincosf( 6.2831853f * f / fs, &sw, &cw );
+    const float ar = r * cw, ai = r * sw;
+    // A click's power at full wind, made one: the clicks a sample, a third (uniform), through the pole's gain.
+    const float p1 = F.m_rate / fs;
+    const float norm = rsqrtf( p1 * ( 1.0f / 3.0f ) / fmaxf( 1.0f - r * r, 1.0e-6f ) ) * ( 1.0f / 64.0f );
+    const float place = 2.0f * gx / static_cast<float>( WindW ) - 1.0f, dist = gy / static_cast<float>( WindH );
+    float       gl, gr, gn, gf;
+    __sincosf( 0.78539816f * ( 1.0f + place ), &gr, &gl );
+    __sincosf( 1.57079633f * dist, &gf, &gn );
+    const float         w = W.m_leavesLevel * F.m_amp * norm * __expf( -dist * f * ( 1.0f / 9000.0f ) );
+    const float         g4[4] = { gl * gn * w, gr * gn * w, gl * gf * w, gr * gf * w };
+    const std::uint32_t seed = hash32( hdr->m_blockIndex * 0x9E3779B9U ^ ( uc * 0x85EBCA6BU ) );
+    const int           lane = static_cast<int>( threadIdx.x ) & 31, warp = static_cast<int>( threadIdx.x ) >> 5;
+    for ( int t0 = 0; t0 < n; t0 += WeatherTile )
+    {
+        const int tn = min( WeatherTile, n - t0 );
+        for ( int i = 0; i < tn; ++i )
+        {
+            const std::uint32_t si = static_cast<std::uint32_t>( t0 + i );
+            const float x = ( p > 0.0f && hash01( seed, si, 1 ) < p ) ? 2.0f * hash01( seed, si, 2 ) - 1.0f : 0.0f;
+            const float re = fmaf( ar, s.x, fmaf( -ai, s.y, x ) );
+            const float im = fmaf( ar, s.y, ai * s.x );
+            s.x = re;
+            s.y = im;
+            float v[4];
+            for ( int ch = 0; ch < 4; ++ch )
+            {
+                v[ch] = im * g4[ch];
+                for ( int off = 16; off > 0; off >>= 1 ) v[ch] += __shfl_down_sync( 0xFFFFFFFFU, v[ch], off );
+            }
+            if ( lane == 0 )
+                for ( int ch = 0; ch < 4; ++ch ) sAcc[warp][ch][i] = v[ch];
+        }
+        __syncthreads();
+        for ( int t = threadIdx.x; t < 4 * tn; t += LeafThreads )
+        {
+            const int ch = t / tn, i = t - ch * tn;
+            float     a = 0.0f;
+            for ( int wv = 0; wv < LeafThreads / 32; ++wv ) a += sAcc[wv][ch][i];
+            out[ch * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    if ( s.x * s.x + s.y * s.y < 1.0e-14f ) s.x = s.y = 0.0f;
+    state[c] = s;
+    atomicAdd( meta + 7, static_cast<int>( I * 250.0f ) );
+}
+
+/**
+ * @brief The sea (Phase 28): one thread a stretch of the shore (SurfSegments, 6 m each). The swell is SurfWaves
+ *        trains about its period (a bell around the peak, deep water: k = w^2 / g), coming in up to 34 degrees off
+ *        straight, so crests run along the shore and come in sets. Where the water rises past its break it foams
+ *        (the foam fades over three seconds); the foam hisses (noise through a low pass that opens with it), the
+ *        backwash crackles through pebbles, and on rocks each breaking wave booms (a low resonance struck).
+ * @param[in]     hdr      the block header
+ * @param[in,out] state    per stretch two entries: (foam, low pass 1, low pass 2, the water before), (boom re, im,
+ *                         crackle re, im)
+ * @param[out]    scratch  the weather's scratch (the sea's CUDA block after the leaves')
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] meta     the counters: [8] the foam, thousandths, summed
+ */
+__global__ void __launch_bounds__( SurfSegments )
+    surfKernel( const BlockHeader *hdr, float4 *state, float *scratch, int maxN, int *meta )
+{
+    __shared__ float sAcc[SurfSegments / 32][4][WeatherTile];
+    const Weather   &W = hdr->m_weather;
+    const int        n = hdr->m_n;
+    const int        seg = static_cast<int>( threadIdx.x );
+    float           *out = scratch + static_cast<size_t>( RainBlocks + LeafBlocks ) * 4 * maxN;
+    if ( !W.m_surfOn )
+    {
+        if ( W.m_reset )
+        {
+            state[2 * seg] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+            state[2 * seg + 1] = make_float4( 0.0f, 0.0f, 0.0f, 0.0f );
+        }
+        for ( int t = threadIdx.x; t < n; t += SurfSegments )
+            for ( int ch = 0; ch < 4; ++ch ) out[ch * maxN + t] = 0.0f;
+        return;
+    }
+    const float fs = hdr->m_sampleRate, dt = static_cast<float>( n ) / fs;
+    float4      s = W.m_reset ? make_float4( 0.0f, 0.0f, 0.0f, 0.0f ) : state[2 * seg];
+    float4      q = W.m_reset ? make_float4( 0.0f, 0.0f, 0.0f, 0.0f ) : state[2 * seg + 1];
+    // The water here at the block's end: the trains, normalised to a standard deviation of one, times the height.
+    const float x = 6.0f * static_cast<float>( seg );
+    const float fp = 1.0f / fmaxf( W.m_surfPeriod, 1.0f );
+    float       eta = 0.0f, var = 0.0f;
+    for ( int k = 0; k < SurfWaves; ++k )
+    {
+        const std::uint32_t uk = static_cast<std::uint32_t>( k );
+        const float         f = fp * ( 0.75f + 0.6f * hash01( 0x5EA5EA5EU, uk, 1 ) );
+        const float         z = ( f / fp - 1.0f ) * ( 1.0f / 0.12f );
+        const float         a = __expf( -0.5f * z * z ) * ( 0.6f + 0.8f * hash01( 0x5EA5EA5EU, uk, 2 ) );
+        const float         om = 6.2831853f * f;
+        const float         kk = om * om * ( 1.0f / 9.81f );
+        const float         th = 0.6f * ( 2.0f * hash01( 0x5EA5EA5EU, uk, 3 ) - 1.0f );
+        const float         ph = 6.2831853f * hash01( 0x5EA5EA5EU, uk, 4 );
+        float               arg = kk * sinf( th ) * x - om * W.m_time + ph;
+        arg -= 6.2831853f * floorf( arg * 0.15915494f );
+        eta += a * __cosf( arg );
+        var += 0.5f * a * a;
+    }
+    eta = eta * rsqrtf( fmaxf( var, 1.0e-9f ) ) * W.m_surfHeight;
+    const float before = s.w;
+    const float brk = fmaxf( 0.0f, eta - 1.4f );   // past its break: the crest foams
+    s.x += dt * ( 6.0f * brk * W.m_surfHeight - s.x * ( 1.0f / 3.0f ) );
+    s.x = fmaxf( s.x, 0.0f );
+    const float fall = fmaxf( 0.0f, ( before - eta ) / dt ) * W.m_surfPeriod * ( 1.0f / 6.2831853f );   // backwash
+    const bool  crash = brk > 0.0f && before <= 1.4f;
+    s.w = eta;
+    // Per shore: the foam's hiss, the backwash's crackle, the boom.
+    const int   shore = min( max( W.m_shore, 0 ), 2 );
+    const float hiss = shore == 0 ? 1.0f : shore == 1 ? 0.7f : 0.8f;
+    const float crackle = shore == 1 ? 1.0f : shore == 2 ? 0.2f : 0.0f;
+    const float boom = shore == 2 ? 1.2f : 0.3f;
+    if ( crash )
+    {
+        q.x += boom * fminf( W.m_surfHeight, 2.0f );
+    }
+    const float foam = fminf( s.x, 4.0f );
+    const float fc = ( shore == 2 ? 400.0f : 700.0f ) + 3500.0f * fminf( sqrtf( foam ), 1.5f );
+    const float lp = 1.0f - __expf( -6.2831853f * fc / fs );
+    const float pc = fminf( crackle * fall * foam * 0.03f, 0.3f );   // crackles a sample
+    float       bs, bc;
+    __sincosf( 6.2831853f * 55.0f / fs, &bs, &bc );
+    const float br = __expf( -1.0f / ( 0.4f * fs ) );
+    float       cs, cc;
+    __sincosf( 6.2831853f * 3200.0f / fs, &cs, &cc );
+    const float cr = __expf( -1.0f / ( 0.0006f * fs ) );
+    const float place = 2.0f * static_cast<float>( seg ) / static_cast<float>( SurfSegments - 1 ) - 1.0f;
+    const float dist = fminf(
+        fmaxf( W.m_surfDistance + 0.08f * ( hash01( 0x5EA5EA5EU, 77U, static_cast<std::uint32_t>( seg ) ) - 0.5f ),
+               0.0f ),
+        1.0f );
+    float gl, gr, gn, gf;
+    __sincosf( 0.78539816f * ( 1.0f + place ), &gr, &gl );
+    __sincosf( 1.57079633f * dist, &gf, &gn );
+    const float         w = W.m_surfLevel * 0.0884f;   // 1 / sqrt(128): the stretches add in power
+    const float         g4[4] = { gl * gn * w, gr * gn * w, gl * gf * w, gr * gf * w };
+    const float         amp = hiss * sqrtf( foam ) * 1.7f;
+    const std::uint32_t seed =
+        hash32( hdr->m_blockIndex * 0x9E3779B9U ^ ( static_cast<std::uint32_t>( seg ) * 0xC2B2AE35U ) );
+    const int lane = static_cast<int>( threadIdx.x ) & 31, warp = static_cast<int>( threadIdx.x ) >> 5;
+    for ( int t0 = 0; t0 < n; t0 += WeatherTile )
+    {
+        const int tn = min( WeatherTile, n - t0 );
+        for ( int i = 0; i < tn; ++i )
+        {
+            const std::uint32_t si = static_cast<std::uint32_t>( t0 + i );
+            const float         noise = 2.0f * hash01( seed, si, 1 ) - 1.0f;
+            s.y += lp * ( noise - s.y );
+            s.z += lp * ( s.y - s.z );
+            const float kick = ( pc > 0.0f && hash01( seed, si, 2 ) < pc ) ? 2.0f * hash01( seed, si, 3 ) - 1.0f : 0.0f;
+            const float qr = fmaf( br * bc, q.x, -br * bs * q.y ), qi = fmaf( br * bc, q.y, br * bs * q.x );
+            q.x = qr;
+            q.y = qi;
+            const float kr = fmaf( cr * cc, q.z, fmaf( -cr * cs, q.w, kick ) ),
+                        ki = fmaf( cr * cc, q.w, cr * cs * q.z );
+            q.z = kr;
+            q.w = ki;
+            const float v0 = amp * 1.8f * s.z + 0.5f * qi + 0.6f * ki;
+            float       v[4];
+            for ( int ch = 0; ch < 4; ++ch )
+            {
+                v[ch] = v0 * g4[ch];
+                for ( int off = 16; off > 0; off >>= 1 ) v[ch] += __shfl_down_sync( 0xFFFFFFFFU, v[ch], off );
+            }
+            if ( lane == 0 )
+                for ( int ch = 0; ch < 4; ++ch ) sAcc[warp][ch][i] = v[ch];
+        }
+        __syncthreads();
+        for ( int t = threadIdx.x; t < 4 * tn; t += SurfSegments )
+        {
+            const int ch = t / tn, i = t - ch * tn;
+            float     a = 0.0f;
+            for ( int wv = 0; wv < SurfSegments / 32; ++wv ) a += sAcc[wv][ch][i];
+            out[ch * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    state[2 * seg] = s;
+    state[2 * seg + 1] = q;
+    atomicAdd( meta + 8, static_cast<int>( foam * 1000.0f ) );
+}
+
+/**
+ * @brief The weather's reduce: the rain's, the leaves' and the sea's CUDA blocks added sample by sample, in a fixed
+ *        order, into the frames' channels 16 .. 19 (near left and right, far left and right).
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  the weather's per-block sums
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels
+ */
+__global__ void weatherReduceKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out )
+{
+    __shared__ float part[ReduceGroups][ReduceLanes + 1];
+    const Weather   &W = hdr->m_weather;
+    const int        n = hdr->m_n;
+    const int        t = static_cast<int>( blockIdx.x ) * ReduceLanes + static_cast<int>( threadIdx.x );
+    const int        c = t / maxN;
+    const int        s = t - c * maxN;
+    const bool       live = c < 4 && s < n;
+    float            acc = 0.0f;
+    if ( live && ( W.m_rainOn || W.m_leavesOn || W.m_surfOn ) )
+        for ( int k = threadIdx.y; k < WeatherBlocks; k += ReduceGroups )
+            acc += scratch[static_cast<size_t>( k ) * 4 * maxN + t];
+    part[threadIdx.y][threadIdx.x] = acc;
+    __syncthreads();
+    if ( threadIdx.y == 0 && live )
+    {
+        for ( int q = 1; q < ReduceGroups; ++q ) acc += part[q][threadIdx.x];
+        out[s * CloudOutChannels + 16 + c] = acc;
+    }
+}
+
+/**
+ * @brief A bloom mode's frequency: evenly in hertz as a plate's modes stand (Weyl), each jittered within its place.
+ * @param[in] B  the bloom
+ * @param[in] k  the mode
+ * @return Hz
+ */
+__device__ __forceinline__ float bloomFreq( const Bloom &B, int k )
+{
+    return fmaxf( B.m_spacing, 0.05f ) *
+           ( static_cast<float>( k ) + 0.5f +
+             0.8f * ( hash01( 0xB100B100U, static_cast<std::uint32_t>( k ), 1 ) - 0.5f ) );
+}
+
+/** @brief A frequency's band of the bloom's cascade. @param[in] f Hz @return 0 .. BloomBands - 1 */
+__device__ __forceinline__ int bloomBand( float f )
+{
+    return min( max( static_cast<int>( log2f( fmaxf( f, BloomLow ) * ( 1.0f / BloomLow ) ) *
+                                       ( static_cast<float>( BloomBands ) / 9.22881869f ) ),   // log2(18000 / 30)
+                     0 ),
+                BloomBands - 1 );
+}
+
+/**
+ * @brief The bloom (Phase 28): one thread a mode of the plate, a complex one-pole as the modal hall's, driven by
+ *        everything in the field (the voices, the chimes, the weather; near and far together), heard through a phase
+ *        of its own in each ear. The cascade from the last block's bands: a band loses each block a share of its
+ *        energy -- the drive times its modes' mean energy against a reference (an input at -20 dBFS), a second's
+ *        worth eighty bands at full drive, at most half -- as extra damping, and the band above gains it as noise of
+ *        that power, spread over its modes. The pitch rises with the plate's energy (Berger), the low modes most.
+ * @param[in]     hdr      the block header
+ * @param[in]     in       the block's frames (channels 0 .. 3, 10 .. 13, 16 .. 19 are read)
+ * @param[in,out] state    per mode its complex state
+ * @param[in]     bands    the last block's band energies and mode counts, then the active modes and the total
+ * @param[out]    scratch  per CUDA block two channels of sums
+ * @param[in]     maxN     the scratch stride
+ */
+__global__ void __launch_bounds__( BloomThreads )
+    bloomKernel( const BlockHeader *hdr, const float *in, float2 *state, const float *bands, float *scratch, int maxN )
+{
+    __shared__ float sIn[2][BloomTile];
+    __shared__ float sAcc[BloomThreads / 32][2][BloomTile];
+    const Bloom     &B = hdr->m_bloom;
+    const int        n = hdr->m_n;
+    const int        k = static_cast<int>( blockIdx.x ) * BloomThreads + static_cast<int>( threadIdx.x );
+    float           *out = scratch + static_cast<size_t>( blockIdx.x ) * 2 * maxN;
+    if ( !B.m_on )
+    {
+        state[k] = make_float2( 0.0f, 0.0f );
+        for ( int s = threadIdx.x; s < n; s += BloomThreads )
+        {
+            out[s] = 0.0f;
+            out[maxN + s] = 0.0f;
+        }
+        return;
+    }
+    const float fs = hdr->m_sampleRate;
+    const float top = fminf( BloomHigh, 0.45f * fs );
+    const float f0 = bloomFreq( B, k );
+    const bool  silent = f0 < BloomLow || f0 > top;
+    const int   b = bloomBand( f0 );
+    const float sp = fmaxf( B.m_spacing, 0.05f );
+    const float active = fmaxf( fminf( top / sp, static_cast<float>( BloomModes ) ) - BloomLow / sp, 1.0f );
+    const float eRef = 0.02f / active;   // a mode's energy at an input of -20 dBFS
+    const float dtb = static_cast<float>( n ) / fs;
+    auto        shareOf = [&]( int band )
+    {
+        const float e = bands[band] / fmaxf( bands[BloomBands + band], 1.0f );
+        return fminf( 0.5f, B.m_drive * 80.0f * ( e / eRef ) * dtb );
+    };
+    const float out1 = shareOf( b );
+    const float in1 = b > 0 ? shareOf( b - 1 ) * bands[b - 1] : 0.0f;
+    const float sigma = sqrtf( 0.5f * in1 / ( fmaxf( bands[BloomBands + b], 1.0f ) * static_cast<float>( n ) ) );
+    const float loss = __powf( 1.0f - out1, 0.5f / static_cast<float>( n ) );
+    const float loud = bands[2 * BloomBands + 1] / ( active * eRef );
+    const float bend =
+        fminf( fmaxf( 1.0f + B.m_glide * 0.1f * loud * ( 100.0f / fmaxf( f0, BloomLow ) ), 0.25f ), 4.0f );
+    const float f = f0 * sqrtf( bend );
+    const float T = fmaxf( B.m_decay * sqrtf( 200.0f / fmaxf( f, BloomLow ) ), 0.05f );
+    const float r0 = __expf( -6.9077553f / ( T * fs ) ), r = r0 * loss;
+    float       sw, cw;
+    sincosf( 6.2831853f * fminf( f, 0.49f * fs ) / fs, &sw, &cw );
+    const float ar = r * cw, ai = r * sw;
+    // The input as if no energy left (the cascade's loss must not open the plate to more of it).
+    const float         g = silent ? 0.0f : sqrtf( 2.0f * fmaxf( 1.0f - r0 * r0, 0.0f ) / active );
+    const std::uint32_t uk = static_cast<std::uint32_t>( k );
+    float               inR, inL;
+    __sincosf( 1.5707963f * hash01( 0xB100B100U, uk, 2 ), &inR, &inL );
+    const float phL = 6.2831853f * hash01( 0xB100B100U, uk, 3 );
+    const float phR = phL + B.m_width * 3.1415927f * ( 2.0f * hash01( 0xB100B100U, uk, 4 ) - 1.0f );
+    float       oLs, oLc, oRs, oRc;
+    __sincosf( phL, &oLs, &oLc );
+    __sincosf( phR, &oRs, &oRc );
+    const float lvl = silent ? 0.0f : B.m_level;
+    oLs *= lvl;
+    oLc *= lvl;
+    oRs *= lvl;
+    oRc *= lvl;
+    float2              y = silent ? make_float2( 0.0f, 0.0f ) : state[k];
+    const std::uint32_t seed = hash32( hdr->m_blockIndex * 0x9E3779B9U ^ ( uk * 0x27D4EB2FU ) );
+    const float         sn = silent ? 0.0f : sigma * 1.7320508f;   // uniform -1 .. 1 has a third's variance
+    const int           lane = static_cast<int>( threadIdx.x ) & 31, warp = static_cast<int>( threadIdx.x ) >> 5;
+    for ( int t0 = 0; t0 < n; t0 += BloomTile )
+    {
+        const int tn = min( BloomTile, n - t0 );
+        for ( int s = threadIdx.x; s < tn; s += BloomThreads )
+        {
+            const float *fr = in + static_cast<size_t>( t0 + s ) * CloudOutChannels;
+            sIn[0][s] = fr[0] + fr[2] + fr[10] + fr[12] + fr[16] + fr[18];
+            sIn[1][s] = fr[1] + fr[3] + fr[11] + fr[13] + fr[17] + fr[19];
+        }
+        __syncthreads();
+        for ( int i = 0; i < tn; ++i )
+        {
+            const float x = g * ( inL * sIn[0][i] + inR * sIn[1][i] );
+            float       nr = 0.0f, ni = 0.0f;
+            if ( sn > 0.0f )
+            {
+                const std::uint32_t si = static_cast<std::uint32_t>( t0 + i );
+                nr = sn * ( 2.0f * hash01( seed, si, 1 ) - 1.0f );
+                ni = sn * ( 2.0f * hash01( seed, si, 2 ) - 1.0f );
+            }
+            const float yr = fmaf( ar, y.x, fmaf( -ai, y.y, x + nr ) );
+            const float yi = fmaf( ar, y.y, fmaf( ai, y.x, ni ) );
+            y.x = yr;
+            y.y = yi;
+            float cL = yr * oLc - yi * oLs;
+            float cR = yr * oRc - yi * oRs;
+            for ( int off = 16; off > 0; off >>= 1 )
+            {
+                cL += __shfl_down_sync( 0xFFFFFFFFU, cL, off );
+                cR += __shfl_down_sync( 0xFFFFFFFFU, cR, off );
+            }
+            if ( lane == 0 )
+            {
+                sAcc[warp][0][i] = cL;
+                sAcc[warp][1][i] = cR;
+            }
+        }
+        __syncthreads();
+        for ( int s = threadIdx.x; s < 2 * tn; s += BloomThreads )
+        {
+            const int c = s / tn, i = s - c * tn;
+            float     a = 0.0f;
+            for ( int w = 0; w < BloomThreads / 32; ++w ) a += sAcc[w][c][i];
+            out[c * maxN + t0 + i] = a;
+        }
+        __syncthreads();
+    }
+    state[k] = ( fabsf( y.x ) + fabsf( y.y ) > 1.0e-12f ) ? y : make_float2( 0.0f, 0.0f );
+}
+
+/**
+ * @brief The bloom's bands (Phase 28): one CUDA block a band sums its modes' energies (and counts them) in a fixed
+ *        order, for the next block's cascade; one more counts the plate's active modes and sums its energy, and
+ *        writes the share above 2 kHz into the stats.
+ * @param[in]  hdr    the block header
+ * @param[in]  state  per mode its complex state after this block
+ * @param[out] bands  per band the energy, then per band the modes, then the active modes and the total energy
+ * @param[out] stats  [21] the energy's share above 2 kHz
+ */
+__global__ void __launch_bounds__( 256 )
+    bloomBandKernel( const BlockHeader *hdr, const float2 *state, float *bands, float *stats )
+{
+    __shared__ float sE[256], sN[256];
+    const Bloom     &B = hdr->m_bloom;
+    if ( !B.m_on ) return;
+    const int   b = static_cast<int>( blockIdx.x );
+    const float sp = fmaxf( B.m_spacing, 0.05f );
+    const float top = fminf( BloomHigh, 0.45f * hdr->m_sampleRate );
+    float       e = 0.0f, cnt = 0.0f, hi = 0.0f;
+    if ( b < BloomBands )
+    {
+        const float lo = BloomLow * exp2f( 9.22881869f * static_cast<float>( b ) / static_cast<float>( BloomBands ) );
+        const float up =
+            BloomLow * exp2f( 9.22881869f * static_cast<float>( b + 1 ) / static_cast<float>( BloomBands ) );
+        const int k0 = max( static_cast<int>( lo / sp ) - 2, 0 );
+        const int k1 = min( static_cast<int>( up / sp ) + 2, BloomModes - 1 );
+        for ( int k = k0 + static_cast<int>( threadIdx.x ); k <= k1; k += 256 )
+        {
+            const float f = bloomFreq( B, k );
+            if ( f < BloomLow || f > top || bloomBand( f ) != b ) continue;
+            const float2 y = state[k];
+            e += y.x * y.x + y.y * y.y;
+            cnt += 1.0f;
+        }
+    }
+    else
+    {   // the whole plate: its active modes, its energy, the share above 2 kHz
+        for ( int k = static_cast<int>( threadIdx.x ); k < BloomModes; k += 256 )
+        {
+            const float f = bloomFreq( B, k );
+            if ( f < BloomLow || f > top ) continue;
+            const float2 y = state[k];
+            const float  ek = y.x * y.x + y.y * y.y;
+            e += ek;
+            cnt += 1.0f;
+            if ( f > 2000.0f ) hi += ek;
+        }
+    }
+    sE[threadIdx.x] = e;
+    sN[threadIdx.x] = cnt;
+    __syncthreads();
+    for ( int s = 128; s > 0; s >>= 1 )
+    {
+        if ( static_cast<int>( threadIdx.x ) < s )
+        {
+            sE[threadIdx.x] += sE[threadIdx.x + s];
+            sN[threadIdx.x] += sN[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
+    const float total = sE[0], count = sN[0];
+    __syncthreads();
+    if ( b == BloomBands )
+    {
+        sE[threadIdx.x] = hi;
+        __syncthreads();
+        for ( int s = 128; s > 0; s >>= 1 )
+        {
+            if ( static_cast<int>( threadIdx.x ) < s ) sE[threadIdx.x] += sE[threadIdx.x + s];
+            __syncthreads();
+        }
+        if ( threadIdx.x == 0 )
+        {
+            bands[2 * BloomBands] = count;
+            bands[2 * BloomBands + 1] = total;
+            stats[21] = total > 0.0f ? sE[0] / total : 0.0f;
+        }
+    }
+    else if ( threadIdx.x == 0 )
+    {
+        bands[b] = total;
+        bands[BloomBands + b] = count;
+    }
+}
+
+/**
+ * @brief The bloom's reduce: the CUDA blocks' sums added sample by sample, in a fixed order, into the frames'
+ *        channels 20 and 21.
+ * @param[in]     hdr      the block header
+ * @param[in]     scratch  the bloom kernel's per-block sums
+ * @param[in]     maxN     the scratch stride
+ * @param[in,out] out      n frames of CloudOutChannels
+ */
+__global__ void bloomReduceKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out )
+{
+    __shared__ float part[ReduceGroups][ReduceLanes + 1];
+    const int        n = hdr->m_n;
+    const int        t = static_cast<int>( blockIdx.x ) * ReduceLanes + static_cast<int>( threadIdx.x );
+    const int        c = t / maxN;
+    const int        s = t - c * maxN;
+    const bool       live = c < 2 && s < n;
+    float            acc = 0.0f;
+    if ( live && hdr->m_bloom.m_on )
+        for ( int k = threadIdx.y; k < BloomBlocks; k += ReduceGroups )
+            acc += scratch[static_cast<size_t>( k ) * 2 * maxN + t];
+    part[threadIdx.y][threadIdx.x] = acc;
+    __syncthreads();
+    if ( threadIdx.y == 0 && live )
+    {
+        for ( int q = 1; q < ReduceGroups; ++q ) acc += part[q][threadIdx.x];
+        out[s * CloudOutChannels + 20 + c] = acc;
+    }
+}
+
+/**
+ * @brief One step of the swarmalators (Phase 28; O'Keeffe, Ha and Strogatz 2017, with A = B = 1): every one pulled
+ *        to every other by 1 + J cos(their phases' difference), pushed off by one over their distance squared (so
+ *        they keep apart), and its phase turned at its own rate and pulled by K sin(the difference) over the
+ *        distance. All pairs, a tile of them in shared memory at a time; the step is the block's time by Speed.
+ *        Two buffers, by the block's parity.
+ * @param[in]     hdr  the block header
+ * @param[in,out] a    the swarm (x, y, phase, -), buffer A
+ * @param[in,out] b    buffer B
+ */
+__global__ void __launch_bounds__( SwarmThreads ) swarmStepKernel( const BlockHeader *hdr, float4 *a, float4 *b )
+{
+    __shared__ float4 tile[SwarmThreads];
+    const SwarmSpace &S = hdr->m_swarm;
+    if ( !S.m_on ) return;
+    const int           i = static_cast<int>( blockIdx.x ) * SwarmThreads + static_cast<int>( threadIdx.x );
+    const bool          odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float4       *src = odd ? b : a;
+    float4             *dst = odd ? a : b;
+    const std::uint32_t ui = static_cast<std::uint32_t>( i );
+    if ( S.m_reset )
+    {   // scattered over the unit disc, at random phases
+        const float r = sqrtf( hash01( 0x5A4A5A4AU, ui, 1 ) ), ang = 6.2831853f * hash01( 0x5A4A5A4AU, ui, 2 );
+        dst[i] = make_float4( r * __cosf( ang ), r * __sinf( ang ), 6.2831853f * hash01( 0x5A4A5A4AU, ui, 3 ), 0.0f );
+        return;
+    }
+    const float4 me = src[i];
+    float        vx = 0.0f, vy = 0.0f, dth = 0.0f;
+    for ( int t = 0; t < SwarmN; t += SwarmThreads )
+    {
+        tile[threadIdx.x] = src[t + static_cast<int>( threadIdx.x )];
+        __syncthreads();
+        for ( int j = 0; j < SwarmThreads; ++j )
+        {
+            const float4 o = tile[j];
+            const float  dx = o.x - me.x, dy = o.y - me.y;
+            const float  d2 = dx * dx + dy * dy + 1.0e-4f;
+            const float  inv = rsqrtf( d2 );
+            float        s, c;
+            __sincosf( o.z - me.z, &s, &c );
+            const float pull = ( 1.0f + S.m_j * c ) * inv - 1.0f / d2;
+            vx += dx * pull;
+            vy += dy * pull;
+            dth += s * inv;
+        }
+        __syncthreads();
+    }
+    const float h = S.m_speed * static_cast<float>( hdr->m_n ) / hdr->m_sampleRate;
+    const float omega = S.m_spread * ( 2.0f * hash01( 0x5A4A5A4AU, ui, 4 ) - 1.0f );
+    const float inv = 1.0f / static_cast<float>( SwarmN );
+    float       th = me.z + h * ( omega + S.m_k * dth * inv );
+    th -= 6.2831853f * floorf( th * 0.15915494f );
+    float x = me.x + h * vx * inv, y = me.y + h * vy * inv;
+    if ( !( fabsf( x ) < 100.0f && fabsf( y ) < 100.0f ) )
+    {   // never lost: one gone wrong starts again near the middle
+        x = 0.1f * ( 2.0f * hash01( 0x5A4A5A4AU, ui, 5 ) - 1.0f );
+        y = 0.1f * ( 2.0f * hash01( 0x5A4A5A4AU, ui, 6 ) - 1.0f );
+    }
+    dst[i] = make_float4( x, y, th, 0.0f );
+}
+
+/**
+ * @brief The swarm as the partials ride it (Phase 28): one CUDA block of SwarmN threads finds its middle and its
+ *        size (the root mean square of the distances), and writes every swarmalator's place in the field, -1 .. 1
+ *        across and from near to far (the swarm fills 2/3 of the field's reach), and its phase. And its orders:
+ *        R, how much the phases agree, and S, how much the phase follows the angle round the middle (a phase wave).
+ * @param[in]  hdr    the block header
+ * @param[in]  a      the swarm, buffer A
+ * @param[in]  b      buffer B
+ * @param[out] view   per swarmalator (across, near to far, phase, -)
+ * @param[out] stats  [22] R, [23] S
+ */
+__global__ void __launch_bounds__( SwarmN )
+    swarmViewKernel( const BlockHeader *hdr, const float4 *a, const float4 *b, float4 *view, float *stats )
+{
+    __shared__ float  sx[SwarmN], sy[SwarmN], sz[SwarmN];
+    const SwarmSpace &S = hdr->m_swarm;
+    if ( !S.m_on ) return;
+    const int    i = static_cast<int>( threadIdx.x );
+    const bool   odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float4 me = ( odd ? a : b )[i];   // what the step just wrote
+    auto         sum3 = [&]( float x, float y, float z, float &ox, float &oy, float &oz )
+    {
+        sx[i] = x;
+        sy[i] = y;
+        sz[i] = z;
+        __syncthreads();
+        for ( int s = SwarmN / 2; s > 0; s >>= 1 )
+        {
+            if ( i < s )
+            {
+                sx[i] += sx[i + s];
+                sy[i] += sy[i + s];
+                sz[i] += sz[i + s];
+            }
+            __syncthreads();
+        }
+        ox = sx[0];
+        oy = sy[0];
+        oz = sz[0];
+        __syncthreads();
+    };
+    float cx, cy, unused;
+    sum3( me.x, me.y, 0.0f, cx, cy, unused );
+    cx *= 1.0f / SwarmN;
+    cy *= 1.0f / SwarmN;
+    const float dx = me.x - cx, dy = me.y - cy;
+    float       r2, rs, rc;
+    float       ts, tc;
+    __sincosf( me.z, &ts, &tc );
+    sum3( dx * dx + dy * dy, ts, tc, r2, rs, rc );
+    const float radius = sqrtf( fmaxf( r2 * ( 1.0f / SwarmN ), 1.0e-8f ) );
+    const float k = 1.0f / ( 1.5f * radius );
+    view[i] = make_float4( fminf( fmaxf( dx * k, -1.0f ), 1.0f ), fminf( fmaxf( dy * k, -1.0f ), 1.0f ), me.z, 0.0f );
+    // S: the phase against the angle round the middle, either way round.
+    const float phi = atan2f( dy, dx );
+    float       ps, pc, ms, mc;
+    __sincosf( phi + me.z, &ps, &pc );
+    __sincosf( phi - me.z, &ms, &mc );
+    float a1, a2, a3, b1, b2, b3;
+    sum3( ps, pc, 0.0f, a1, a2, a3 );
+    sum3( ms, mc, 0.0f, b1, b2, b3 );
+    if ( i == 0 )
+    {
+        stats[22] = sqrtf( rs * rs + rc * rc ) * ( 1.0f / SwarmN );
+        stats[23] = fmaxf( sqrtf( a1 * a1 + a2 * a2 ), sqrtf( b1 * b1 + b2 * b2 ) ) * ( 1.0f / SwarmN );
+    }
+}
+
+/**
+ * @brief The physarum's trail (Phase 28): each block it spreads (a share to the mean of its 3 x 3 neighbourhood),
+ *        fades, takes in what the agents left in the last block (whole numbers, so in any order the same) and the
+ *        food at the notes' harmonics -- a line across the field at each, two cells wide, a fifth of a visit a block
+ *        (stronger, it held the agents on the lines: measured 0.1 % of the power between the harmonics; so, with a
+ *        sensor of 200 cents, a quarter). Two buffers, by the block's parity; the update kernel reads the one written
+ *        here.
+ * @param[in]     hdr      the block header
+ * @param[in,out] trail    two buffers of PhysCells
+ * @param[in,out] deposit  per cell what the agents left, 256 a visit (cleared here)
+ */
+__global__ void physTrailKernel( const BlockHeader *hdr, float *trail, unsigned int *deposit )
+{
+    const Physarum &P = hdr->m_phys;
+    if ( !P.m_on ) return;
+    const int idx = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
+    if ( idx >= PhysCells ) return;
+    const bool   odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float *src = trail + ( odd ? PhysCells : 0 );
+    float       *dst = trail + ( odd ? 0 : PhysCells );
+    if ( P.m_fresh )
+    {
+        dst[idx] = 0.0f;
+        deposit[idx] = 0U;
+        return;
+    }
+    const int x = idx % PhysW, y = idx / PhysW;
+    float     sum = 0.0f;
+    for ( int dy = -1; dy <= 1; ++dy )
+        for ( int dx = -1; dx <= 1; ++dx )
+        {
+            const int xx = min( max( x + dx, 0 ), PhysW - 1 ), yy = min( max( y + dy, 0 ), PhysH - 1 );
+            sum += src[yy * PhysW + xx];
+        }
+    float v = ( 1.0f - P.m_spread ) * src[idx] + P.m_spread * sum * ( 1.0f / 9.0f );
+    v = v * P.m_keep + static_cast<float>( deposit[idx] ) * ( 1.0f / 256.0f );
+    const float fx = static_cast<float>( x ) + 0.5f;
+    for ( int k = 0; k < min( P.m_count, PhysFood ); ++k )
+    {
+        const float d = fabsf( fx - P.m_food[k] );
+        if ( d < 2.0f ) v += 0.2f * P.m_foodWeight[k] * ( 1.0f - 0.5f * d );
+    }
+    dst[idx] = v;
+    deposit[idx] = 0U;
+}
+
+/**
+ * @brief The physarum's trail in two numbers (Phase 28): its mean and its spread (standard deviation over the
+ *        mean), one CUDA block of 1024 over the trail just written.
+ * @param[in]  hdr    the block header
+ * @param[in]  trail  the two buffers
+ * @param[out] stats  [24] the mean, [25] the spread
+ */
+__global__ void __launch_bounds__( 1024 ) physStatsKernel( const BlockHeader *hdr, const float *trail, float *stats )
+{
+    __shared__ float s1[1024], s2[1024];
+    const Physarum  &P = hdr->m_phys;
+    if ( !P.m_on ) return;
+    const bool   odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float *t = trail + ( odd ? 0 : PhysCells );
+    float        a = 0.0f, b = 0.0f;
+    for ( int k = static_cast<int>( threadIdx.x ); k < PhysCells; k += 1024 )
+    {
+        a += t[k];
+        b += t[k] * t[k];
+    }
+    s1[threadIdx.x] = a;
+    s2[threadIdx.x] = b;
+    __syncthreads();
+    for ( int s = 512; s > 0; s >>= 1 )
+    {
+        if ( static_cast<int>( threadIdx.x ) < s )
+        {
+            s1[threadIdx.x] += s1[threadIdx.x + s];
+            s2[threadIdx.x] += s2[threadIdx.x + s];
+        }
+        __syncthreads();
+    }
+    if ( threadIdx.x == 0 )
+    {
+        const float mean = s1[0] / PhysCells, var = fmaxf( s2[0] / PhysCells - mean * mean, 0.0f );
+        stats[24] = mean;
+        stats[25] = mean > 1.0e-9f ? sqrtf( var ) / mean : 0.0f;
+    }
+}
+
+/**
+ * @brief The Phase 28 counters into the stats, and cleared for the next block: the drops sounding (kept for the
+ *        next block's odds too), born, the leaves' mean rustle, the sea's mean foam.
+ * @param[in]     hdr    the block header
+ * @param[in]     wind   the wind's lattice after this block's steps (its mean speed is measured)
+ * @param[in,out] meta   the counters
+ * @param[out]    stats  [16] drops sounding, [17] born, [18] the wind's mean speed, [19] the rustle, [20] the foam
+ */
+__global__ void __launch_bounds__( 256 )
+    phase28StatsKernel( const BlockHeader *hdr, const float *wind, int *meta, float *stats )
+{
+    __shared__ float sv[256];
+    float            v = 0.0f;
+    if ( hdr->m_weather.m_wind )
+        for ( int idx = static_cast<int>( threadIdx.x ); idx < WindCells; idx += 256 )
+        {
+            const float2 u = windAt( wind, idx );
+            v += sqrtf( u.x * u.x + u.y * u.y );
+        }
+    sv[threadIdx.x] = v;
+    __syncthreads();
+    for ( int s = 128; s > 0; s >>= 1 )
+    {
+        if ( static_cast<int>( threadIdx.x ) < s ) sv[threadIdx.x] += sv[threadIdx.x + s];
+        __syncthreads();
+    }
+    if ( threadIdx.x != 0 ) return;
+    stats[16] = static_cast<float>( meta[4] );
+    stats[17] = static_cast<float>( meta[6] );
+    stats[18] = sv[0] / WindCells;
+    stats[19] = static_cast<float>( meta[7] ) * ( 1.0f / 250.0f ) / LeafClusters;
+    stats[20] = static_cast<float>( meta[8] ) * ( 1.0f / 1000.0f ) / SurfSegments;
+    meta[5] = meta[4];
+    meta[4] = 0;
+    meta[6] = 0;
+    meta[7] = 0;
+    meta[8] = 0;
 }
 
 /**
@@ -3802,36 +5018,54 @@ struct CloudEngine::Impl
     int                m_lifeParity = 0;      ///< which buffer holds the field before the next block's steps
     float2       *m_dSnap = nullptr;   ///< device: the picture's snapshot, every SnapStride-th partial (Hz, amplitude)
     float2       *m_hSnap = nullptr;   ///< pinned host: the snapshot brought down
-    bool          m_snapAsked = false;         ///< the next launch brings it down
-    bool          m_snapInFlight = false;      ///< the launched block brings it down
-    bool          m_snapReady = false;         ///< a snapshot came down and was not taken yet
-    Binaural      m_binaural;                  ///< the host's copy of the binaural placement
-    SpectralEcho  m_echo;                      ///< the host's copy of the spectral echo's settings
-    EnvShape     *m_dShapes = nullptr;         ///< device: the envelope bank, EnvShapes
-    float        *m_dLand = nullptr;           ///< device: the landscape, room for LandMaxColumns * LandMaxRows
-    float2       *m_dModal = nullptr;          ///< device: the modal hall's states, ModalModes
-    float        *m_dGainRing = nullptr;       ///< device: per voice GainRing levels, for the dispersion
-    SpectralField m_field;                     ///< the host's copy of the field and the dispersion
-    std::uint32_t m_blockIndex = 0;            ///< blocks launched since open()
-    float        *m_dModalScratch = nullptr;   ///< device: per modal CUDA block two channels of sums
-    float        *m_dWindA = nullptr;          ///< device: the wind's lattice, nine directions a cell, buffer A
-    float        *m_dWindB = nullptr;          ///< device: buffer B
-    float4       *m_dChimeState = nullptr;     ///< device: per chime its clapper (angle, speed, slow wind)
-    float2       *m_dChimeHit = nullptr;       ///< device: per chime this block's strike
-    float2       *m_dChimeModes = nullptr;     ///< device: per chime mode its complex state
-    float        *m_dChimeScratch = nullptr;   ///< device: per chime CUDA block four channels of sums
-    float        *m_dDreamAcc = nullptr;       ///< device: the hall's bands gathered for the dream's next memory
-    float        *m_dDreamMem = nullptr;       ///< device: the dream's memories, DreamBands x DreamMemories
-    float        *m_dDreamState = nullptr;     ///< device: the dream's state, DreamBands
-    float        *m_dDreamSims = nullptr;      ///< device: the memories' likenesses, two sets
-    int          *m_dMeta = nullptr;           ///< device: the Phase 27 counters (memories, strikes, next slot)
-    ChimeField    m_chimes;                    ///< the host's copy of the chime field's settings
-    Dream         m_dream;                     ///< the host's copy of the dream's settings
-    int           m_phantomVoice = -1;         ///< the phantom layer's GPU voice, -1 none
-    int           m_dreamVoice = -1;           ///< the dream's GPU voice, -1 none
-    ModalHall     m_modal;                     ///< the host's copy of the modal hall's settings
-    float         m_gpuMs = 0.0f;              ///< GPU time of the last finished block
-    bool          m_launched = false;          ///< a block is in flight
+    bool          m_snapAsked = false;           ///< the next launch brings it down
+    bool          m_snapInFlight = false;        ///< the launched block brings it down
+    bool          m_snapReady = false;           ///< a snapshot came down and was not taken yet
+    Binaural      m_binaural;                    ///< the host's copy of the binaural placement
+    SpectralEcho  m_echo;                        ///< the host's copy of the spectral echo's settings
+    EnvShape     *m_dShapes = nullptr;           ///< device: the envelope bank, EnvShapes
+    float        *m_dLand = nullptr;             ///< device: the landscape, room for LandMaxColumns * LandMaxRows
+    float2       *m_dModal = nullptr;            ///< device: the modal hall's states, ModalModes
+    float        *m_dGainRing = nullptr;         ///< device: per voice GainRing levels, for the dispersion
+    SpectralField m_field;                       ///< the host's copy of the field and the dispersion
+    std::uint32_t m_blockIndex = 0;              ///< blocks launched since open()
+    float        *m_dModalScratch = nullptr;     ///< device: per modal CUDA block two channels of sums
+    float        *m_dWindA = nullptr;            ///< device: the wind's lattice, nine directions a cell, buffer A
+    float        *m_dWindB = nullptr;            ///< device: buffer B
+    float4       *m_dChimeState = nullptr;       ///< device: per chime its clapper (angle, speed, slow wind)
+    float2       *m_dChimeHit = nullptr;         ///< device: per chime this block's strike
+    float2       *m_dChimeModes = nullptr;       ///< device: per chime mode its complex state
+    float        *m_dChimeScratch = nullptr;     ///< device: per chime CUDA block four channels of sums
+    float        *m_dDreamAcc = nullptr;         ///< device: the hall's bands gathered for the dream's next memory
+    float        *m_dDreamMem = nullptr;         ///< device: the dream's memories, DreamBands x DreamMemories
+    float        *m_dDreamState = nullptr;       ///< device: the dream's state, DreamBands
+    float        *m_dDreamSims = nullptr;        ///< device: the memories' likenesses, two sets
+    int          *m_dMeta = nullptr;             ///< device: the counters (Phase 27: memories, strikes, next slot; 28)
+    float        *m_dShowers = nullptr;          ///< device: the showers' density, two buffers of WindCells
+    float4       *m_dDrop = nullptr;             ///< device: per rain slot its ring
+    int2         *m_dBirth = nullptr;            ///< device: per rain slot when its drop fell
+    float4       *m_dLeaf = nullptr;             ///< device: per leaf cluster its ring and its slow wind
+    float4       *m_dSurf = nullptr;             ///< device: per stretch of shore two entries
+    float        *m_dWeatherScratch = nullptr;   ///< device: per weather CUDA block four channels of sums
+    float2       *m_dBloom = nullptr;            ///< device: per bloom mode its complex state
+    float        *m_dBloomBands = nullptr;       ///< device: the bloom's bands, the active modes, the energy
+    float        *m_dBloomScratch = nullptr;     ///< device: per bloom CUDA block two channels of sums
+    float4       *m_dSwarmA = nullptr;           ///< device: the swarmalators, buffer A
+    float4       *m_dSwarmB = nullptr;           ///< device: buffer B
+    float4       *m_dSwarmView = nullptr;        ///< device: the swarm as the partials ride it
+    float        *m_dPhysTrail = nullptr;        ///< device: the physarum's trail, two buffers of PhysCells
+    unsigned int *m_dPhysDeposit = nullptr;      ///< device: what its agents left, per cell
+    Weather       m_weather;                     ///< the host's copy of the weather's settings
+    Bloom         m_bloom;                       ///< the host's copy of the bloom's settings
+    SwarmSpace    m_swarm;                       ///< the host's copy of the swarmalators' settings
+    Physarum      m_phys;                        ///< the host's copy of the physarum's settings and food
+    ChimeField    m_chimes;                      ///< the host's copy of the chime field's settings
+    Dream         m_dream;                       ///< the host's copy of the dream's settings
+    int           m_phantomVoice = -1;           ///< the phantom layer's GPU voice, -1 none
+    int           m_dreamVoice = -1;             ///< the dream's GPU voice, -1 none
+    ModalHall     m_modal;                       ///< the host's copy of the modal hall's settings
+    float         m_gpuMs = 0.0f;                ///< GPU time of the last finished block
+    bool          m_launched = false;            ///< a block is in flight
 
     /** @brief Bytes of the upload: the header and the voices. @return bytes */
     size_t uploadBytes() const
@@ -3883,7 +5117,14 @@ struct CloudEngine::Impl
                           static_cast<void *>( m_dChimeHit ),     static_cast<void *>( m_dChimeModes ),
                           static_cast<void *>( m_dChimeScratch ), static_cast<void *>( m_dDreamAcc ),
                           static_cast<void *>( m_dDreamMem ),     static_cast<void *>( m_dDreamState ),
-                          static_cast<void *>( m_dDreamSims ),    static_cast<void *>( m_dMeta ) } )
+                          static_cast<void *>( m_dDreamSims ),    static_cast<void *>( m_dMeta ),
+                          static_cast<void *>( m_dShowers ),      static_cast<void *>( m_dDrop ),
+                          static_cast<void *>( m_dBirth ),        static_cast<void *>( m_dLeaf ),
+                          static_cast<void *>( m_dSurf ),         static_cast<void *>( m_dWeatherScratch ),
+                          static_cast<void *>( m_dBloom ),        static_cast<void *>( m_dBloomBands ),
+                          static_cast<void *>( m_dBloomScratch ), static_cast<void *>( m_dSwarmA ),
+                          static_cast<void *>( m_dSwarmB ),       static_cast<void *>( m_dSwarmView ),
+                          static_cast<void *>( m_dPhysTrail ),    static_cast<void *>( m_dPhysDeposit ) } )
             if ( p ) cudaFree( p );
         m_exec = nullptr;
         m_graph = nullptr;
@@ -3940,6 +5181,11 @@ struct CloudEngine::Impl
         m_dChimeScratch = nullptr;
         m_dDreamAcc = m_dDreamMem = m_dDreamState = m_dDreamSims = nullptr;
         m_dMeta = nullptr;
+        m_dShowers = m_dWeatherScratch = m_dBloomBands = m_dBloomScratch = m_dPhysTrail = nullptr;
+        m_dDrop = m_dLeaf = m_dSurf = m_dSwarmA = m_dSwarmB = m_dSwarmView = nullptr;
+        m_dBirth = nullptr;
+        m_dBloom = nullptr;
+        m_dPhysDeposit = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -4156,7 +5402,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                "cudaHostAlloc hall", error ) &&
            ok( cudaHostAlloc( &m.m_hHallUp, sizeof( float ) * HallBins, cudaHostAllocDefault ), "cudaHostAlloc hall",
                error ) &&
-           ok( cudaMalloc( &m.m_dLifeStats, sizeof( float ) * 16 ), "cudaMalloc life stats", error ) &&
+           ok( cudaMalloc( &m.m_dLifeStats, sizeof( float ) * StatsFloats ), "cudaMalloc life stats", error ) &&
            ok( cudaMalloc( &m.m_dResW, sizeof( float ) * ReservoirN * ReservoirN ), "cudaMalloc reservoir", error ) &&
            ok( cudaMalloc( &m.m_dResIn, sizeof( float ) * ReservoirN * ReservoirInputs ), "cudaMalloc reservoir",
                error ) &&
@@ -4178,8 +5424,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dFlockB, sizeof( float2 ) * partialsTotal ), "cudaMalloc flock", error ) &&
            ok( cudaMalloc( &m.m_dSyncOrder, sizeof( float2 ) * 3 * partialsTotal ), "cudaMalloc sync order", error ) &&
            ok( cudaMalloc( &m.m_dSyncX, sizeof( float ) * partialsTotal ), "cudaMalloc sync places", error ) &&
-           ok( cudaHostAlloc( &m.m_hLifeStats, sizeof( float ) * 16, cudaHostAllocDefault ), "cudaHostAlloc life stats",
-               error ) &&
+           ok( cudaHostAlloc( &m.m_hLifeStats, sizeof( float ) * StatsFloats, cudaHostAllocDefault ),
+               "cudaHostAlloc life stats", error ) &&
            ok( cudaHostAlloc( &m.m_hLife, sizeof( float2 ) * LifeCells, cudaHostAllocDefault ), "cudaHostAlloc life",
                error ) &&
            ok( cudaMalloc( &m.m_dShapes, sizeof( EnvShape ) * EnvShapes ), "cudaMalloc shapes", error ) &&
@@ -4201,7 +5447,23 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                "cudaMalloc dream", error ) &&
            ok( cudaMalloc( &m.m_dDreamState, sizeof( float ) * DreamBands ), "cudaMalloc dream", error ) &&
            ok( cudaMalloc( &m.m_dDreamSims, sizeof( float ) * 2 * DreamMemories ), "cudaMalloc dream", error ) &&
-           ok( cudaMalloc( &m.m_dMeta, sizeof( int ) * 4 ), "cudaMalloc counters", error );
+           ok( cudaMalloc( &m.m_dMeta, sizeof( int ) * 16 ), "cudaMalloc counters", error ) &&
+           ok( cudaMalloc( &m.m_dShowers, sizeof( float ) * 2 * WindCells ), "cudaMalloc showers", error ) &&
+           ok( cudaMalloc( &m.m_dDrop, sizeof( float4 ) * RainSlots ), "cudaMalloc rain", error ) &&
+           ok( cudaMalloc( &m.m_dBirth, sizeof( int2 ) * RainSlots ), "cudaMalloc rain", error ) &&
+           ok( cudaMalloc( &m.m_dLeaf, sizeof( float4 ) * LeafClusters ), "cudaMalloc leaves", error ) &&
+           ok( cudaMalloc( &m.m_dSurf, sizeof( float4 ) * 2 * SurfSegments ), "cudaMalloc sea", error ) &&
+           ok( cudaMalloc( &m.m_dWeatherScratch, sizeof( float ) * 4 * n * static_cast<size_t>( WeatherBlocks ) ),
+               "cudaMalloc weather", error ) &&
+           ok( cudaMalloc( &m.m_dBloom, sizeof( float2 ) * BloomModes ), "cudaMalloc bloom", error ) &&
+           ok( cudaMalloc( &m.m_dBloomBands, sizeof( float ) * ( 2 * BloomBands + 2 ) ), "cudaMalloc bloom", error ) &&
+           ok( cudaMalloc( &m.m_dBloomScratch, sizeof( float ) * 2 * n * static_cast<size_t>( BloomBlocks ) ),
+               "cudaMalloc bloom", error ) &&
+           ok( cudaMalloc( &m.m_dSwarmA, sizeof( float4 ) * SwarmN ), "cudaMalloc swarm", error ) &&
+           ok( cudaMalloc( &m.m_dSwarmB, sizeof( float4 ) * SwarmN ), "cudaMalloc swarm", error ) &&
+           ok( cudaMalloc( &m.m_dSwarmView, sizeof( float4 ) * SwarmN ), "cudaMalloc swarm", error ) &&
+           ok( cudaMalloc( &m.m_dPhysTrail, sizeof( float ) * 2 * PhysCells ), "cudaMalloc physarum", error ) &&
+           ok( cudaMalloc( &m.m_dPhysDeposit, sizeof( unsigned int ) * PhysCells ), "cudaMalloc physarum", error );
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -4242,7 +5504,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             error ) &&
         ok( cudaMemsetAsync( m.m_dOrbitB, 0, sizeof( float4 ) * partialsTotal, m.m_stream ), "cudaMemsetAsync",
             error ) &&
-        ok( cudaMemsetAsync( m.m_dLifeStats, 0, sizeof( float ) * 16, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dLifeStats, 0, sizeof( float ) * StatsFloats, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
         ok( cudaMemsetAsync( m.m_dListenHist, 0, sizeof( float ) * 2 * EchoN, m.m_stream ), "cudaMemsetAsync",
             error ) &&
         ok( cudaMemsetAsync( m.m_dListenPrev, 0, sizeof( float ) * EchoBins, m.m_stream ), "cudaMemsetAsync", error ) &&
@@ -4278,7 +5541,27 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             error ) &&
         ok( cudaMemsetAsync( m.m_dDreamSims, 0, sizeof( float ) * 2 * DreamMemories, m.m_stream ), "cudaMemsetAsync",
             error ) &&
-        ok( cudaMemsetAsync( m.m_dMeta, 0, sizeof( int ) * 4, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dMeta, 0, sizeof( int ) * 16, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dShowers, 0, sizeof( float ) * 2 * WindCells, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dDrop, 0, sizeof( float4 ) * RainSlots, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dBirth, 0xFF, sizeof( int2 ) * RainSlots, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dLeaf, 0, sizeof( float4 ) * LeafClusters, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dSurf, 0, sizeof( float4 ) * 2 * SurfSegments, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dWeatherScratch, 0, sizeof( float ) * 4 * n * static_cast<size_t>( WeatherBlocks ),
+                             m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dBloom, 0, sizeof( float2 ) * BloomModes, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dBloomBands, 0, sizeof( float ) * ( 2 * BloomBands + 2 ), m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dSwarmA, 0, sizeof( float4 ) * SwarmN, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dSwarmB, 0, sizeof( float4 ) * SwarmN, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dSwarmView, 0, sizeof( float4 ) * SwarmN, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dPhysTrail, 0, sizeof( float ) * 2 * PhysCells, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dPhysDeposit, 0, sizeof( unsigned int ) * PhysCells, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
         ok( cudaStreamSynchronize( m.m_stream ), "cudaStreamSynchronize", error );
     if ( good )
     {
@@ -4301,7 +5584,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         reservoirInitKernel<<<static_cast<unsigned>( ( static_cast<size_t>( ReservoirN ) * ReservoirN + 255 ) / 256 ),
                               256, 0, m.m_stream>>>( m.m_dResW, m.m_dResIn, m.m_dResOut, m.m_dResX );
         good = ok( cudaStreamSynchronize( m.m_stream ), "reservoir init", error );
-        std::memset( m.m_hLifeStats, 0, sizeof( float ) * 16 );
+        std::memset( m.m_hLifeStats, 0, sizeof( float ) * StatsFloats );
         m.m_melt.m_clear = 1;                                         // the first block fills the melt's tables
         for ( int b = 0; b < HallBins; ++b ) m.m_hHallUp[b] = 1.0f;   // the hall new: every band at the average
         good =
@@ -4337,6 +5620,11 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             windStepKernel<<<( WindCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, 1, m.m_dWindA, m.m_dWindB );
             chimeStepKernel<<<( ChimeCount + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dChimeState,
                                                                                  m.m_dChimeHit, m.m_dMeta );
+            rainFieldKernel<<<( WindCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dShowers );
+            swarmStepKernel<<<SwarmN / SwarmThreads, SwarmThreads, 0, m.m_stream>>>( hdr, m.m_dSwarmA, m.m_dSwarmB );
+            swarmViewKernel<<<1, SwarmN, 0, m.m_stream>>>( hdr, m.m_dSwarmA, m.m_dSwarmB, m.m_dSwarmView,
+                                                           m.m_dLifeStats );
+            physTrailKernel<<<( PhysCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, m.m_dPhysTrail, m.m_dPhysDeposit );
             gainRingKernel<<<static_cast<unsigned>( config.m_voices ), 256, 0, m.m_stream>>>( hdr, voices,
                                                                                               m.m_dGainRing );
             cascadeKernel<<<static_cast<unsigned>( ( partialsTotal + Threads - 1 ) / Threads ), Threads, 0,
@@ -4347,11 +5635,11 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                               m.m_stream>>>( hdr, voices, m.m_pcap, m.m_dSyncTheta, m.m_dSyncX, m.m_dSyncOrder,
                                              partialsTotal );
             updateKernel<<<static_cast<unsigned>( ( partialsTotal + Threads - 1 ) / Threads ), Threads, 0,
-                           m.m_stream>>>( hdr, voices, m.m_pcap, m.m_dShapes, m.m_dLand, m.m_dRun, m.m_dAmp, m.m_dGains,
-                                          m.m_dGainRing, m.m_dAmpQ, m.m_dSnap, m.m_dLifeA, m.m_dLifeB, m.m_dSyncTheta,
-                                          m.m_dSyncX, m.m_dSyncOrder, partialsTotal, m.m_dFlockA, m.m_dFlockB,
-                                          m.m_dCascadeA, m.m_dCascadeB, m.m_dFilterTable, m.m_dHallHist, m.m_dDensity,
-                                          m.m_dTau, m.m_dOrbitA, m.m_dOrbitB, m.m_dDreamState );
+                           m.m_stream>>>(
+                hdr, voices, m.m_pcap, m.m_dShapes, m.m_dLand, m.m_dRun, m.m_dAmp, m.m_dGains, m.m_dGainRing, m.m_dAmpQ,
+                m.m_dSnap, m.m_dLifeA, m.m_dLifeB, m.m_dSyncTheta, m.m_dSyncX, m.m_dSyncOrder, partialsTotal,
+                m.m_dFlockA, m.m_dFlockB, m.m_dCascadeA, m.m_dCascadeB, m.m_dFilterTable, m.m_dHallHist, m.m_dDensity,
+                m.m_dTau, m.m_dOrbitA, m.m_dOrbitB, m.m_dDreamState, m.m_dSwarmView, m.m_dPhysTrail, m.m_dPhysDeposit );
             hallKernel<<<1, HallBins, 0, m.m_stream>>>( hdr, m.m_dHallHist, m.m_dHallMemory, m.m_dDensity,
                                                         m.m_dDreamAcc );
             dreamSimKernel<<<DreamMemories / DreamThreads, DreamThreads, 0, m.m_stream>>>(
@@ -4368,10 +5656,22 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                 hdr, m.m_dChimeHit, m.m_dChimeModes, m.m_dChimeScratch, n );
             chimeReduceKernel<<<static_cast<unsigned>( 4 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
                                 m.m_stream>>>( hdr, m.m_dChimeScratch, n, m.m_dOut );
+            rainKernel<<<RainBlocks, RainThreads, 0, m.m_stream>>>( hdr, m.m_dShowers, m.m_dDrop, m.m_dBirth,
+                                                                    m.m_dWeatherScratch, n, m.m_dMeta );
+            leafKernel<<<LeafBlocks, LeafThreads, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dLeaf, m.m_dWeatherScratch, n,
+                                                                    m.m_dMeta );
+            surfKernel<<<1, SurfSegments, 0, m.m_stream>>>( hdr, m.m_dSurf, m.m_dWeatherScratch, n, m.m_dMeta );
+            weatherReduceKernel<<<static_cast<unsigned>( 4 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
+                                  m.m_stream>>>( hdr, m.m_dWeatherScratch, n, m.m_dOut );
             modalKernel<<<static_cast<unsigned>( ModalBlocks ), ModalThreads, 0, m.m_stream>>>(
                 hdr, m.m_dOut, m.m_dModal, m.m_dModalScratch, n, m.m_dLand, m.m_dHallMemory );
             modalReduceKernel<<<static_cast<unsigned>( 2 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
                                 m.m_stream>>>( hdr, m.m_dModalScratch, n, m.m_dOut );
+            bloomKernel<<<BloomBlocks, BloomThreads, 0, m.m_stream>>>( hdr, m.m_dOut, m.m_dBloom, m.m_dBloomBands,
+                                                                       m.m_dBloomScratch, n );
+            bloomBandKernel<<<BloomBands + 1, 256, 0, m.m_stream>>>( hdr, m.m_dBloom, m.m_dBloomBands, m.m_dLifeStats );
+            bloomReduceKernel<<<static_cast<unsigned>( 2 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
+                                m.m_stream>>>( hdr, m.m_dBloomScratch, n, m.m_dOut );
             spectralEchoKernel<<<1, EchoThreads, 0, m.m_stream>>>( hdr, m.m_dOut, m.m_dEchoHist, m.m_dEchoAcc,
                                                                    m.m_dEchoRing, m.m_dEchoState );
             meltKernel<<<1, MeltThreads, 0, m.m_stream>>>( hdr, m.m_dOut, m.m_dMeltHist, m.m_dMeltAcc, m.m_dMeltEnergy,
@@ -4383,7 +5683,10 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                 hdr, m.m_dResW, m.m_dResIn, m.m_dResX );
             reservoirReadKernel<<<1, 256, 0, m.m_stream>>>( hdr, m.m_dResOut, m.m_dResX, m.m_dLifeStats );
             phase27StatsKernel<<<1, 32, 0, m.m_stream>>>( m.m_dMeta, m.m_dLifeStats );
-            cudaMemcpyAsync( m.m_hLifeStats, m.m_dLifeStats, sizeof( float ) * 16, cudaMemcpyDeviceToHost, m.m_stream );
+            phase28StatsKernel<<<1, 256, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dMeta, m.m_dLifeStats );
+            physStatsKernel<<<1, 1024, 0, m.m_stream>>>( hdr, m.m_dPhysTrail, m.m_dLifeStats );
+            cudaMemcpyAsync( m.m_hLifeStats, m.m_dLifeStats, sizeof( float ) * StatsFloats, cudaMemcpyDeviceToHost,
+                             m.m_stream );
             cudaMemcpyAsync( m.m_hOut, m.m_dOut, sizeof( float ) * CloudOutChannels * n, cudaMemcpyDeviceToHost,
                              m.m_stream );
             good = ok( cudaStreamEndCapture( m.m_stream, &m.m_graph ), "cudaStreamEndCapture", error ) &&
@@ -4520,6 +5823,37 @@ int CloudEngine::chimeStrikes() const
     return m_impl ? static_cast<int>( m_impl->m_hLifeStats[13] ) : 0;
 }
 
+Weather &CloudEngine::weather()
+{
+    return m_impl->m_weather;
+}
+
+Bloom &CloudEngine::bloom()
+{
+    return m_impl->m_bloom;
+}
+
+SwarmSpace &CloudEngine::swarm()
+{
+    return m_impl->m_swarm;
+}
+
+Physarum &CloudEngine::physarum()
+{
+    return m_impl->m_phys;
+}
+
+void CloudEngine::weatherStats( float *out ) const
+{
+    for ( int k = 0; k < 8; ++k ) out[k] = m_impl ? m_impl->m_hLifeStats[16 + k] : 0.0f;
+}
+
+void CloudEngine::physarumStats( float &mean, float &spread ) const
+{
+    mean = m_impl ? m_impl->m_hLifeStats[24] : 0.0f;
+    spread = m_impl ? m_impl->m_hLifeStats[25] : 0.0f;
+}
+
 void CloudEngine::setLayers( int phantomVoice, int dreamVoice )
 {
     m_impl->m_phantomVoice = phantomVoice;
@@ -4615,6 +5949,19 @@ void CloudEngine::launch()
     hdr->m_dream = m.m_dream;
     m.m_dream.m_store = 0;   // asked for once
     m.m_dream.m_clear = 0;
+    hdr->m_weather = m.m_weather;
+    hdr->m_weather.m_pitchCount = std::clamp( m.m_weather.m_pitchCount, 0, RainPitches );
+    hdr->m_weather.m_wind = ( m.m_weather.m_wind || m.m_chimes.m_on ) ? 1 : 0;
+    m.m_weather.m_reset = 0;   // asked for once
+    m.m_weather.m_rainFresh = 0;
+    m.m_weather.m_windFresh = 0;
+    hdr->m_bloom = m.m_bloom;
+    hdr->m_swarm = m.m_swarm;
+    m.m_swarm.m_reset = 0;   // asked for once
+    hdr->m_phys = m.m_phys;
+    hdr->m_phys.m_on = m.m_field.m_mode == FieldModeE::PHYSARUM ? m.m_phys.m_on : 0;
+    hdr->m_phys.m_count = std::clamp( m.m_phys.m_count, 0, PhysFood );
+    m.m_phys.m_fresh = 0;   // asked for once
     hdr->m_phantomVoice = m.m_phantomVoice >= 0 && m.m_phantomVoice < m.m_cfg.m_voices ? m.m_phantomVoice : -1;
     hdr->m_dreamVoice = m.m_dreamVoice >= 0 && m.m_dreamVoice < m.m_cfg.m_voices ? m.m_dreamVoice : -1;
     m.m_melt.m_clear = 0;   // asked for once

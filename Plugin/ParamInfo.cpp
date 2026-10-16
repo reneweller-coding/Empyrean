@@ -153,8 +153,8 @@ const Info InfoTable[] = {
     { "modal_low", "The hall's lowest mode: below it, nothing rings (drag it in the picture on the Hall page)." },
     { "modal_freeze", "Holds the hall as it is: a chord left hanging in the air." },
     { "modal_breath", "Lets every resonance's decay wander, so the hall's colour moves while it rings." },
-    { "field_mode",
-      "What pulls the partials' pitches: the scale, wandering attractors, a scattering, a flock, or orbits." },
+    { "field_mode", "What pulls the partials' pitches: the scale, wandering attractors, a scattering, a flock, "
+                    "orbits, or a slime mould crawling between the harmonics (Physarum)." },
     { "field_strength", "How strongly the field pulls (Orbit: how deep its wells are)." },
     { "field_radius", "How far the field reaches, in cents (Orbit: the orbits' size)." },
     { "field_spring", "How strongly the partials are drawn back to their own places (Orbit: the damping)." },
@@ -282,7 +282,8 @@ const Info InfoTable[] = {
     { "chime_kind", "Metal tubes, glass, bamboo or small bells." },
     { "chime_pitch", "The chimes' register, in octaves up or down. They are tuned to the scale." },
     { "chime_decay", "How long a chime rings." },
-    { "wind", "The wind's strength: calm below a quarter, a breeze at half, a gale at the top." },
+    { "wind", "The wind's strength, for the chimes and the weather: calm below a quarter, a breeze at half, a gale "
+              "at the top." },
     { "gusts", "How much the wind gusts: steady air or squalls." },
     { "dream", "The instrument remembers what it heard and dreams it far off, wandering from memory to memory." },
     { "dream_focus", "A blend of memories, or one memory at a time." },
@@ -292,6 +293,35 @@ const Info InfoTable[] = {
     { "premonition_time", "How long before a note its premonition begins." },
     { "ripple_breathers", "The ripple as a chain of pendulums: a note's strike stays where it fell as a breather, "
                           "pulsing there, and drifts slowly." },
+    { "rain", "Rain over the field: it falls where the showers are, and the wind carries them across." },
+    { "rain_rate", "Drops a second over the whole field: a few, a shower, a downpour." },
+    { "rain_surface", "What the rain falls on: a pond (each drop's bubble sings), leaves, stone, a tin roof." },
+    { "rain_showers", "Even rain, or showers passing with the wind." },
+    { "rain_tune", "How many of the bubbles and the roof's rings sing the scale's pitches." },
+    { "leaves", "Leaves rustle where the wind blows, harder in its gusts: listen to them sweep across." },
+    { "foliage", "Broad leaves, pine needles, tall grass or dry leaves." },
+    { "surf", "A sea breaks on a shore along the field: swells come in sets, the wind raises them." },
+    { "surf_swell", "The swell's period: seconds from one wave to the next." },
+    { "shore", "What the sea breaks on: sand hisses, pebbles crackle in the backwash, rocks boom." },
+    { "surf_distance", "How far off the shore is." },
+    { "bloom", "A large plate everything rings -- the voices, the chimes, the weather -- whose energy climbs into a "
+               "shimmer, as a tam-tam's does after the stroke." },
+    { "bloom_size", "The plate's side: small and bright, or a thunder sheet with modes a hertz apart." },
+    { "bloom_decay", "How long the plate rings (at 200 Hz; the high modes shorter)." },
+    { "bloom_drive", "How readily its energy climbs into the high modes: the louder, the faster." },
+    { "bloom_glide", "The pitch with the plate's energy, as an opera gong's: up when loud (positive), or down." },
+    { "swarmal",
+      "The partials ride swarmalators round you: their place follows the swarm, their loudness its phases." },
+    { "swarmal_gather", "Like phases gather (positive) or part: with nothing else, the swarm becomes a ring whose "
+                        "pulse circles you." },
+    { "swarmal_sync", "Near ones fall into step (positive: all pulse as one) or out of step: the ring breaks into "
+                      "turning clusters, then turns itself, and further down stands still, its phases scattered." },
+    { "swarmal_rate", "How fast the swarm's pulse turns." },
+    { "swarmal_speed", "How fast the swarm settles into its pattern and moves in it." },
+    { "swarmal_spread",
+      "How different the swarmalators' own rates are: a little breaks the ring into turning clusters." },
+    { "physarum_share", "Physarum: how many of the partials crawl as the slime mould does." },
+    { "physarum_trail", "Physarum: how long its trail lasts -- the veins between the harmonics." },
 };
 
 }   // namespace

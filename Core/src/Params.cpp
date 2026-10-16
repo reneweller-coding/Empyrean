@@ -43,7 +43,10 @@ const char *const MpeTargetNames[NumMpeTargets] = { "Off",    "Level",   "Filter
 const char *const TalbotModeNames[NumTalbotModes] = { "Revival", "Bloch" };
 const char *const PhantomLineNames[NumPhantomLines] = { "Melody", "Echo", "Chord" };
 const char *const ChimeKindNames[NumChimeKinds] = { "Tubes", "Glass", "Bamboo", "Bells" };
-const char *const FieldModeNames[NumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" };
+const char *const FieldModeNames[NumFieldModes] = { "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit", "Physarum" };
+const char *const RainSurfaceNames[NumRainSurfaces] = { "Water", "Leaves", "Stone", "Tin Roof" };
+const char *const FoliageNames[NumFoliages] = { "Broadleaf", "Pine", "Grass", "Dry Leaves" };
+const char *const ShoreNames[NumShores] = { "Sand", "Pebbles", "Rocks" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -389,14 +392,38 @@ const std::array<ParamDesc, NumParams> Table = { {
     C( ParamIdE::CHIME_KIND, "chime_kind", "Chime Kind", "Chimes", ChimeKindNames, NumChimeKinds, 0 ),
     F( ParamIdE::CHIME_PITCH, "chime_pitch", "Chime Pitch", "Chimes", -2.f, 2.f, 0.f, 1.f, "oct" ),
     F( ParamIdE::CHIME_DECAY, "chime_decay", "Chime Decay", "Chimes", 0.5f, 20.f, 4.f, 0.5f, "s" ),
-    F( ParamIdE::WIND, "wind", "Wind", "Chimes", 0.f, 1.f, 0.5f, 1.f, "" ),
-    F( ParamIdE::GUSTS, "gusts", "Gusts", "Chimes", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::WIND, "wind", "Wind", "Wind", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::GUSTS, "gusts", "Gusts", "Wind", 0.f, 1.f, 0.5f, 1.f, "" ),
     F( ParamIdE::DREAM, "dream", "Dream", "Dream", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::DREAM_FOCUS, "dream_focus", "Dream Focus", "Dream", 0.f, 1.f, 0.6f, 1.f, "" ),
     F( ParamIdE::DREAM_DRIFT, "dream_drift", "Dream Drift", "Dream", 0.f, 1.f, 0.4f, 1.f, "" ),
     F( ParamIdE::DREAM_DEPTH, "dream_depth", "Dream Depth", "Dream", 0.f, 1.f, 0.8f, 1.f, "" ),
     F( ParamIdE::PREMONITION, "premonition", "Premonition", "Premonition", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::PREMONITION_TIME, "premonition_time", "Premonition Time", "Premonition", 1.f, 15.f, 5.f, 0.6f, "s" ),
+    F( ParamIdE::RAIN, "rain", "Rain", "Rain", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::RAIN_RATE, "rain_rate", "Drops", "Rain", 20.f, 20000.f, 600.f, 0.25f, "/s" ),
+    C( ParamIdE::RAIN_SURFACE, "rain_surface", "Falls On", "Rain", RainSurfaceNames, NumRainSurfaces, 0 ),
+    F( ParamIdE::RAIN_SHOWERS, "rain_showers", "Showers", "Rain", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::RAIN_TUNE, "rain_tune", "Tuned Drops", "Rain", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::LEAVES, "leaves", "Leaves", "Leaves", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::FOLIAGE, "foliage", "Foliage", "Leaves", FoliageNames, NumFoliages, 0 ),
+    F( ParamIdE::SURF, "surf", "Surf", "Surf", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SURF_SWELL, "surf_swell", "Swell", "Surf", 5.f, 20.f, 10.f, 1.f, "s" ),
+    C( ParamIdE::SHORE, "shore", "Shore", "Surf", ShoreNames, NumShores, 0 ),
+    F( ParamIdE::SURF_DISTANCE, "surf_distance", "Shore Distance", "Surf", 0.f, 1.f, 0.6f, 1.f, "" ),
+    F( ParamIdE::BLOOM, "bloom", "Bloom", "Bloom", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::BLOOM_SIZE, "bloom_size", "Plate Size", "Bloom", 0.4f, 2.f, 1.2f, 1.f, "m" ),
+    F( ParamIdE::BLOOM_DECAY, "bloom_decay", "Plate Decay", "Bloom", 1.f, 60.f, 8.f, 0.5f, "s" ),
+    F( ParamIdE::BLOOM_DRIVE, "bloom_drive", "Bloom Drive", "Bloom", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::BLOOM_GLIDE, "bloom_glide", "Gong Glide", "Bloom", -1.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::SWARMAL, "swarmal", "Swarmalators", "Swarmalators", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SWARMAL_GATHER, "swarmal_gather", "Like Gathers", "Swarmalators", -1.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::SWARMAL_SYNC, "swarmal_sync", "Fall In Step", "Swarmalators", -1.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SWARMAL_RATE, "swarmal_rate", "Swarm Pulse", "Swarmalators", 0.02f, 4.f, 0.3f, 0.4f, "Hz" ),
+    F( ParamIdE::SWARMAL_SPEED, "swarmal_speed", "Swarm Speed", "Swarmalators", 0.1f, 10.f, 1.f, 0.4f, "" ),
+    F( ParamIdE::SWARMAL_SPREAD, "swarmal_spread", "Swarm Spread", "Swarmalators", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::PHYSARUM_SHARE, "physarum_share", "Crawlers", "Field", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::PHYSARUM_TRAIL, "physarum_trail", "Trail", "Field", 0.5f, 30.f, 5.f, 0.5f, "s" ),
 } };
 
 }   // namespace

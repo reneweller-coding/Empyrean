@@ -3675,6 +3675,211 @@ int main()
                     before, after, gainBefore, gainAfter ) );
     }
 
+    // 80. Rain (Phase 28a): on a tin roof the drops ring long enough to be counted -- four times the rate, about four
+    //     times the drops sounding at once -- and the rain is heard; switched off, it falls silent.
+    {
+        auto play = [&]( float rate, float rain, float &sounding, double &db )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::RAIN, rain );
+            e.setParam( ParamIdE::RAIN_RATE, rate );
+            e.setParam( ParamIdE::RAIN_SURFACE, 3.0f );
+            e.setParam( ParamIdE::RAIN_SHOWERS, 0.0f );
+            if ( !openOffline( e, false, 251 ) ) return false;
+            render( e, 4.0 );
+            const std::vector<float> lr = render( e, 4.0 );
+            float                    nature[10];
+            e.natureStats( nature );
+            sounding = nature[0];
+            db = rmsDb( lr, 0, lr.size() / 2 );
+            return true;
+        };
+        float       few = 0.0f, many = 0.0f, none = 0.0f;
+        double      fewDb = 0.0, manyDb = 0.0, noneDb = 0.0;
+        const bool  ran = play( 150.0f, 1.0f, few, fewDb ) && play( 600.0f, 1.0f, many, manyDb ) &&
+                          play( 600.0f, 0.0f, none, noneDb );
+        const float ratio = few > 0.0f ? many / few : 0.0f;
+        check( ran && few > 30.0f && ratio > 2.8f && ratio < 5.5f && manyDb > fewDb + 3.0 && fewDb > -70.0 &&
+                   noneDb < -100.0,
+               "rain: the drops fall at their rate and the rain is heard",
+               fmt( "on a tin roof, 150 drops a second: %.0f sounding, %.1f dBFS; 600: %.0f (%.1f times), %.1f dBFS; "
+                    "no rain: %.0f dBFS",
+                    few, fewDb, many, ratio, manyDb, noneDb ) );
+    }
+
+    // 81. Leaves (Phase 28a): in a calm they are silent; they rustle in the wind, louder in a strong one.
+    {
+        auto play = [&]( float wind, double &db )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::LEAVES, 1.0f );
+            e.setParam( ParamIdE::WIND, wind );
+            if ( !openOffline( e, false, 253 ) ) return false;
+            render( e, 6.0 );
+            const std::vector<float> lr = render( e, 6.0 );
+            db = rmsDb( lr, 0, lr.size() / 2 );
+            return true;
+        };
+        double     calm = 0.0, breeze = 0.0, gale = 0.0;
+        const bool ran = play( 0.0f, calm ) && play( 0.3f, breeze ) && play( 0.9f, gale );
+        check( ran && calm < -100.0 && breeze > -80.0 && gale > breeze + 3.0,
+               "leaves: silent in a calm, rustling in the wind, louder in a gale",
+               fmt( "calm %.0f dBFS, wind 0.3 %.1f dBFS, wind 0.9 %.1f dBFS", calm, breeze, gale ) );
+    }
+
+    // 82. Surf (Phase 28a): the sea comes in sets -- its loudness over a minute and a half, second by second, rises and
+    //     falls by more than 6 dB -- and a wind raises it.
+    {
+        auto play = [&]( float wind, double &range, double &db )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::SURF, 1.0f );
+            e.setParam( ParamIdE::WIND, wind );
+            e.setParam( ParamIdE::SURF_SWELL, 8.0f );
+            if ( !openOffline( e, false, 257 ) ) return false;
+            render( e, 10.0 );
+            const std::vector<float> lr = render( e, 90.0 );
+            double                   lo = 1.0e9, hi = -1.0e9;
+            for ( size_t s = 0; s + 48000 <= lr.size() / 2; s += 48000 )
+            {
+                const double d = rmsDb( lr, s, s + 48000 );
+                lo = std::min( lo, d );
+                hi = std::max( hi, d );
+            }
+            range = hi - lo;
+            db = rmsDb( lr, 0, lr.size() / 2 );
+            return true;
+        };
+        double     range = 0.0, db = 0.0, calmRange = 0.0, calmDb = 0.0;
+        const bool ran = play( 0.6f, range, db ) && play( 0.0f, calmRange, calmDb );
+        check( ran && range > 6.0 && db > calmDb + 3.0, "surf: the sea comes in sets, and the wind raises it",
+               fmt( "in a wind of 0.6: %.1f dBFS, second by second over %.1f dB; in a calm %.1f dBFS", db, range,
+                    calmDb ) );
+    }
+
+    // 83. Bloom (Phase 28b): a chord struck and let go rings the plate; with its drive, half a second after the chord
+    //     ends more of the plate's energy stands above 2 kHz than without -- it has climbed -- and the plate is not
+    //     louder for it (the cascade only moves energy).
+    {
+        auto play = [&]( float drive, float &high, double &db )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::BLOOM, 1.0f );
+            e.setParam( ParamIdE::BLOOM_DRIVE, drive );
+            e.setParam( ParamIdE::BLOOM_GLIDE, 0.0f );
+            e.setParam( ParamIdE::ATTACK, 0.01f );
+            e.setParam( ParamIdE::RELEASE, 0.2f );
+            e.setParam( ParamIdE::MASTER_GAIN, 6.0f );
+            if ( !openOffline( e, false, 259 ) ) return false;
+            e.noteOn( 45, 1.0f, 0 );
+            e.noteOn( 52, 1.0f, 0 );
+            e.noteOn( 57, 1.0f, 0 );
+            render( e, 1.0 );
+            e.noteOff( 45, 0 );
+            e.noteOff( 52, 0 );
+            e.noteOff( 57, 0 );
+            const std::vector<float> lr = render( e, 0.5 );
+            float                    nature[10];
+            e.natureStats( nature );
+            high = nature[5];
+            const std::vector<float> tail = render( e, 4.0 );
+            db = rmsDb( tail, 0, tail.size() / 2 );
+            return true;
+        };
+        float      still = 0.0f, bloom = 0.0f;
+        double     stillDb = 0.0, bloomDb = 0.0;
+        const bool ran = play( 0.0f, still, stillDb ) && play( 1.0f, bloom, bloomDb );
+        check( ran && bloom > 2.0f * still + 0.02f && bloomDb < stillDb + 0.5,
+               "bloom: the plate's energy climbs into the high modes, and it is not louder for it",
+               fmt( "half a second after the chord: above 2 kHz %.1f %% of the plate's energy without drive, %.1f %% "
+                    "with; its tail %.1f dBFS, then %.1f dBFS",
+                    100.0f * still, 100.0f * bloom, stillDb, bloomDb ) );
+    }
+
+    // 84. Swarmalators (Phase 28c): O'Keeffe's states. Like phases gathering and nothing else: a ring whose phase
+    //     follows its angle (S high, R low); falling into step too: all pulse as one (R near 1); falling out of step
+    //     twice as strongly as they gather: a still disc of phases (both low). (At J = 1, K = -1 the ring turns
+    //     instead -- the active phase wave, S 0.55: the disc lies past K = -1.2 J.)
+    {
+        auto play = [&]( float j, float k, float &R, float &S )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::SWARMAL, 1.0f );
+            e.setParam( ParamIdE::SWARMAL_GATHER, j );
+            e.setParam( ParamIdE::SWARMAL_SYNC, k );
+            e.setParam( ParamIdE::SWARMAL_SPEED, 10.0f );
+            e.setParam( ParamIdE::SWARMAL_SPREAD, 0.0f );
+            if ( !openOffline( e, false, 263 ) ) return false;
+            e.noteOn( 57, 0.8f, 0 );
+            render( e, 30.0 );   // 300 of the swarm's time units: out of step it settles last
+            float nature[10];
+            e.natureStats( nature );
+            R = nature[6];
+            S = nature[7];
+            return true;
+        };
+        float      waveR = 0.0f, waveS = 0.0f, syncR = 0.0f, syncS = 0.0f, asyncR = 0.0f, asyncS = 0.0f;
+        const bool ran =
+            play( 1.0f, 0.0f, waveR, waveS ) && play( 1.0f, 1.0f, syncR, syncS ) && play( 0.5f, -1.0f, asyncR, asyncS );
+        check( ran && waveS > 0.8f && waveR < 0.2f && syncR > 0.9f && asyncR < 0.2f && asyncS < 0.3f,
+               "swarmalators: a phase wave, a synchronised swarm, a still disc",
+               fmt( "gathering alone R %.2f S %.2f; falling into step R %.2f; out of step R %.2f S %.2f", waveR, waveS,
+                    syncR, asyncR, asyncS ) );
+    }
+
+    // 85. Physarum (Phase 28d): a note's partials as crawlers with a long sensor leave the harmonics -- a fifth of
+    //     their power or more stands between them after fifteen seconds (without the physarum almost none) -- and the
+    //     trail they leave is veined (its spread over its mean well above an even trail's).
+    {
+        auto play = [&]( bool phys, double &between, float &spread )
+        {
+            Engine e;
+            plainNote( e );
+            e.setParam( ParamIdE::FIELD_MODE, phys ? 6.0f : 0.0f );
+            e.setParam( ParamIdE::PHYSARUM_SHARE, 1.0f );
+            e.setParam( ParamIdE::FIELD_STRENGTH, 0.6f );
+            e.setParam( ParamIdE::FIELD_RADIUS, 200.0f );
+            e.setParam( ParamIdE::FIELD_SPRING, 0.0f );
+            if ( !openOffline( e, false, 269 ) ) return false;
+            e.noteOn( 45, 0.8f, 0 );
+            render( e, 0.2 );
+            const double f0 = soundingHz( e );
+            double       off = 0.0, all = 0.0;
+            watch( e, 15.0, 14.0,
+                   [&]( const std::vector<float> &dots, int per, double )
+                   {
+                       for ( int i = 0; i < per; ++i )
+                       {
+                           const double f = dots[static_cast<size_t>( 2 * i )],
+                                        a = dots[static_cast<size_t>( 2 * i + 1 )];
+                           if ( f <= 0.0 || f0 <= 0.0 ) continue;
+                           const double h = std::max( 1.0, std::round( f / f0 ) );
+                           all += a * a;
+                           if ( std::fabs( 1200.0 * std::log2( f / ( h * f0 ) ) ) > 35.0 ) off += a * a;
+                       }
+                   } );
+            float nature[10];
+            e.natureStats( nature );
+            spread = nature[9];
+            between = all > 0.0 ? off / all : 0.0;
+            return f0 > 0.0;
+        };
+        double     between = 0.0, home = 0.0;
+        float      spread = 0.0f, unused = 0.0f;
+        const bool ran = play( true, between, spread ) && play( false, home, unused );
+        check(
+            ran && between > 0.2 && home < 0.05 && spread > 1.0f,
+            "physarum: the crawlers leave the harmonics along a veined trail",
+            fmt( "after fifteen seconds %.0f %% of the power between the harmonics (without it %.1f %%); the trail's "
+                 "spread %.2f",
+                 100.0 * between, 100.0 * home, spread ) );
+    }
+
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }

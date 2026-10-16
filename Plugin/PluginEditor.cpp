@@ -364,28 +364,30 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::COMB_DEPTH } },
             { "Envelope", F::ENVELOPE,
               IdsT{ ParamIdE::ATTACK, ParamIdE::DECAY, ParamIdE::SUSTAIN, ParamIdE::RELEASE } } } );
-    page( "Motion", { { "Motion", F::MOTION,
-                        IdsT{ ParamIdE::MOTION, ParamIdE::MOTION_RATE, ParamIdE::MOTION_DEPTH, ParamIdE::LANDSCAPE },
-                        IdsT{ ParamIdE::MOTION } },
-                      { "Field", F::MOTION,
-                        IdsT{ ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, ParamIdE::FIELD_RADIUS,
-                              ParamIdE::FIELD_SPRING, ParamIdE::FIELD_RATE, ParamIdE::FIELD_COUNT },
-                        IdsT{ ParamIdE::FIELD_MODE } },
-                      { "Time", F::ENVELOPE, IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND },
-                        IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND } },
-                      { "Living Landscape", F::SOURCE,
-                        IdsT{ ParamIdE::LIFE_MODE, ParamIdE::LIFE_DEPTH, ParamIdE::LIFE_RATE, ParamIdE::LIFE_CHARACTER,
-                              ParamIdE::LIFE_ZOOM, ParamIdE::LIFE_SIDES, ParamIdE::LIFE_TURN },
-                        IdsT{ ParamIdE::LIFE_MODE } },
-                      { "Partial Sync", F::ENVELOPE,
-                        IdsT{ ParamIdE::SYNC_DEPTH, ParamIdE::SYNC_MODE, ParamIdE::SYNC_COUPLING, ParamIdE::SYNC_RATE,
-                              ParamIdE::SYNC_SPREAD, ParamIdE::SYNC_SWARM, ParamIdE::SYNC_REACH, ParamIdE::SYNC_LAG },
-                        IdsT{ ParamIdE::SYNC_DEPTH } },
-                      { "Ripple", F::SPACE,
-                        IdsT{ ParamIdE::RIPPLE_DEPTH, ParamIdE::RIPPLE_SPEED, ParamIdE::RIPPLE_DECAY,
-                              ParamIdE::RIPPLE_BEND, ParamIdE::RIPPLE_BREATHERS },
-                        IdsT{ ParamIdE::RIPPLE_DEPTH } } } );
-    // Phase 26: the harmonics' own lives, the horizon and the grains (and Phase 27's Talbot timbre).
+    page( "Motion",
+          { { "Motion", F::MOTION,
+              IdsT{ ParamIdE::MOTION, ParamIdE::MOTION_RATE, ParamIdE::MOTION_DEPTH, ParamIdE::LANDSCAPE },
+              IdsT{ ParamIdE::MOTION } },
+            { "Field", F::MOTION,
+              IdsT{ ParamIdE::FIELD_MODE, ParamIdE::FIELD_STRENGTH, ParamIdE::FIELD_RADIUS, ParamIdE::FIELD_SPRING,
+                    ParamIdE::FIELD_RATE, ParamIdE::FIELD_COUNT, ParamIdE::PHYSARUM_SHARE, ParamIdE::PHYSARUM_TRAIL },
+              IdsT{ ParamIdE::FIELD_MODE } },
+            { "Time", F::ENVELOPE, IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND },
+              IdsT{ ParamIdE::DISPERSION, ParamIdE::TIME_BEND } },
+            { "Living Landscape", F::SOURCE,
+              IdsT{ ParamIdE::LIFE_MODE, ParamIdE::LIFE_DEPTH, ParamIdE::LIFE_RATE, ParamIdE::LIFE_CHARACTER,
+                    ParamIdE::LIFE_ZOOM, ParamIdE::LIFE_SIDES, ParamIdE::LIFE_TURN },
+              IdsT{ ParamIdE::LIFE_MODE } },
+            { "Partial Sync", F::ENVELOPE,
+              IdsT{ ParamIdE::SYNC_DEPTH, ParamIdE::SYNC_MODE, ParamIdE::SYNC_COUPLING, ParamIdE::SYNC_RATE,
+                    ParamIdE::SYNC_SPREAD, ParamIdE::SYNC_SWARM, ParamIdE::SYNC_REACH, ParamIdE::SYNC_LAG },
+              IdsT{ ParamIdE::SYNC_DEPTH } },
+            { "Swarmalators", F::ENVELOPE,
+              IdsT{ ParamIdE::SWARMAL, ParamIdE::SWARMAL_GATHER, ParamIdE::SWARMAL_SYNC, ParamIdE::SWARMAL_RATE,
+                    ParamIdE::SWARMAL_SPEED, ParamIdE::SWARMAL_SPREAD },
+              IdsT{ ParamIdE::SWARMAL } } } );
+    // Phase 26: the harmonics' own lives, the horizon and the grains (and Phase 27's Talbot timbre; the ripple and its
+    // breathers, from the Motion page, Phase 28).
     page( "Harmonics",
           { { "Overblow", F::SOURCE, IdsT{ ParamIdE::OVERBLOW, ParamIdE::OVERBLOW_TIME }, IdsT{ ParamIdE::OVERBLOW } },
             { "Subharmonics", F::SOURCE, IdsT{ ParamIdE::SUBHARMONICS, ParamIdE::SUB_TIME },
@@ -397,20 +399,38 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
             { "Grain", F::SOURCE, IdsT{ ParamIdE::GRAIN, ParamIdE::GRAIN_LENGTH, ParamIdE::GRAIN_DENSITY },
               IdsT{ ParamIdE::GRAIN } },
             { "Talbot", F::ENVELOPE, IdsT{ ParamIdE::TALBOT, ParamIdE::TALBOT_MODE, ParamIdE::TALBOT_TIME },
-              IdsT{ ParamIdE::TALBOT } } } );
-    // Phase 27: layers that are not notes -- the chime field, the phantom layer, the dream -- and the premonition.
+              IdsT{ ParamIdE::TALBOT } },
+            { "Ripple", F::SPACE,
+              IdsT{ ParamIdE::RIPPLE_DEPTH, ParamIdE::RIPPLE_SPEED, ParamIdE::RIPPLE_DECAY, ParamIdE::RIPPLE_BEND,
+                    ParamIdE::RIPPLE_BREATHERS },
+              IdsT{ ParamIdE::RIPPLE_DEPTH } } } );
+    // Phase 27: layers that are not notes -- the phantom layer, the dream -- and the premonition; the memory's ghosts
+    // (from the Effects page, Phase 28).
     page( "Dreams",
-          { { "Chimes", F::SPACE,
-              IdsT{ ParamIdE::CHIMES, ParamIdE::CHIME_KIND, ParamIdE::CHIME_PITCH, ParamIdE::CHIME_DECAY,
-                    ParamIdE::WIND, ParamIdE::GUSTS },
-              IdsT{ ParamIdE::CHIMES } },
-            { "Phantom", F::FILTER, IdsT{ ParamIdE::PHANTOM, ParamIdE::PHANTOM_LINE, ParamIdE::PHANTOM_WIDTH },
+          { { "Phantom", F::FILTER, IdsT{ ParamIdE::PHANTOM, ParamIdE::PHANTOM_LINE, ParamIdE::PHANTOM_WIDTH },
               IdsT{ ParamIdE::PHANTOM } },
             { "Dream", F::ENVELOPE,
               IdsT{ ParamIdE::DREAM, ParamIdE::DREAM_FOCUS, ParamIdE::DREAM_DRIFT, ParamIdE::DREAM_DEPTH },
               IdsT{ ParamIdE::DREAM } },
             { "Premonition", F::MOTION, IdsT{ ParamIdE::PREMONITION, ParamIdE::PREMONITION_TIME },
-              IdsT{ ParamIdE::PREMONITION } } } );
+              IdsT{ ParamIdE::PREMONITION } },
+            { "Memory", F::ENVELOPE,
+              IdsT{ ParamIdE::MEMORY_LEVEL, ParamIdE::MEMORY_TIME, ParamIdE::MEMORY_BLOOM, ParamIdE::MEMORY_BLUR,
+                    ParamIdE::MEMORY_SINK },
+              IdsT{ ParamIdE::MEMORY_LEVEL } } } );
+    // Phase 28: the wind and what it moves -- the chimes (Phase 27), the rain, the leaves, the sea.
+    page( "Weather",
+          { { "Wind", F::SPACE, IdsT{ ParamIdE::WIND, ParamIdE::GUSTS } },
+            { "Chimes", F::SPACE,
+              IdsT{ ParamIdE::CHIMES, ParamIdE::CHIME_KIND, ParamIdE::CHIME_PITCH, ParamIdE::CHIME_DECAY },
+              IdsT{ ParamIdE::CHIMES } },
+            { "Rain", F::FILTER,
+              IdsT{ ParamIdE::RAIN, ParamIdE::RAIN_RATE, ParamIdE::RAIN_SURFACE, ParamIdE::RAIN_SHOWERS,
+                    ParamIdE::RAIN_TUNE },
+              IdsT{ ParamIdE::RAIN } },
+            { "Leaves", F::SOURCE, IdsT{ ParamIdE::LEAVES, ParamIdE::FOLIAGE }, IdsT{ ParamIdE::LEAVES } },
+            { "Surf", F::MOTION, IdsT{ ParamIdE::SURF, ParamIdE::SURF_SWELL, ParamIdE::SHORE, ParamIdE::SURF_DISTANCE },
+              IdsT{ ParamIdE::SURF } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [tp] { return tp->describe(); } );
@@ -472,10 +492,10 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                        { "Melt", F::MOTION,
                          IdsT{ ParamIdE::MELT_MIX, ParamIdE::MELT_TIME, ParamIdE::MELT_SPREAD, ParamIdE::MELT_TO_FAR },
                          IdsT{ ParamIdE::MELT_MIX } },
-                       { "Memory", F::ENVELOPE,
-                         IdsT{ ParamIdE::MEMORY_LEVEL, ParamIdE::MEMORY_TIME, ParamIdE::MEMORY_BLOOM,
-                               ParamIdE::MEMORY_BLUR, ParamIdE::MEMORY_SINK },
-                         IdsT{ ParamIdE::MEMORY_LEVEL } } } );
+                       { "Bloom", F::SPACE,
+                         IdsT{ ParamIdE::BLOOM, ParamIdE::BLOOM_SIZE, ParamIdE::BLOOM_DECAY, ParamIdE::BLOOM_DRIVE,
+                               ParamIdE::BLOOM_GLIDE },
+                         IdsT{ ParamIdE::BLOOM } } } );
     {
         auto *h = new HallPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [h] { return h->describe(); } );
@@ -511,7 +531,7 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
         auto                            at = [&names]( const char *n ) { return names.indexOf( n ); };
         std::vector<PageStrip::Section> sections = {
             { "", { at( "Focus" ) } },
-            { "Sound", { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ) } },
+            { "Sound", { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ) } },
             { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
             { "Space", { at( "Space" ), at( "Effects" ), at( "Hall" ) } },
             { "Modulation", { at( "Modulation" ) } },

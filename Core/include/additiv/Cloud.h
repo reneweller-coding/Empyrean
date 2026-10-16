@@ -122,6 +122,19 @@ constexpr int DreamBands = 512;       ///< the dream's spectrum: bands over 20 H
 constexpr int DreamMemories = 4096;   ///< snapshots of the heard spectrum the dream keeps
 constexpr int DreamRecall = 32;       ///< memories a recall blends at most (the nearest)
 
+// Phase 28 (16.10.2026): the weather in the wind, the bloom, the swarmalators, the physarum.
+constexpr int RainSlots = 16384;     ///< drops that may sound at once
+constexpr int RainPitches = 64;      ///< pitches tuned rain may sing
+constexpr int LeafClusters = 4096;   ///< the leaves' clusters over the field (64 across, 64 from near to far)
+constexpr int SurfSegments = 128;    ///< the shore's stretches from left to right
+constexpr int SurfWaves = 64;        ///< the sea's wave trains
+constexpr int BloomModes = 32768;    ///< the bloom plate's modes
+constexpr int BloomBands = 64;       ///< its bands for the cascade, on the log axis from 30 Hz to 18 kHz
+constexpr int SwarmN = 1024;         ///< the swarmalators
+constexpr int PhysW = 1024;          ///< the physarum's trail across the spectrum: 20 Hz .. 20 kHz on the log axis
+constexpr int PhysH = 32;            ///< and across the field, left to right
+constexpr int PhysFood = 128;        ///< its food: lines at the notes' harmonics
+
 /** @brief What a GPU voice plays: a note, or one of the layers that are not notes (Phase 27). */
 enum class VoiceKindE : std::int32_t
 {
@@ -244,9 +257,10 @@ constexpr int NumFilterModels = static_cast<int>( FilterModelE::COUNT );   ///< 
 constexpr int CloudChannels = 4;   ///< the voices' channels on the GPU: near left, near right, far left, far right
 /**
  * @brief A finished frame: the four voice channels, the modal hall's left and right, the spectral echo's, the
- *        melt's, the chime field's four (near and far, left and right) and the phantom layer's two (heard dry).
+ *        melt's, the chime field's four (near and far, left and right), the phantom layer's two (heard dry), the
+ *        weather's four (near and far, left and right) and the bloom's two.
  */
-constexpr int CloudOutChannels = 16;
+constexpr int CloudOutChannels = 22;
 constexpr int ModalModes = 65536;   ///< the modal hall's resonances
 constexpr int ModalTuned = 128;     ///< pitches the hall's tuned modes may sit on
 constexpr int HallBins =
@@ -470,6 +484,160 @@ struct Dream
 };
 static_assert( sizeof( Dream ) % 16 == 0, "Dream rides in the block header" );
 
+/** @brief What the rain falls on: the RainSurface parameter's choices. */
+enum class RainSurfaceE : std::int32_t
+{
+    WATER = 0,   ///< a pond: a drop traps a bubble that sings (Minnaert's resonance), rising as it rises
+    LEAVES,      ///< leaves: a short tick, a leaf's own ring
+    STONE,       ///< stone: a click and a glint
+    ROOF,        ///< a tin roof: each drop rings the sheet's modes
+    COUNT        ///< number of surfaces
+};
+
+/** @brief What the wind moves: the Foliage parameter's choices. */
+enum class FoliageE : std::int32_t
+{
+    BROADLEAF = 0,   ///< broad leaves: a soft rustle
+    PINE,            ///< needles: a high, smooth hiss
+    GRASS,           ///< tall grass: low and soft
+    DRY,             ///< dry leaves: a sparse crackle
+    COUNT            ///< number of kinds
+};
+
+/** @brief What the sea breaks on: the Shore parameter's choices. */
+enum class ShoreE : std::int32_t
+{
+    SAND = 0,   ///< sand: the foam's hiss
+    PEBBLES,    ///< pebbles: the backwash crackles through the stones
+    ROCKS,      ///< rocks: a boom as each wave breaks
+    COUNT       ///< number of shores
+};
+
+/**
+ * @brief The weather (Phase 28): rain, leaves and a sea, all in the chime field's wind (ChimeField).
+ *
+ * Rain: drops fall over the field -- left to right, near to far -- where the showers are: a density carried
+ * across by the wind (advected on its lattice), fed at the windward side by slow randoms, so showers pass. On water
+ * a drop traps a bubble whose ring is Minnaert's (3.26 kHz over its radius in mm, damped as van den Doel measured,
+ * rising as it rises); on leaves it ticks, on stone it clicks, on a tin roof it rings the sheet's modes. Tuned, a
+ * share of the bubbles and the roof's modes sing the scale's pitches.
+ * Leaves: clusters over the field rustle as the wind where they stand blows -- harder in the gusts --, every leaf
+ * a click through its own small resonance.
+ * The sea: SurfWaves trains of a swell, their heights by the wind, run onto a shore along the field; where a crest
+ * rises past its break it foams, and the foam hisses, the backwash crackles, rocks boom.
+ */
+struct Weather
+{
+    int   m_wind = 0;                  ///< 1: the wind blows (for the chimes or the weather; its lattice computed)
+    int   m_rainOn = 0;                ///< 1: the rain falls
+    int   m_leavesOn = 0;              ///< 1: the leaves rustle
+    int   m_surfOn = 0;                ///< 1: the sea breaks
+    int   m_surface = 0;               ///< RainSurfaceE
+    int   m_foliage = 0;               ///< FoliageE
+    int   m_shore = 0;                 ///< ShoreE
+    int   m_pitchCount = 0;            ///< pitches in `pitch`
+    int   m_reset = 0;                 ///< 1 for one block: the showers, the drops and the sea begin again
+    int   m_rainFresh = 0;             ///< 1 for one block: the showers begin even (the rain turned on)
+    int   m_windFresh = 0;             ///< 1 for one block: the wind begins from calm air (it began to blow)
+    int   m_pad2 = 0;                  ///< keeps the floats 16-byte aligned
+    float m_rainLevel = 0.0f;          ///< the rain's amplitude
+    float m_rainRate = 600.0f;         ///< drops a second over the whole field
+    float m_showers = 0.5f;            ///< 0 .. 1: how patchy the rain is (0 even, 1 passing showers)
+    float m_tune = 0.0f;               ///< 0 .. 1: the share of the bubbles and the roof's modes on the scale's pitches
+    float m_leavesLevel = 0.0f;        ///< the leaves' amplitude
+    float m_windRef = 0.02f;           ///< the wind's speed (lattice units) at which the leaves rustle fully
+    float m_surfLevel = 0.0f;          ///< the sea's amplitude
+    float m_surfHeight = 1.0f;         ///< the waves' height against the calm swell's (the wind raises it)
+    float m_surfPeriod = 10.0f;        ///< s: the swell's period
+    float m_surfDistance = 0.6f;       ///< 0 .. 1: how far off the shore is
+    float m_time = 0.0f;               ///< s since the sea began (its clock)
+    float m_advect = 0.15f;            ///< the showers' drift against the wind's speed
+    float m_shower[4] = {};            ///< the windward feed across the field (near .. far): slow randoms, -1 .. 1
+    float m_pitch[RainPitches] = {};   ///< Hz: the pitches tuned drops may sing
+};
+static_assert( sizeof( Weather ) % 16 == 0, "Weather rides in the block header" );
+
+/**
+ * @brief The bloom (Phase 28): a large plate of BloomModes modes (a tam-tam, a thunder sheet) that everything in
+ *        the field rings -- the voices, the chimes, the weather -- and whose energy climbs.
+ *
+ * A thin plate's modes stand evenly in hertz (Weyl), a mode every 3.24 / area Hz for bronze 1.5 mm thick. Linear,
+ * it would be a hall; a plate struck hard is not (von Karman's equations): its modes trade energy, and the energy
+ * runs up to the high ones -- the shimmer that blooms out of a tam-tam's stroke a moment after it -- the faster the
+ * louder (weak wave turbulence: Duering, Josserand and Rica 2006). Here the trade is the kinetic picture of that
+ * cascade: per band each block a flux upward, the energy over the band's modes squared, taken from a band as
+ * extra damping and given to the next as noise of the same power -- every mode a complex one-pole, the sum of the
+ * energies kept. And as in Berger's plate the stretching raises the pitch with the energy, the low modes most:
+ * the glide of an opera gong.
+ */
+struct Bloom
+{
+    int   m_on = 0;            ///< 1: the plate rings (0: nothing computed, its modes cleared)
+    int   m_pad0 = 0;          ///< keeps the floats 16-byte aligned
+    int   m_pad1 = 0;          ///< likewise
+    int   m_pad2 = 0;          ///< likewise
+    float m_level = 0.0f;      ///< the plate's amplitude out
+    float m_spacing = 1.65f;   ///< Hz between its modes (the plate's size)
+    float m_decay = 8.0f;      ///< s: a mode's ring at 200 Hz (higher ones shorter, as the square root)
+    float m_drive = 0.5f;      ///< 0 .. 1: how readily the energy climbs
+    float m_glide = 0.3f;      ///< -1 .. 1: the pitch with the energy (up when positive)
+    float m_width = 1.0f;      ///< 0 .. 1: how far the ears' phases differ
+    float m_pad3 = 0.0f;       ///< keeps the struct 16-byte aligned
+    float m_pad4 = 0.0f;       ///< likewise
+};
+static_assert( sizeof( Bloom ) % 16 == 0, "Bloom rides in the block header" );
+
+/**
+ * @brief The swarmalators (Phase 28; O'Keeffe, Ha and Strogatz 2017): SwarmN oscillators that swarm in the plane
+ *        around the listener while they synchronise, place and phase pulling each other -- like phases gather
+ *        (J), near ones fall into step (K). Every partial rides one of them: its place left to right and near to
+ *        far is the swarmalator's, its loudness pulses with its phase. Their states: gathered and pulsing as one;
+ *        a disc of phases at rest; a ring whose phase turns round it, so the pulse circles the listener; that ring
+ *        broken into turning clusters; and, past a point, the ring itself turning.
+ */
+struct SwarmSpace
+{
+    int   m_on = 0;          ///< 1: the swarm moves and the partials ride it
+    int   m_reset = 0;       ///< 1 for one block: the swarm scattered afresh
+    int   m_pad0 = 0;        ///< keeps the floats 16-byte aligned
+    int   m_pad1 = 0;        ///< likewise
+    float m_depth = 0.0f;    ///< 0 .. 1: how far the partials follow it (place and pulse)
+    float m_j = 0.5f;        ///< J: like phases gather (positive) or part
+    float m_k = 0.0f;        ///< K: near ones fall into step (positive) or out of it
+    float m_rate = 0.3f;     ///< Hz: the pulse's middle rate
+    float m_speed = 1.0f;    ///< the swarm's time against the clock's
+    float m_spread = 0.3f;   ///< the oscillators' own rates scattered, against the rate
+    float m_pad2 = 0.0f;     ///< keeps the struct 16-byte aligned
+    float m_pad3 = 0.0f;     ///< likewise
+};
+static_assert( sizeof( SwarmSpace ) % 16 == 0, "SwarmSpace rides in the block header" );
+
+/**
+ * @brief The physarum (Phase 28; Jones 2010, after the slime mould Physarum polycephalum): a share of the partials
+ *        crawl as its agents over a trail across the spectrum and the field. Each senses the trail ahead, ahead
+ *        left and ahead right, turns towards the most, moves and leaves trail; the trail spreads and fades, and the
+ *        notes' harmonics feed it. So veins grow between the harmonics -- partials gliding along them from one to
+ *        the next -- and as the chord changes the network moves to the new food and the old veins starve.
+ */
+struct Physarum
+{
+    int   m_on = 0;                      ///< 1: the field is the physarum (FieldModeE::PHYSARUM)
+    int   m_fresh = 0;                   ///< 1 when the last block was none: every agent starts where its partial is
+    int   m_count = 0;                   ///< food lines in `food`
+    int   m_pad0 = 0;                    ///< keeps the floats 16-byte aligned
+    float m_share = 0.3f;                ///< 0 .. 1: the share of the partials that crawl
+    float m_speed = 0.2f;                ///< trail cells an agent moves a block
+    float m_sensor = 5.0f;               ///< cells ahead it senses
+    float m_spring = 0.0f;               ///< per second: how fast an agent is drawn back to its partial's own place
+    float m_keep = 0.99f;                ///< the trail's share kept a block (its fading)
+    float m_spread = 0.15f;              ///< the share of the trail that spreads to the neighbours a block
+    float m_pad1 = 0.0f;                 ///< keeps the arrays 16-byte aligned
+    float m_pad2 = 0.0f;                 ///< likewise
+    float m_food[PhysFood] = {};         ///< food lines: trail cells across (0 .. PhysW)
+    float m_foodWeight[PhysFood] = {};   ///< each one's weight
+};
+static_assert( sizeof( Physarum ) % 16 == 0, "Physarum rides in the block header" );
+
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
 {
@@ -646,7 +814,8 @@ enum class FieldModeE : std::int32_t
     SCATTER,   ///< the same attractors push the partials away: moving gaps, like dust parted by a wind
     FLOCK,     ///< every cloud's members as a flock of starlings: cohesion, alignment, separation, a wind
     ORBIT,   ///< the scale's pitches as wells in pitch and side, a magnetic field bending every move: the partials circle them
-    COUNT   ///< number of modes
+    PHYSARUM,   ///< a share of the partials crawl as a slime mould over a trail the harmonics feed (Physarum)
+    COUNT       ///< number of modes
 };
 
 /**
@@ -795,6 +964,28 @@ public:
     int dreamMemories() const;
     /** @brief How many chimes struck in the last block. @return the count */
     int chimeStrikes() const;
+    /** @brief The weather's settings for the next block (Phase 28). @return them */
+    Weather &weather();
+    /** @brief The bloom's settings for the next block (Phase 28). @return them */
+    Bloom &bloom();
+    /** @brief The swarmalators' settings for the next block (Phase 28). @return them */
+    SwarmSpace &swarm();
+    /** @brief The physarum's settings and food for the next block (Phase 28). @return them */
+    Physarum &physarum();
+    /**
+     * @brief What the weather, the bloom, the swarm and the physarum did in the last block (Phase 28).
+     * @param[out] out  receives 8 values: drops sounding, drops born, the wind's mean speed (lattice units), the
+     *                  leaves' mean rustle (0 .. 1), the sea's mean foam, the bloom's share of its energy above 2 kHz,
+     *                  the swarm's phase order R and its phase-place order S (each 0 .. 1)
+     */
+    void weatherStats( float *out ) const;
+    /**
+     * @brief The physarum's trail as the last block left it: its mean and its spread (standard deviation over the
+     *        mean -- 0 for an even trail, large for veins).
+     * @param[out] mean    receives the mean
+     * @param[out] spread  receives the spread
+     */
+    void physarumStats( float &mean, float &spread ) const;
     /**
      * @brief Which GPU voices carry the layers that are not notes (Phase 27): the phantom layer's chunks are summed
      *        apart, into the frame's channels 14 and 15.

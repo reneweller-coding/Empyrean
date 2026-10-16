@@ -514,6 +514,13 @@ int main( int argc, char **argv )
             std::printf( "  %5.0f s: %6.1f dBFS RMS, peak %6.1f dBFS, %2d voices, root %3d, GPU %.3f ms/block\n",
                          now / c.m_sampleRate, 20.0 * std::log10( std::max( rms, 1e-9 ) ),
                          20.0 * std::log10( std::max( peak, 1e-9 ) ), e.soundingVoices(), e.brainRoot(), gpu / blocks );
+            float nature[10];   // Phase 28: what the weather, the bloom, the swarm and the physarum did
+            e.natureStats( nature );
+            if ( nature[0] + nature[2] + nature[4] + nature[5] + nature[6] + nature[8] > 0.0f )
+                std::printf(
+                    "         drops %.0f, wind %.4f, rustle %.2f, foam %.2f, bloom above 2 kHz %.2f, swarm R %.2f S "
+                    "%.2f, trail %.2f spread %.2f\n",
+                    nature[0], nature[2], nature[3], nature[4], nature[5], nature[6], nature[7], nature[8], nature[9] );
             sq = 0.0;
             peak = 0.0;
             gpu = 0.0;

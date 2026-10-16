@@ -271,8 +271,9 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_early.prepare( m_cfg.m_sampleRate );
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
-    for ( std::vector<float> *b : { &m_nearL, &m_nearR, &m_farL, &m_farR, &m_dryL, &m_dryR, &m_wetL, &m_wetR, &m_modalL,
-                                    &m_modalR, &m_specL, &m_specR, &m_meltL, &m_meltR, &m_phantomL, &m_phantomR } )
+    for ( std::vector<float> *b :
+          { &m_nearL, &m_nearR, &m_farL, &m_farR, &m_dryL, &m_dryR, &m_wetL, &m_wetR, &m_modalL, &m_modalR, &m_specL,
+            &m_specR, &m_meltL, &m_meltR, &m_phantomL, &m_phantomR, &m_bloomL, &m_bloomR } )
         b->assign( static_cast<size_t>( G ), 0.0f );
     m_ghosts.assign( static_cast<size_t>( std::max( 0, m_cfg.m_ghosts ) ), Ghost{} );
     m_ghostRng = Rng( m_cfg.m_seed ^ 0x47686F7374ull );
@@ -285,6 +286,10 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_echoCount = 0;
     m_gust = 0.0f;
     m_chimesOn = false;
+    m_rainLevel = m_leavesLevel = m_surfLevel = m_bloomLevel = m_swarmDepth = 0.0f;
+    m_rainWas = m_windWas = m_swarmWas = m_physWas = false;
+    for ( float &s : m_shower ) s = 0.0f;
+    m_showerRng = Rng( m_cfg.m_seed ^ 0x5261696Eull );
     m_chimeLevel = m_phantomGain = m_dreamGain = 0.0f;
     m_dreamBlocks = 0;
     m_chimeStrikes.store( 0, std::memory_order_relaxed );
@@ -2109,10 +2114,6 @@ void Engine::stepLayers( float dt )
         m_chimesOn = on;
         if ( on )
         {
-            m_gust += -m_gust * dt / 3.0f + std::sqrt( 2.0f * dt / 3.0f ) * m_windRng.bipolar() * 1.7320508f;
-            const float wind = cur( ParamIdE::WIND );
-            const float gust = std::max( 0.0f, 1.0f + cur( ParamIdE::GUSTS ) * m_gust );
-            C.m_force = 2.0e-5f * std::pow( 2.0f * wind, 1.2f ) * gust;
             C.m_kick = 16.0f;
             C.m_level = 0.25f * m_chimeLevel * VoiceLevel;
             C.m_decay = cur( ParamIdE::CHIME_DECAY );
@@ -2128,6 +2129,121 @@ void Engine::stepLayers( float dt )
             }
             C.m_pitchCount = count;
         }
+    }
+}
+
+void Engine::stepNature( float dt )
+{
+    auto glide = [dt]( float &v, float want, float tau )
+    {
+        v += ( want - v ) * ( 1.0f - std::exp( -dt / tau ) );
+        if ( want <= 0.0f && v < 1.0e-4f ) v = 0.0f;
+    };
+    Weather    &W = m_cloud.weather();
+    ChimeField &C = m_cloud.chimes();
+    const float rain = cur( ParamIdE::RAIN ), leaves = cur( ParamIdE::LEAVES ), surf = cur( ParamIdE::SURF );
+    glide( m_rainLevel, rain, 0.3f );
+    glide( m_leavesLevel, leaves, 0.3f );
+    glide( m_surfLevel, surf, 0.5f );
+    W.m_rainOn = ( rain > 0.0f || m_rainLevel > 0.0f ) ? 1 : 0;
+    W.m_leavesOn = ( leaves > 0.0f || m_leavesLevel > 0.0f ) ? 1 : 0;
+    W.m_surfOn = ( surf > 0.0f || m_surfLevel > 0.0f ) ? 1 : 0;
+    if ( W.m_rainOn && !m_rainWas ) W.m_rainFresh = 1;   // the showers begin even
+    m_rainWas = W.m_rainOn != 0;
+    const bool weather = W.m_rainOn || W.m_leavesOn || W.m_surfOn;
+    W.m_wind = weather ? 1 : 0;   // the chimes' own need is added at launch
+
+    // The wind, for the chimes or the weather: its gust a slow random of three seconds' memory, its push by the knob
+    // (measured with the chimes: a strike or none a second at 0.3, a few at half, dozens at 0.7, more than a hundred
+    // at the top). It begins from calm air when it begins to blow.
+    const bool windOn = weather || C.m_on;
+    if ( windOn && !m_windWas ) W.m_windFresh = 1;
+    m_windWas = windOn;
+    const float wind = cur( ParamIdE::WIND );
+    if ( windOn )
+    {
+        m_gust += -m_gust * dt / 3.0f + std::sqrt( 2.0f * dt / 3.0f ) * m_windRng.bipolar() * 1.7320508f;
+        const float gust = std::max( 0.0f, 1.0f + cur( ParamIdE::GUSTS ) * m_gust );
+        C.m_force = 2.0e-5f * std::pow( 2.0f * wind, 1.2f ) * gust;
+    }
+
+    // The rain: its showers' windward feed (four slow randoms of ten seconds' memory, near to far: a shower about half as
+    // wide as the field; with six seconds the left and the right differed by a decibel), what it falls on,
+    // the pitches tuned drops sing (bubbles 1 .. 8 kHz, a roof's ring 300 Hz .. 2.4 kHz).
+    if ( W.m_rainOn )
+    {
+        for ( int k = 0; k < 4; ++k )
+        {
+            m_shower[k] +=
+                -m_shower[k] * dt / 10.0f + std::sqrt( 2.0f * dt / 10.0f ) * m_showerRng.bipolar() * 1.7320508f;
+            W.m_shower[k] = std::clamp( 0.8f * m_shower[k], -1.0f, 1.0f );
+        }
+        W.m_rainLevel = 4.0f * m_rainLevel * VoiceLevel;
+        W.m_rainRate = rain > 0.0f ? cur( ParamIdE::RAIN_RATE ) : 0.0f;   // fading out: no new drops
+        W.m_surface =
+            std::clamp( static_cast<int>( std::lround( cur( ParamIdE::RAIN_SURFACE ) ) ), 0, NumRainSurfaces - 1 );
+        W.m_showers = cur( ParamIdE::RAIN_SHOWERS );
+        W.m_tune = cur( ParamIdE::RAIN_TUNE );
+        W.m_advect = 0.15f;
+        const float lo = W.m_surface == 3 ? 300.0f : 1000.0f, hi = W.m_surface == 3 ? 2400.0f : 8000.0f;
+        int         count = 0;
+        for ( int k = 0; k < 128 && count < RainPitches; ++k )
+        {
+            const double f = frequencyOf( k );
+            if ( f >= lo && f < hi ) W.m_pitch[count++] = static_cast<float>( f );
+        }
+        W.m_pitchCount = count;
+    }
+    // The leaves: they rustle fully at about the wind's mean speed at the top of the knob (measured: 0.026, 0.050,
+    // 0.069 lattice units at 0.2, 0.5, 0.8), their gusting part counted twice.
+    if ( W.m_leavesOn )
+    {
+        W.m_leavesLevel = 2.5f * m_leavesLevel * VoiceLevel;
+        W.m_foliage = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::FOLIAGE ) ) ), 0, NumFoliages - 1 );
+        W.m_windRef = 0.08f;
+    }
+    // The sea: its height by the wind (a calm swell at none), its clock.
+    if ( W.m_surfOn )
+    {
+        W.m_surfLevel = 3.0f * m_surfLevel * VoiceLevel;
+        W.m_surfHeight = 0.7f + 1.3f * wind * wind;
+        W.m_surfPeriod = cur( ParamIdE::SURF_SWELL );
+        W.m_shore = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::SHORE ) ) ), 0, NumShores - 1 );
+        W.m_surfDistance = cur( ParamIdE::SURF_DISTANCE );
+        W.m_time += dt;
+        if ( W.m_time > 86400.0f ) W.m_time -= 86400.0f;
+    }
+
+    // The bloom: a plate of the knob's side (bronze, 1.5 mm: a mode every 3.24 / area Hz, the plate 1.37 times as
+    // long as wide), its ring at 200 Hz, its drive and glide.
+    {
+        Bloom      &B = m_cloud.bloom();
+        const float want = cur( ParamIdE::BLOOM );
+        glide( m_bloomLevel, want, 0.3f );
+        B.m_on = ( want > 0.0f || m_bloomLevel > 0.0f ) ? 1 : 0;
+        const float side = cur( ParamIdE::BLOOM_SIZE );
+        B.m_level = m_bloomLevel;
+        B.m_spacing = 3.24f / ( 1.37f * side * side );
+        B.m_decay = cur( ParamIdE::BLOOM_DECAY );
+        B.m_drive = cur( ParamIdE::BLOOM_DRIVE );
+        B.m_glide = cur( ParamIdE::BLOOM_GLIDE );
+        B.m_width = 1.0f;
+    }
+
+    // The swarmalators: scattered afresh when they begin.
+    {
+        SwarmSpace &S = m_cloud.swarm();
+        const float want = cur( ParamIdE::SWARMAL );
+        glide( m_swarmDepth, want, 0.5f );
+        S.m_on = ( want > 0.0f || m_swarmDepth > 0.0f ) ? 1 : 0;
+        if ( S.m_on && !m_swarmWas ) S.m_reset = 1;
+        m_swarmWas = S.m_on != 0;
+        S.m_depth = m_swarmDepth;
+        S.m_j = cur( ParamIdE::SWARMAL_GATHER );
+        S.m_k = cur( ParamIdE::SWARMAL_SYNC );
+        S.m_rate = cur( ParamIdE::SWARMAL_RATE );
+        S.m_speed = cur( ParamIdE::SWARMAL_SPEED );
+        S.m_spread = cur( ParamIdE::SWARMAL_SPREAD );
     }
 }
 
@@ -2359,6 +2475,7 @@ void Engine::renderBlock()
         landMakeup = 1.0f / std::max( 0.125f, 1.0f - m_blk.m_motionDepth + m_blk.m_motionDepth * m_landRms );
     stepSeasons( dtf );
     stepLayers( dtf );
+    stepNature( dtf );
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
@@ -2779,6 +2896,41 @@ void Engine::renderBlock()
         m_flockWas = F.m_mode == FieldModeE::FLOCK;
         F.m_orbitFresh = ( F.m_mode == FieldModeE::ORBIT && !m_orbitWas ) ? 1 : 0;
         m_orbitWas = F.m_mode == FieldModeE::ORBIT;
+        // The Physarum (Phase 28): Pull its agents' speed (20 .. 600 cents a second), Radius how far ahead they sense,
+        // Spring how they are drawn back home, Trail how long what they leave lasts; its food the sounding notes'
+        // first eight harmonics, each line as strong as its note and weaker up the series.
+        {
+            Physarum &P = m_cloud.physarum();
+            P.m_on = F.m_mode == FieldModeE::PHYSARUM ? 1 : 0;
+            P.m_fresh = ( P.m_on && !m_physWas ) ? 1 : 0;
+            m_physWas = P.m_on != 0;
+            if ( P.m_on )
+            {
+                const float cellCents = 1200.0f * 9.96578428f / static_cast<float>( PhysW );
+                const float dtb = static_cast<float>( dt );
+                P.m_share = cur( ParamIdE::PHYSARUM_SHARE );
+                P.m_speed = ( 20.0f + 580.0f * pull * pull ) * dtb / cellCents;
+                P.m_sensor = std::max( F.m_radius / cellCents, 1.0f );
+                P.m_spring = F.m_spring;
+                P.m_keep = std::exp( -dtb / std::max( cur( ParamIdE::PHYSARUM_TRAIL ), 0.1f ) );
+                P.m_spread = 0.15f;
+                int count = 0;
+                for ( const Voice &v : m_voices )
+                {
+                    if ( v.m_note < 0 || v.m_lastGain < 0.01f ) continue;
+                    for ( int h = 1; h <= 8 && count < PhysFood; ++h )
+                    {
+                        const double f = static_cast<double>( v.m_hz ) * h;
+                        if ( f < 20.0 || f > 20000.0 ) break;
+                        P.m_food[count] = static_cast<float>( std::log2( f / 20.0 ) * PhysW / 9.96578428 );
+                        P.m_foodWeight[count] =
+                            std::min( 1.0f, 1.5f * v.m_lastGain ) / std::sqrt( static_cast<float>( h ) );
+                        ++count;
+                    }
+                }
+                P.m_count = count;
+            }
+        }
         // The Orbit: Pull the wells' depth (0.5 .. 8.5 rad/s), Wander the magnetic field (the circling,
         // 0.5 .. 30 rad/s), Spring the damping -- light, the circles keep their course; heavy, they
         // wander; Radius the cents to a full side, and the orbits' size about half of it.
@@ -3194,10 +3346,12 @@ void Engine::renderBlock()
         m_specR[k] = f[7];
         m_meltL[k] = f[8];
         m_meltR[k] = f[9];
-        m_nearL[k] += f[10];   // the chime field, near and far, as the voices' planes (Phase 27)
-        m_nearR[k] += f[11];
-        m_farL[k] += f[12] * m_blk.m_farLevel;
-        m_farR[k] += f[13] * m_blk.m_farLevel;
+        m_nearL[k] += f[10] + f[16];   // the chime field and the weather, near and far, as the voices' planes
+        m_nearR[k] += f[11] + f[17];
+        m_farL[k] += ( f[12] + f[18] ) * m_blk.m_farLevel;
+        m_farR[k] += ( f[13] + f[19] ) * m_blk.m_farLevel;
+        m_bloomL[k] = f[20];   // the bloom (Phase 28), its level applied on the card
+        m_bloomR[k] = f[21];
         m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
         m_phantomR[k] = f[15];
     }
@@ -3301,8 +3455,8 @@ void Engine::renderBlock()
         {
             const size_t k = static_cast<size_t>( s );
             const float  m = ramp( m_prevModalLevel, ml, s );
-            m_nearL[k] += m_farL[k] + m_modalL[k] * m;
-            m_nearR[k] += m_farR[k] + m_modalR[k] * m;
+            m_nearL[k] += m_farL[k] + m_modalL[k] * m + m_bloomL[k];
+            m_nearR[k] += m_farR[k] + m_modalR[k] * m + m_bloomR[k];
         }
         m_prevModalLevel = ml;
     }

@@ -293,7 +293,32 @@ enum class ParamIdE : int
     DREAM_DEPTH,   ///< 0 .. 1: how far off the dream is heard
     PREMONITION,   ///< 0 .. 1: the conductor's notes are heard coming -- a swell like a reverb backwards into their start
     PREMONITION_TIME,   ///< s: how long before a note its premonition begins
-    COUNT               ///< number of parameters
+    // Phase 28 (16.10.2026): the weather in the wind, the bloom, the swarmalators, the physarum
+    RAIN,             ///< 0 .. 1: rain falls over the field where the showers the wind carries are
+    RAIN_RATE,        ///< drops a second over the whole field
+    RAIN_SURFACE,     ///< what it falls on: water, leaves, stone, a tin roof
+    RAIN_SHOWERS,     ///< 0 .. 1: how patchy the rain is (showers passing with the wind)
+    RAIN_TUNE,        ///< 0 .. 1: the share of the bubbles and the roof's ring on the scale's pitches
+    LEAVES,           ///< 0 .. 1: leaves rustle where the wind blows
+    FOLIAGE,          ///< broad leaves, pine, grass, dry leaves
+    SURF,             ///< 0 .. 1: a sea breaks on a shore along the field, its waves raised by the wind
+    SURF_SWELL,       ///< s: the swell's period
+    SHORE,            ///< sand, pebbles, rocks
+    SURF_DISTANCE,    ///< 0 .. 1: how far off the shore is
+    BLOOM,            ///< 0 .. 1: a large plate everything rings, its energy climbing into a shimmer
+    BLOOM_SIZE,       ///< m: the plate's side
+    BLOOM_DECAY,      ///< s: its ring at 200 Hz
+    BLOOM_DRIVE,      ///< 0 .. 1: how readily its energy climbs
+    BLOOM_GLIDE,      ///< -1 .. 1: its pitch with its energy (an opera gong's glide)
+    SWARMAL,          ///< 0 .. 1: the partials ride swarmalators round the listener (place and pulse)
+    SWARMAL_GATHER,   ///< J, -1 .. 1: like phases gather (positive) or part
+    SWARMAL_SYNC,     ///< K, -1 .. 1: near ones fall into step (positive) or out of it
+    SWARMAL_RATE,     ///< Hz: the pulse's rate
+    SWARMAL_SPEED,    ///< the swarm's time against the clock's
+    SWARMAL_SPREAD,   ///< 0 .. 1: the swarmalators' own rates scattered
+    PHYSARUM_SHARE,   ///< 0 .. 1: the share of the partials that crawl (Field: Physarum)
+    PHYSARUM_TRAIL,   ///< s: how long the physarum's trail lasts
+    COUNT             ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table
@@ -394,10 +419,16 @@ constexpr int            NumPhantomLines = 3;                 ///< entries of Ph
 extern const char *const PhantomLineNames[NumPhantomLines];   ///< "Melody", "Echo", "Chord"
 constexpr int            NumChimeKinds = 4;                   ///< entries of ChimeKindNames
 extern const char *const ChimeKindNames[NumChimeKinds];   ///< "Tubes", "Glass", "Bamboo", "Bells" (Cloud.h ChimeKind)
-constexpr int            NumFieldModes = 6;               ///< entries of FieldModeNames
-extern const char *const
-    FieldModeNames[NumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit" (Cloud.h FieldMode)
-constexpr int            NumFarModes = 4;   ///< entries of FarModeNames
+constexpr int            NumFieldModes = 7;               ///< entries of FieldModeNames
+extern const char *const FieldModeNames
+    [NumFieldModes];   ///< "Off", "Scale", "Swarm", "Scatter", "Flock", "Orbit", "Physarum" (Cloud.h FieldMode)
+constexpr int            NumRainSurfaces = 4;                 ///< entries of RainSurfaceNames
+extern const char *const RainSurfaceNames[NumRainSurfaces];   ///< "Water", "Leaves", "Stone", "Tin Roof"
+constexpr int            NumFoliages = 4;                     ///< entries of FoliageNames
+extern const char *const FoliageNames[NumFoliages];           ///< "Broadleaf", "Pine", "Grass", "Dry Leaves"
+constexpr int            NumShores = 3;                       ///< entries of ShoreNames
+extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
+constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames
 extern const char *const FarModeNames
     [NumFarModes];   ///< the far reverb's networks (Effects.h Reverb::setMode): "Classic", "Scattering", "Colourless", "Rotating"
 extern const char *const RootNames[12];    ///< "C" .. "B"

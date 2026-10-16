@@ -358,6 +358,19 @@ public:
 
     /** @brief Voices sounding after the last rendered block. @return 0 .. voices */
     int soundingVoices() const { return m_sounding.load( std::memory_order_relaxed ); }
+    /**
+     * @brief What the weather, the bloom, the swarm and the physarum did in the last block (Phase 28; for tests and
+     *        tools, offline: read on the thread that renders).
+     * @param[out] out  receives 10 values: drops sounding, drops born, the wind's mean speed, the leaves' rustle, the
+     *                  sea's foam, the bloom's share above 2 kHz, the swarm's orders R and S, the physarum's trail mean
+     *                  and its spread
+     */
+    void natureStats( float *out ) const
+    {
+        m_cloud.weatherStats( out );
+        m_cloud.physarumStats( out[8], out[9] );
+    }
+
     /** @brief Chimes that struck since the engine was prepared (Phase 27; tests, diagnostics). @return the count */
     long long chimeStrikes() const { return m_chimeStrikes.load( std::memory_order_relaxed ); }
     /** @brief Memories the dream keeps, as the last block left them (Phase 27). @return 0 .. DreamMemories */
@@ -889,6 +902,13 @@ private:
      * @param[in] dt  the block's length, seconds
      */
     void stepLayers( float dt );
+    /**
+     * @brief The weather, the bloom and the swarmalators, one block (Phase 28): their levels gliding, the wind
+     *        blowing for the chimes or the weather (its gusts, its push), the rain's showers and pitches, the sea's
+     *        height by the wind, the plate's size, the swarm's couplings.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepNature( float dt );
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost
@@ -962,6 +982,21 @@ private:
     std::atomic<long long>            m_chimeStrikes{ 0 };   ///< chimes struck since prepare (chimeStrikes)
     std::vector<float>                m_phantomL;            ///< the phantom layer's block from the GPU, left
     std::vector<float>                m_phantomR;            ///< and right
+    // Phase 28
+    float              m_rainLevel = 0.0f;     ///< the rain's level as it glides
+    float              m_leavesLevel = 0.0f;   ///< the leaves' level as it glides
+    float              m_surfLevel = 0.0f;     ///< the sea's level as it glides
+    float              m_bloomLevel = 0.0f;    ///< the bloom's level as it glides
+    float              m_swarmDepth = 0.0f;    ///< the swarmalators' depth as it glides
+    bool               m_rainWas = false;      ///< the rain fell in the last block
+    bool               m_windWas = false;      ///< the wind blew in the last block
+    bool               m_swarmWas = false;     ///< the swarm moved in the last block
+    bool               m_physWas = false;      ///< the field was the physarum in the last block
+    float              m_shower[4] = {};       ///< the showers' windward feed, slow randoms (10 s memory)
+    Rng                m_showerRng;            ///< their dice
+    std::vector<float> m_bloomL;               ///< the bloom's block from the GPU, left
+    std::vector<float> m_bloomR;               ///< and right
+    float              m_prevBloom = 0.0f;     ///< unused: the bloom's level is applied on the card
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
