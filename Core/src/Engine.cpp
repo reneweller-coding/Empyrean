@@ -2003,23 +2003,30 @@ void Engine::stepLayers( float dt )
                 double hz;
                 float  weight;
             };
-            std::vector<Pitch> sounding;
+            std::array<Pitch, 64> sounding{};   // fixed: nothing is allocated a block
+            int                   soundingCount = 0;
+            auto                  sound = [&]( double hz, float weight )
+            {
+                if ( soundingCount < static_cast<int>( sounding.size() ) )
+                    sounding[static_cast<size_t>( soundingCount++ )] = { hz, weight };
+            };
             const int line = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::PHANTOM_LINE ) ) ), 0, 2 );
             for ( int k = 0; k < m_echoCount; ++k ) m_echoAge[static_cast<size_t>( k )] += dt;
             while ( m_echoCount > 0 && m_echoAge[static_cast<size_t>( m_echoCount - 1 )] > 30.0f ) --m_echoCount;
             if ( line == 0 )
             {   // Melody: a line of its own among the scale's pitches in 220 .. 880 Hz, a step of one or two every
                 // four to eight seconds, each note fading in over a second and a half as the last fades out
-                std::vector<double> scale;
+                std::array<double, 128> scale{};
+                int                     n = 0;
                 for ( int k = 0; k < 128; ++k )
                 {
                     const double f = frequencyOf( k );
-                    if ( f >= 220.0 && f < 880.0 && ( scale.empty() || f > scale.back() * 1.01 ) ) scale.push_back( f );
+                    if ( f >= 220.0 && f < 880.0 && ( n == 0 || f > scale[static_cast<size_t>( n - 1 )] * 1.01 ) )
+                        scale[static_cast<size_t>( n++ )] = f;
                 }
                 m_melodyNext -= dt;
-                if ( !scale.empty() && ( m_melodyNext <= 0.0f || m_melodyAt < 0 ) )
+                if ( n > 0 && ( m_melodyNext <= 0.0f || m_melodyAt < 0 ) )
                 {
-                    const int n = static_cast<int>( scale.size() );
                     int       at = m_melodyAt < 0 ? n / 2 : m_melodyAt;
                     const int step = 1 + static_cast<int>( m_phantomRng.uniform() * 2.0f );
                     at += m_phantomRng.uniform() < 0.5f ? -step : step;
@@ -2036,24 +2043,23 @@ void Engine::stepLayers( float dt )
                 m_melodyWeight[0] = std::min( 1.0f, m_melodyWeight[0] + fade );
                 m_melodyWeight[1] = std::max( 0.0f, m_melodyWeight[1] - fade );
                 for ( int k = 0; k < 2; ++k )
-                    if ( m_melodyHz[k] > 0.0f && m_melodyWeight[k] > 0.0f )
-                        sounding.push_back( { m_melodyHz[k], m_melodyWeight[k] } );
+                    if ( m_melodyHz[k] > 0.0f && m_melodyWeight[k] > 0.0f ) sound( m_melodyHz[k], m_melodyWeight[k] );
             }
             else if ( line == 1 )
             {   // Echo: the notes that ended lately, fading over half a minute
                 for ( int k = 0; k < m_echoCount; ++k )
-                    sounding.push_back(
-                        { m_echoHz[static_cast<size_t>( k )], 1.0f - m_echoAge[static_cast<size_t>( k )] / 30.0f } );
+                    sound( m_echoHz[static_cast<size_t>( k )], 1.0f - m_echoAge[static_cast<size_t>( k )] / 30.0f );
             }
             else
             {   // Chord: the notes sounding now
                 for ( const Voice &v : m_voices )
                     if ( v.m_note >= 0 && !v.m_stealing && v.m_lastGain > 0.02f && v.m_pre <= 0.0f )
-                        sounding.push_back( { v.m_hz, std::min( 1.0f, 1.5f * v.m_lastGain ) } );
+                        sound( v.m_hz, std::min( 1.0f, 1.5f * v.m_lastGain ) );
             }
             cv.m_phantomCount = 0;
-            for ( const Pitch &p : sounding )
+            for ( int s = 0; s < soundingCount; ++s )
             {
+                const Pitch &p = sounding[static_cast<size_t>( s )];
                 if ( cv.m_phantomCount >= PhantomTargets ) break;
                 double f = std::max( p.hz, 1.0 );
                 while ( f < 220.0 ) f *= 2.0;

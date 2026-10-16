@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <complex>
 #include <cmath>
@@ -49,7 +50,9 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -100,14 +103,35 @@ double measure( int index, double seconds, std::string *error, Description *desc
     c.m_realtimeGpuClass = false;
     if ( !e.prepare( c, error ) ) return std::nan( "" );
     for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
-    // The loudest second: a pad's sustain, a bell's strike -- what a listener levels by. (The
-    // last eight seconds measured the bells' and the glass's decay, 20 dB under their strike.)
+    // The loudest three seconds, K-weighted (ITU-R BS.1770's short-term loudness, LUFS): a pad's sustain, a bell's
+    // strike -- what a listener levels by. (The last eight seconds measured the bells' and the glass's decay, 20 dB
+    // under their strike. The loudest second's RMS weighed a wave room's bass as much as a rain's glints, which the ear
+    // does not: so the loudness's weighting, 16.10.2026.)
     const int          n = 512;
     const int          blocks = static_cast<int>( seconds * c.m_sampleRate / n );
     const int          perSecond = static_cast<int>( c.m_sampleRate / n );
     std::vector<float> L( n ), R( n );
     double             sq = 0.0, loudest = 0.0;
     int                inWindow = 0;
+    // The K-weighting at 48 kHz (BS.1770-4: the head's shelf, then the RLB high pass), a pair of biquads a channel.
+    struct Biquad
+    {
+        double b0, b1, b2, a1, a2, z1 = 0.0, z2 = 0.0;
+        double run( double x )
+        {
+            const double y = b0 * x + z1;
+            z1 = b1 * x - a1 * y + z2;
+            z2 = b2 * x - a2 * y;
+            return y;
+        }
+    };
+    Biquad shelf[2], rlb[2];
+    for ( int ch = 0; ch < 2; ++ch )
+    {
+        shelf[ch] = { 1.53512485958697, -2.69169618940638, 1.19839281085285, -1.69065929318241, 0.73248077421585 };
+        rlb[ch] = { 1.0, -2.0, 1.0, -1.99004745483398, 0.99007225036621 };
+    }
+    std::vector<double> seconds3;   // per second the K-weighted power, both channels summed
     // The last eight seconds kept for the description.
     const int          keepFrom = std::max( 0, blocks - static_cast<int>( 8.0 * c.m_sampleRate / n ) );
     std::vector<float> keptL, keptR;
@@ -120,16 +144,24 @@ double measure( int index, double seconds, std::string *error, Description *desc
             keptR.insert( keptR.end(), R.begin(), R.end() );
         }
         for ( int i = 0; i < n; ++i )
-            sq += 0.5 * ( static_cast<double>( L[i] ) * L[i] + static_cast<double>( R[i] ) * R[i] );
+        {
+            const double l = rlb[0].run( shelf[0].run( L[i] ) ), r = rlb[1].run( shelf[1].run( R[i] ) );
+            sq += l * l + r * r;
+        }
         if ( ++inWindow == perSecond )
         {
-            loudest = std::max( loudest, sq / ( static_cast<double>( perSecond ) * n ) );
+            seconds3.push_back( sq / ( static_cast<double>( perSecond ) * n ) );
             sq = 0.0;
             inWindow = 0;
+            if ( seconds3.size() >= 3 )
+            {
+                const size_t k = seconds3.size();
+                loudest = std::max( loudest, ( seconds3[k - 1] + seconds3[k - 2] + seconds3[k - 3] ) / 3.0 );
+            }
         }
     }
     if ( desc != nullptr ) *desc = describe( keptL, keptR, c.m_sampleRate );
-    return 10.0 * std::log10( std::max( loudest, 1e-20 ) );
+    return -0.691 + 10.0 * std::log10( std::max( loudest, 1e-20 ) );
 }
 
 /** @brief The knobs the sensitivity mode nudges: those that shape the sound and that a preset sets. */
@@ -382,7 +414,7 @@ int main( int argc, char **argv )
     int         from = 0, to = numPresets() - 1;
     std::string namesFile, describeFile, sensitivityFile, registerFile, setText;
     bool        checkNudges = false;
-    int         step = 1;
+    int         step = 1, jobs = 10;
     double      seconds = -1.0;
     fs::path    out = repoRoot() / "work" / "presets" / "levels.json";
     for ( int i = 1; i < argc; ++i )
@@ -411,12 +443,14 @@ int main( int argc, char **argv )
             step = std::max( 1, std::atoi( argv[++i] ) );
         else if ( a == "--set" && has )
             setText = argv[++i];
+        else if ( a == "--jobs" && has )
+            jobs = std::clamp( std::atoi( argv[++i] ), 1, 16 );
         else
         {
             std::fprintf(
                 stderr,
                 "additiv_presets [--from N] [--to M] [--step K] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE] "
-                "[--register FILE [--set \"key=value;...\"]]\n" );
+                "[--register FILE [--set \"key=value;...\"]] [--jobs N]\n" );
             return 1;
         }
     }
@@ -467,25 +501,58 @@ int main( int argc, char **argv )
     std::vector<std::pair<std::string, double>>      levels;
     std::vector<std::pair<std::string, Description>> descriptions;
     double                                           lo = 1e9, hi = -1e9;
+    // Several engines at once (each its own stream and tables on the card, its own thread for the effects): the
+    // card is mostly idle while one engine renders. Kept in the order asked for, so the files read the same.
+    std::vector<double>      dbs( which.size(), std::nan( "" ) );
+    std::vector<Description> descs( which.size() );
+    std::atomic<size_t>      next{ 0 }, done{ 0 };
+    std::atomic<bool>        failed{ false };
+    std::mutex               lock;
+    std::string              failure;
+    auto                     work = [&]()
+    {
+        for ( ;; )
+        {
+            const size_t k = next++;
+            if ( k >= which.size() || failed ) return;
+            const int    i = which[k];
+            std::string  error;
+            Description  desc;
+            const double db = measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc );
+            const std::lock_guard<std::mutex> hold( lock );
+            if ( std::isnan( db ) )
+            {
+                failure = error;
+                failed = true;
+                return;
+            }
+            dbs[k] = db;
+            descs[k] = desc;
+            lo = std::min( lo, db );
+            hi = std::max( hi, db );
+            const size_t count = ++done;
+            if ( count % 64 == 0 || count == which.size() )
+            {
+                std::printf( "  %4zu / %zu  %-14s %-24s %6.1f LUFS (so far %.1f .. %.1f)\n", count, which.size(),
+                             PresetGroupNames[preset( i ).m_group], preset( i ).m_name, db, lo, hi );
+                std::fflush( stdout );
+            }
+        }
+    };
+    {
+        std::vector<std::thread> pool;
+        for ( int j = 0; j < std::min<int>( jobs, static_cast<int>( which.size() ) ); ++j ) pool.emplace_back( work );
+        for ( std::thread &th : pool ) th.join();
+    }
+    if ( failed )
+    {
+        std::fprintf( stderr, "additiv_presets: %s\n", failure.c_str() );
+        return 1;
+    }
     for ( size_t k = 0; k < which.size(); ++k )
     {
-        const int    i = which[k];
-        std::string  error;
-        Description  desc;
-        const double db = measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc );
-        if ( !describeFile.empty() ) descriptions.emplace_back( preset( i ).m_name, desc );
-        if ( std::isnan( db ) )
-        {
-            std::fprintf( stderr, "additiv_presets: %s\n", error.c_str() );
-            return 1;
-        }
-        levels.emplace_back( preset( i ).m_name, db );
-        lo = std::min( lo, db );
-        hi = std::max( hi, db );
-        if ( k % 64 == 63 || k + 1 == which.size() )
-            std::printf( "  %4zu / %zu  %-14s %-24s %6.1f dBFS (so far %.1f .. %.1f)\n", k + 1, which.size(),
-                         PresetGroupNames[preset( i ).m_group], preset( i ).m_name, db, lo, hi );
-        std::fflush( stdout );
+        levels.emplace_back( preset( which[k] ).m_name, dbs[k] );
+        if ( !describeFile.empty() ) descriptions.emplace_back( preset( which[k] ).m_name, descs[k] );
     }
     // Merged into what the file already holds, so one group can be measured again on its own.
     {
@@ -542,7 +609,7 @@ int main( int argc, char **argv )
         df << "}\n";
     }
     const double took = std::chrono::duration<double>( std::chrono::steady_clock::now() - t0 ).count();
-    std::printf( "%zu presets measured in %.0f s, %.1f .. %.1f dBFS -> %s\n", levels.size(), took, lo, hi,
+    std::printf( "%zu presets measured in %.0f s, %.1f .. %.1f LUFS -> %s\n", levels.size(), took, lo, hi,
                  out.string().c_str() );
     return 0;
 }
