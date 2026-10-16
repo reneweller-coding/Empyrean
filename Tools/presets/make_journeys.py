@@ -17,8 +17,9 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And eleven whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
-currents, the halls and orbits, the harmonic lives and the dreams and phantoms): twenty-four presets, the stillest few
+And thirteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
+currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
+topology): twenty-four presets, the stillest few
 of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
 
@@ -67,6 +68,10 @@ WHOLE_NIGHTS = [
                                       "Breath Registers", "Subterranea", "Halo Horizons"]),
     ("Whole Night - Dreams & Phantoms", ["Night Memories", "Breathing In", "Inner Voices", "Temple Winds", "Glass Forests",
                                          "Dreaming Rooms", "Bloch Tides", "Lucid Dreams"]),
+    ("Whole Night - Weather & Growth", ["Rain on Water", "Seashores", "Mycelium Nights", "Forest Rain", "Rustling Woods",
+                                        "Swarm Rings", "Pine Winds", "Tam-Tam Halls"]),
+    ("Whole Night - Rooms & Topology", ["Interference Nights", "Chapel Air", "Halo Rings", "Curtained Rooms",
+                                        "Tonnetz Walks", "Standing Waves", "Still Halos", "Stone Halls"]),
 ]
 
 

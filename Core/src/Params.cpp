@@ -47,6 +47,7 @@ const char *const FieldModeNames[NumFieldModes] = { "Off", "Scale", "Swarm", "Sc
 const char *const RainSurfaceNames[NumRainSurfaces] = { "Water", "Leaves", "Stone", "Tin Roof" };
 const char *const FoliageNames[NumFoliages] = { "Broadleaf", "Pine", "Grass", "Dry Leaves" };
 const char *const ShoreNames[NumShores] = { "Sand", "Pebbles", "Rocks" };
+const char *const HaloTurnNames[NumHaloTurns] = { "Counter-clockwise", "Clockwise" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -424,6 +425,18 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::SWARMAL_SPREAD, "swarmal_spread", "Swarm Spread", "Swarmalators", 0.f, 1.f, 0.3f, 1.f, "" ),
     F( ParamIdE::PHYSARUM_SHARE, "physarum_share", "Crawlers", "Field", 0.f, 1.f, 0.3f, 1.f, "" ),
     F( ParamIdE::PHYSARUM_TRAIL, "physarum_trail", "Trail", "Field", 0.5f, 30.f, 5.f, 0.5f, "s" ),
+    F( ParamIdE::WAVE_ROOM, "wave_room", "Wave Room", "Wave Room", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::ROOM_SIZE, "room_size", "Room Size", "Wave Room", 0.3f, 1.f, 0.7f, 1.f, "" ),
+    F( ParamIdE::ROOM_ABSORB, "room_absorb", "Walls", "Wave Room", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::ROOM_WALK, "room_walk", "Listener", "Wave Room", 0.f, 1.f, 0.4f, 1.f, "" ),
+    F( ParamIdE::HALO, "halo", "Halo", "Halo", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::HALO_SPEED, "halo_speed", "Once Round", "Halo", 3.f, 60.f, 12.f, 0.5f, "s" ),
+    F( ParamIdE::HALO_TOPOLOGY, "halo_topology", "Topology", "Halo", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::HALO_DISORDER, "halo_disorder", "Disorder", "Halo", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::HALO_TURN, "halo_turn", "Way Round", "Halo", HaloTurnNames, NumHaloTurns, 0 ),
+    F( ParamIdE::QUANTUM, "quantum", "Quantum Walk", "Quantum Walk", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::QUANTUM_TIME, "quantum_time", "Look Every", "Quantum Walk", 5.f, 600.f, 90.f, 0.5f, "s" ),
+    F( ParamIdE::QUANTUM_SPREAD, "quantum_spread", "Spread", "Quantum Walk", 0.f, 1.f, 0.4f, 1.f, "" ),
 } };
 
 }   // namespace

@@ -6,7 +6,7 @@
  *
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
- *                    [--route NAME|FILE] [--route-speed X] [--fill]
+ *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -267,7 +267,7 @@ bool findJourney( const std::string &what, Journey &j )
  */
 int main( int argc, char **argv )
 {
-    double                   seconds = 120.0, hold = -1.0;
+    double                   seconds = 120.0, hold = -1.0, logEvery = 10.0;
     fs::path                 out = repoRoot() / "work" / "renders" / "render.wav";
     std::uint64_t            seed = 0x5EEDu;
     std::vector<std::string> sets;
@@ -297,6 +297,8 @@ int main( int argc, char **argv )
             brain = false;
         else if ( a == "--fill" )
             fill = true;
+        else if ( a == "--log" && has )
+            logEvery = std::max( 0.1, std::atof( argv[++i] ) );   // seconds between the log's lines
         else if ( a == "--preset" && has )
             presetName = argv[++i];
         else if ( a == "--journey" && has )
@@ -508,7 +510,8 @@ int main( int argc, char **argv )
         gpu += e.lastGpuMs();
         ++blocks;
         const std::int64_t now = done + n;
-        if ( now % ( static_cast<std::int64_t>( c.m_sampleRate ) * 10 ) < n )
+        const std::int64_t every = std::max<std::int64_t>( n, static_cast<std::int64_t>( c.m_sampleRate * logEvery ) );
+        if ( now % every < n )
         {
             const double rms = std::sqrt( sq / ( blocks * static_cast<double>( n ) ) );
             std::printf( "  %5.0f s: %6.1f dBFS RMS, peak %6.1f dBFS, %2d voices, root %3d, GPU %.3f ms/block\n",
@@ -521,6 +524,15 @@ int main( int argc, char **argv )
                     "         drops %.0f, wind %.4f, rustle %.2f, foam %.2f, bloom above 2 kHz %.2f, swarm R %.2f S "
                     "%.2f, trail %.2f spread %.2f\n",
                     nature[0], nature[2], nature[3], nature[4], nature[5], nature[6], nature[7], nature[8], nature[9] );
+            float energy[HaloCarriers], angle[HaloCarriers], rim[HaloCarriers];   // Phase 29: the halo's carriers
+            e.haloStats( energy, angle, rim );
+            int             qwStep = 0;
+            const long long qwMoves = e.quantumMoves( qwStep );
+            if ( energy[0] + energy[1] + energy[2] > 0.0f || qwMoves > 0 )
+                std::printf( "         halo: energy %.3g %.3g %.3g, at %+.0f %+.0f %+.0f degrees, on the rim %.2f %.2f "
+                             "%.2f; quantum walk %lld moves (last %d)\n",
+                             energy[0], energy[1], energy[2], angle[0] * 57.29578f, angle[1] * 57.29578f,
+                             angle[2] * 57.29578f, rim[0], rim[1], rim[2], qwMoves, qwStep );
             sq = 0.0;
             peak = 0.0;
             gpu = 0.0;

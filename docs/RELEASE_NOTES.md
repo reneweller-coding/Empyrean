@@ -1,5 +1,52 @@
 # Release notes
 
+## 0.19.0 (16.10.2026, not released)
+
+A room simulated as air, a topological insulator of sound round the listener, and a conductor whose root walks as a
+quantum wave on the Tonnetz. A page Rooms, 1024 presets.
+
+- **Wave Room** (the new page Rooms): the voices sound in a room simulated as air -- the wave equation on a grid of a
+  quarter of a million cells, eleven centimetres apart, six thousand steps a second, on the graphics card. Its modes,
+  its standing waves and its flutter happen of themselves below about 1.5 kHz. Every voice stands where it is, the
+  listener's two ears hear it; Room Size, Walls, and Listener -- walk through the room and the bass swells and thins.
+- **Halo** (Rooms): a topological insulator made of sound (Qi, Wu and Zhang's Chern insulator on a disc of 441 sites
+  round the listener). Every note of the chord strikes its rim from a direction of its own, and what it starts runs
+  round you one way only, past any disorder inside (topological protection); made trivial, it stays where it was
+  struck. Once Round, Way Round, Topology, Disorder.
+- **Quantum Walk** (Conductor): the conductor's root moves as a continuous-time quantum walk on the Tonnetz (fifths
+  and thirds): a wave over the twelve pitch classes that spreads and interferes, looked at every so often -- the root
+  moves to where it is found and the wave partly collapses there, so it remembers where it might have gone.
+- **10240 presets:** sixteen new groups of rooms and topology (Chapel Air, Stone Halls, Curtained Rooms, Walking Rooms,
+  Standing Waves, Halo Rings, Counter Halos, Edge States, Still Halos, Halo Chapels, Quantum Harmony, Interference
+  Nights, Tonnetz Walks, Quantum Halos, Resonant Spaces, Topologies); the presets before are as they were.
+- **empy_render --log S:** a line of its numbers every S seconds (the halo's and the walk's among them).
+
+## 0.18.0 (16.10.2026, not released; its presets came with 0.19.0)
+
+The wind brings weather -- rain, leaves, a sea --, a plate everything rings blooms, the partials swarm round the
+listener or crawl as a slime mould between the harmonics. A page Weather, 1024 presets.
+
+- **Rain** (the new page Weather, with the Wind and the Chimes): drops fall over the field where the showers are, and
+  the wind carries the showers across. On water each drop traps a bubble that sings (Minnaert's resonance, as van den
+  Doel measured it, rising as it rises), on leaves it ticks, on stone it clicks, on a tin roof it rings the sheet; tuned,
+  the bubbles and the roof sing the scale.
+- **Leaves** (Weather): four thousand clusters over the field rustle as the wind where they stand blows, harder in its
+  gusts -- broad leaves, pine needles, grass, dry leaves.
+- **Surf** (Weather): sixty-four trains of swell run onto a shore along the field and come in sets; the crests foam where
+  they break -- sand hisses, pebbles crackle in the backwash, rocks boom. The wind raises the waves.
+- **Bloom** (Effects): a large plate of 32768 modes that the voices, the chimes and the weather ring. Its energy climbs
+  into the high modes, as a tam-tam's shimmer blooms after the stroke (the cascade of weak wave turbulence, the energy
+  kept), and its pitch rises with the energy like an opera gong's.
+- **Swarmalators** (Motion): a thousand oscillators swarm in the plane round the listener while they synchronise; the
+  partials ride them, placed and pulsing -- a ring whose pulse circles you, all pulsing as one, turning clusters, a still
+  disc.
+- **Physarum** (a mode of the Field): a share of the partials crawl as a slime mould over a trail the harmonics feed;
+  veins grow between the harmonics and the partials glide along them.
+- **The pages:** Ripple moved to Harmonics, Memory to Dreams.
+- **9216 presets:** sixteen new groups of weather and growth (Rain on Water, Tin Roofs, Forest Rain, Stone Gardens,
+  Rustling Woods, Pine Winds, Seashores, Pebble Beaches, Storm Coasts, Tam-Tam Halls, Thunder Sheets, Swarm Rings,
+  Firefly Swarms, Slime Veins, Mycelium Nights, Weather Gardens); the presets before are as they were.
+
 ## 0.17.0 (16.10.2026, not released)
 
 Four layers that are not notes, made for the night -- a field of chimes in a wind, a melody heard only between the ears,

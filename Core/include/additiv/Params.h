@@ -318,6 +318,19 @@ enum class ParamIdE : int
     SWARMAL_SPREAD,   ///< 0 .. 1: the swarmalators' own rates scattered
     PHYSARUM_SHARE,   ///< 0 .. 1: the share of the partials that crawl (Field: Physarum)
     PHYSARUM_TRAIL,   ///< s: how long the physarum's trail lasts
+    // Phase 29 (16.10.2026): the wave room, the topological halo, the quantum walk
+    WAVE_ROOM,     ///< 0 .. 1: the voices sound in a room simulated as air (its modes, its standing waves)
+    ROOM_SIZE,     ///< 0.3 .. 1: the room, from a chapel to a hall of 10 x 8 x 4.5 m
+    ROOM_ABSORB,   ///< 0 .. 1: how much the walls take up
+    ROOM_WALK,     ///< 0 .. 1: where the listener stands, from the front to the back
+    HALO,   ///< 0 .. 1: a topological halo round the listener: struck where a note stands, it runs round one way only
+    HALO_SPEED,       ///< s: once round
+    HALO_TOPOLOGY,    ///< 0 .. 1: topological (the halo runs) .. trivial (it stays where it was struck)
+    HALO_DISORDER,    ///< 0 .. 1: disorder inside the lattice (the rim runs on regardless)
+    HALO_TURN,        ///< which way round: counter-clockwise, clockwise
+    QUANTUM,          ///< 0 .. 1: the conductor's root moves as a quantum walk on the Tonnetz
+    QUANTUM_TIME,     ///< s: between the walk's looks
+    QUANTUM_SPREAD,   ///< 0 .. 1: how far the walk's wave spreads between them
     COUNT             ///< number of parameters
 };
 
@@ -426,6 +439,8 @@ constexpr int            NumRainSurfaces = 4;                 ///< entries of Ra
 extern const char *const RainSurfaceNames[NumRainSurfaces];   ///< "Water", "Leaves", "Stone", "Tin Roof"
 constexpr int            NumFoliages = 4;                     ///< entries of FoliageNames
 extern const char *const FoliageNames[NumFoliages];           ///< "Broadleaf", "Pine", "Grass", "Dry Leaves"
+constexpr int            NumHaloTurns = 2;                    ///< entries of HaloTurnNames
+extern const char *const HaloTurnNames[NumHaloTurns];         ///< "Counter-clockwise", "Clockwise"
 constexpr int            NumShores = 3;                       ///< entries of ShoreNames
 extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
 constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames

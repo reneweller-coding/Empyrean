@@ -65,7 +65,11 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Overblown Flutes", "Breath Registers", "Four Seasons", "Turning Years", "Avalanches", "Glacier Calving", "Subterranea", "Period Doubling",
           "Halo Horizons", "Aurora Curtains", "Rainfall Grains", "Breathing Grains", "Breather Chains", "Harmonic Ecology", "Night Ecology", "Wild Harmonics",
           "Phantom Choirs", "Inner Voices", "Talbot Carpets", "Bloch Tides", "Glass Forests", "Bamboo Groves", "Wind Tubes", "Temple Winds",
-          "Storm Gardens", "Dreaming Rooms", "Night Memories", "Premonitions", "Breathing In", "Phantom Gardens", "Lucid Dreams", "Elsewhere"]
+          "Storm Gardens", "Dreaming Rooms", "Night Memories", "Premonitions", "Breathing In", "Phantom Gardens", "Lucid Dreams", "Elsewhere",
+          "Rain on Water", "Tin Roofs", "Forest Rain", "Stone Gardens", "Rustling Woods", "Pine Winds", "Seashores", "Pebble Beaches",
+          "Storm Coasts", "Tam-Tam Halls", "Thunder Sheets", "Swarm Rings", "Firefly Swarms", "Slime Veins", "Mycelium Nights", "Weather Gardens",
+          "Chapel Air", "Stone Halls", "Curtained Rooms", "Walking Rooms", "Standing Waves", "Halo Rings", "Counter Halos", "Edge States",
+          "Still Halos", "Halo Chapels", "Quantum Harmony", "Interference Nights", "Tonnetz Walks", "Quantum Halos", "Resonant Spaces", "Topologies"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -326,6 +330,70 @@ NAMES = {
                      ["Dream", "Vision", "Reverie", "Trance", "Rapture", "Daydream", "Somnium", "Oneiros"]),
     "Elsewhere": (["Elsewhere", "Faraway", "Further", "Beyond", "Liminal", "Unmapped", "Remote", "Uncharted"],
                   ["Shore", "Country", "Realm", "Province", "Valley", "Island", "Coast", "Hinterland"]),
+    "Rain on Water": (["Dripping", "Pattering", "Dimpled", "Rippled", "Puddled", "Brimming", "Spattered", "Plinking"],
+                      ["Pond", "Pool", "Lake", "Mere", "Tarn", "Basin", "Millpond", "Rain Barrel"]),
+    "Tin Roofs": (["Corrugated", "Rattling", "Drumming", "Galvanised", "Rusted", "Leaky", "Pinging", "Ringing Tin"],
+                  ["Roof", "Shed", "Gutter", "Awning", "Lean-To", "Porch", "Barn", "Shack"]),
+    "Forest Rain": (["Mossy", "Dewy", "Sodden", "Verdant", "Fern", "Drenched", "Misty", "Leafy"],
+                    ["Rainforest", "Understory", "Cloudforest", "Fernbrake", "Wildwood", "Greenwood", "Copse", "Holt"]),
+    "Stone Gardens": (["Raked", "Granite", "Basalt", "Slate", "Gravelled", "Weathered", "Zen", "Mossed"],
+                      ["Garden", "Courtyard", "Cloister", "Terrace", "Rockery", "Path", "Steps", "Stones"]),
+    "Rustling Woods": (["Rustling", "Whispering", "Swaying", "Sighing", "Fluttering", "Shivering", "Murmuring", "Stirring"],
+                       ["Beeches", "Aspens", "Poplars", "Birches", "Oaks", "Limes", "Maples", "Elms"]),
+    "Pine Winds": (["Resinous", "Northern", "Highland", "Evergreen", "Needled", "Alpine", "Boreal", "Taiga"],
+                   ["Pines", "Firs", "Spruces", "Larches", "Cedars", "Hemlocks", "Pinewood", "Conifers"]),
+    "Seashores": (["Sandy", "Tidal", "Salt", "Shoreline", "Dune", "Coastal", "Sea-Washed", "Breaking"],
+                  ["Shore", "Strand", "Beach", "Bay", "Cove", "Machair", "Shallows", "Surf"]),
+    "Pebble Beaches": (["Clattering", "Tumbling", "Rounded", "Grinding", "Polished", "Washing", "Hissing", "Rolling"],
+                       ["Shingle", "Pebbles", "Cobbles", "Strandline", "Shingle Beach", "Foreshore", "Spit", "Sandbar"]),
+    "Storm Coasts": (["Stormy", "Windswept", "Untamed", "Raging", "Thundering", "Gale", "Battered", "Howling"],
+                     ["Coast", "Headland", "Cliffs", "Point", "Cape", "Reef", "Skerries", "Lighthouse"]),
+    "Tam-Tam Halls": (["Shimmering", "Flowering", "Gonglike", "Resounding", "Burnished", "Hammered", "Opera", "Sounding"],
+                      ["Tam-Tam Hall", "Gong Hall", "Bronze Mirror", "Peking Gong", "Wind Gong", "Chau Gong", "Bell Plate", "Bronze Sheet"]),
+    "Thunder Sheets": (["Booming", "Sullen", "Heavy", "Looming", "Vast", "Roaring", "Growling", "Mighty"],
+                       ["Thunder", "Thundersheet", "Stormcloud", "Rumble", "Peal", "Thunderclap", "Squall Line", "Thunderhead"]),
+    "Swarm Rings": (["Circling", "Orbiting", "Vortical", "Revolving", "Eddying", "Spinning", "Gyring", "Haloed"],
+                    ["Round Dance", "Ringlet", "Circle", "Whirl", "Wheel", "Merry-Go-Round", "Corona", "Rondeau"]),
+    "Firefly Swarms": (["Firefly", "Flickering", "Blinking", "Glowing", "Pulsing", "Twinkling", "Sparking", "Luminous"],
+                       ["Swarm", "Lantern Cloud", "Meadow", "Marsh", "Hedgerow", "Paddock", "Dusk", "Summer Night"]),
+    "Slime Veins": (["Branching", "Creeping", "Threaded", "Golden", "Questing", "Reticulate", "Foraging", "Spreading"],
+                    ["Veins", "Network", "Mould", "Plasmodium", "Tendrils", "Web", "Pathways", "Filaments"]),
+    "Mycelium Nights": (["Hidden", "Underground", "Rooted", "Damp", "Earthen", "Midnight", "Mossbound", "Slow-Growing"],
+                        ["Mycelium", "Hyphae", "Spores", "Root Web", "Forest Floor", "Loam", "Leaf Litter", "Mushroom Ring"]),
+    "Weather Gardens": (["Changing", "Passing", "Fair", "Unsettled", "Clearing", "Brewing", "Fitful", "Fickle"],
+                        ["Weather", "Skies", "Weather Front", "Spell", "Turn of Weather", "Climate", "Forecast", "Outlook"]),
+    "Chapel Air": (["Vespered", "Whitewashed", "Candlelit", "Romanesque", "Chantry", "Votive", "Sanctified", "Lady"],
+                   ["Chapel", "Apse", "Nave", "Crypt", "Oratory", "Chancel", "Sacristy", "Transept"]),
+    "Stone Halls": (["Echoing", "Cavernous", "Pillared", "Flagstone", "Travertine", "Limestone", "Arched", "Colonnaded"],
+                    ["Hall", "Gallery", "Atrium", "Rotunda", "Basilica", "Hypostyle", "Undercroft", "Great Hall"]),
+    "Curtained Rooms": (["Curtained", "Velvet-Hung", "Carpeted", "Tapestry-Hung", "Felted", "Quilted", "Upholstered", "Draped"],
+                        ["Parlour", "Study", "Salon", "Drawing Room", "Library", "Bedchamber", "Den", "Boudoir"]),
+    "Walking Rooms": (["Wandering", "Pacing", "Strolling", "Roaming", "Ambling", "Sauntering", "Promenading", "Drifting"],
+                      ["Corridor", "Passage", "Hallway", "Arcade", "Walkway", "Ambulatory", "Concourse", "Loggia"]),
+    "Standing Waves": (["Standing", "Stationary", "Resonant", "Modal", "Nodal", "Antinodal", "Humming", "Droning"],
+                       ["Wave", "Mode", "Node", "Antinode", "Room Mode", "Flutter", "Boom", "Waveguide"]),
+    "Halo Rings": (["Topological", "Chiral", "One-Way", "Edge-Bound", "Protected", "Circulating", "Girding", "Rimward"],
+                   ["Halo", "Ring", "Rim", "Circuit", "Girdle", "Annulus", "Loop", "Perimeter"]),
+    "Counter Halos": (["Counterwise", "Widdershins", "Sunwise", "Retrograde", "Reversed", "Mirrored", "Backward", "Contrary"],
+                      ["Halo", "Turning", "Circle", "Round", "Gyre", "Orbit", "Spiral", "Rotation"]),
+    "Edge States": (["Robust", "Unscattered", "Unbroken", "Resilient", "Steadfast", "Unwavering", "Undeterred", "Persistent"],
+                    ["Edge", "Boundary", "Shoreline", "Border", "Margin", "Frontier", "Verge", "Brink"]),
+    "Still Halos": (["Trivial", "Insulating", "Gapped", "Localized", "Pinned", "Anchored", "Stationed", "Settled"],
+                    ["Halo", "Glow", "Aureole", "Nimbus", "Gloriole", "Glory", "Crown", "Aura"]),
+    "Halo Chapels": (["Haloed", "Gilded", "Illumined", "Radiant", "Glorified", "Lambent", "Shining", "Nimbed"],
+                     ["Chapel", "Shrine", "Sanctum", "Reliquary", "Baptistery", "Font", "Altar", "Tabernacle"]),
+    "Quantum Harmony": (["Quantum", "Superposed", "Entangled", "Coherent", "Uncertain", "Probable", "Collapsing", "Observed"],
+                        ["Harmony", "Cadence", "Progression", "Modulation", "Chord", "Key", "Tonic", "Mode Shift"]),
+    "Interference Nights": (["Interfering", "Diffracted", "Fringed", "Phased", "Coherent-Night", "Wave-Borne", "Overlapping", "Superposing"],
+                            ["Night", "Nocturne", "Midnight", "Small Hours", "Vigil", "Darkness", "Nightfall", "Eventide"]),
+    "Tonnetz Walks": (["Tonnetz", "Riemannian", "Lattice", "Triadic", "Neo-Riemannian", "Euler", "Fifth-Wise", "Third-Wise"],
+                      ["Walk", "Path", "Journey", "Route", "Ramble", "Trail", "Circuit Walk", "Wayfaring"]),
+    "Quantum Halos": (["Uncertain-Rim", "Probabilistic", "Quantized", "Spinor", "Eigen", "Hilbert", "Planck", "Dirac"],
+                      ["Halo", "Ring State", "Edge Mode", "Bound State", "Orbital", "Spin Ring", "Chern Ring", "Band"]),
+    "Resonant Spaces": (["Resounding", "Reverberant", "Ringing-Stone", "Vibrant", "Sonorous", "Booming", "Plangent", "Echoic"],
+                        ["Space", "Chamber", "Vault", "Cistern", "Silo", "Tank", "Dome", "Rotunda Space"]),
+    "Topologies": (["Twisted", "Knotted-Space", "Inverted", "Woven-Space", "Plaited", "Linked", "Wound", "Coiled"],
+                   ["Topology", "Manifold", "Torus", "Surface", "Space-Time", "Lattice", "Fabric", "Continuum"]),
 }
 
 
@@ -2740,6 +2808,421 @@ RECIPES = RECIPES + [d_phantom_choirs, d_inner, d_carpets, d_bloch, d_glass, d_b
                      d_rooms, d_memories, d_premonitions, d_breathing_in, d_phantom_gardens, d_lucid, d_elsewhere]
 
 
+# ---- Phase 28 (16.10.2026): the weather in the wind, the bloom, the swarmalators, the physarum.
+
+SURFACE = {"Water": 0, "Leaves": 1, "Stone": 2, "Tin Roof": 3}
+FOLIAGE = {"Broadleaf": 0, "Pine": 1, "Grass": 2, "Dry Leaves": 3}
+SHORE = {"Sand": 0, "Pebbles": 1, "Rocks": 2}
+# The swarmalators' states (O'Keeffe): like phases gathering (J) against near ones falling into step (K).
+SWARM_STATES = {"ring": ((0.7, 1.0), (-0.05, 0.05)), "sync": ((0.3, 1.0), (0.3, 1.0)),
+                "splinter": ((0.7, 1.0), (-0.4, -0.1)), "turning": ((0.8, 1.0), (-1.0, -0.6)),
+                "disc": ((0.2, 0.45), (-1.0, -0.8))}
+
+
+def set_wind(r, wind=(0.3, 0.6), gusts=(0.3, 0.7)):
+    """The wind, for the chimes and the weather."""
+    r.set("wind", f(r.u(*wind), 2))
+    r.set("gusts", f(r.u(*gusts), 2))
+
+
+def set_rain(r, surface, level=(0.3, 0.7), rate=(150, 2500), showers=(0.3, 0.9), tune=None):
+    """Rain: what it falls on, how much, how patchy, how many drops sing the scale."""
+    r.set("rain", f(r.u(*level), 2))
+    r.set("rain_rate", f(r.lg(*rate), 1))
+    r.set("rain_surface", SURFACE[surface])
+    r.set("rain_showers", f(r.u(*showers), 2))
+    if tune:
+        r.set("rain_tune", f(r.u(*tune), 2))
+
+
+def set_leaves(r, foliage, level=(0.3, 0.7)):
+    """Leaves in the wind."""
+    r.set("leaves", f(r.u(*level), 2))
+    r.set("foliage", FOLIAGE[foliage])
+
+
+def set_surf(r, shore, level=(0.4, 0.8), swell=(7, 14), distance=(0.4, 0.8)):
+    """A sea on a shore."""
+    r.set("surf", f(r.u(*level), 2))
+    r.set("surf_swell", f(r.u(*swell), 1))
+    r.set("shore", SHORE[shore])
+    r.set("surf_distance", f(r.u(*distance), 2))
+
+
+def set_bloom(r, level=(0.3, 0.7), size=(0.8, 1.8), decay=(5, 20), drive=(0.3, 0.8), glide=(-0.3, 0.6)):
+    """The plate everything rings."""
+    r.set("bloom", f(r.u(*level), 2))
+    r.set("bloom_size", f(r.u(*size), 2))
+    r.set("bloom_decay", f(r.lg(*decay), 1))
+    r.set("bloom_drive", f(r.u(*drive), 2))
+    r.set("bloom_glide", f(r.u(*glide), 2))
+
+
+def set_swarmal(r, state, depth=(0.4, 0.8), rate=(0.1, 0.8), speed=(0.5, 3.0), spread=(0.0, 0.3)):
+    """The swarmalators in one of their states."""
+    (jlo, jhi), (klo, khi) = SWARM_STATES[state]
+    r.set("swarmal", f(r.u(*depth), 2))
+    r.set("swarmal_gather", f(r.u(jlo, jhi), 2))
+    r.set("swarmal_sync", f(r.u(klo, khi), 2))
+    r.set("swarmal_rate", f(r.lg(*rate), 3))
+    r.set("swarmal_speed", f(r.lg(*speed), 2))
+    r.set("swarmal_spread", f(r.u(*spread), 2))
+
+
+def set_physarum(r, share=(0.2, 0.6), trail=(2, 15), pull=(0.3, 0.7), radius=(60, 250), spring=(0.0, 0.3)):
+    """The field as the physarum: its crawlers, its trail, their speed, their reach, their way home."""
+    r.set("field_mode", 6)
+    r.set("physarum_share", f(r.u(*share), 2))
+    r.set("physarum_trail", f(r.lg(*trail), 1))
+    r.set("field_strength", f(r.u(*pull), 2))
+    r.set("field_radius", f(r.lg(*radius), 0))
+    r.set("field_spring", f(r.u(*spring), 2))
+
+
+P28_POOLS = {
+    "wind": [("lfo2", "wind", (0.08, 0.2)), ("lfo3", "gusts", (0.1, 0.25))],
+    "rain": [("lfo3", "rain", (0.1, 0.25)), ("lfo2", "rain_showers", (0.1, 0.2))],
+    "leaves": [("lfo2", "leaves", (0.08, 0.2))],
+    "surf": [("lfo3", "surf", (0.08, 0.2)), ("lfo3", "surf_distance", (0.08, 0.2))],
+    "bloom": [("lfo2", "bloom_drive", (0.1, 0.25)), ("lfo3", "bloom", (0.08, 0.2))],
+    "swarmal": [("lfo3", "swarmal_sync", (0.08, 0.2)), ("lfo2", "swarmal_gather", (0.08, 0.2))],
+    "physarum": [("lfo2", "physarum_share", (0.08, 0.2)), ("lfo3", "field_radius", (0.08, 0.2))],
+}
+
+
+def p28_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P28_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def w_rain_water(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_rain(r, "Water", rate=(200, 3000))
+    set_wind(r, wind=(0.2, 0.5))
+    p28_rows(r, ["rain"], 1)
+
+
+def w_tin_roofs(r):
+    based(r, "Bells", "Glass", "Keys", "Strings", "Sleep Concert", "Organs")
+    set_rain(r, "Tin Roof", rate=(60, 600), tune=(0.6, 1.0))
+    set_wind(r, wind=(0.2, 0.5))
+    p28_rows(r, ["rain"], 1)
+
+
+def w_forest_rain(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.4:
+        sleepy(r)
+    set_rain(r, "Leaves", rate=(400, 4000))
+    set_leaves(r, r.pick("Broadleaf", "Grass"), level=(0.2, 0.5))
+    set_wind(r, wind=(0.3, 0.6))
+    p28_rows(r, ["rain", "leaves"], 1)
+
+
+def w_stone_gardens(r):
+    based(r, "Bells", "Glass", "Deep Space", "Sleep Concert", "Strings", "Organs")
+    set_rain(r, "Stone", rate=(40, 400), showers=(0.5, 1.0))
+    if r.rng.random() < 0.4:
+        set_chimes(r, r.pick("Bells", "Tubes", "Bamboo"), level=(0.25, 0.5))
+    set_wind(r, wind=(0.2, 0.45))
+    p28_rows(r, ["rain", "wind"], 1)
+
+
+def w_rustling(r):
+    based(r, *ALL)
+    set_leaves(r, "Broadleaf", level=(0.35, 0.75))
+    set_wind(r, wind=(0.4, 0.75), gusts=(0.4, 0.9))
+    p28_rows(r, ["leaves", "wind"], 1)
+
+
+def w_pine(r):
+    based(r, "Deep Space", "Dark Drones", "Choirs", "Strings", "Air & Noise", "Organs", "Shepard & Tides")
+    set_leaves(r, "Pine", level=(0.35, 0.75))
+    set_wind(r, wind=(0.5, 0.85), gusts=(0.3, 0.8))
+    p28_rows(r, ["leaves", "wind"], 1)
+
+
+def w_seashores(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_surf(r, "Sand")
+    set_wind(r, wind=(0.2, 0.55))
+    p28_rows(r, ["surf"], 1)
+
+
+def w_pebbles(r):
+    based(r, *CALM)
+    set_surf(r, "Pebbles", distance=(0.3, 0.7))
+    set_wind(r, wind=(0.3, 0.6))
+    p28_rows(r, ["surf"], 1)
+
+
+def w_storm_coasts(r):
+    based(r, "Air & Noise", "Dark Drones", "Deep Space", "Waves", "Strings")
+    set_surf(r, "Rocks", level=(0.5, 0.9), swell=(9, 18))
+    set_wind(r, wind=(0.65, 0.95), gusts=(0.6, 1.0))
+    if r.rng.random() < 0.6:
+        set_rain(r, r.pick("Water", "Stone"), level=(0.3, 0.6), rate=(1500, 8000), showers=(0.6, 1.0))
+    elif r.rng.random() < 0.5:
+        set_leaves(r, "Dry Leaves", level=(0.3, 0.6))
+    p28_rows(r, ["surf", "wind", "rain"], 2)
+
+
+def w_tamtam(r):
+    based(r, "Bells", "Glass", "Keys", "Shimmer", "Deep Space", "Dark Drones")
+    set_bloom(r, drive=(0.4, 0.9), glide=(-0.4, 0.6))
+    p28_rows(r, ["bloom"], 1)
+
+
+def w_thunder(r):
+    based(r, "Dark Drones", "Deep Space", "Air & Noise", "Organs", "Strings")
+    set_bloom(r, level=(0.4, 0.8), size=(1.5, 2.0), decay=(10, 40), drive=(0.6, 1.0), glide=(-0.6, 0.2))
+    if r.rng.random() < 0.3:
+        set_surf(r, "Rocks", level=(0.3, 0.6))
+        set_wind(r, wind=(0.5, 0.8))
+    p28_rows(r, ["bloom"], 1)
+
+
+def w_swarm_rings(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Shimmer", "Sleep Concert", "Deep Space", "Bells")
+    set_swarmal(r, "ring")
+    p28_rows(r, ["swarmal"], 1)
+
+
+def w_fireflies(r):
+    based(r, *ALL)
+    set_swarmal(r, r.pick("sync", "splinter", "turning", "disc"), rate=(0.3, 2.0))
+    p28_rows(r, ["swarmal"], 1)
+
+
+def w_slime(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Shimmer", "Deep Space", "Bells")
+    set_physarum(r)
+    p28_rows(r, ["physarum"], 1)
+
+
+def w_mycelium(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_physarum(r, share=(0.15, 0.4), trail=(5, 25), pull=(0.2, 0.5), radius=(40, 150), spring=(0.05, 0.3))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def w_weather_gardens(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("rain", "leaves", "surf", "bloom", "swarmal", "physarum") if r.rng.random() < 0.4]
+    if "rain" in kinds:
+        set_rain(r, r.pick("Water", "Leaves", "Stone", "Tin Roof"), level=(0.25, 0.6), tune=(0.0, 0.8))
+    if "leaves" in kinds:
+        set_leaves(r, r.pick("Broadleaf", "Pine", "Grass", "Dry Leaves"), level=(0.25, 0.6))
+    if "surf" in kinds:
+        set_surf(r, r.pick("Sand", "Pebbles", "Rocks"), level=(0.3, 0.7))
+    if "bloom" in kinds:
+        set_bloom(r, level=(0.25, 0.6))
+    if "swarmal" in kinds:
+        set_swarmal(r, r.pick("ring", "sync", "splinter", "turning"))
+    if "physarum" in kinds:
+        set_physarum(r, share=(0.15, 0.45))
+    if {"rain", "leaves", "surf"} & set(kinds):
+        set_wind(r)
+    p28_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [w_rain_water, w_tin_roofs, w_forest_rain, w_stone_gardens, w_rustling, w_pine, w_seashores,
+                     w_pebbles, w_storm_coasts, w_tamtam, w_thunder, w_swarm_rings, w_fireflies, w_slime, w_mycelium,
+                     w_weather_gardens]
+
+
+# ---- Phase 29 (16.10.2026): the wave room, the topological halo, the quantum walk.
+
+TURN = {"Counter-clockwise": 0, "Clockwise": 1}
+
+
+def set_room(r, level=(0.4, 0.9), size=(0.4, 1.0), absorb=(0.1, 0.6), walk=(0.2, 0.7)):
+    """The wave room: its level, size, walls, the listener's place."""
+    r.set("wave_room", f(r.u(*level), 2))
+    r.set("room_size", f(r.u(*size), 2))
+    r.set("room_absorb", f(r.u(*absorb), 2))
+    r.set("room_walk", f(r.u(*walk), 2))
+
+
+def set_halo(r, level=(0.4, 0.9), speed=(6, 30), topology=(0.0, 0.2), disorder=(0.0, 0.3), turn=None):
+    """The topological halo: its level, once round, topology, disorder, which way."""
+    r.set("halo", f(r.u(*level), 2))
+    r.set("halo_speed", f(r.lg(*speed), 1))
+    r.set("halo_topology", f(r.u(*topology), 2))
+    r.set("halo_disorder", f(r.u(*disorder), 2))
+    r.set("halo_turn", TURN[turn or r.pick("Counter-clockwise", "Clockwise")])
+
+
+def set_quantum(r, amount=(0.6, 1.0), time=(40, 240), spread=(0.1, 0.7)):
+    """The quantum walk on the Tonnetz: it needs the conductor, whose root it moves."""
+    r.set("quantum", f(r.u(*amount), 2))
+    r.set("quantum_time", f(r.lg(*time), 1))
+    r.set("quantum_spread", f(r.u(*spread), 2))
+    r.set("brain_on", 1)
+
+
+P29_POOLS = {
+    "room": [("lfo2", "room_walk", (0.15, 0.35)), ("lfo3", "room_absorb", (0.08, 0.2))],
+    "halo": [("lfo3", "halo_speed", (0.1, 0.25)), ("lfo2", "halo_disorder", (0.1, 0.3))],
+    "quantum": [("lfo3", "quantum_spread", (0.1, 0.3))],
+}
+
+
+def p29_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P29_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def z_chapel(r):
+    based(r, "Choirs", "Organs", "Sleep Concert", "Strings", "Bells")
+    set_room(r, size=(0.35, 0.6), absorb=(0.0, 0.25))
+    p29_rows(r, ["room"], 1)
+
+
+def z_stone(r):
+    based(r, "Choirs", "Organs", "Deep Space", "Dark Drones", "Bells", "Strings")
+    set_room(r, size=(0.8, 1.0), absorb=(0.0, 0.2))
+    p29_rows(r, ["room"], 1)
+
+
+def z_curtained(r):
+    based(r, "Keys", "Strings", "Glass", "Sleep Concert", "Choirs")
+    set_room(r, level=(0.3, 0.7), size=(0.3, 0.55), absorb=(0.5, 0.95))
+    p29_rows(r, ["room"], 1)
+
+
+def z_walking(r):
+    based(r, *CALM)
+    set_room(r, walk=(0.3, 0.6))
+    setup(r, "wander")
+    r.row("lfo2", "room_walk", round(r.u(0.25, 0.45), 3))
+    p29_rows(r, ["room"], 1)
+
+
+def z_standing(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Air & Noise", "Shepard & Tides")
+    set_room(r, level=(0.6, 1.0), size=(0.5, 0.9), absorb=(0.0, 0.15))
+    p29_rows(r, ["room"], 1)
+
+
+def z_halo_rings(r):
+    based(r, "Choirs", "Strings", "Glass", "Bells", "Shimmer", "Organs", "Keys")
+    set_halo(r, turn="Counter-clockwise")
+    p29_rows(r, ["halo"], 1)
+
+
+def z_counter(r):
+    based(r, "Glass", "Bells", "Keys", "Shimmer", "Strings", "Pendulums")
+    set_halo(r, speed=(4, 15), turn="Clockwise")
+    p29_rows(r, ["halo"], 1)
+
+
+def z_edge(r):
+    based(r, *ALL)
+    set_halo(r, disorder=(0.4, 1.0))
+    p29_rows(r, ["halo"], 1)
+
+
+def z_still(r):
+    based(r, "Choirs", "Strings", "Sleep Concert", "Deep Space", "Organs", "Glass")
+    set_halo(r, topology=(0.6, 1.0))
+    p29_rows(r, ["halo"], 1)
+
+
+def z_halo_chapels(r):
+    based(r, "Choirs", "Organs", "Bells", "Glass", "Strings")
+    set_halo(r, level=(0.3, 0.7))
+    set_room(r, level=(0.3, 0.7), absorb=(0.05, 0.4))
+    p29_rows(r, ["halo", "room"], 1)
+
+
+def z_quantum(r):
+    based(r, "Choirs", "Strings", "Organs", "Keys", "Glass", "Sleep Concert")
+    set_quantum(r, time=(30, 150))
+    p29_rows(r, ["quantum"], 1)
+
+
+def z_interference(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_quantum(r, time=(120, 480), spread=(0.4, 1.0))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def z_tonnetz(r):
+    based(r, "Choirs", "Strings", "Organs", "Deep Space", "Dark Drones", "Bells")
+    set_quantum(r, spread=(0.0, 0.35))
+    p29_rows(r, ["quantum"], 1)
+
+
+def z_quantum_halos(r):
+    based(r, "Glass", "Bells", "Choirs", "Strings", "Shimmer")
+    set_quantum(r, time=(40, 180))
+    set_halo(r, level=(0.35, 0.8))
+    p29_rows(r, ["quantum", "halo"], 1)
+
+
+def z_resonant(r):
+    based(r, "Bells", "Dark Drones", "Deep Space", "Organs", "Glass")
+    set_room(r, level=(0.4, 0.8))
+    if r.rng.random() < 0.6:
+        set_bloom(r, level=(0.25, 0.55))
+    p29_rows(r, ["room"], 1)
+
+
+def z_topologies(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("room", "halo", "quantum") if r.rng.random() < 0.6]
+    if "room" in kinds:
+        set_room(r, level=(0.3, 0.7))
+    if "halo" in kinds:
+        set_halo(r, level=(0.3, 0.7), topology=(0.0, 0.6), disorder=(0.0, 0.6))
+    if "quantum" in kinds:
+        set_quantum(r)
+    if r.rng.random() < 0.3:
+        set_swarmal(r, r.pick("ring", "splinter"), depth=(0.3, 0.6))
+    p29_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [z_chapel, z_stone, z_curtained, z_walking, z_standing, z_halo_rings, z_counter, z_edge, z_still,
+                     z_halo_chapels, z_quantum, z_interference, z_tonnetz, z_quantum_halos, z_resonant, z_topologies]
+
+
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
     a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was."""
@@ -2787,7 +3270,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 128 groups of 64 (Presets.h).",
+             "/// The factory presets: 160 groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

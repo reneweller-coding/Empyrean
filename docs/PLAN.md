@@ -529,6 +529,78 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 29: Wellenraum, topologischer Halo, Quantum Walk (gebaut, 16.10.2026, 0.19.0)
+
+Der zweite Teil der Nacht (siehe Phase 28). Absorb (Sidechain-Resynthese) blieb wie empfohlen außen vor.
+
+- **29a Wellenraum:** 3D-Wellengleichung (Standard-Leapfrog, Courant ~0,5) auf 88 × 70 × 40 Zellen à 11,4 cm bei
+  fs/8 (6 kHz bei 48 kHz), 16 Kernel-Schritte je Block im Graphen, drei Druckfelder rotierend. Wände: Bilbaos
+  Finite-Volumen-Rand mit einer Admittanz ((1 + l b (6-K)/2) p+ = (2 - K l²) p + l² Σ - (1 - l b (6-K)/2) p-).
+  Quellen: jede Stimme aus ihren Chunks summiert, Tiefpass (64-Tap-Sinc, 2,2 kHz) und Dezimation, an ihrer Zelle auf
+  einer Höhenebene (sonst prüfte jede Zelle 24 Quellen); zwei Ohren je eine Zelle neben dem Hörer, polyphase
+  hochgerechnet. Kanäle 22, 23. **Gemessen [M]:** durch bitgleiche Differenz isoliert (mit minus ohne Raum) bei
+  Pegel 1 gleichauf mit dem trockenen Akkord (-28 gegen -29 dBFS), Band 100 Hz .. 3 kHz.
+- **29b Halo:** Qi-Wu-Zhang-Modell auf einer Scheibe (Radius 12, 441 Plätze, zwei Orbitale), je Träger (8) ein Gitter,
+  RK4 je Block im mitdrehenden Rahmen, eine CUDA-Block je Träger. Antrieb in der Lückenmitte an der Randstelle in
+  Richtung der Note (goldener Winkel), 0,4 s kräftig, dann sanft. Eine dritte Schichtstimme (HALO) singt es: je Platz
+  und Träger ein Sinus mit der komplexen Amplitude des Platzes (Sinus- und Kosinusanteil, gemeinsame Phase je Träger).
+  **Prototyp [M]:** u = +1 läuft gegen den Uhrzeigersinn, 98 % am Rand, ein Umlauf 12,5 s bei Omega 10; u = -1 im
+  Uhrzeigersinn; Unordnung 1,5 innen: gleiche Richtung, ~50 % am Rand; u = 3 (trivial): keine Zustände in der Lücke.
+  In der Engine 99 % am Rand.
+- **29c Quantum Walk:** 12 komplexe Amplituden auf den Tonklassen, Tonnetz-Kanten ±3, ±4, ±7 (zirkulant: Schritt im
+  Fourierraum), Phase zwischen zwei Blicken 0,3 .. 6 rad (Spread); beim Blick Wurf nach |psi|², der Grundton
+  (setRoot wie der Jam-Folger) springt zur nächsten Note dieser Klasse, psi zu 70 % kollabiert. Ein Jam-Leiter hat
+  Vorrang.
+- **Seiten:** neue Seite Rooms (Wave Room, Halo) im Abschnitt Space; Quantum Walk auf Conductor.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Rooms & Topology“); die bestehenden unverändert.
+
+**Gemessen [M]:** Selbsttest 88/88 (86 Wellenraum: Ausklang eine Sekunde nach dem Akkord zwischen harten Wänden -29,8,
+mit weichen -56,7 dBFS, 99 % unter 2,5 kHz; 87 Halo: in drei Sekunden +142° gegen den Uhrzeigersinn (86 % am Rand),
+-145° im Uhrzeigersinn, trivial -35° -- was sich da bewegt, sind die Flanken des Anschlags außerhalb der Lücke; 88
+Quantum Walk: bei 0,5 rad 74 Schritte, 49 % zu Tonnetz-Nachbarn, bei 2 rad 78 Schritte, 76 % -- simuliert 47 und 78 %:
+Interferenz). Gefunden: der Dirigent bewegt den Grundton auch selbst; ohne Neuzentrierung maß der Walk Sprünge von
+einem Grundton aus, an dem er nicht stand. Bank: 1040 Presets in 1449 s gemessen (die 16 umbenannten -- „Opera Opera
+Gong“, „Sandy Sands“ -- mit), 0 alte verändert. 333 Reisen.
+
+## Phase 28: Wetter, Bloom, Swarmalators, Physarum (gebaut, 16.10.2026, 0.18.0)
+
+Der Nutzer fragte nach weiteren Ideen jenseits des Stands der Technik; von meinen sieben Vorschlägen (Weather, Bloom,
+Swarmalators, Physarum, Topological Halo, Quantum Walk, Absorb; dazu der Wellenraum) empfahl ich 28 und 29, er: „führe
+über Nacht die nächsten Phasen 28 und 29 aus“. Die Swarmalators gab es als Sync-Modus auf dem Ring je Wolke schon
+(Phase 16); gebaut ist die zweidimensionale, instrumentweite Fassung mit Paarkräften.
+
+- **28a Wetter:** Der Wind (LBM aus Phase 27) bläst für Windspiele oder Wetter (`Weather::m_wind`, eigener Neustart
+  `m_windFresh`). **Regen:** 16384 Plätze, ein freier fängt einen Tropfen mit der Wahrscheinlichkeit Rate · dt / freie
+  Plätze · Schauerdichte; Wasser: Minnaert 3,26 kHz / r(mm), Dämpfung 0,043 f + 0,0014 f^1,5 (van den Doel), Anstieg;
+  Blätter, Stein, Blechdach (gestimmt: Skalentöne). Schauer: Dichte auf dem Windgitter, semi-Lagrange mit 0,15 der
+  Windgeschwindigkeit verfrachtet, links gespeist von vier OU-Zufällen (10 s). **Gefunden [M]:** die Rückkehr zur
+  Gleichverteilung mit 0,0005 je Block (5 s) löschte jeden Schauer, bevor er ein Viertel des Feldes kreuzte; jetzt
+  0,00002 -- links/rechts schwankt 1,3 dB (gleichmäßiger Regen 0,47). **Laub:** 4096 Gruppen, Klickrate ∝ ((|u| + 2
+  Böe) / 0,08)², gemessen mittlere Windgeschwindigkeit 0,026 / 0,050 / 0,069 bei Wind 0,2 / 0,5 / 0,8. **Brandung:**
+  128 Uferstücke, 64 Wellenzüge um die Periode (Tiefwasser), Brechen über 1,4 σ · Höhe, Schaum (3 s), Zischen,
+  Rückstrom-Knistern (Kiesel), Brandungsdonner (Felsen). Kanäle 16 .. 19.
+- **28b Bloom:** 32768 komplexe Einpoler gleichverteilt in Hz (Weyl, Abstand 3,24 / Fläche), angeregt von Stimmen,
+  Windspielen, Wetter; je Block die Energie von 64 Bändern (feste Reihenfolge), Fluss nach oben Drive · 80 · (ē / ē_ref)
+  · dt (höchstens die Hälfte), als Dämpfung abgezogen und dem Band darüber als Rauschen gleicher Leistung gegeben;
+  Berger-Glide. **Gefunden [M]:** die Kaskadendämpfung ging in die Eingangsnormierung ein und öffnete die Platte für mehr
+  Eingang (lauter statt verschoben) -- Eingang jetzt mit dem ungedämpften Pol. Ein echtes FD-Gitter (von Kármán) bräuchte
+  je Sample eine Biharmonik-Lösung: in Echtzeit zu teuer. Kanäle 20, 21.
+- **28c Swarmalators:** 1024 Agenten, alle Paare in Kacheln, Schritt = Blockzeit · Speed; Ansicht normiert auf ihren
+  Schwerpunkt und Radius; R und S nach O'Keeffe. Partials reiten einen (Ort, Tiefe, Puls). **Gemessen [M]:** J 1, K 0:
+  S 1,00, R 0,01; K 1: R 1,00; J 0,5, K -1: R 0,00, S 0,00. **Gefunden:** J 1, K -1 ist die aktive Phasenwelle (S 0,55,
+  der Ring dreht), die stille Scheibe liegt erst jenseits von K = -1,2 J.
+- **28d Physarum (Feldmodus):** Spur 1024 × 32 (log-Frequenz × Feld), Agenten nach Jones (Sensor 0,7 rad, Drehung 45°
+  je Zelle), Ablage in ganzen Zahlen, Futter an den ersten acht Harmonischen. **Gefunden [M]:** Futter 4 je Block hielt
+  die Agenten auf den Linien (0,1 % der Leistung zwischen den Harmonischen); mit 0,2 und Radius 200 Cent 26 .. 36 %.
+- **Seiten:** neue Seite Weather (Wind, Chimes, Rain, Leaves, Surf); Ripple nach Harmonics, Memory nach Dreams (Motion
+  und Effects waren bei 1280 × 860 10 px zu hoch).
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Weather & Growth“); die bestehenden unverändert.
+
+**Gemessen [M]:** Selbsttest 85/85 (80 Regen: Blechdach 150 → 600 Tropfen/s, 218 → 864 klingend (4,0×); 81 Laub: Stille,
+Wind 0,3 -25,9, 0,9 -16,5 dBFS; 82 Brandung: Sätze über 11,3 dB, Wind 0,6 gegen Flaute +16 dB; 83 Bloom: über 2 kHz
+37,5 % gegen 0,2 %, Ausklang leiser; 84 Swarmalators wie oben; 85 Physarum: 36 % zwischen den Harmonischen, Spur-Spread
+3,46). GPU mit allem an 0,17 ms je Block (Bloom 0,07).
+
 ## Phase 27: Windspiele, Phantommelodien, Traum, Vorahnung, Talbot (gebaut, 16.10.2026, 0.17.0)
 
 Der Nutzer fragte nach Ideen weit über den Stand der Synthese hinaus, für Ambient auf der GPU; meine Vorschläge (im

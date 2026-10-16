@@ -135,12 +135,25 @@ constexpr int PhysW = 1024;          ///< the physarum's trail across the spectr
 constexpr int PhysH = 32;            ///< and across the field, left to right
 constexpr int PhysFood = 128;        ///< its food: lines at the notes' harmonics
 
+// Phase 29 (16.10.2026): the topological halo, the wave room.
+constexpr int HaloRadius = 12;                        ///< the halo's lattice: a disc of this radius, in sites
+constexpr int HaloSites = 441;                        ///< its sites (the whole points of the disc)
+constexpr int HaloComponents = 2 * HaloSites;         ///< two orbitals a site (Qi, Wu and Zhang's model)
+constexpr int HaloCarriers = 8;                       ///< pitches it carries at once, each its own lattice
+constexpr int RoomDecim = 8;                          ///< the wave room runs at the sample rate over this
+constexpr int RoomNX = 88;                            ///< its grid across (11.4 cm cells at 48 kHz: 10 m)
+constexpr int RoomNY = 70;                            ///< from front to back (8 m)
+constexpr int RoomNZ = 40;                            ///< from the floor up (4.5 m)
+constexpr int RoomCells = RoomNX * RoomNY * RoomNZ;   ///< its cells
+constexpr int RoomSources = 24;                       ///< voices that may sound in it at once
+
 /** @brief What a GPU voice plays: a note, or one of the layers that are not notes (Phase 27). */
 enum class VoiceKindE : std::int32_t
 {
     NOTE = 0,   ///< a note: its harmonics' clouds and its air
     PHANTOM,    ///< the phantom layer: noise the same in both ears but where pitches turn the phase between them
-    DREAM       ///< the dream: a cloud over DreamBands bands, shaped by what the dream recalls
+    DREAM,      ///< the dream: a cloud over DreamBands bands, shaped by what the dream recalls
+    HALO        ///< the topological halo (Phase 29): a lattice round the listener, every site a sine per carrier
 };
 
 constexpr int VoiceFilters = 4;    ///< filters a voice carries during a morph between different ones (the heaviest)
@@ -236,6 +249,8 @@ struct CloudVoice
     float      m_phantomHz[PhantomTargets] = {};       ///< Phantom: the pitches heard only between the ears
     float      m_phantomWeight[PhantomTargets] = {};   ///< each one's share of the full turn (it fades in and out)
     float m_talbot[TalbotHarmonics] = {};   ///< Talbot: harmonics 1 .. 24, their amplitude factors (harmonicLife 8)
+    // Phase 29
+    float m_haloHz[HaloCarriers] = {};   ///< Halo: each carrier's pitch, Hz (0: silent)
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
@@ -258,9 +273,9 @@ constexpr int CloudChannels = 4;   ///< the voices' channels on the GPU: near le
 /**
  * @brief A finished frame: the four voice channels, the modal hall's left and right, the spectral echo's, the
  *        melt's, the chime field's four (near and far, left and right), the phantom layer's two (heard dry), the
- *        weather's four (near and far, left and right) and the bloom's two.
+ *        weather's four (near and far, left and right), the bloom's two and the wave room's two.
  */
-constexpr int CloudOutChannels = 22;
+constexpr int CloudOutChannels = 24;
 constexpr int ModalModes = 65536;   ///< the modal hall's resonances
 constexpr int ModalTuned = 128;     ///< pitches the hall's tuned modes may sit on
 constexpr int HallBins =
@@ -638,6 +653,58 @@ struct Physarum
 };
 static_assert( sizeof( Physarum ) % 16 == 0, "Physarum rides in the block header" );
 
+/**
+ * @brief The topological halo (Phase 29): a Chern insulator of sound round the listener -- Qi, Wu and Zhang's model
+ *        on a disc of HaloSites sites, two orbitals each, its hopping turning the phase so that its bulk is gapped and
+ *        its rim carries states that run one way only. Every carrier (a pitch of the chord) has a lattice of its
+ *        own: a note drives the rim where it stands, at the gap's middle, and what it starts runs round the
+ *        listener -- the same way whatever is in the way (disorder inside cannot turn it back: topological
+ *        protection). Made trivial (Topology), the gap holds no states and the sound stays where it was struck.
+ *        Evolved a block at a time (fourth-order Runge-Kutta) in the frame turning with the carrier; a voice of the
+ *        kind HALO sings it, each site a sine per carrier, its complex amplitude the site's.
+ */
+struct Halo
+{
+    int   m_on = 0;                     ///< 1: the lattices evolve (0: nothing computed, cleared)
+    int   m_voice = -1;                 ///< the GPU voice that sings it
+    int   m_clear = 0;                  ///< bits: carriers whose lattice is cleared this block (a new pitch on it)
+    int   m_pad0 = 0;                   ///< keeps the floats 16-byte aligned
+    float m_omega = 10.0f;              ///< rad/s per unit of the lattice's energy: how fast it all runs
+    float m_mass = 1.0f;                ///< u: 0 < |u| < 2 topological (its sign the way round), beyond trivial
+    float m_disorder = 0.0f;            ///< the inside's random potential, in units of the hopping
+    float m_damp = 0.1f;                ///< per second: how fast it fades
+    float m_drive[HaloCarriers] = {};   ///< each carrier's drive this block (amplitude)
+    int   m_site[HaloCarriers] = {};    ///< the rim site each carrier is driven at
+};
+static_assert( sizeof( Halo ) % 16 == 0, "Halo rides in the block header" );
+
+/**
+ * @brief The wave room (Phase 29): a room simulated as air -- the wave equation on a grid of RoomNX x RoomNY x RoomNZ
+ *        cells (the standard leapfrog scheme, a Courant number of about a half), at the sample rate over RoomDecim:
+ *        its modes, its standing waves and its flutter come of themselves, below about 1.5 kHz. The voices sound in
+ *        it where they stand (their side and their distance), each from its own cell; two ears a cell either side of
+ *        the listener hear it. The walls take up a share of what meets them (a locally reacting boundary of one
+ *        admittance). The voices go down to the room's rate through a low pass, the ears come up through the same.
+ */
+struct WaveRoom
+{
+    int   m_on = 0;                      ///< 1: the room runs (0: nothing computed, its air at rest)
+    int   m_nx = 0;                      ///< its cells across this block (at most RoomNX)
+    int   m_ny = 0;                      ///< from front to back
+    int   m_nz = 0;                      ///< from the floor up
+    int   m_count = 0;                   ///< sources in `source`
+    int   m_ear[2] = { 0, 0 };           ///< the ears' cells (left, right)
+    int   m_clear = 0;                   ///< 1 for one block: the air at rest (the room changed size)
+    float m_lambda2 = 0.25f;             ///< the Courant number squared
+    float m_beta = 0.2f;                 ///< the walls' admittance (0: rigid; 1: as much taken as reflected away)
+    float m_level = 0.0f;                ///< the ears' level
+    int   m_srcZ = 0;                    ///< the plane the sources stand on (only its cells look for them)
+    int   m_source[RoomSources] = {};    ///< each source's cell
+    int   m_voiceOf[RoomSources] = {};   ///< and its GPU voice
+    float m_gain[RoomSources] = {};      ///< and its gain
+};
+static_assert( sizeof( WaveRoom ) % 16 == 0, "WaveRoom rides in the block header" );
+
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
 {
@@ -986,6 +1053,17 @@ public:
      * @param[out] spread  receives the spread
      */
     void physarumStats( float &mean, float &spread ) const;
+    /** @brief The halo's settings and drives for the next block (Phase 29). @return them */
+    Halo &halo();
+    /** @brief The wave room's settings and sources for the next block (Phase 29). @return them */
+    WaveRoom &room();
+    /**
+     * @brief The halo's carriers as the last block left them (Phase 29).
+     * @param[out] energy  receives HaloCarriers values: each lattice's energy (the sum of its amplitudes squared)
+     * @param[out] angle   receives HaloCarriers values: where round the disc its energy's middle stands, radians
+     * @param[out] rim     receives HaloCarriers values: the share of its energy on the rim (the outer two rings)
+     */
+    void haloStats( float *energy, float *angle, float *rim ) const;
     /**
      * @brief Which GPU voices carry the layers that are not notes (Phase 27): the phantom layer's chunks are summed
      *        apart, into the frame's channels 14 and 15.

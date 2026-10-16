@@ -322,6 +322,20 @@ const Info InfoTable[] = {
       "How different the swarmalators' own rates are: a little breaks the ring into turning clusters." },
     { "physarum_share", "Physarum: how many of the partials crawl as the slime mould does." },
     { "physarum_trail", "Physarum: how long its trail lasts -- the veins between the harmonics." },
+    { "wave_room", "The voices sound in a room simulated as air: its modes, its standing waves, its flutter, below "
+                   "about 1.5 kHz." },
+    { "room_size", "The room, from a chapel to a hall of ten by eight metres." },
+    { "room_absorb", "How much the walls take up: stone that rings, or curtains." },
+    { "room_walk", "Where you stand in the room, from the front to the back: the bass changes as you walk." },
+    { "halo", "A topological halo round you: struck where a note stands, the sound runs round one way only." },
+    { "halo_speed", "Seconds for the halo to run once round." },
+    { "halo_topology", "Topological, the halo runs round; trivial, it stays where it was struck." },
+    { "halo_disorder", "Disorder inside the lattice: the rim runs on regardless (that is the topology)." },
+    { "halo_turn", "Which way round the halo runs." },
+    { "quantum", "The conductor's root moves as a quantum walk on the Tonnetz: by fifths and thirds, as a wave "
+                 "that spreads and interferes." },
+    { "quantum_time", "How often the walk is looked at, and the root moves to where it is found." },
+    { "quantum_spread", "How far the walk's wave spreads between two looks." },
 };
 
 }   // namespace

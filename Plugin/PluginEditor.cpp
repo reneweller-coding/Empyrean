@@ -437,29 +437,32 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
         m_tabs.addTab( "Tuning", additivui::skin().m_panel,
                        new ScrollPage( tp, [tp]( int w ) { return tp->heightFor( w ); } ), true );
     }
-    page( "Conductor", { { "Conductor",
-                           F::MOTION,
-                           IdsT{ ParamIdE::BRAIN_ON, ParamIdE::AUTO_MODE, ParamIdE::BRAIN_RATE, ParamIdE::AUTO_RATE,
-                                 ParamIdE::BRAIN_DENSITY, ParamIdE::BRAIN_HOLD_MIN, ParamIdE::BRAIN_HOLD_MAX },
-                           IdsT{ ParamIdE::BRAIN_ON },
-                           { { ParamIdE::BRAIN_HOLD_MIN, ParamIdE::BRAIN_HOLD_MAX } } },
-                         { "Register",
-                           F::MOTION,
-                           IdsT{ ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH, ParamIdE::BRAIN_FOUNDATION },
-                           {},
-                           { { ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH } } },
-                         { "Harmony", F::MOTION,
-                           IdsT{ ParamIdE::BRAIN_CONSONANCE, ParamIdE::BRAIN_WANDER, ParamIdE::AUTO_LEAD,
-                                 ParamIdE::AUTO_TENSION, ParamIdE::AUTO_ROOT_MOVE, ParamIdE::BRAIN_TIMBRE,
-                                 ParamIdE::BRAIN_CASCADE, ParamIdE::BRAIN_LIGHT, ParamIdE::AUTO_STEP } },
-                         { "Brain 2", F::ENVELOPE,
-                           IdsT{ ParamIdE::BRAIN2_ON, ParamIdE::BRAIN2_INTERVAL, ParamIdE::BRAIN2_DENSITY,
-                                 ParamIdE::BRAIN2_RATE, ParamIdE::BRAIN2_DEPTH },
-                           IdsT{ ParamIdE::BRAIN2_ON } },
-                         { "MPE", F::FILTER,
-                           IdsT{ ParamIdE::MPE_ON, ParamIdE::MPE_BEND, ParamIdE::MPE_PRESS, ParamIdE::MPE_PRESS_DEPTH,
-                                 ParamIdE::MPE_SLIDE, ParamIdE::MPE_SLIDE_DEPTH },
-                           IdsT{ ParamIdE::MPE_ON } } } );
+    page( "Conductor",
+          { { "Conductor",
+              F::MOTION,
+              IdsT{ ParamIdE::BRAIN_ON, ParamIdE::AUTO_MODE, ParamIdE::BRAIN_RATE, ParamIdE::AUTO_RATE,
+                    ParamIdE::BRAIN_DENSITY, ParamIdE::BRAIN_HOLD_MIN, ParamIdE::BRAIN_HOLD_MAX },
+              IdsT{ ParamIdE::BRAIN_ON },
+              { { ParamIdE::BRAIN_HOLD_MIN, ParamIdE::BRAIN_HOLD_MAX } } },
+            { "Register",
+              F::MOTION,
+              IdsT{ ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH, ParamIdE::BRAIN_FOUNDATION },
+              {},
+              { { ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH } } },
+            { "Harmony", F::MOTION,
+              IdsT{ ParamIdE::BRAIN_CONSONANCE, ParamIdE::BRAIN_WANDER, ParamIdE::AUTO_LEAD, ParamIdE::AUTO_TENSION,
+                    ParamIdE::AUTO_ROOT_MOVE, ParamIdE::BRAIN_TIMBRE, ParamIdE::BRAIN_CASCADE, ParamIdE::BRAIN_LIGHT,
+                    ParamIdE::AUTO_STEP } },
+            { "Brain 2", F::ENVELOPE,
+              IdsT{ ParamIdE::BRAIN2_ON, ParamIdE::BRAIN2_INTERVAL, ParamIdE::BRAIN2_DENSITY, ParamIdE::BRAIN2_RATE,
+                    ParamIdE::BRAIN2_DEPTH },
+              IdsT{ ParamIdE::BRAIN2_ON } },
+            { "MPE", F::FILTER,
+              IdsT{ ParamIdE::MPE_ON, ParamIdE::MPE_BEND, ParamIdE::MPE_PRESS, ParamIdE::MPE_PRESS_DEPTH,
+                    ParamIdE::MPE_SLIDE, ParamIdE::MPE_SLIDE_DEPTH },
+              IdsT{ ParamIdE::MPE_ON } },
+            { "Quantum Walk", F::ENVELOPE, IdsT{ ParamIdE::QUANTUM, ParamIdE::QUANTUM_TIME, ParamIdE::QUANTUM_SPREAD },
+              IdsT{ ParamIdE::QUANTUM } } } );
     {
         auto *s = new SpacePage( m_proc, m_actions, &m_live );
         m_describe.push_back( [s] { return s->describe(); } );
@@ -496,6 +499,14 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                          IdsT{ ParamIdE::BLOOM, ParamIdE::BLOOM_SIZE, ParamIdE::BLOOM_DECAY, ParamIdE::BLOOM_DRIVE,
                                ParamIdE::BLOOM_GLIDE },
                          IdsT{ ParamIdE::BLOOM } } } );
+    // Phase 29: the wave room and the topological halo.
+    page( "Rooms", { { "Wave Room", F::SPACE,
+                       IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
+                       IdsT{ ParamIdE::WAVE_ROOM } },
+                     { "Halo", F::MOTION,
+                       IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
+                             ParamIdE::HALO_TURN },
+                       IdsT{ ParamIdE::HALO } } } );
     {
         auto *h = new HallPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [h] { return h->describe(); } );
@@ -533,7 +544,7 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
             { "", { at( "Focus" ) } },
             { "Sound", { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ) } },
             { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
-            { "Space", { at( "Space" ), at( "Effects" ), at( "Hall" ) } },
+            { "Space", { at( "Space" ), at( "Effects" ), at( "Rooms" ), at( "Hall" ) } },
             { "Modulation", { at( "Modulation" ) } },
             { "Explore", { at( "Journey" ), at( "Map" ) } }
         };
@@ -1096,7 +1107,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "8192 presets",
+        { &m_presetName, "10240 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1754,6 +1765,8 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstHallGroup ) bank.addSectionHeader( "Halls & Orbits" );
         if ( g == additiv::FirstLivesGroup ) bank.addSectionHeader( "Harmonic Lives" );
         if ( g == additiv::FirstDreamGroup ) bank.addSectionHeader( "Dreams & Phantoms" );
+        if ( g == additiv::FirstWeatherGroup ) bank.addSectionHeader( "Weather & Growth" );
+        if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

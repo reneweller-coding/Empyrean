@@ -137,6 +137,8 @@ void JourneyView::choosePreset( int slot )
         if ( g == additiv::FirstHallGroup ) bank.addSectionHeader( "Halls & Orbits" );
         if ( g == additiv::FirstLivesGroup ) bank.addSectionHeader( "Harmonic Lives" );
         if ( g == additiv::FirstDreamGroup ) bank.addSectionHeader( "Dreams & Phantoms" );
+        if ( g == additiv::FirstWeatherGroup ) bank.addSectionHeader( "Weather & Growth" );
+        if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

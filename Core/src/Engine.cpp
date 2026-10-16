@@ -219,11 +219,12 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     CloudConfig cc;
     cc.m_sampleRate = m_cfg.m_sampleRate;
     cc.m_blockSize = G;
-    cc.m_voices = m_cfg.m_voices + std::max( 0, m_cfg.m_ghosts ) + 2;   // and the phantom layer and the dream
+    cc.m_voices = m_cfg.m_voices + std::max( 0, m_cfg.m_ghosts ) + 3;   // and the phantom layer, the dream, the halo
     cc.m_partialsPerVoice = m_cfg.m_partialsPerVoice;
     cc.m_spinWait = true;
     if ( !m_cloud.open( cc, error ) ) return false;
-    m_cloud.setLayers( cc.m_voices - 2, cc.m_voices - 1 );
+    m_cloud.setLayers( cc.m_voices - 3, cc.m_voices - 2 );
+    m_cloud.halo().m_voice = cc.m_voices - 1;
     {   // the hall remembers across a new start (a new sample rate, a new block): its memory goes up again
         const std::lock_guard<std::mutex> lock( m_snapLock );
         if ( !m_hallPendingSet && m_snapHallValid )
@@ -271,9 +272,9 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_early.prepare( m_cfg.m_sampleRate );
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
-    for ( std::vector<float> *b :
-          { &m_nearL, &m_nearR, &m_farL, &m_farR, &m_dryL, &m_dryR, &m_wetL, &m_wetR, &m_modalL, &m_modalR, &m_specL,
-            &m_specR, &m_meltL, &m_meltR, &m_phantomL, &m_phantomR, &m_bloomL, &m_bloomR } )
+    for ( std::vector<float> *b : { &m_nearL,    &m_nearR,    &m_farL,   &m_farR,   &m_dryL,  &m_dryR,  &m_wetL,
+                                    &m_wetR,     &m_modalL,   &m_modalR, &m_specL,  &m_specR, &m_meltL, &m_meltR,
+                                    &m_phantomL, &m_phantomR, &m_bloomL, &m_bloomR, &m_roomL, &m_roomR } )
         b->assign( static_cast<size_t>( G ), 0.0f );
     m_ghosts.assign( static_cast<size_t>( std::max( 0, m_cfg.m_ghosts ) ), Ghost{} );
     m_ghostRng = Rng( m_cfg.m_seed ^ 0x47686F7374ull );
@@ -290,6 +291,35 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_rainWas = m_windWas = m_swarmWas = m_physWas = false;
     for ( float &s : m_shower ) s = 0.0f;
     m_showerRng = Rng( m_cfg.m_seed ^ 0x5261696Eull );
+    m_haloGain = m_roomLevel = 0.0f;
+    m_haloNote.fill( -1 );
+    m_haloAge.fill( 0.0f );
+    m_haloHeld.fill( false );
+    m_roomDims[0] = m_roomDims[1] = m_roomDims[2] = 0;
+    m_qwPsi.fill( 0.0 );
+    m_qwNext = 0.0f;
+    m_qwWas = false;
+    m_qwMoves = 0;
+    m_qwLastStep = 0;
+    m_qwRootPc = -1;
+    m_qwRng = Rng( m_cfg.m_seed ^ 0x5157616Cull );
+    {   // the halo's rim: its sites in the card's order (row by row), those on the outer ring, with their angles
+        int s = 0;
+        m_haloRimCount = 0;
+        for ( int y = -HaloRadius; y <= HaloRadius; ++y )
+            for ( int x = -HaloRadius; x <= HaloRadius; ++x )
+            {
+                if ( x * x + y * y > HaloRadius * HaloRadius ) continue;
+                if ( x * x + y * y > ( HaloRadius - 1 ) * ( HaloRadius - 1 ) && m_haloRimCount < HaloSites )
+                {
+                    m_haloRim[static_cast<size_t>( m_haloRimCount )] = static_cast<short>( s );
+                    m_haloRimAngle[static_cast<size_t>( m_haloRimCount )] =
+                        std::atan2( static_cast<float>( y ), static_cast<float>( x ) );
+                    ++m_haloRimCount;
+                }
+                ++s;
+            }
+    }
     m_chimeLevel = m_phantomGain = m_dreamGain = 0.0f;
     m_dreamBlocks = 0;
     m_chimeStrikes.store( 0, std::memory_order_relaxed );
@@ -2247,6 +2277,274 @@ void Engine::stepNature( float dt )
     }
 }
 
+void Engine::stepRooms( float dt )
+{
+    auto glide = [dt]( float &v, float want, float tau )
+    {
+        v += ( want - v ) * ( 1.0f - std::exp( -dt / tau ) );
+        if ( want <= 0.0f && v < 1.0e-4f ) v = 0.0f;
+    };
+    const int first = static_cast<int>( m_voices.size() + m_ghosts.size() );
+
+    // The halo: its carriers given to the sounding notes, each driven at the rim from its own direction (the golden
+    // angle by its note, so a chord comes in from round the circle) -- strongly for its first 0.4 s, gently while it
+    // sounds -- and let ring once its note is gone, until it has died away and the carrier is free again.
+    {
+        Halo       &H = m_cloud.halo();
+        CloudVoice &cv = m_cloud.voice( first + 2 );
+        const float want = cur( ParamIdE::HALO );
+        glide( m_haloGain, want, 0.5f );
+        H.m_on = ( want > 0.0f || m_haloGain > 0.0f ) ? 1 : 0;
+        if ( !H.m_on )
+        {
+            cv.m_active = 0;
+            m_haloNote.fill( -1 );
+        }
+        else
+        {
+            float energy[HaloCarriers], angle[HaloCarriers], rim[HaloCarriers];
+            m_cloud.haloStats( energy, angle, rim );
+            float peak = 1.0e-12f;
+            for ( float e : energy ) peak = std::max( peak, e );
+            m_haloHeld.fill( false );
+            for ( const Voice &v : m_voices )
+            {
+                if ( v.m_note < 0 || v.m_stealing || v.m_lastGain < 0.02f || v.m_pre > 0.0f ) continue;
+                int slot = -1;
+                for ( int c = 0; c < HaloCarriers && slot < 0; ++c )
+                    if ( m_haloNote[static_cast<size_t>( c )] == v.m_note ) slot = c;
+                if ( slot < 0 )
+                {   // a free carrier, or the faintest one not held
+                    float least = 1.0e30f;
+                    for ( int c = 0; c < HaloCarriers; ++c )
+                    {
+                        const float e = m_haloNote[static_cast<size_t>( c )] < 0 ? -1.0f : energy[c];
+                        if ( e < least && !m_haloHeld[static_cast<size_t>( c )] )
+                        {
+                            least = e;
+                            slot = c;
+                        }
+                    }
+                    if ( slot < 0 ) continue;
+                    m_haloNote[static_cast<size_t>( slot )] = v.m_note;
+                    m_haloAge[static_cast<size_t>( slot )] = 0.0f;
+                    H.m_clear |= 1 << slot;
+                    cv.m_haloHz[slot] = static_cast<float>( v.m_hz );
+                    // where it is struck: the rim site nearest its direction
+                    const float a = std::fmod( static_cast<float>( v.m_note ) * 2.3999632f, 6.2831853f ) - 3.1415927f;
+                    int         best = 0;
+                    float       bestD = 1.0e9f;
+                    for ( int k = 0; k < m_haloRimCount; ++k )
+                    {
+                        float d = std::fabs( m_haloRimAngle[static_cast<size_t>( k )] - a );
+                        d = std::min( d, 6.2831853f - d );
+                        if ( d < bestD )
+                        {
+                            bestD = d;
+                            best = m_haloRim[static_cast<size_t>( k )];
+                        }
+                    }
+                    H.m_site[slot] = best;
+                }
+                m_haloHeld[static_cast<size_t>( slot )] = true;
+                cv.m_haloHz[slot] = static_cast<float>( v.m_hz );   // it follows its note's glides
+                H.m_drive[slot] = ( m_haloAge[static_cast<size_t>( slot )] < 0.4f ? 1.0f : 0.25f ) *
+                                  std::min( 1.0f, 1.5f * v.m_lastGain );
+            }
+            for ( int c = 0; c < HaloCarriers; ++c )
+            {
+                m_haloAge[static_cast<size_t>( c )] += dt;
+                if ( !m_haloHeld[static_cast<size_t>( c )] )
+                {
+                    H.m_drive[c] = 0.0f;
+                    if ( m_haloNote[static_cast<size_t>( c )] >= 0 && m_haloAge[static_cast<size_t>( c )] > 1.0f &&
+                         energy[c] < 1.0e-6f * peak )
+                    {   // died away: free, silent
+                        m_haloNote[static_cast<size_t>( c )] = -1;
+                        cv.m_haloHz[c] = 0.0f;
+                    }
+                }
+            }
+            const float round = cur( ParamIdE::HALO_SPEED );
+            const float sign = std::lround( cur( ParamIdE::HALO_TURN ) ) == 1 ? -1.0f : 1.0f;
+            H.m_omega = 125.0f / std::max( round, 1.0f );   // measured: omega 10 runs round a radius of 12 in 12.5 s
+            H.m_mass = sign * ( 1.0f + 1.5f * cur( ParamIdE::HALO_TOPOLOGY ) );
+            H.m_disorder = 2.0f * cur( ParamIdE::HALO_DISORDER );
+            H.m_damp = 1.0f / ( 1.5f * std::max( round, 1.0f ) );
+            cv.m_restart = cv.m_active ? 0 : 1;
+            cv.m_active = 1;
+            cv.m_kind = VoiceKindE::HALO;
+            cv.m_partials = HaloCarriers * HaloSites;
+            cv.m_level = VoiceLevel * 3.5f;
+            cv.m_gain = m_haloGain;
+            cv.m_distance = 0.0f;
+            cv.m_stereo = 0.0f;
+            cv.m_seed = 0x48414C4Fu;
+            cv.m_onset = 0;
+            cv.m_harmonicLife = 0;
+            cv.m_subClouds = 0;
+            cv.m_grain = 0.0f;
+        }
+    }
+
+    // The wave room: its size (a change clears the air), its walls, where the listener stands, the voices in it --
+    // each where it stands, round in front of the listener by a direction of its own and as far as its distance.
+    {
+        WaveRoom   &W = m_cloud.room();
+        const float want = cur( ParamIdE::WAVE_ROOM );
+        glide( m_roomLevel, want, 0.5f );
+        constexpr float Cell = 0.1143f;   // m: the grid at 48 kHz, a Courant number of a half
+        const float     lambda = 343.0f * RoomDecim / ( static_cast<float>( m_cfg.m_sampleRate ) * Cell );
+        W.m_on = ( ( want > 0.0f || m_roomLevel > 0.0f ) && lambda < 0.57f ) ? 1 : 0;
+        if ( W.m_on )
+        {
+            const float s = cur( ParamIdE::ROOM_SIZE );
+            const int   nx = std::clamp( static_cast<int>( std::lround( RoomNX * s ) ), 8, RoomNX );
+            const int   ny = std::clamp( static_cast<int>( std::lround( RoomNY * s ) ), 8, RoomNY );
+            const int   nz = std::clamp( static_cast<int>( std::lround( RoomNZ * ( 0.5f + 0.5f * s ) ) ), 8, RoomNZ );
+            if ( nx != m_roomDims[0] || ny != m_roomDims[1] || nz != m_roomDims[2] ) W.m_clear = 1;
+            m_roomDims[0] = W.m_nx = nx;
+            m_roomDims[1] = W.m_ny = ny;
+            m_roomDims[2] = W.m_nz = nz;
+            W.m_lambda2 = lambda * lambda;
+            W.m_beta = 0.03f + 0.7f * cur( ParamIdE::ROOM_ABSORB );
+            W.m_level = m_roomLevel * 40.0f;
+            auto      cell = [&]( int x, int y, int z ) { return x + RoomNX * ( y + RoomNY * z ); };
+            const int xl = nx / 2;
+            const int yl = std::clamp( static_cast<int>( std::lround( ( 0.25f + 0.5f * cur( ParamIdE::ROOM_WALK ) ) *
+                                                                      static_cast<float>( ny - 1 ) ) ),
+                                       1, ny - 2 );
+            const int zl = std::min( nz - 2, static_cast<int>( std::lround( 1.6f / Cell ) ) );
+            W.m_ear[0] = cell( xl - 1, yl, zl );
+            W.m_ear[1] = cell( xl + 1, yl, zl );
+            W.m_srcZ = std::min( nz - 2, static_cast<int>( std::lround( 1.4f / Cell ) ) );
+            int count = 0;
+            for ( int i = 0; i < first && count < RoomSources; ++i )
+            {
+                const CloudVoice &v = m_cloud.voice( i );
+                if ( !v.m_active ) continue;
+                const float side = 0.8f * ( 2.0f * std::fmod( 0.618034f * static_cast<float>( i + 1 ), 1.0f ) - 1.0f );
+                const float theta = side * 1.0471976f, r = ( 1.5f + 4.0f * v.m_distance ) / Cell;
+                const int   x = std::clamp( static_cast<int>( std::lround( xl + r * std::sin( theta ) ) ), 1, nx - 2 );
+                const int   y = std::clamp( static_cast<int>( std::lround( yl - r * std::cos( theta ) ) ), 1, ny - 2 );
+                W.m_source[count] = cell( x, y, W.m_srcZ );
+                W.m_voiceOf[count] = i;
+                W.m_gain[count] = 1.0f;
+                ++count;
+            }
+            W.m_count = count;
+        }
+    }
+
+    // The quantum walk on the Tonnetz: twelve amplitudes on the pitch classes, each joined to its fifths and its
+    // thirds (major and minor, up and down); the walk turns as e^(-i A w t), w such that between two looks the
+    // phase is 0.15 .. 6 radians (Spread). Its share of moves to a neighbour does not fall steadily with it -- 79 %
+    // at 0.15, 47 % at 0.5, 78 % at 2, 36 % at 4 (simulated, 4000 looks): interference, which a random walk has not. Every Look Every seconds it is looked at: the root moves to a pitch class
+    // drawn by |psi|^2 -- the nearest note of it to where the root is -- and the walk is partly collapsed there (70 %),
+    // so it keeps a memory of where it might have gone. A family jam's leader keeps the root: then it waits.
+    {
+        const float amount = cur( ParamIdE::QUANTUM );
+        const bool  on = amount > 0.0f && m_bp.m_on && m_jamRoot.load( std::memory_order_relaxed ) < 0;
+        const int   rootPc = ( ( m_brain.root() % 12 ) + 12 ) % 12;
+        if ( on && ( !m_qwWas || rootPc != m_qwRootPc ) )
+        {   // begun, or the conductor moved the root itself: the walk sees it there and goes on from it
+            m_qwPsi.fill( 0.0 );
+            m_qwPsi[static_cast<size_t>( 2 * rootPc )] = 1.0;
+            if ( !m_qwWas ) m_qwNext = cur( ParamIdE::QUANTUM_TIME );
+            m_qwRootPc = rootPc;
+        }
+        m_qwWas = on;
+        if ( on )
+        {
+            const double T = std::max( 1.0f, cur( ParamIdE::QUANTUM_TIME ) );
+            const double w = ( 0.15 + 5.85 * cur( ParamIdE::QUANTUM_SPREAD ) ) / T;
+            // A step by the circulant's own basis: psi_hat_k *= e^(-i lambda_k w dt), lambda_k = 2 sum cos(2 pi k s / 12).
+            std::array<double, 24> hat{};
+            for ( int k = 0; k < 12; ++k )
+                for ( int j = 0; j < 12; ++j )
+                {
+                    const double a = -6.283185307179586 * k * j / 12.0;
+                    hat[2 * k] += m_qwPsi[2 * j] * std::cos( a ) - m_qwPsi[2 * j + 1] * std::sin( a );
+                    hat[2 * k + 1] += m_qwPsi[2 * j] * std::sin( a ) + m_qwPsi[2 * j + 1] * std::cos( a );
+                }
+            for ( int k = 0; k < 12; ++k )
+            {
+                double l = 0.0;
+                for ( int s : { 3, 4, 7 } ) l += 2.0 * std::cos( 6.283185307179586 * k * s / 12.0 );
+                const double ph = -l * w * dt, c = std::cos( ph ), sn = std::sin( ph );
+                const double re = hat[2 * k] * c - hat[2 * k + 1] * sn, im = hat[2 * k] * sn + hat[2 * k + 1] * c;
+                hat[2 * k] = re;
+                hat[2 * k + 1] = im;
+            }
+            for ( int j = 0; j < 12; ++j )
+            {
+                double re = 0.0, im = 0.0;
+                for ( int k = 0; k < 12; ++k )
+                {
+                    const double a = 6.283185307179586 * k * j / 12.0;
+                    re += hat[2 * k] * std::cos( a ) - hat[2 * k + 1] * std::sin( a );
+                    im += hat[2 * k] * std::sin( a ) + hat[2 * k + 1] * std::cos( a );
+                }
+                m_qwPsi[2 * j] = re / 12.0;
+                m_qwPsi[2 * j + 1] = im / 12.0;
+            }
+            m_qwNext -= dt;
+            if ( m_qwNext <= 0.0f )
+            {
+                m_qwNext = static_cast<float>( T );
+                double norm = 0.0;
+                for ( double x : m_qwPsi ) norm += x * x;
+                if ( norm > 1.0e-12 && m_qwRng.uniform() < amount )
+                {
+                    double u = m_qwRng.uniform() * norm;
+                    int    pc = 11;
+                    for ( int j = 0; j < 12; ++j )
+                    {
+                        u -= m_qwPsi[static_cast<size_t>( 2 * j )] * m_qwPsi[static_cast<size_t>( 2 * j )] +
+                             m_qwPsi[static_cast<size_t>( 2 * j + 1 )] * m_qwPsi[static_cast<size_t>( 2 * j + 1 )];
+                        if ( u <= 0.0 )
+                        {
+                            pc = j;
+                            break;
+                        }
+                    }
+                    const double amp = std::sqrt(
+                        m_qwPsi[static_cast<size_t>( 2 * pc )] * m_qwPsi[static_cast<size_t>( 2 * pc )] +
+                        m_qwPsi[static_cast<size_t>( 2 * pc + 1 )] * m_qwPsi[static_cast<size_t>( 2 * pc + 1 )] );
+                    for ( double &x : m_qwPsi ) x *= std::sqrt( 0.3 / norm );
+                    if ( amp > 0.0 )
+                    {   // partly collapsed onto what was found, its phase kept
+                        m_qwPsi[static_cast<size_t>( 2 * pc )] += std::sqrt( 0.7 ) *
+                                                                  m_qwPsi[static_cast<size_t>( 2 * pc )] /
+                                                                  ( amp * std::sqrt( 0.3 / norm ) );
+                        m_qwPsi[static_cast<size_t>( 2 * pc + 1 )] += std::sqrt( 0.7 ) *
+                                                                      m_qwPsi[static_cast<size_t>( 2 * pc + 1 )] /
+                                                                      ( amp * std::sqrt( 0.3 / norm ) );
+                    }
+                    double n2 = 0.0;
+                    for ( double x : m_qwPsi ) n2 += x * x;
+                    for ( double &x : m_qwPsi ) x /= std::sqrt( std::max( n2, 1.0e-30 ) );
+                    if ( pc != rootPc )
+                    {
+                        const int r = m_brain.root();
+                        int       best = r, bestDist = 99;
+                        for ( int d = -6; d <= 6; ++d )
+                            if ( ( ( ( r + d ) % 12 ) + 12 ) % 12 == pc && std::abs( d ) < bestDist )
+                            {
+                                bestDist = std::abs( d );
+                                best = r + d;
+                            }
+                        m_brain.setRoot( std::clamp( best, 0, 127 ) );
+                        m_qwLastStep = ( ( pc - rootPc ) % 12 + 12 ) % 12;
+                        m_qwRootPc = pc;
+                        ++m_qwMoves;
+                    }
+                }
+            }
+        }
+    }
+}
+
 void Engine::captureGhost( int i )
 {
     size_t slot = 0;
@@ -2476,6 +2774,7 @@ void Engine::renderBlock()
     stepSeasons( dtf );
     stepLayers( dtf );
     stepNature( dtf );
+    stepRooms( dtf );
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
@@ -2819,8 +3118,8 @@ void Engine::renderBlock()
         m_viewSource[i].store( 3, std::memory_order_relaxed );
         m_viewNote[i].store( -1, std::memory_order_relaxed );
     }
-    for ( size_t k = 0; k < 2; ++k )
-    {   // the phantom layer and the dream (Phase 27), drawn as the memory is, with no key of their own
+    for ( size_t k = 0; k < 3; ++k )
+    {   // the phantom layer, the dream and the halo, drawn as the memory is, with no key of their own
         const size_t i = m_voices.size() + m_ghosts.size() + k;
         if ( i >= static_cast<size_t>( MaxViewVoices ) ) break;
         const CloudVoice &cv = m_cloud.voice( static_cast<int>( i ) );
@@ -3352,6 +3651,8 @@ void Engine::renderBlock()
         m_farR[k] += ( f[13] + f[19] ) * m_blk.m_farLevel;
         m_bloomL[k] = f[20];   // the bloom (Phase 28), its level applied on the card
         m_bloomR[k] = f[21];
+        m_roomL[k] = f[22];   // the wave room (Phase 29), likewise
+        m_roomR[k] = f[23];
         m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
         m_phantomR[k] = f[15];
     }
@@ -3455,8 +3756,8 @@ void Engine::renderBlock()
         {
             const size_t k = static_cast<size_t>( s );
             const float  m = ramp( m_prevModalLevel, ml, s );
-            m_nearL[k] += m_farL[k] + m_modalL[k] * m + m_bloomL[k];
-            m_nearR[k] += m_farR[k] + m_modalR[k] * m + m_bloomR[k];
+            m_nearL[k] += m_farL[k] + m_modalL[k] * m + m_bloomL[k] + m_roomL[k];
+            m_nearR[k] += m_farR[k] + m_modalR[k] * m + m_bloomR[k] + m_roomR[k];
         }
         m_prevModalLevel = ml;
     }

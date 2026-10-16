@@ -107,11 +107,18 @@ offline renderer and the manual, and a portable zip.
   heard only between the ears (dichotic pitch, headphones); the instrument dreaming of what it played, by association
   (a modern Hopfield network over its own spectra); the conductor's notes heard coming, as a reverb backwards; timbres
   that fall apart and come back whole (Talbot's effect) or swing up and down the harmonics (Bloch).
-- **8192 presets** in 128 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
-  visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms), levelled by their loudest second.
+- **Weather and growth:** rain where the showers the wind carries are (bubbles singing on water, a tin roof in
+  tune), leaves rustling in its gusts, a sea breaking in sets; a plate everything rings, its energy blooming upward as
+  a tam-tam's; the partials riding swarmalators round the listener, or crawling as a slime mould between the harmonics.
+- **Rooms and topology:** a room simulated as air (the wave equation on a quarter of a million cells: its modes and
+  standing waves, a listener who walks through them); a topological insulator of sound round the listener, its rim
+  carrying the notes round one way only; the conductor's root walking as a quantum wave on the Tonnetz.
+- **10240 presets** in 160 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+  visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms, weather and growth, rooms and
+  topology), levelled by their loudest second.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (267 come with it, eleven of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (333 come with it, thirteen of them whole nights).
 
 ## Build
 

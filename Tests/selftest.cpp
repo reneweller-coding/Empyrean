@@ -604,7 +604,7 @@ int main()
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 8192 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 10240 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -3878,6 +3878,152 @@ int main()
             fmt( "after fifteen seconds %.0f %% of the power between the harmonics (without it %.1f %%); the trail's "
                  "spread %.2f",
                  100.0 * between, 100.0 * home, spread ) );
+    }
+
+    // 86. Wave room (Phase 29a): a short chord in the room, the room alone (the render with it less the render without:
+    //     the engine renders the same, sample for sample) -- its sound lies below 2.5 kHz (the grid's band), and with
+    //     rigid walls its tail half a second to a second and a half after the chord is far louder than with walls that
+    //     take it up.
+    {
+        auto play = [&]( float room, float absorb, std::vector<float> &out )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::WAVE_ROOM, room );
+            e.setParam( ParamIdE::ROOM_ABSORB, absorb );
+            e.setParam( ParamIdE::ROOM_SIZE, 0.6f );
+            e.setParam( ParamIdE::ATTACK, 0.01f );
+            e.setParam( ParamIdE::RELEASE, 0.15f );
+            if ( !openOffline( e, false, 271 ) ) return false;
+            e.noteOn( 45, 1.0f, 0 );
+            e.noteOn( 52, 1.0f, 0 );
+            render( e, 0.3 );
+            e.noteOff( 45, 0 );
+            e.noteOff( 52, 0 );
+            out = render( e, 2.0 );
+            return true;
+        };
+        std::vector<float> dry, rigid, soft;
+        const bool         ran = play( 0.0f, 0.0f, dry ) && play( 1.0f, 0.0f, rigid ) && play( 1.0f, 1.0f, soft );
+        double             tailRigid = 0.0, tailSoft = 0.0, low = 0.0, all = 0.0;
+        if ( ran )
+        {
+            std::vector<float> r( dry.size() ), s( dry.size() );
+            for ( size_t i = 0; i < dry.size(); ++i )
+            {
+                r[i] = rigid[i] - dry[i];
+                s[i] = soft[i] - dry[i];
+            }
+            tailRigid = rmsDb( r, 24000, 72000 );
+            tailSoft = rmsDb( s, 24000, 72000 );
+            // its band: a one-pole split at 2.5 kHz, the power below against all of it
+            double       lp = 0.0;
+            const double k = 1.0 - std::exp( -6.283185307179586 * 2500.0 / 48000.0 );
+            for ( size_t i = 0; i < r.size() / 2; ++i )
+            {
+                const double x = 0.5 * ( r[2 * i] + r[2 * i + 1] );
+                lp += k * ( x - lp );
+                low += lp * lp;
+                all += x * x;
+            }
+        }
+        const double share = all > 0.0 ? low / all : 0.0;
+        check(
+            ran && tailRigid > -90.0 && tailRigid > tailSoft + 6.0 && share > 0.7,
+            "wave room: the room rings below 2.5 kHz, longer between rigid walls",
+            fmt( "the room's tail a second after the chord %.1f dBFS between rigid walls, %.1f with soft ones; %.0f %% "
+                 "of it below 2.5 kHz",
+                 tailRigid, tailSoft, 100.0 * share ) );
+    }
+
+    // 87. Topological halo (Phase 29b): a note struck and let go -- its halo stays on the rim and runs round, counter-
+    //     clockwise or clockwise as asked, more than a quarter of the way in three seconds; made trivial, the gap holds
+    //     nothing and it moves less than a third as far (what moves at all is the strike's edges, outside the gap:
+    //     measured -35 degrees against +142).
+    {
+        auto play = [&]( float turn, float topology, float &moved, float &rim )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::HALO, 1.0f );
+            e.setParam( ParamIdE::HALO_SPEED, 8.0f );
+            e.setParam( ParamIdE::HALO_TURN, turn );
+            e.setParam( ParamIdE::HALO_TOPOLOGY, topology );
+            e.setParam( ParamIdE::ATTACK, 0.01f );
+            e.setParam( ParamIdE::RELEASE, 0.1f );
+            if ( !openOffline( e, false, 277 ) ) return false;
+            e.noteOn( 60, 1.0f, 0 );
+            render( e, 0.5 );
+            e.noteOff( 60, 0 );
+            render( e, 0.2 );
+            float energy[HaloCarriers], angle[HaloCarriers], rims[HaloCarriers];
+            e.haloStats( energy, angle, rims );
+            int c = 0;
+            for ( int k = 1; k < HaloCarriers; ++k )
+                if ( energy[k] > energy[c] ) c = k;
+            const float from = angle[c];
+            render( e, 3.0 );
+            e.haloStats( energy, angle, rims );
+            float d = angle[c] - from;
+            while ( d > 3.1415927f ) d -= 6.2831853f;
+            while ( d < -3.1415927f ) d += 6.2831853f;
+            moved = d * 57.29578f;
+            rim = rims[c];
+            return energy[c] > 0.0f;
+        };
+        float      ccw = 0.0f, cw = 0.0f, still = 0.0f, rimCcw = 0.0f, rimCw = 0.0f, rimStill = 0.0f;
+        const bool ran =
+            play( 0.0f, 0.0f, ccw, rimCcw ) && play( 1.0f, 0.0f, cw, rimCw ) && play( 0.0f, 1.0f, still, rimStill );
+        check( ran && ccw > 90.0f && cw < -90.0f && rimCcw > 0.8f && rimCw > 0.8f && std::fabs( still ) < ccw / 3.0f,
+               "halo: it runs round the rim one way or the other; trivial, it stays",
+               fmt( "in three seconds %+.0f degrees counter-clockwise (%.0f %% on the rim), %+.0f clockwise (%.0f %%); "
+                    "trivial %+.0f",
+                    ccw, 100.0f * rimCcw, cw, 100.0f * rimCw, still ) );
+    }
+
+    // 88. Quantum walk (Phase 29c): the root moves on the Tonnetz, and how often to a neighbour there (a fifth or a
+    //     fourth, a major or minor third or sixth) does not fall steadily as the wave spreads further between two
+    //     looks: at a phase of 2 radians more of the moves go to a neighbour than at 0.5 -- interference, which a
+    //     random walk cannot do (simulated: 78 % against 47 %). With it off the root does not move by it.
+    {
+        auto play = [&]( float spread, long long &moves, long long &toNeighbour )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::QUANTUM, 1.0f );
+            e.setParam( ParamIdE::QUANTUM_TIME, 5.0f );
+            e.setParam( ParamIdE::QUANTUM_SPREAD, spread );
+            if ( !openOffline( e, true, 281 ) ) return false;
+            e.requestFill();
+            moves = toNeighbour = 0;
+            for ( int k = 0; k < 90; ++k )
+            {
+                render( e, 5.0 );
+                int             step = 0;
+                const long long m = e.quantumMoves( step );
+                if ( m > moves )
+                {
+                    moves = m;
+                    if ( step == 3 || step == 4 || step == 5 || step == 7 || step == 8 || step == 9 ) ++toNeighbour;
+                }
+            }
+            return true;
+        };
+        long long  m05 = 0, n05 = 0, m2 = 0, n2 = 0;
+        const bool ran = play( ( 0.5f - 0.15f ) / 5.85f, m05, n05 ) && play( ( 2.0f - 0.15f ) / 5.85f, m2, n2 );
+        Engine     off;
+        quietEffects( off );
+        bool ranOff = openOffline( off, true, 281 );
+        off.requestFill();
+        render( off, 60.0 );
+        int             unused = 0;
+        const long long offMoves = off.quantumMoves( unused );
+        const double    s05 = m05 > 0 ? static_cast<double>( n05 ) / m05 : 0.0,
+                        s2 = m2 > 0 ? static_cast<double>( n2 ) / m2 : 0.0;
+        check( ran && ranOff && m05 >= 20 && m2 >= 20 && s2 > s05 + 0.15 && offMoves == 0,
+               "quantum walk: the root moves on the Tonnetz, its steps shaped by interference",
+               fmt( "a phase of 0.5 rad: %lld moves, %.0f %% to a neighbour; 2 rad: %lld, %.0f %%; off: %lld", m05,
+                    100.0 * s05, m2, 100.0 * s2, offMoves ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

@@ -371,6 +371,25 @@ public:
         m_cloud.physarumStats( out[8], out[9] );
     }
 
+    /**
+     * @brief The halo's carriers as the last block left them (Phase 29; tests and tools, offline).
+     * @param[out] energy  receives HaloCarriers energies
+     * @param[out] angle   receives where round the disc each one's energy stands, radians
+     * @param[out] rim     receives each one's share on the rim
+     */
+    void haloStats( float *energy, float *angle, float *rim ) const { m_cloud.haloStats( energy, angle, rim ); }
+
+    /**
+     * @brief The quantum walk's moves (Phase 29; tests, offline).
+     * @param[out] lastStep  receives the last move's step, semitones within the octave (0 .. 11)
+     * @return the roots it moved since prepare()
+     */
+    long long quantumMoves( int &lastStep ) const
+    {
+        lastStep = m_qwLastStep;
+        return m_qwMoves;
+    }
+
     /** @brief Chimes that struck since the engine was prepared (Phase 27; tests, diagnostics). @return the count */
     long long chimeStrikes() const { return m_chimeStrikes.load( std::memory_order_relaxed ); }
     /** @brief Memories the dream keeps, as the last block left them (Phase 27). @return 0 .. DreamMemories */
@@ -909,6 +928,14 @@ private:
      * @param[in] dt  the block's length, seconds
      */
     void stepNature( float dt );
+    /**
+     * @brief The halo, the wave room and the quantum walk, one block (Phase 29): the halo's carriers given to the
+     *        sounding notes (a free slot, or the faintest) and driven at the rim where each stands, its speed and
+     *        topology; the room's size, walls, listener and the voices standing in it; the walk evolving on the
+     *        Tonnetz and, every so often, looked at -- the conductor's root moves to where it is found.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepRooms( float dt );
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost
@@ -997,6 +1024,25 @@ private:
     std::vector<float> m_bloomL;               ///< the bloom's block from the GPU, left
     std::vector<float> m_bloomR;               ///< and right
     float              m_prevBloom = 0.0f;     ///< unused: the bloom's level is applied on the card
+    // Phase 29
+    float                           m_haloGain = 0.0f;    ///< the halo's level as it glides
+    std::array<int, HaloCarriers>   m_haloNote{};         ///< the note each carrier carries (-1 free)
+    std::array<float, HaloCarriers> m_haloAge{};          ///< seconds since it was given its note
+    std::array<bool, HaloCarriers>  m_haloHeld{};         ///< its note still sounds
+    std::array<short, HaloSites>    m_haloRim{};          ///< the rim's sites (their index), first m_haloRimCount
+    std::array<float, HaloSites>    m_haloRimAngle{};     ///< and their angles round the disc
+    int                             m_haloRimCount = 0;   ///< how many
+    float                           m_roomLevel = 0.0f;   ///< the wave room's level as it glides
+    int                    m_roomDims[3] = { 0, 0, 0 };   ///< its size the last block (a change clears the air)
+    std::array<double, 24> m_qwPsi{};         ///< the quantum walk: 12 complex amplitudes (re, im) on the pitch classes
+    float                  m_qwNext = 0.0f;   ///< s until it is looked at
+    bool                   m_qwWas = false;   ///< it walked in the last block
+    long long              m_qwMoves = 0;     ///< roots it moved (since prepare)
+    int                    m_qwLastStep = 0;   ///< the last move's step, semitones within the octave
+    int                    m_qwRootPc = -1;    ///< the root's pitch class as the walk last saw or set it
+    Rng                    m_qwRng;            ///< its dice
+    std::vector<float>     m_roomL;            ///< the wave room's block from the GPU, left
+    std::vector<float>     m_roomR;            ///< and right
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
