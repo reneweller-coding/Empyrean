@@ -507,6 +507,18 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::SOFAR, "sofar", "Deep Channel", "Deep Channel", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::SOFAR_RANGE, "sofar_range", "Range", "Deep Channel", 100.f, 3000.f, 800.f, 0.5f, "km" ),
     F( ParamIdE::SOFAR_DEPTH, "sofar_depth", "Off Axis", "Deep Channel", 0.f, 1.f, 0.2f, 1.f, "" ),
+    F( ParamIdE::MAGNETO, "magneto", "Magnetosphere", "Magnetosphere", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::WHISTLERS, "whistlers", "Whistlers", "Magnetosphere", 0.f, 30.f, 4.f, 0.5f, "/min" ),
+    F( ParamIdE::WHISTLER_DISPERSION, "whistler_dispersion", "Dispersion", "Magnetosphere", 15.f, 120.f, 50.f, 0.5f,
+       "s/Hz" ),
+    F( ParamIdE::DAWN_CHORUS, "dawn_chorus", "Dawn Chorus", "Magnetosphere", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::GYRO, "gyro", "Gyrofrequency", "Magnetosphere", 1500.f, 9000.f, 4000.f, 0.5f, "Hz" ),
+    F( ParamIdE::HISS, "hiss", "Hiss", "Magnetosphere", 0.f, 1.f, 0.2f, 1.f, "" ),
+    F( ParamIdE::THROAT, "throat", "Throat", "Throat", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::THROAT_SIZE, "throat_size", "Tract", "Throat", 17.f, 45.f, 30.f, 1.f, "cm" ),
+    F( ParamIdE::THROAT_SUB, "throat_sub", "Kargyraa", "Throat", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::THROAT_VOWEL, "throat_vowel", "Vowel", "Throat", 0.f, 1.f, 0.2f, 1.f, "" ),
+    I( ParamIdE::THROAT_VOICES, "throat_voices", "Throats", "Throat", 1.f, 4.f, 2.f ),
 } };
 
 }   // namespace

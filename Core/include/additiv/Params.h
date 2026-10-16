@@ -401,7 +401,19 @@ enum class ParamIdE : int
     SOFAR,            ///< 0 .. 1: the deep channel: everything heard again as sound arrives across an ocean
     SOFAR_RANGE,      ///< km: how far (the arrivals' spread, the depth's darkening)
     SOFAR_DEPTH,      ///< 0 .. 1: the source on the channel's axis .. far off it (more, steeper rays)
-    COUNT             ///< number of parameters
+    // Phase 35 (16.10.2026): plasma and voice
+    MAGNETO,     ///< 0 .. 1: the magnetosphere heard as a VLF receiver hears it (its level)
+    WHISTLERS,   ///< /min: whistlers -- lightning's clicks dispersed along the field lines (and every strike's)
+    WHISTLER_DISPERSION,   ///< s sqrt(Hz): how far a whistler is drawn out (t = D / sqrt(f))
+    DAWN_CHORUS,           ///< 0 .. 1: the dawn chorus -- rising tones in bursts, like birds
+    GYRO,                  ///< Hz: the electrons' gyrofrequency at the equator (the chorus's band: 0.1 .. 0.5 of it)
+    HISS,                  ///< 0 .. 1: plasmaspheric hiss
+    THROAT,                ///< 0 .. 1: the throat of the abyss -- giant vocal tracts singing the root
+    THROAT_SIZE,     ///< cm: the tract's length (17: a man's; 45: a giant's, its formants an octave and more down)
+    THROAT_SUB,      ///< 0 .. 1: the ventricular folds closing every other cycle: kargyraa, an octave below
+    THROAT_VOWEL,    ///< 0 .. 1: the vowel, u o a e i
+    THROAT_VOICES,   ///< 1 .. 4: throats (the root, its fifth, its octave, the fifth above)
+    COUNT            ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table

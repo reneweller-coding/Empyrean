@@ -134,13 +134,16 @@ offline renderer and the manual, and a portable zip.
   hydrogen's spectral lines as a timbre (Zeeman triplets, Doppler widths) and its dark lines carved into the sound, a
   derelict's structure ringing in modes worked out from a mass-spring model, the ocean's deep sound channel traced ray
   by ray.
-- **15360 presets** in 240 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+- **Plasma and voice:** the magnetosphere as a VLF radio hears it (whistlers dispersed along the field lines, the
+  dawn chorus, hiss) and the throat of the abyss: giant vocal tracts (Kelly-Lochbaum) whose ventricular folds sing an
+  octave below (kargyraa).
+- **16384 presets** in 256 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
   visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms, weather and growth, rooms and
-  topology, night and illusions, choruses and mirrors, deep floors, stars and gravity, light and depth), levelled by their loudness (ITU-R BS.1770); and a map that
+  topology, night and illusions, choruses and mirrors, deep floors, stars and gravity, light and depth, plasma and voice), levelled by their loudness (ITU-R BS.1770); and a map that
   grows itself (MAP-Elites, Tools/presets/grow.py) into presets of your own.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (498 come with it, eighteen of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (531 come with it, nineteen of them whole nights).
 
 ## Build
 

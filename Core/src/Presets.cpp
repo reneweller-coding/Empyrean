@@ -253,6 +253,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Ocean Crossings",
     "Whale Roads",
     "Lost Signals",
+    "Whistler Nights",
+    "Sferic Storms",
+    "Dawn Choruses",
+    "Radio Auroras",
+    "Plasma Hiss",
+    "VLF Receivers",
+    "Monk Drones",
+    "Kargyraa Halls",
+    "Giant Throats",
+    "Vowel Tides",
+    "Abyssal Choirs",
+    "Overtone Caves",
+    "Throat & Thunder",
+    "Cosmic Chant",
+    "Ionosphere",
+    "Voices of the Void",
 };
 
 namespace

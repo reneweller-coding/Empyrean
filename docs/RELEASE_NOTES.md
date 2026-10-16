@@ -1,5 +1,19 @@
 # Release notes
 
+## 0.25.0 (16.10.2026, not released)
+
+Plasma and voice. 1024 presets; 16384 in all.
+
+- **Magnetosphere** (Night): the Earth's magnetic field as a VLF radio hears it -- whistlers (a lightning click drawn
+  out along a field line into a falling tone, with its echoes; every strike of Thunder sends one), the dawn chorus
+  (rising tones in bursts, like birds), plasmaspheric hiss. Whistlers, Dispersion, Dawn Chorus, Gyrofrequency, Hiss.
+- **Throat** (Dreams): the throat of the abyss -- up to four vocal tracts of a giant's length (Kelly-Lochbaum), singing
+  the root, its fifth, its octave; Kargyraa closes the ventricular folds every other cycle, an octave below, as in
+  Tuvan and Tibetan chant. Tract, Kargyraa, Vowel, Throats.
+- **16384 presets:** sixteen new groups of plasma and voice (Whistler Nights, Sferic Storms, Dawn Choruses, Radio
+  Auroras, Plasma Hiss, VLF Receivers, Monk Drones, Kargyraa Halls, Giant Throats, Vowel Tides, Abyssal Choirs,
+  Overtone Caves, Throat & Thunder, Cosmic Chant, Ionosphere, Voices of the Void); 531 journeys, nineteen whole nights.
+
 ## 0.24.0 (16.10.2026, not released)
 
 Light and depth. 1024 presets.

@@ -631,7 +631,7 @@ int main( int argc, char **argv )
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 15360 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 16384 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -5074,6 +5074,106 @@ int main( int argc, char **argv )
             fmt( "the loudest arrival %.1f s after the note (%.1f dBFS), %.1f dB over the first second's; 30 dB down "
                  "%.1f s later",
                  at, loud, loud - early, last - at ) );
+    }
+
+    // 109. Magnetosphere (Phase 35): whistlers fall -- the loudest pitch from one twentieth of a second to the next goes
+    //      down far more often than up --, and the dawn chorus rises.
+    if ( from <= 109 )
+    {
+        // the share of steps, between neighbouring 50 ms windows that both sound, where the loudest pitch (on a grid
+        // of sixths of an octave, 200 Hz .. 10 kHz) falls, and where it rises
+        auto glide = [&]( float whistlers, float dawn, double &down, double &up )
+        {
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::MAGNETO, 1.0f );
+            e.setParam( ParamIdE::WHISTLERS, whistlers );
+            e.setParam( ParamIdE::WHISTLER_DISPERSION, 50.0f );
+            e.setParam( ParamIdE::DAWN_CHORUS, dawn );
+            e.setParam( ParamIdE::HISS, 0.0f );
+            if ( !openOffline( e, false, 109 ) ) return false;
+            const std::vector<float> a = render( e, 40.0 );
+            std::vector<int>         peak;
+            for ( size_t s = 0; s + 2400 <= a.size() / 2; s += 2400 )
+            {
+                if ( rmsDb( a, s, s + 2400 ) < -80.0 )
+                {
+                    peak.push_back( -1 );
+                    continue;
+                }
+                int    best = 0;
+                double most = -1e9;
+                for ( int k = 0; k <= 34; ++k )
+                {
+                    const double db = toneDb( a, s, s + 2400, 200.0 * std::exp2( k / 6.0 ) );
+                    if ( db > most )
+                    {
+                        most = db;
+                        best = k;
+                    }
+                }
+                peak.push_back( best );
+            }
+            int fall = 0, rise = 0, steps = 0;
+            for ( size_t k = 1; k < peak.size(); ++k )
+            {
+                if ( peak[k] < 0 || peak[k - 1] < 0 ) continue;
+                ++steps;
+                if ( peak[k] < peak[k - 1] ) ++fall;
+                if ( peak[k] > peak[k - 1] ) ++rise;
+            }
+            down = steps > 0 ? static_cast<double>( fall ) / steps : 0.0;
+            up = steps > 0 ? static_cast<double>( rise ) / steps : 0.0;
+            return steps > 20;
+        };
+        double     wDown = 0.0, wUp = 0.0, cDown = 0.0, cUp = 0.0;
+        const bool ran =
+            glide( 8.0f, 0.0f, wDown, wUp ) && glide( 0.0f, 1.0f, cDown, cUp );   // few whistlers: seldom two at once
+        check(
+            ran && wDown > 2.0 * wUp && cUp > 2.0 * cDown, "magnetosphere: whistlers fall, the dawn chorus rises",
+            fmt( "whistlers: the loudest pitch falls in %.0f %% of the steps, rises in %.0f %%; the chorus: rises in "
+                 "%.0f %%, falls in %.0f %%",
+                 100.0 * wDown, 100.0 * wUp, 100.0 * cUp, 100.0 * cDown ) );
+    }
+
+    // 110. Throat (Phase 35): one throat on D2; with Kargyraa an octave below sounds; its vowel i has a second formant
+    //      far up, u not.
+    if ( from <= 110 )
+    {
+        auto sing = [&]( float sub, float vowel, double &below, double &centre )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::THROAT, 1.0f );
+            e.setParam( ParamIdE::THROAT_VOICES, 1.0f );
+            e.setParam( ParamIdE::THROAT_SIZE, 30.0f );
+            e.setParam( ParamIdE::THROAT_SUB, sub );
+            e.setParam( ParamIdE::THROAT_VOWEL, vowel );
+            if ( !openOffline( e, false, 110 ) ) return false;
+            (void)render( e, 2.0 );
+            const std::vector<float> a = render( e, 6.0 );
+            const double             f0 = e.noteHz( 38 );
+            below = toneDb( a, 0, a.size() / 2, f0 * 0.5 ) - toneDb( a, 0, a.size() / 2, f0 );
+            // the second formant's region (1 .. 2.5 kHz) against the first's (150 .. 600 Hz), over the harmonics
+            double hi = 0.0, lo = 0.0;
+            for ( int h = 1; h <= 60; ++h )
+            {
+                const double f = f0 * h, p = std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, f ) );
+                if ( f >= 1000.0 && f <= 2500.0 ) hi += p;
+                if ( f >= 150.0 && f <= 600.0 ) lo += p;
+            }
+            centre = 10.0 * std::log10( std::max( hi, 1e-30 ) / std::max( lo, 1e-30 ) );
+            return rmsDb( a, 0, a.size() / 2 ) > -60.0;
+        };
+        double     subOn = 0.0, subOff = 0.0, cU = 0.0, cI = 0.0, dummy = 0.0;
+        const bool ran = sing( 1.0f, 0.2f, subOn, dummy ) && sing( 0.0f, 0.2f, subOff, dummy ) &&
+                         sing( 0.0f, 0.0f, dummy, cU ) && sing( 0.0f, 1.0f, dummy, cI );
+        check( ran && subOn > subOff + 15.0 && cI > cU + 6.0, "throat: kargyraa an octave below, the vowels apart",
+               fmt( "f0 / 2 against f0: %+.1f dB with Kargyraa, %+.1f dB without; 1 .. 2.5 kHz against 150 .. 600 Hz: "
+                    "i %+.1f dB, u %+.1f dB",
+                    subOn, subOff, cI, cU ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

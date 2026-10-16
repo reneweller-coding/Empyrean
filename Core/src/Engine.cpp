@@ -382,6 +382,17 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_sofarTaps.clear();
     m_sofarKey[0] = m_sofarKey[1] = -1.0f;
     for ( auto &z : m_sofarZ ) z[0] = z[1] = 0.0f;
+    for ( Whistler &w : m_whistlers ) w = Whistler{};   // plasma and voice (Phase 35)
+    for ( ChorusTone &c : m_tones ) c = ChorusTone{};
+    m_whistlerWait = 5.0f;
+    m_burstWait = 2.0f;
+    m_burstLeft = 0;
+    for ( auto &z : m_hissZ ) z[0] = z[1] = 0.0f;
+    m_strikesSeen = 0;
+    m_lightningCount = 0;
+    for ( Throat &th : m_throats ) th = Throat{};
+    m_throatKey[0] = m_throatKey[1] = -1.0f;
+    m_throatClock = 0.0;
     m_mergerEnv = 0.0f;
     m_journalClock = 30.0f;
     m_pose = HeadsetPose{};
@@ -3199,6 +3210,262 @@ void Engine::renderSofar( float *L, float *R, int n )
     }
 }
 
+namespace
+{
+
+/**
+ * @brief A vowel's area along the vocal tract, from the glottis to the lips: eight points (cm^2) for u o a e i
+ *        (after Fant's and Story's shapes, simplified), read at x (0 .. 1) and blended between neighbouring vowels.
+ * @param[in] vowel  0 .. 1 over u o a e i
+ * @param[in] x      0 .. 1 from the glottis to the lips
+ * @return cm^2
+ */
+float vowelArea( float vowel, float x )
+{
+    static const float A[5][8] = { { 2.5f, 3.0f, 2.0f, 1.0f, 1.5f, 2.5f, 0.5f, 0.3f },     // u
+                                   { 2.0f, 1.5f, 1.0f, 1.2f, 2.0f, 3.0f, 1.5f, 0.8f },     // o
+                                   { 1.0f, 0.8f, 0.6f, 0.5f, 2.5f, 4.0f, 5.0f, 4.0f },     // a
+                                   { 2.5f, 3.0f, 2.5f, 1.5f, 1.0f, 0.8f, 1.2f, 2.0f },     // e
+                                   { 3.0f, 4.0f, 3.5f, 2.0f, 0.5f, 0.3f, 0.6f, 1.5f } };   // i
+    const float        v = std::clamp( vowel, 0.0f, 1.0f ) * 4.0f;
+    const int          a = std::min( static_cast<int>( v ), 3 );
+    const float        u = v - static_cast<float>( a );
+    const float        p = std::clamp( x, 0.0f, 1.0f ) * 7.0f;
+    const int          i = std::min( static_cast<int>( p ), 6 );
+    const float        w = p - static_cast<float>( i );
+    const float lo = A[a][i] + ( A[a][i + 1] - A[a][i] ) * w, hi = A[a + 1][i] + ( A[a + 1][i + 1] - A[a + 1][i] ) * w;
+    return std::max( 0.2f, lo + ( hi - lo ) * u );
+}
+
+}   // namespace
+
+void Engine::renderMagneto( float *L, float *R, int n )
+{
+    const float level = std::clamp( cur( ParamIdE::MAGNETO ), 0.0f, 1.0f );
+    bool        any = false;
+    for ( const Whistler &w : m_whistlers ) any = any || w.m_on;
+    for ( const ChorusTone &c : m_tones ) any = any || c.m_on;
+    if ( level <= 0.0f && !any ) return;
+    const double fs = static_cast<double>( m_cfg.m_sampleRate ), dt = n / fs;
+    auto launch = [&]( double D, float amp, float pan )
+    {   // a whistler and its echoes, bouncing between the hemispheres: 3 D, 5 D, each fainter
+        float a = amp;
+        for ( int hop = 1; hop <= 5; hop += 2, a *= 0.35f )
+            for ( Whistler &w : m_whistlers )
+                if ( !w.m_on )
+                {
+                    w = Whistler{ true, 0.0, D * hop, 0.0, a, pan };
+                    break;
+                }
+    };
+    if ( level > 0.0f )
+    {
+        // whistlers: a Poisson stream, and every lightning strike of Thunder sends one along the field lines
+        const float rate = cur( ParamIdE::WHISTLERS );
+        const float D = cur( ParamIdE::WHISTLER_DISPERSION );
+        if ( rate > 0.0f && ( m_whistlerWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            launch( D * ( 0.8 + 0.4 * m_eventRng.uniform() ), level * ( 0.5f + 0.5f * m_eventRng.uniform() ),
+                    2.0f * m_eventRng.uniform() - 1.0f );
+            m_whistlerWait = -60.0f / rate * std::log( std::max( 1.0e-6f, m_eventRng.uniform() ) );
+        }
+        const int strikes = static_cast<int>( m_lightningCount );
+        if ( strikes > m_strikesSeen )
+        {
+            launch( D, level, 2.0f * m_eventRng.uniform() - 1.0f );
+            m_strikesSeen = strikes;
+        }
+        // the dawn chorus: bursts every few seconds, three to ten elements a burst, a tenth to a third of a second
+        // apart; each rises from a tenth to a third of the gyrofrequency, faster the louder (Omura)
+        const float dawn = cur( ParamIdE::DAWN_CHORUS ), gyro = cur( ParamIdE::GYRO );
+        if ( dawn > 0.0f && m_burstLeft == 0 && ( m_burstWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            m_burstLeft = 3 + static_cast<int>( m_eventRng.uniform() * 8.0f );
+            m_toneWait = 0.0f;
+            m_burstWait = -6.0f / dawn * std::log( std::max( 1.0e-6f, m_eventRng.uniform() ) );
+        }
+        if ( m_burstLeft > 0 && ( m_toneWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            --m_burstLeft;
+            m_toneWait = 0.08f + 0.22f * m_eventRng.uniform();
+            for ( ChorusTone &c : m_tones )
+                if ( !c.m_on )
+                {
+                    const float  amp = level * dawn * ( 0.3f + 0.7f * m_eventRng.uniform() );
+                    const double f0 = gyro * ( 0.1 + 0.2 * m_eventRng.uniform() );
+                    c = ChorusTone{ true,
+                                    f0,
+                                    gyro * ( 0.4 + 1.2 * amp ),
+                                    0.0,
+                                    0.15 + 0.35 * m_eventRng.uniform(),
+                                    0.0,
+                                    amp,
+                                    0.6f * ( 2.0f * m_eventRng.uniform() - 1.0f ) };
+                    break;
+                }
+        }
+    }
+    const float  k = 0.5f * VoiceLevel;
+    const float  hiss = level * std::clamp( cur( ParamIdE::HISS ), 0.0f, 1.0f ) * 0.6f * VoiceLevel;
+    const double wh = 2.0 * 3.14159265358979 * 700.0 / fs, alpha = std::sin( wh ) / ( 2.0 * 0.6 );
+    const float  b0 = static_cast<float>( alpha / ( 1.0 + alpha ) ),
+                 a1 = static_cast<float>( -2.0 * std::cos( wh ) / ( 1.0 + alpha ) ),
+                 a2 = static_cast<float>( ( 1.0 - alpha ) / ( 1.0 + alpha ) );
+    for ( int s = 0; s < n; ++s )
+    {
+        float l = 0.0f, r = 0.0f;
+        for ( Whistler &w : m_whistlers )
+        {
+            if ( !w.m_on ) continue;
+            // f = (D / (t + t0))^2, t0 where it is at 10 kHz; it ends below 200 Hz
+            const double t0 = w.m_D / 100.0, f = ( w.m_D / ( w.m_t + t0 ) ) * ( w.m_D / ( w.m_t + t0 ) );
+            if ( f < 200.0 )
+            {
+                w.m_on = false;
+                continue;
+            }
+            w.m_phase += 2.0 * 3.14159265358979 * f / fs;
+            if ( w.m_phase > 6.283185307179586 ) w.m_phase -= 6.283185307179586;
+            const float env = static_cast<float>(
+                std::min( 1.0, w.m_t * 50.0 ) * std::min( 1.0, ( f - 200.0 ) / 300.0 ) * std::pow( f / 1000.0, -0.3 ) );
+            const float v = k * w.m_amp * env * static_cast<float>( std::sin( w.m_phase ) );
+            l += v * ( 1.0f - w.m_pan ) * 0.5f;
+            r += v * ( 1.0f + w.m_pan ) * 0.5f;
+            w.m_t += 1.0 / fs;
+        }
+        for ( ChorusTone &c : m_tones )
+        {
+            if ( !c.m_on ) continue;
+            if ( c.m_t >= c.m_len )
+            {
+                c.m_on = false;
+                continue;
+            }
+            c.m_phase += 2.0 * 3.14159265358979 * c.m_f / fs;
+            if ( c.m_phase > 6.283185307179586 ) c.m_phase -= 6.283185307179586;
+            c.m_f += c.m_rate / fs;
+            const double u = c.m_t / c.m_len, e = std::sin( 3.14159265358979 * u );
+            const float  v = k * c.m_amp * static_cast<float>( e * e * std::sin( c.m_phase ) );
+            l += v * ( 1.0f - c.m_pan ) * 0.5f;
+            r += v * ( 1.0f + c.m_pan ) * 0.5f;
+            c.m_t += 1.0 / fs;
+        }
+        if ( hiss > 0.0f )
+        {   // two noises through a band pass round 700 Hz: the hiss, apart in the two ears
+            for ( int c = 0; c < 2; ++c )
+            {
+                const float x = 2.0f * m_eventRng.uniform() - 1.0f;
+                float      *z = m_hissZ[c];
+                const float y = b0 * x + z[0];
+                z[0] = -a1 * y + z[1];
+                z[1] = -b0 * x - a2 * y;
+                ( c == 0 ? l : r ) += hiss * y;
+            }
+        }
+        L[s] += l;
+        R[s] += r;
+    }
+}
+
+void Engine::renderThroat( float *L, float *R, int n )
+{
+    const float level = std::clamp( cur( ParamIdE::THROAT ), 0.0f, 1.0f );
+    if ( level <= 0.0f && m_throatKey[0] < 0.0f ) return;
+    const double fs = static_cast<double>( m_cfg.m_sampleRate ), half = 0.5 * fs;
+    const float  length = cur( ParamIdE::THROAT_SIZE ), vowel = cur( ParamIdE::THROAT_VOWEL );
+    const float  sub = std::clamp( cur( ParamIdE::THROAT_SUB ), 0.0f, 1.0f );
+    const int    voices = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::THROAT_VOICES ) ) ), 1, 4 );
+    // the tract's sections at half the rate: each 343 m/s / (2 x 24 kHz) = 7.1 mm, so many along its length
+    const int sections =
+        std::clamp( static_cast<int>( std::lround( length * 0.01 / ( 343.0 / ( 2.0 * half ) ) ) ), 12, 80 );
+    m_throatClock += n / fs;
+    const float drift = 0.08f * static_cast<float>( std::sin( 2.0 * 3.14159265358979 * m_throatClock / 23.0 ) );
+    if ( std::abs( length - m_throatKey[0] ) > 0.2f || std::abs( vowel + drift - m_throatKey[1] ) > 0.01f )
+    {   // shaped again (its waves kept where the length stays)
+        for ( int v = 0; v < 4; ++v )
+        {
+            Throat &th = m_throats[static_cast<size_t>( v )];
+            if ( static_cast<int>( th.m_fwd.size() ) != sections )
+            {
+                th.m_fwd.assign( static_cast<size_t>( sections ), 0.0f );
+                th.m_bwd.assign( static_cast<size_t>( sections ), 0.0f );
+            }
+            th.m_k.assign( static_cast<size_t>( sections ), 0.0f );
+            const float vv = std::clamp( vowel + drift + 0.05f * static_cast<float>( v ), 0.0f, 1.0f );
+            for ( int i = 0; i + 1 < sections; ++i )
+            {
+                const float a = vowelArea( vv, static_cast<float>( i ) / ( sections - 1 ) ),
+                            b = vowelArea( vv, static_cast<float>( i + 1 ) / ( sections - 1 ) );
+                th.m_k[static_cast<size_t>( i )] = ( a - b ) / ( a + b );
+            }
+            th.m_pan = v == 0 ? 0.0f : ( v % 2 ? -0.5f : 0.5f ) * ( 0.5f + 0.25f * v );
+        }
+        m_throatKey[0] = length;
+        m_throatKey[1] = vowel + drift;
+    }
+    // their pitches: the root in the octave from C2, its fifth, its octave, the fifth above; a slow vibrato each
+    const int    root = 36 + ( ( m_rootPc % 12 ) + 12 ) % 12;
+    const int    steps[4] = { 0, 7, 12, 19 };
+    const double g = level * 40.0 * VoiceLevel;   // the lips' derivative is small in the bass: made up
+    for ( int s = 0; s < n; ++s )
+    {
+        m_throatOdd = !m_throatOdd;
+        float l = 0.0f, r = 0.0f;
+        for ( int v = 0; v < voices; ++v )
+        {
+            Throat &th = m_throats[static_cast<size_t>( v )];
+            if ( th.m_fwd.empty() ) continue;
+            if ( m_throatOdd )
+            {   // a half-rate step of the tract
+                const double want =
+                    frequencyOf( root + steps[v] ) *
+                    ( 1.0 + 0.003 * std::sin( 2.0 * 3.14159265358979 * ( 4.3 + 0.4 * v ) * m_throatClock ) );
+                th.m_hz = th.m_hz <= 0.0 ? want : th.m_hz + ( want - th.m_hz ) * 0.0005;
+                th.m_phase += th.m_hz / half;
+                if ( th.m_phase >= 2.0 ) th.m_phase -= 2.0;
+                // Rosenberg's pulse, open for 60 % of the cycle; the ventricular folds weaken every other one
+                const double u = th.m_phase - std::floor( th.m_phase );
+                double       pulse = 0.0;
+                if ( u < 0.4 )
+                    pulse = 0.5 * ( 1.0 - std::cos( 3.14159265358979 * u / 0.4 ) );
+                else if ( u < 0.6 )
+                    pulse = std::cos( 3.14159265358979 * ( u - 0.4 ) / 0.4 );
+                if ( th.m_phase >= 1.0 ) pulse *= 1.0 - 0.75 * sub;
+                const int    N = static_cast<int>( th.m_fwd.size() );
+                const float *k = th.m_k.data();
+                float       *F = th.m_fwd.data(), *B = th.m_bwd.data();
+                // Kelly and Lochbaum: the waves meet at every junction, a part of each turned back
+                float carry = static_cast<float>( pulse ) + 0.75f * B[0];
+                for ( int i = 0; i + 1 < N; ++i )
+                {
+                    const float f = F[i], b = B[i + 1];
+                    const float fNext = ( 1.0f + k[i] ) * f - k[i] * b;
+                    B[i] = 0.999f * ( k[i] * f + ( 1.0f - k[i] ) * b );
+                    F[i] = carry;
+                    carry = 0.999f * fNext;
+                }
+                const float lips = F[N - 1];
+                F[N - 1] = carry;
+                B[N - 1] = -0.85f * lips;
+                const float out = 0.15f * lips;   // what passes the lips
+                th.m_prev = th.m_now;
+                th.m_now = out - th.m_last;   // the radiation: its derivative
+                th.m_last = out;
+            }
+            const float y = static_cast<float>( g ) * ( m_throatOdd ? th.m_prev : 0.5f * ( th.m_prev + th.m_now ) );
+            l += y * ( 1.0f - th.m_pan ) * 0.5f;
+            r += y * ( 1.0f + th.m_pan ) * 0.5f;
+        }
+        L[s] += l;
+        R[s] += r;
+    }
+    if ( level <= 0.0f )
+    {   // let go: rung out at once, shaped anew when it is opened again
+        for ( Throat &th : m_throats ) th = Throat{};
+        m_throatKey[0] = m_throatKey[1] = -1.0f;
+    }
+}
+
 void Engine::stepNight( float dt )
 {
     auto glide = [dt]( float &v, float want, float tau )
@@ -3378,6 +3645,7 @@ void Engine::stepNight( float dt )
                 ++m_strikes;
                 m_lastStrikeM = T.m_distance;
                 m_lightning = 1.0f;   // the flash, seen at once (the thunder comes three seconds a kilometre later)
+                ++m_lightningCount;   // and its sferic, for the magnetosphere's whistlers (Phase 35)
             }
         }
     }
@@ -4877,7 +5145,9 @@ void Engine::renderBlock()
         m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
         m_phantomR[k] = f[15];
     }
-    renderWreck( m_nearL.data(), m_nearR.data(), G );   // the wreck (Phase 34), into the near plane as the voices
+    renderWreck( m_nearL.data(), m_nearR.data(), G );     // the wreck (Phase 34), into the near plane as the voices
+    renderMagneto( m_nearL.data(), m_nearR.data(), G );   // the magnetosphere and the throats (Phase 35), likewise
+    renderThroat( m_nearL.data(), m_nearR.data(), G );
     // A level from the last block's to this one's, across the block (no zipper when it is modulated).
     auto ramp = [G]( float from, float to, int s )
     { return from + ( to - from ) * static_cast<float>( s + 1 ) / static_cast<float>( G ); };

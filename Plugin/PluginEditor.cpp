@@ -424,7 +424,11 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::STREAM_DEPTH } },
             { "Risset", F::MOTION,
               IdsT{ ParamIdE::RISSET, ParamIdE::RISSET_RATE, ParamIdE::RISSET_TIME, ParamIdE::RISSET_WAY },
-              IdsT{ ParamIdE::RISSET } } } );
+              IdsT{ ParamIdE::RISSET } },
+            { "Throat", F::SOURCE,
+              IdsT{ ParamIdE::THROAT, ParamIdE::THROAT_SIZE, ParamIdE::THROAT_SUB, ParamIdE::THROAT_VOWEL,
+                    ParamIdE::THROAT_VOICES },
+              IdsT{ ParamIdE::THROAT } } } );
     // Phase 28: the wind and what it moves -- the chimes (Phase 27), the rain, the leaves, the sea.
     page( "Weather",
           { { "Wind", F::SPACE, IdsT{ ParamIdE::WIND, ParamIdE::GUSTS } },
@@ -450,7 +454,11 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::CHORUS, ParamIdE::CHORUS_KIND, ParamIdE::CHORUS_WARMTH, ParamIdE::CHORUS_SYNC,
                     ParamIdE::CHORUS_TUNE },
               IdsT{ ParamIdE::CHORUS } },
-            { "Night", F::ENVELOPE, IdsT{ ParamIdE::NIGHT_ARC }, IdsT{ ParamIdE::NIGHT_ARC } } } );
+            { "Night", F::ENVELOPE, IdsT{ ParamIdE::NIGHT_ARC }, IdsT{ ParamIdE::NIGHT_ARC } },
+            { "Magnetosphere", F::SPACE,
+              IdsT{ ParamIdE::MAGNETO, ParamIdE::WHISTLERS, ParamIdE::WHISTLER_DISPERSION, ParamIdE::DAWN_CHORUS,
+                    ParamIdE::GYRO, ParamIdE::HISS },
+              IdsT{ ParamIdE::MAGNETO } } } );
     page( "Cosmos", { { "Star", F::SOURCE,
                         IdsT{ ParamIdE::STAR, ParamIdE::STAR_KIND, ParamIdE::STAR_AGE, ParamIdE::STAR_SPIN,
                               ParamIdE::STAR_PITCH },
@@ -1157,7 +1165,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "15360 presets",
+        { &m_presetName, "16384 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1822,6 +1830,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstFloorGroup ) bank.addSectionHeader( "Deep Floors" );
         if ( g == additiv::FirstSpaceGroup ) bank.addSectionHeader( "Stars & Gravity" );
         if ( g == additiv::FirstLightGroup ) bank.addSectionHeader( "Light & Depth" );
+        if ( g == additiv::FirstVoiceGroup ) bank.addSectionHeader( "Plasma & Voice" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

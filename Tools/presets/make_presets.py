@@ -79,7 +79,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Sun Songs", "Red Giants", "White Dwarfs", "Spinning Stars", "Ageing Stars", "Star Choirs", "Accretion Disks", "Falling Light",
           "Einstein Rings", "Mergers", "Distant Mergers", "Redshift Halls", "Receding Light", "Cosmic Floors", "Quiet Universe", "Gravity's Choir",
           "Twinkling Stars", "Turbulent Light", "Hydrogen Choirs", "Balmer Bells", "Zeeman Fields", "Dark Lines", "Nebula Glow", "Derelict Hulls",
-          "Orbital Tanks", "Broken Trusses", "Perforated Plates", "Thermal Snaps", "Deep Channels", "Ocean Crossings", "Whale Roads", "Lost Signals"]
+          "Orbital Tanks", "Broken Trusses", "Perforated Plates", "Thermal Snaps", "Deep Channels", "Ocean Crossings", "Whale Roads", "Lost Signals",
+          "Whistler Nights", "Sferic Storms", "Dawn Choruses", "Radio Auroras", "Plasma Hiss", "VLF Receivers", "Monk Drones", "Kargyraa Halls",
+          "Giant Throats", "Vowel Tides", "Abyssal Choirs", "Overtone Caves", "Throat & Thunder", "Cosmic Chant", "Ionosphere", "Voices of the Void"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -607,6 +609,53 @@ NAMES = {
                       "Ghostly"],
                      ["Signal", "Beacon Call", "Transmission", "Carrier", "Ping", "Telemetry", "Distress Call",
                       "Echo Signal"]),
+    "Whistler Nights": (["Whistling", "Dispersed", "Descending", "Falling-Tone", "Field-Line", "Ducted", "Sliding",
+                         "Plunging"],
+                        ["Whistler", "Night Wave", "Swoop", "Glide Tone", "Sferic Echo", "Field Song", "Downsweep",
+                         "Radio Night"]),
+    "Sferic Storms": (["Sferic", "Crackling", "Atmospheric", "Static", "Discharging", "Spark-Lit", "Clicking", "Tweeking"],
+                      ["Storm", "Tweek", "Crackle", "Discharge", "Static Front", "Spark Field", "Lightning Radio",
+                       "Bolt Chain"]),
+    "Dawn Choruses": (["Rising", "Chirping", "Dawn-Lit", "Ascending", "Twittering", "Upswept", "Morning-Side",
+                       "Warbling"],
+                      ["Chorus", "Dawn", "Riser", "Upsweep", "Chirp Field", "Lark Wave", "Daybreak", "Wren Song"]),
+    "Radio Auroras": (["Auroral", "Borealis", "Australis", "Polar", "Curtained", "Kilometric", "Flickering-Sky",
+                       "Magnetic"],
+                      ["Aurora", "Arc Light", "Oval", "Corona Sky", "Radio Glow", "Sky Curtain", "Pulsation", "Substorm"]),
+    "Plasma Hiss": (["Hissing", "Plasmaspheric", "Breathing-Field", "Steady", "Grey", "Seething-Band", "Diffuse",
+                     "Featureless"],
+                    ["Hiss", "Plasma", "Band Noise", "Torus", "Ion Sea", "Belt", "Hum", "Murmur Band"]),
+    "VLF Receivers": (["Listening", "Tuned", "Faraway-Tuned", "Polar-Station", "Antarctic", "Buried", "Loop-Antenna",
+                       "Long-Wire"],
+                      ["Receiver", "Station", "Antenna", "Logbook", "Loop", "Wire", "Baseband", "Night Shift"]),
+    "Monk Drones": (["Chanted", "Monastic", "Gyuto", "Tantric", "Low-Voiced", "Cloistral", "Prayerful", "Droning"],
+                    ["Chant", "Om", "Mantra", "Recitation", "Prayer Hall", "Puja", "Sutra", "Litany"]),
+    "Kargyraa Halls": (["Kargyraa", "Growling", "Subharmonic", "Rumbling-Voice", "Ventricular", "Doubled-Low",
+                        "Steppe", "Tuvan"],
+                       ["Hall", "Yurt", "Valley", "Gorge", "Steppe Night", "Riverbank", "Rock Shelter", "Mountain Pass"]),
+    "Giant Throats": (["Giant", "Titanic", "Colossal", "Enormous", "Mountainous", "Cyclopean", "Vast-Chested",
+                       "Leviathan-Voiced"],
+                      ["Throat", "Larynx", "Gullet", "Voice", "Breath", "Lung", "Bellow", "Utterance"]),
+    "Vowel Tides": (["Vowelled", "Shifting-Vowel", "Mouthed", "Formant", "Opening", "Closing", "Murmured", "Intoned"],
+                    ["Tide", "Swell", "Vowel", "Syllable", "Mouth Tide", "Breath Tide", "Aum", "Hum Tide"]),
+    "Abyssal Choirs": (["Abyssal-Voiced", "Drowned-Voice", "Deep-Throated", "Sunken-Choir", "Benthic-Sung",
+                        "Trench-Deep", "Lightless-Sung", "Pressure-Sung"],
+                       ["Choir", "Chorale", "Assembly", "Choristers", "Cantors", "Psalmody", "Dirge", "Chant Line"]),
+    "Overtone Caves": (["Overtone", "Whistled", "Resonant-Cave", "Harmonic-Sung", "Flute-Voiced", "Glinting-Voice",
+                        "Reedy", "Bright-Sung"],
+                       ["Cave", "Grotto Song", "Cavern Voice", "Hollow", "Recess", "Niche", "Den", "Lair"]),
+    "Throat & Thunder": (["Thundering", "Storm-Voiced", "Roaring", "Rumble-Sung", "Tempest-Chanted", "Booming-Voice",
+                          "Gale-Sung", "Thunderous"],
+                         ["Chant", "Invocation", "Call", "Cry", "Roar", "Summoning", "Rite", "Incantation"]),
+    "Cosmic Chant": (["Cosmic", "Stellar-Sung", "Orbiting-Voice", "Galactic-Sung", "Starborne", "Celestial-Voice",
+                      "Nebular-Sung", "Void-Sung"],
+                     ["Chant", "Hymn", "Om Star", "Mantra Sky", "Sky Psalm", "Star Litany", "Orbit Prayer", "Space Sutra"]),
+    "Ionosphere": (["Ionospheric", "Layered", "Reflecting", "D-Layer", "E-Layer", "F-Layer", "Skywave", "Refracted"],
+                   ["Ionosphere", "Layer", "Sky Mirror", "Skip", "Ceiling", "Ion Roof", "Upper Air", "Radio Sky"]),
+    "Voices of the Void": (["Voiceless", "Hollow-Voiced", "Spectral-Voiced", "Disembodied", "Ethereal", "Unbodied",
+                            "Whispering-Void", "Shadow-Voiced"],
+                           ["Void", "Emptiness", "Nothing", "Abyss Voice", "Silence", "Nowhere", "Hollow Sky",
+                            "Outer Dark"]),
 }
 
 
@@ -4389,6 +4438,176 @@ def l_lost_signals(r):
 RECIPES = RECIPES + [l_twinkling, l_turbulent, l_hydrogen, l_balmer_bells, l_zeeman, l_dark_lines, l_nebula,
                      l_hulls, l_tanks, l_trusses, l_plates, l_snaps, l_channels, l_crossings, l_whale_roads,
                      l_lost_signals]
+
+# ---- Phase 35 (16.10.2026): plasma and voice -- the magnetosphere as a VLF receiver hears it, the throat of the abyss.
+
+
+def set_magneto(r, level=(0.4, 0.8), whistlers=(1, 8), dispersion=(30, 90), dawn=(0.0, 0.4), gyro=(2500, 6000),
+                hiss=(0.0, 0.3)):
+    """The magnetosphere: its level, whistlers a minute and their dispersion, the dawn chorus, its band, the hiss."""
+    r.set("magneto", f(r.u(*level), 2))
+    r.set("whistlers", f(r.lg(*whistlers), 1) if whistlers[1] > 0 else 0)
+    r.set("whistler_dispersion", f(r.lg(*dispersion), 1))
+    r.set("dawn_chorus", f(r.u(*dawn), 2))
+    r.set("gyro", f(r.lg(*gyro), 0))
+    r.set("hiss", f(r.u(*hiss), 2))
+
+
+def set_throat(r, level=(0.4, 0.8), size=(24, 40), sub=(0.3, 1.0), vowel=(0.0, 0.6), voices=(1, 4)):
+    """Throats: their level, the tract's length, kargyraa, the vowel, how many."""
+    r.set("throat", f(r.u(*level), 2))
+    r.set("throat_size", f(r.u(*size), 1))
+    r.set("throat_sub", f(r.u(*sub), 2))
+    r.set("throat_vowel", f(r.u(*vowel), 2))
+    r.set("throat_voices", int(r.u(voices[0], voices[1] + 0.999)))
+
+
+P35_POOLS = {
+    "magneto": [("lfo3", "dawn_chorus", (0.1, 0.3)), ("night", "whistlers", (0.1, 0.3)), ("lfo2", "hiss", (0.1, 0.25))],
+    "throat": [("lfo3", "throat_vowel", (0.15, 0.4)), ("lfo2", "throat_sub", (0.1, 0.3)), ("lfo3", "throat", (0.1, 0.2))],
+}
+
+
+def p35_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P35_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def v_whistlers(r):
+    based(r, *CALM)
+    set_magneto(r, whistlers=(2, 12))
+    set_night(r, arc=(0.4, 0.9))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_sferics(r):
+    based(r, *SPACE)
+    set_magneto(r, whistlers=(3, 15), dispersion=(20, 60))
+    set_thunder(r, level=(0.2, 0.5), distance=(4.0, 12.0))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_dawn(r):
+    based(r, *CALM)
+    set_magneto(r, whistlers=(0.5, 3), dawn=(0.6, 1.0))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_auroras(r):
+    based(r, *SPACE)
+    set_magneto(r, dawn=(0.3, 0.8), hiss=(0.2, 0.5))
+    set_scint(r, depth=(0.3, 0.7))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_hiss(r):
+    based(r, "Air & Noise", "Deep Space", "Dark Drones", "Sleep Concert")
+    set_magneto(r, whistlers=(0.5, 3), hiss=(0.6, 1.0))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_receivers(r):
+    based(r, *SPACE)
+    set_magneto(r, whistlers=(2, 10), dawn=(0.2, 0.7), hiss=(0.2, 0.6))
+    p35_rows(r, ["magneto"], 2)
+
+
+def v_monks(r):
+    based(r, "Dark Drones", "Organs", "Choirs", "Deep Space")
+    set_throat(r, voices=(2, 4))
+    set_floor(r, pedal=(0.6, 1.0))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_kargyraa(r):
+    based(r, "Organs", "Choirs", "Dark Drones")
+    set_throat(r, sub=(0.7, 1.0), voices=(1, 2))
+    set_hall(r, level=(0.3, 0.5), decay=(20, 45))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_giants(r):
+    based(r, "Dark Drones", "Deep Space")
+    low_register(r)
+    set_throat(r, size=(38, 45), voices=(1, 3))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_vowels(r):
+    based(r, *CALM)
+    set_throat(r, vowel=(0.0, 1.0))
+    r.row("lfo3", "throat_vowel", round(r.u(0.25, 0.5), 3), None)
+    setup(r, "tide")
+    p35_rows(r, ["throat"], 1)
+
+
+def v_abyssal(r):
+    based(r, "Dark Drones", "Deep Space", "Choirs")
+    set_throat(r, size=(32, 45), voices=(2, 4))
+    set_sofar(r, wet=(0.2, 0.5), range_=(300, 1200))
+    set_floor(r, sub=(0.3, 0.7))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_caves(r):
+    based(r, "Glass", "Shimmer", "Choirs", "Strings")
+    set_throat(r, size=(17, 24), sub=(0.0, 0.3), vowel=(0.5, 1.0))
+    set_room(r, size=(0.5, 0.9), absorb=(0.0, 0.3))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_throat_thunder(r):
+    based(r, "Dark Drones", "Deep Space", "Organs")
+    set_throat(r, sub=(0.5, 1.0))
+    set_thunder(r, level=(0.25, 0.6), distance=(2.0, 8.0))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_cosmic(r):
+    based(r, *SPACE)
+    set_throat(r, level=(0.3, 0.6))
+    set_star(r, r.pick("Sun", "Red Giant", "White Dwarf"), level=(0.3, 0.6))
+    p35_rows(r, ["throat"], 1)
+
+
+def v_ionosphere(r):
+    based(r, *SPACE)
+    set_magneto(r, whistlers=(1, 6), dawn=(0.1, 0.5), hiss=(0.1, 0.4))
+    set_lines(r, lines=(0.3, 0.8))
+    p35_rows(r, ["magneto"], 1)
+
+
+def v_void(r):
+    based(r, *SPACE)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("magneto", "throat", "sofar", "star") if r.rng.random() < 0.5]
+    if "magneto" in kinds:
+        set_magneto(r, level=(0.3, 0.6))
+    if "throat" in kinds:
+        set_throat(r, level=(0.3, 0.6))
+    if "sofar" in kinds:
+        set_sofar(r, wet=(0.2, 0.5))
+    if "star" in kinds:
+        set_star(r, r.pick("Sun", "Red Giant", "White Dwarf"), level=(0.25, 0.5))
+    p35_rows(r, [k for k in kinds if k in ("magneto", "throat")] or ["throat"], 2)
+
+
+RECIPES = RECIPES + [v_whistlers, v_sferics, v_dawn, v_auroras, v_hiss, v_receivers, v_monks, v_kargyraa, v_giants,
+                     v_vowels, v_abyssal, v_caves, v_throat_thunder, v_cosmic, v_ionosphere, v_void]
 
 
 def foundation(r):

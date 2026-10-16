@@ -17,9 +17,9 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And eighteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
+And nineteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
 currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
-topology, the night and illusions, the choruses and mirrors, the deep floors, the stars and gravity, the light and depth): twenty-four presets, the stillest few
+topology, the night and illusions, the choruses and mirrors, the deep floors, the stars and gravity, the light and depth, the plasma and voice): twenty-four presets, the stillest few
 of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
 
@@ -53,6 +53,8 @@ FEATURES = {
     "star": 0.6, "black_hole": 0.5, "merger": 0.4, "redshift": 0.5,
     # Phase 34: light and depth
     "scintillation": 0.5, "lines": 0.6, "absorption": 0.5, "wreck": 0.5, "sofar": 0.5,
+    # Phase 35: plasma and voice
+    "magneto": 0.5, "dawn_chorus": 0.4, "throat": 0.6, "throat_sub": 0.4,
 }
 # The stillness: what moves, brightens or hurries (lower is stiller).
 STILL = {"motion_depth": 1.0, "shimmer": 1.0, "brightness": 1.0, "ripple_depth": 1.0, "sync_depth": 0.7, "air": 0.5,
@@ -91,6 +93,8 @@ WHOLE_NIGHTS = [
                                        "Cosmic Floors", "Star Choirs", "Distant Mergers"]),
     ("Whole Night - Light & Depth", ["Nebula Glow", "Twinkling Stars", "Ocean Crossings", "Whale Roads", "Derelict Hulls",
                                      "Hydrogen Choirs", "Deep Channels", "Thermal Snaps"]),
+    ("Whole Night - Plasma & Voice", ["Monk Drones", "Whistler Nights", "Kargyraa Halls", "Plasma Hiss", "Abyssal Choirs",
+                                      "Dawn Choruses", "Vowel Tides", "Giant Throats"]),
 ]
 
 

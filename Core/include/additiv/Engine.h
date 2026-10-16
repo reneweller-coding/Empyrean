@@ -1134,6 +1134,26 @@ private:
      */
     void traceSofar( float rangeKm, float offAxis );
     /**
+     * @brief The magnetosphere, sample by sample (Phase 35), added to the near plane before the effects: whistlers (a
+     *        sferic's click dispersed along a field line, f(t) = (D / t)^2, with its echoes at 3 D and 5 D), the dawn
+     *        chorus's rising elements in bursts (each sweeping faster the louder it is: Omura's nonlinear growth), and
+     *        plasmaspheric hiss.
+     * @param[in,out] L  left
+     * @param[in,out] R  right
+     * @param[in]     n  samples
+     */
+    void renderMagneto( float *L, float *R, int n );
+    /**
+     * @brief The throat of the abyss, sample by sample (Phase 35), added to the near plane before the effects: up to
+     *        four Kelly-Lochbaum vocal tracts run at half the rate, each driven by a Rosenberg glottal pulse on the root
+     *        (its fifth, its octave), the ventricular folds closing every other cycle for the octave below (kargyraa);
+     *        their area along the tract a vowel's (u o a e i), slowly drifting.
+     * @param[in,out] L  left
+     * @param[in,out] R  right
+     * @param[in]     n  samples
+     */
+    void renderThroat( float *L, float *R, int n );
+    /**
      * @brief The headset, one block (Phase 30): the head's turn held off the binaural cloud and the thunder, the hands
      *        in the wind, the halo, the wave room and the physarum's food (after stepRooms, so its places are known).
      * @param[in] dt  the block's length, seconds
@@ -1326,27 +1346,76 @@ private:
         float m_gl = 0.0f;   ///< left
         float m_gr = 0.0f;   ///< right
     };
-    std::vector<SofarTap>     m_sofarTaps;      ///< the arrivals
-    std::vector<float>        m_sofarRing;      ///< the mix, mono, as long as the longest spread (sized at prepare)
-    int                       m_sofarPos = 0;   ///< where the ring is written
-    float                     m_sofarKey[2] = { -1.0f, -1.0f };   ///< what the taps were traced for: range, off axis
-    float                     m_sofarCut = 1000.0f;               ///< Hz: the water's darkening at the range
-    float                     m_sofarZ[2][2] = {};                ///< its low pass's state, left and right (two poles)
-    std::mutex                m_poseLock;                         ///< guards m_posePending
-    HeadsetPose               m_posePending;                      ///< the pose as it arrived
-    HeadsetPose               m_pose;                             ///< the pose this block works with
-    std::vector<std::uint8_t> m_journal;                          ///< the dream journal brought down last (m_snapLock)
-    std::vector<std::uint8_t> m_journalPending;                   ///< a journal to write to the card (m_snapLock)
-    bool                      m_journalPendingSet = false;        ///< journalPending waits for the worker
-    float                     m_journalClock = 0.0f;              ///< s until the journal is brought down again
-    std::vector<float>        m_journalScratch;                   ///< the worker's memories on their way (no lock)
-    float                     m_headYaw = 0.0f;                   ///< rad: the head's turn held off the binaural cloud
-    float                     m_handFood[2] = { -1.0f, -1.0f };   ///< the hands' food lines, trail cells (-1 none)
-    float                     m_handFoodWeight = 1.0f;            ///< their weight
-                                                                  // Phase 31
-    float     m_chorusLevel = 0.0f;                               ///< the night chorus's level as it glides
-    long long m_chorusCalls = 0;                                  ///< the chorus's calls begun since prepare
-    bool      m_chorusWas = false;                                ///< the chorus called in the last block
+    std::vector<SofarTap> m_sofarTaps;      ///< the arrivals
+    std::vector<float>    m_sofarRing;      ///< the mix, mono, as long as the longest spread (sized at prepare)
+    int                   m_sofarPos = 0;   ///< where the ring is written
+    float                 m_sofarKey[2] = { -1.0f, -1.0f };   ///< what the taps were traced for: range, off axis
+    float                 m_sofarCut = 1000.0f;               ///< Hz: the water's darkening at the range
+    float                 m_sofarZ[2][2] = {};                ///< its low pass's state, left and right (two poles)
+    // Phase 35: plasma and voice
+    /** @brief A whistler (or one of its echoes): its time since the sferic, its dispersion, its phase. */
+    struct Whistler
+    {
+        bool   m_on = false;    ///< sounding
+        double m_t = 0.0;       ///< s since its sferic (from where it is at 10 kHz)
+        double m_D = 50.0;      ///< s sqrt(Hz): its dispersion
+        double m_phase = 0.0;   ///< radians
+        float  m_amp = 0.0f;    ///< its loudness
+        float  m_pan = 0.0f;    ///< -1 .. 1
+    };
+    std::array<Whistler, 12> m_whistlers{};   ///< the whistlers sounding
+    /** @brief One element of the dawn chorus: a rising tone. */
+    struct ChorusTone
+    {
+        bool   m_on = false;    ///< sounding
+        double m_f = 0.0;       ///< Hz now
+        double m_rate = 0.0;    ///< Hz a second it rises
+        double m_t = 0.0;       ///< s into it
+        double m_len = 0.3;     ///< s it lasts
+        double m_phase = 0.0;   ///< radians
+        float  m_amp = 0.0f;    ///< its loudness
+        float  m_pan = 0.0f;    ///< -1 .. 1
+    };
+    std::array<ChorusTone, 24> m_tones{};               ///< the chorus's elements sounding
+    float                      m_whistlerWait = 5.0f;   ///< s until the next whistler
+    float                      m_burstWait = 2.0f;      ///< s until the next burst of the chorus
+    int                        m_burstLeft = 0;         ///< elements left in this burst
+    float                      m_toneWait = 0.0f;       ///< s until its next element
+    float                      m_hissZ[2][2] = {};      ///< the hiss's band pass, left and right
+    int                        m_strikesSeen = 0;       ///< thunder's strikes already given a whistler
+    long long                  m_lightningCount = 0;    ///< thunder's strikes since prepare
+    /** @brief One throat: its tract's waves and its voice. */
+    struct Throat
+    {
+        std::vector<float> m_fwd;           ///< the waves going to the lips, a section each
+        std::vector<float> m_bwd;           ///< the waves going back to the glottis
+        std::vector<float> m_k;             ///< the reflection at each junction
+        double             m_phase = 0.0;   ///< the glottal cycle, 0 .. 2 (two cycles: the folds' period doubling)
+        double             m_hz = 0.0;      ///< its pitch now (gliding)
+        float              m_last = 0.0f;   ///< the lips' last output (for the radiation's derivative)
+        float              m_prev = 0.0f;   ///< the output at the half-rate step before (for the interpolation)
+        float              m_now = 0.0f;    ///< and at this one
+        float              m_pan = 0.0f;    ///< -1 .. 1
+    };
+    std::array<Throat, 4>     m_throats{};                         ///< up to four
+    float                     m_throatKey[2] = { -1.0f, -1.0f };   ///< what the tracts were shaped for: length, vowel
+    double                    m_throatClock = 0.0;                 ///< s, for the vowels' drift and the vibrato
+    bool                      m_throatOdd = false;                 ///< the half-rate tract steps every other sample
+    std::mutex                m_poseLock;                          ///< guards m_posePending
+    HeadsetPose               m_posePending;                       ///< the pose as it arrived
+    HeadsetPose               m_pose;                              ///< the pose this block works with
+    std::vector<std::uint8_t> m_journal;                           ///< the dream journal brought down last (m_snapLock)
+    std::vector<std::uint8_t> m_journalPending;                    ///< a journal to write to the card (m_snapLock)
+    bool                      m_journalPendingSet = false;         ///< journalPending waits for the worker
+    float                     m_journalClock = 0.0f;               ///< s until the journal is brought down again
+    std::vector<float>        m_journalScratch;                    ///< the worker's memories on their way (no lock)
+    float                     m_headYaw = 0.0f;                    ///< rad: the head's turn held off the binaural cloud
+    float                     m_handFood[2] = { -1.0f, -1.0f };    ///< the hands' food lines, trail cells (-1 none)
+    float                     m_handFoodWeight = 1.0f;             ///< their weight
+                                                                   // Phase 31
+    float     m_chorusLevel = 0.0f;                                ///< the night chorus's level as it glides
+    long long m_chorusCalls = 0;                                   ///< the chorus's calls begun since prepare
+    bool      m_chorusWas = false;                                 ///< the chorus called in the last block
     int       m_mirrorPos = 0;   ///< the time mirror: where in its window the next block begins (the room's samples)
     int       m_mirrorBuf = 0;   ///< which of its recordings records
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength

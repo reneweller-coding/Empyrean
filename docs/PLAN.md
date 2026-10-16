@@ -529,6 +529,34 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 35: Plasma und Stimme (gebaut, 16.10.2026, 0.25.0)
+
+Die letzten beiden Ideen: die Magnetosphäre und die Kehle des Abgrunds -- beide auf der CPU.
+
+- **35a Magnetosphere (Night):** wie ein VLF-Empfänger sie hört. Whistler: der Klick eines Blitzes läuft entlang einer
+  Feldlinie durchs Plasma und kommt dispergiert an, f(t) = (D / t)², von 10 kHz bis unter 200 Hz, mit Echos bei 3 D und
+  5 D (Hin und Her zwischen den Hemisphären); Whistlers je Minute als Poissonstrom, und jeder Einschlag von Thunder
+  schickt einen. Dawn Chorus: steigende Elemente in Bündeln (drei bis zehn, 0,08 .. 0,3 s auseinander) von 0,1 .. 0,3
+  der Gyrofrequenz, je lauter, desto schneller steigend (Omuras nichtlineares Wachstum). Hiss: zwei Rauschquellen
+  durch einen Bandpass um 700 Hz. Eigener Würfel.
+- **35b Throat (Dreams):** bis zu vier Kelly-Lochbaum-Vokaltrakte, bei halber Rate gerechnet (je Abschnitt 7,1 mm, 24
+  .. 63 Abschnitte für 17 .. 45 cm), mit Verlust 0,999 je Stoß, Glottis 0,75, Lippen -0,85 und abgeleiteter
+  Abstrahlung; angeregt von einem Rosenberg-Puls auf dem Grundton (Oktave ab C2), seiner Quinte, Oktave, der Quinte
+  darüber, mit langsamem Vibrato. Kargyraa: die Taschenfalten schwächen jeden zweiten Puls (bis 75 %) -- die
+  Periodenverdopplung des Tuva- und Gyuto-Gesangs, eine Oktave darunter. Vowel u o a e i über Flächenfunktionen nach
+  Fant und Story (vereinfacht, acht Punkte), langsam driftend.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Plasma & Voice“, 240 .. 255): Whistler Nights, Sferic Storms, Dawn
+  Choruses, Radio Auroras, Plasma Hiss, VLF Receivers, Monk Drones, Kargyraa Halls, Giant Throats, Vowel Tides,
+  Abyssal Choirs, Overtone Caves, Throat & Thunder, Cosmic Chant, Ionosphere, Voices of the Void. 531 Reisen,
+  neunzehn ganze Nächte. Damit 16384 Presets in 256 Gruppen.
+
+**Gemessen [M]:** Selbsttest 109, 110 (Whistler: der lauteste Ton fällt in 23 % der Schritte von 50 ms, steigt in 4 %; der Dawn
+Chorus steigt in 82 %, fällt in 15 %; die Kehle auf D2: f0/2 gegen f0 -10,6 dB mit Kargyraa, -83,9 dB ohne; 1 .. 2,5
+kHz gegen 150 .. 600 Hz bei i +1,8 dB, bei u -7,4 dB). **Gefunden:** `dispersion` gab es schon (Phase 8, die Uhr der
+Teiltöne) -- der neue heißt `whistler_dispersion`; die Kehle war über die Ableitung der Abstrahlung im Bass zu leise
+(x 16 ausgeglichen). **Bass-Prüfung [M]** (64 der neuen, Dirigent an): unter 150 Hz Median 17,2 %, 10. Perzentil
+10,8 %, zwei unter 8 %.
+
 ## Phase 34: Licht und Tiefe (gebaut, 16.10.2026, 0.24.0)
 
 Die nächsten vier Ideen: Szintillation, Spektrallinien (mit Absorption), Wrack, Tiefsee-Kanal.
