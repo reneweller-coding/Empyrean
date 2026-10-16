@@ -1,5 +1,23 @@
 # Release notes
 
+## 0.24.0 (16.10.2026, not released)
+
+Light and depth. 1024 presets.
+
+- **Scintillation** (Cosmos): the partials twinkle as starlight does -- a drifting screen of turbulence, every band
+  heard through its own Fresnel zone, bright and dark patches wandering over pitch and time. Scattering, Drift.
+- **Spectral Lines** (Cosmos): Lines draws every harmonic to a line of hydrogen's spectrum (Pfund at the note up to
+  Lyman six octaves above); Heat is the lines' Doppler width; Zeeman splits them into slowly beating triplets;
+  Absorption carves hydrogen's dark lines, on the key's tonic, into everything that sounds.
+- **Wreck** (Cosmos): a derelict's structure -- hull, tank, truss, plate, its modes worked out from a mass-spring
+  model (Tools/presets/make_wreck.py) -- struck by micrometeorites and creaking in thermal snaps, most at dusk and dawn
+  with the night arc. Structure, Wreck Size, Hits, Snaps, Ring.
+- **Deep Channel** (Rooms): the ocean's sound channel -- rays traced through Munk's profile; a sound comes back as a
+  swell of arrivals that ends at once, darkened by the water. Range, Off Axis.
+- **15360 presets:** sixteen new groups of light and depth (Twinkling Stars, Turbulent Light, Hydrogen Choirs, Balmer
+  Bells, Zeeman Fields, Dark Lines, Nebula Glow, Derelict Hulls, Orbital Tanks, Broken Trusses, Perforated Plates,
+  Thermal Snaps, Deep Channels, Ocean Crossings, Whale Roads, Lost Signals); 498 journeys, eighteen whole nights.
+
 ## 0.23.0 (16.10.2026, not released)
 
 Stars and gravity: a page Cosmos, the redshift hall. 1024 presets.

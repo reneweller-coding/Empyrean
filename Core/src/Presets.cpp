@@ -237,6 +237,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Cosmic Floors",
     "Quiet Universe",
     "Gravity's Choir",
+    "Twinkling Stars",
+    "Turbulent Light",
+    "Hydrogen Choirs",
+    "Balmer Bells",
+    "Zeeman Fields",
+    "Dark Lines",
+    "Nebula Glow",
+    "Derelict Hulls",
+    "Orbital Tanks",
+    "Broken Trusses",
+    "Perforated Plates",
+    "Thermal Snaps",
+    "Deep Channels",
+    "Ocean Crossings",
+    "Whale Roads",
+    "Lost Signals",
 };
 
 namespace

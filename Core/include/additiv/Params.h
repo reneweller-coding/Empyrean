@@ -384,7 +384,24 @@ enum class ParamIdE : int
     MERGER_TIME,     ///< s: the inspiral heard, from half a hertz to the last orbit
     REDSHIFT,        ///< 0 .. 1: the modal hall's modes glide down for ever, reborn at the top
     REDSHIFT_TIME,   ///< s: an octave of the glide
-    COUNT            ///< number of parameters
+    // Phase 34 (16.10.2026): light and depth
+    SCINTILLATION,    ///< 0 .. 1: the partials twinkle through a drifting screen of turbulence (Fresnel diffraction)
+    SCINT_STRENGTH,   ///< 0 .. 1: weak scattering (a shimmer) .. strong (deep patches over frequency and time)
+    SCINT_SPEED,      ///< /s: how fast the screen drifts (patches a second)
+    LINES,            ///< 0 .. 1: every harmonic drawn to a line of hydrogen's spectrum (Lyman .. Pfund)
+    LINE_HEAT,        ///< 0 .. 1: the gas's heat -- each line's Doppler width
+    ZEEMAN,           ///< Hz: a magnetic field splits every line into a triplet
+    ABSORPTION,       ///< 0 .. 1: hydrogen's dark lines carved into everything that sounds
+    WRECK,            ///< 0 .. 1: a derelict's structure ringing in its modes, struck by micrometeorites, snapping
+    WRECK_SHAPE,      ///< which structure: a hull, a tank, a truss, a plate
+    WRECK_SIZE,       ///< oct: its lowest mode against the root
+    WRECK_HITS,       ///< /min: micrometeorites
+    WRECK_SNAP,       ///< 0 .. 1: thermal snaps (creaking runs, most at dusk and dawn with the night arc)
+    WRECK_DECAY,      ///< s: how long its lowest modes ring
+    SOFAR,            ///< 0 .. 1: the deep channel: everything heard again as sound arrives across an ocean
+    SOFAR_RANGE,      ///< km: how far (the arrivals' spread, the depth's darkening)
+    SOFAR_DEPTH,      ///< 0 .. 1: the source on the channel's axis .. far off it (more, steeper rays)
+    COUNT             ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table
@@ -502,6 +519,8 @@ constexpr int            NumChorusKinds = 4;                  ///< entries of Ch
 extern const char *const ChorusKindNames[NumChorusKinds];     ///< "Meadow", "Treetops", "Pond", "Summer Night"
 constexpr int            NumStarKinds = 3;                    ///< entries of StarKindNames
 extern const char *const StarKindNames[NumStarKinds];         ///< "Sun", "Red Giant", "White Dwarf"
+constexpr int            NumWreckShapes = 4;                  ///< entries of WreckShapeNames
+extern const char *const WreckShapeNames[NumWreckShapes];     ///< "Hull", "Tank", "Truss", "Plate"
 constexpr int            NumShores = 3;                       ///< entries of ShoreNames
 extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
 constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames

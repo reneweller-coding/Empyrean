@@ -52,6 +52,7 @@ const char *const StreamsNames[NumStreams] = { "Odd & Even", "By Three", "Regist
 const char *const RissetWayNames[NumRissetWays] = { "Slowing", "Quickening" };
 const char *const ChorusKindNames[NumChorusKinds] = { "Meadow", "Treetops", "Pond", "Summer Night" };
 const char *const StarKindNames[NumStarKinds] = { "Sun", "Red Giant", "White Dwarf" };
+const char *const WreckShapeNames[NumWreckShapes] = { "Hull", "Tank", "Truss", "Plate" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -490,6 +491,22 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::MERGER_TIME, "merger_time", "Inspiral", "Merger", 20.f, 300.f, 90.f, 0.5f, "s" ),
     F( ParamIdE::REDSHIFT, "redshift", "Redshift", "Modal", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::REDSHIFT_TIME, "redshift_time", "Redshift Time", "Modal", 4.f, 120.f, 20.f, 0.5f, "s" ),
+    F( ParamIdE::SCINTILLATION, "scintillation", "Scintillation", "Scintillation", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SCINT_STRENGTH, "scint_strength", "Scattering", "Scintillation", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::SCINT_SPEED, "scint_speed", "Drift", "Scintillation", 0.05f, 4.f, 0.5f, 0.5f, "/s" ),
+    F( ParamIdE::LINES, "lines", "Lines", "Spectral Lines", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::LINE_HEAT, "line_heat", "Heat", "Spectral Lines", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::ZEEMAN, "zeeman", "Zeeman", "Spectral Lines", 0.f, 3.f, 0.f, 0.5f, "Hz" ),
+    F( ParamIdE::ABSORPTION, "absorption", "Absorption", "Spectral Lines", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::WRECK, "wreck", "Wreck", "Wreck", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::WRECK_SHAPE, "wreck_shape", "Structure", "Wreck", WreckShapeNames, NumWreckShapes, 0 ),
+    F( ParamIdE::WRECK_SIZE, "wreck_size", "Wreck Size", "Wreck", -3.f, 1.f, -1.f, 1.f, "oct" ),
+    F( ParamIdE::WRECK_HITS, "wreck_hits", "Hits", "Wreck", 0.f, 60.f, 6.f, 0.5f, "/min" ),
+    F( ParamIdE::WRECK_SNAP, "wreck_snap", "Snaps", "Wreck", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::WRECK_DECAY, "wreck_decay", "Ring", "Wreck", 1.f, 40.f, 8.f, 0.5f, "s" ),
+    F( ParamIdE::SOFAR, "sofar", "Deep Channel", "Deep Channel", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::SOFAR_RANGE, "sofar_range", "Range", "Deep Channel", 100.f, 3000.f, 800.f, 0.5f, "km" ),
+    F( ParamIdE::SOFAR_DEPTH, "sofar_depth", "Off Axis", "Deep Channel", 0.f, 1.f, 0.2f, 1.f, "" ),
 } };
 
 }   // namespace

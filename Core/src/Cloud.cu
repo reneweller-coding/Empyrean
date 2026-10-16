@@ -249,6 +249,8 @@ struct CloudEngine::Impl
     float        *m_dStarScratch = nullptr;     ///< device: per star CUDA block four channels of the block
     float        *m_hStarUp = nullptr;          ///< pinned host: a star's modes to send up
     StarField     m_star;                       ///< the host's copy of the star's settings
+    Scintillation m_scint;                      ///< the host's copy of the scintillation's settings (Phase 34)
+    Absorption    m_absorb;                     ///< the host's copy of the absorption's settings (Phase 34)
     BlackHole     m_hole;                       ///< the host's copy of the black hole's settings
     bool          m_starUp = false;             ///< the next launch sends hStarUp up first
     bool          m_mirrorWas = false;          ///< the time mirror ran in the last block (cleared as it begins)
@@ -270,9 +272,9 @@ struct CloudEngine::Impl
         bool                         m_enabled = true;   ///< as the executable graph has them
         int                          m_rest = 0;         ///< blocks the feature has rested
     };
-    std::array<Gate, 21> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
+    std::array<Gate, 23> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
                                     ///< dream, phantom, reservoir, spectral echo, melt, harp, thunder, ice, the night's
-                                    ///< mix, the chorus, the star
+                                    ///< mix, the chorus, the star, the scintillation, the absorption
     float m_gpuMs = 0.0f;           ///< GPU time of the last finished block
     bool  m_launched = false;       ///< a block is in flight
 
@@ -994,7 +996,49 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                 firSum += s * w;
             }
             for ( float &h : fir ) h = static_cast<float>( h / firSum );
-            good = good && ok( uploadVoiceTables( xy ), "cudaMemcpyToSymbol halo", error ) &&
+            // Phase 34: hydrogen's lines (five series of thirty, rising, over Pfund alpha) and the scintillation's
+            // Kolmogorov screen (a power spectrum k^(-11/3) under an outer scale: amplitudes (k^2 + k0^2)^(-11/12), the
+            // phases a seeded die), unit RMS.
+            std::vector<double> lines;
+            for ( int n1 = 1; n1 <= 5; ++n1 )
+                for ( int n2 = n1 + 1; n2 <= n1 + 30; ++n2 )
+                    lines.push_back( 1.0 / ( n1 * n1 ) - 1.0 / ( static_cast<double>( n2 ) * n2 ) );
+            std::sort( lines.begin(), lines.end() );
+            float linesF[LineCount];
+            for ( int i = 0; i < LineCount; ++i )
+                linesF[i] = static_cast<float>( lines[static_cast<size_t>( i )] / lines[0] );
+            std::vector<float> screen( ScintScreen, 0.0f );
+            {
+                std::uint32_t die = 0x5C1A7u;
+                auto          next = [&die]()
+                {
+                    die = die * 1664525u + 1013904223u;
+                    return static_cast<double>( die >> 8 ) / 16777216.0;
+                };
+                std::vector<double> amp( ScintScreen / 2 ), ph( ScintScreen / 2 );
+                for ( int k = 1; k < ScintScreen / 2; ++k )
+                {
+                    // von Karman: Kolmogorov's k^(-11/6) under an outer scale of 64 points (two Fresnel radii),
+                    // so the small whirls carry the phase -- a pure k^(-11/6) is all its longest wave, a ramp
+                    // across the Fresnel zone that only moves the pattern
+                    amp[static_cast<size_t>( k )] =
+                        std::pow( static_cast<double>( k ) * k + 32.0 * 32.0, -11.0 / 12.0 );
+                    ph[static_cast<size_t>( k )] = 6.283185307179586 * next();
+                }
+                double sq = 0.0;
+                for ( int x = 0; x < ScintScreen; ++x )
+                {
+                    double v = 0.0;
+                    for ( int k = 1; k < ScintScreen / 2; ++k )
+                        v += amp[static_cast<size_t>( k )] *
+                             std::cos( 6.283185307179586 * k * x / ScintScreen + ph[static_cast<size_t>( k )] );
+                    screen[static_cast<size_t>( x )] = static_cast<float>( v );
+                    sq += v * v;
+                }
+                const double rms = std::sqrt( sq / ScintScreen );
+                for ( float &v : screen ) v = static_cast<float>( v / std::max( rms, 1e-12 ) );
+            }
+            good = good && ok( uploadVoiceTables( xy, linesF, screen.data() ), "cudaMemcpyToSymbol halo", error ) &&
                    ok( uploadRoomTables( xy, nbr, fir ), "cudaMemcpyToSymbol halo, room", error );
         }
         m.m_lifeCells.assign( static_cast<size_t>( LifeCells ), 0.0f );
@@ -1050,6 +1094,9 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             physTrailKernel<<<( PhysCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, m.m_dPhysTrail, m.m_dPhysDeposit );
             haloKernel<<<HaloCarriers, HaloThreads, 0, m.m_stream>>>( hdr, m.m_dHalo, m.m_dLifeStats );
 
+            // Phase 34: the screen's intensity per band and the absorption's transmission, read by the voices.
+            scintKernel<<<ScintBins, 256, 0, m.m_stream>>>( hdr );
+            absorbKernel<<<AbsorbBins / 256, 256, 0, m.m_stream>>>( hdr );
             gainRingKernel<<<static_cast<unsigned>( config.m_voices ), 256, 0, m.m_stream>>>( hdr, voices,
                                                                                               m.m_dGainRing );
             cascadeKernel<<<static_cast<unsigned>( ( partialsTotal + Threads - 1 ) / Threads ), Threads, 0,
@@ -1207,6 +1254,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                     { reinterpret_cast<const void *>( &starStepKernel ), 20 },
                     { reinterpret_cast<const void *>( &starSoundKernel ), 20 },
                     { reinterpret_cast<const void *>( &spaceMixKernel ), 20 },
+                    { reinterpret_cast<const void *>( &scintKernel ), 21 },
+                    { reinterpret_cast<const void *>( &absorbKernel ), 22 },
                 };
                 size_t nodeCount = 0;
                 good = ok( cudaGraphGetNodes( m.m_graph, nullptr, &nodeCount ), "cudaGraphGetNodes", error );
@@ -1488,6 +1537,16 @@ BlackHole &CloudEngine::hole()
     return m_impl->m_hole;
 }
 
+Scintillation &CloudEngine::scintillation()
+{
+    return m_impl->m_scint;
+}
+
+Absorption &CloudEngine::absorption()
+{
+    return m_impl->m_absorb;
+}
+
 void CloudEngine::setStarModes( const float *in, int count )
 {
     if ( !m_impl || !m_impl->m_hStarUp ) return;
@@ -1674,6 +1733,9 @@ void CloudEngine::launch()
     hdr->m_star.m_count = std::clamp( m.m_star.m_count, 0, StarModes );
     m.m_star.m_reset = 0;   // asked for once
     hdr->m_hole = m.m_hole;
+    hdr->m_scint = m.m_scint;   // Phase 34
+    hdr->m_scint.m_offset -= std::floor( m.m_scint.m_offset / ScintScreen ) * ScintScreen;
+    hdr->m_absorb = m.m_absorb;
     hdr->m_hole.m_start = std::max( m.m_hole.m_start, 1.5f );
     {   // the time mirror (Phase 31): its window within bounds; it begins from silent recordings
         const bool mirror = m.m_room.m_on && m.m_room.m_mirrorOn;
@@ -1734,7 +1796,7 @@ void CloudEngine::launch()
     // The gates: a resting feature's kernels switched off in the graph (on again at once when it wakes).
     {
         const int  pv = hdr->m_phantomVoice;
-        const bool want[21] = { hdr->m_life.m_mode != LifeModeE::OFF,
+        const bool want[23] = { hdr->m_life.m_mode != LifeModeE::OFF,
                                 hdr->m_weather.m_wind != 0,
                                 hdr->m_chimes.m_on != 0,
                                 hdr->m_weather.m_rainOn || hdr->m_weather.m_leavesOn || hdr->m_weather.m_surfOn,
@@ -1754,7 +1816,9 @@ void CloudEngine::launch()
                                 hdr->m_ice.m_on != 0,
                                 hdr->m_harp.m_on || hdr->m_thunder.m_on || hdr->m_ice.m_on || hdr->m_chorus.m_on,
                                 hdr->m_chorus.m_on != 0,
-                                hdr->m_star.m_on != 0 };
+                                hdr->m_star.m_on != 0,
+                                hdr->m_scint.m_on != 0,
+                                hdr->m_absorb.m_on != 0 };
         for ( size_t g = 0; g < m.m_gates.size(); ++g )
         {
             Impl::Gate &gate = m.m_gates[g];

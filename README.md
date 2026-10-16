@@ -130,13 +130,17 @@ offline renderer and the manual, and a portable zip.
   Lorentzian line kept ringing by noise), a black hole that redshifts the partials falling into it and lenses the
   rest into a ring, black holes merging (an inspiral felt in the field's width, a ringdown in the bass), a modal hall
   whose tails sink for ever.
-- **14336 presets** in 224 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+- **Light and depth:** partials that twinkle through a drifting screen of turbulence (Fresnel diffraction per band),
+  hydrogen's spectral lines as a timbre (Zeeman triplets, Doppler widths) and its dark lines carved into the sound, a
+  derelict's structure ringing in modes worked out from a mass-spring model, the ocean's deep sound channel traced ray
+  by ray.
+- **15360 presets** in 240 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
   visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms, weather and growth, rooms and
-  topology, night and illusions, choruses and mirrors, deep floors, stars and gravity), levelled by their loudness (ITU-R BS.1770); and a map that
+  topology, night and illusions, choruses and mirrors, deep floors, stars and gravity, light and depth), levelled by their loudness (ITU-R BS.1770); and a map that
   grows itself (MAP-Elites, Tools/presets/grow.py) into presets of your own.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (465 come with it, seventeen of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (498 come with it, eighteen of them whole nights).
 
 ## Build
 

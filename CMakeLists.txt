@@ -12,7 +12,7 @@
 # Built with CUDA 13.4 for the RTX 5090 (Blackwell, sm_120); the presets select CUDA 13.4 by its folder, whatever
 # CUDA_PATH or the nvcc on the PATH say. Windows only for now; no macOS path (user, 11.10.2026).
 cmake_minimum_required(VERSION 3.30)
-project(Empyrean VERSION 0.23.0 LANGUAGES C CXX CUDA)
+project(Empyrean VERSION 0.24.0 LANGUAGES C CXX CUDA)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake (the same file in
 # every repository of the family), CMakePresets.json and build.ps1.
@@ -115,7 +115,9 @@ if(ADDITIV_BUILD_TOOLS)
     add_executable(additiv_selftest Tests/selftest.cpp)
     target_compile_options(additiv_selftest PRIVATE /W4 /permissive-)
     target_link_libraries(additiv_selftest PRIVATE AdditivCore)
-    target_link_options(additiv_selftest PRIVATE /STACK:8388608)
+    # A hundred tests, each block with an Engine in main's frame (MSVC keeps them apart): 8 MB ran out at
+    # Phase 34 (0xC00000FD before the first test); 32 MB. The newer tests hold theirs on the heap.
+    target_link_options(additiv_selftest PRIVATE /STACK:33554432)
     add_test(NAME selftest COMMAND additiv_selftest)
     add_test(NAME probe COMMAND probe selftest)
 endif()

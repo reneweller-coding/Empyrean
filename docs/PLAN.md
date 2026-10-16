@@ -529,6 +529,54 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 34: Licht und Tiefe (gebaut, 16.10.2026, 0.24.0)
+
+Die nächsten vier Ideen: Szintillation, Spektrallinien (mit Absorption), Wrack, Tiefsee-Kanal.
+
+- **34a Scintillation (`Voices.cu`):** ein dünner Phasenschirm (von Kármán: Kolmogorovs k^(-11/6) unter einer äußeren
+  Skala von 64 Punkten, 2048 Punkte, Einheits-RMS) zieht durch die Sichtlinie. Je Band (256, 40 Hz .. 16 kHz) das
+  Fresnel-Integral E = sum w(x) exp(i (s phi(x) + pi x² / rF²)) über eine Gauß-Apertur von zwei Fresnelradien, die
+  Phase mit der Wellenlänge (s = 1 kHz / f, wie im Plasma), rF mit ihrer Wurzel; |E|² über dieselbe Summe ohne Schirm,
+  dann über ihr eigenes Mittel der letzten 8 s. Die Teiltöne lesen sqrt(I) bei ihrer Frequenz. **Gefunden [M]:** mit
+  reinem Kolmogorov war alles Phase in der längsten Welle -- eine Rampe über die Fresnelzone, die das Muster nur
+  verschiebt: nichts funkelte; ohne die Normierung verlor die endliche Apertur bei starker Streuung 10 dB.
+- **34b Lines (`Voices.cu`):** die h-te Harmonische zur h-ten Linie des Wasserstoffs (fünf Serien Lyman .. Pfund,
+  je dreißig Linien, aufsteigend über Pfund alpha auf der Note: sechs Oktaven, jede Serie zu ihrer Grenze
+  gedrängt); Heat ist die Dopplerbreite (2 .. 40 Cent, an jeder Linie gleich in Cent); Zeeman ein Triplett: je ein
+  Viertel der Glieder Zeeman Hz tiefer und höher.
+- **34c Absorption:** die Transmission exp(-tau Summe der Linienprofile), tau 4, Halbwertsbreite 0,1 .. 1,3 % (Heat),
+  auf der Tonika der Tonart (Pfund alpha in der Oktave ab C1), für alle Teiltöne, die Luft eingeschlossen. **Gefunden
+  [M]:** 1024 Bänder über zehn Oktaven waren bei 417 Hz 2,8 Hz breit, die Linie 2 Hz: der Einbruch 5 dB -- jetzt 8192
+  Bänder; das Flackern der Luft (±40 Cent bei 8 Hz) verschmiert die Linie als FM, der Test misst mit langsamem Flackern.
+- **34d Wreck:** `Tools/presets/make_wreck.py` rechnet die Moden von vier Feder-Masse-Modellen (Rumpf 142 Knoten /
+  798 Federn, Tank 146 / 1488, Fachwerk 84 / 265, Platte zweilagig 286 / 1599; Biegung über übernächste Nachbarn und
+  Diagonalen) mit numpy (eigh), ohne die freien Starrkörpermoden und einen weichen Mechanismus der Platte (Schwelle
+  1e-5 des größten Eigenwerts): je Form 64 Moden, wie stark sie an 16 Stellen angeschlagen werden, zwei Tonabnehmer --
+  `Core/src/Wreck.inc`. Die Engine lässt sie als komplexe Einpoler klingen (T60 = Ring x Verhältnis^-0,4, die tiefste
+  auf dem Grundton x 2^Size); Mikrometeoriten als Poissonstrom (Hits je Minute, log-normal), thermische Knacke als
+  Läufe von Knarzen aus winzigen Rutschern 3 .. 12 ms auseinander, sechsmal so oft in der Dämmerung mit dem
+  Nachtbogen; eigener Würfel. Pegel: 60 Treffer je Minute bei Wreck 1 -26 dBFS (zuerst -38).
+- **34e Deep Channel (CPU):** Munks Profil c(z) = 1500 (1 + 0,00737 (eta + e^-eta - 1)), 400 Strahlen ±14°, 4-km-Schritte
+  über Snells Invariante, Oberfläche (-0,9) und Boden (0,3) reflektierend; Eigenstrahlen, wo Nachbarn den Empfänger auf
+  der Achse einklammern, so laut, wie ihre Strahlröhre schmal ist; Abgriffe relativ zur ersten Ankunft auf einem Ring
+  von 43 s, das Wasser dunkelt ab (8 kHz x (100 km / R)^0,9). Rechenzeit wenige Millisekunden, nur wenn Range oder
+  Off Axis sich bewegen.
+- **Seiten:** Cosmos bekommt Scintillation, Spectral Lines, Wreck; Rooms den Deep Channel.
+- **Selbsttest:** der Rahmen von `main` hält eine Engine je alten Testblock (MSVC legt sie nicht übereinander) und
+  überlief nun auch 8 MB, noch vor dem ersten Test -- jetzt 32 MB Stapel (`/STACK`); die neuen Tests halten ihre Engine
+  auf dem Heap.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Light & Depth“, 224 .. 239): Twinkling Stars, Turbulent Light,
+  Hydrogen Choirs, Balmer Bells, Zeeman Fields, Dark Lines, Nebula Glow, Derelict Hulls, Orbital Tanks, Broken
+  Trusses, Perforated Plates, Thermal Snaps, Deep Channels, Ocean Crossings, Whale Roads, Lost Signals. 498 Reisen,
+  achtzehn ganze Nächte.
+
+**Gemessen [M]:** Selbsttest 104 .. 108 (Szintillation: mit gegen ohne 4,5 dB hin und her, -1,2 dB im Ganzen; Lines:
+Balmer alpha gegen die 11. Harmonische +59,5 dB mit, -86,4 ohne; Absorption: die Linie -15,2 dB gegen die Luft daneben,
+ohne +0,2; Wrack: die tiefsten acht Moden 15,3 dB über den Lücken; Tiefsee: nach 800 km die lauteste Ankunft 10,2 s
+nach der Note, 0,2 s später 30 dB leiser -- ein Anschwellen, das jäh endet). Wrack und Tiefsee-Kanal kosten kaum messbar CPU (30 s Klang mit und ohne gleich schnell gerendert).
+**Bass-Prüfung [M]** (64 der neuen, Dirigent an): unter 150 Hz Median 20,0 %, 10. Perzentil 12,9 %, eines unter 8 %
+(„Long-Range Transit“, 6,7 %: der Kanal dunkelt die Mischung ab, mit ihr die Tiefe, die er nicht weiterträgt).
+
 ## Phase 33: Sterne und Schwerkraft (gebaut, 16.10.2026, 0.23.0)
 
 Die ersten vier der Ideen für Dark und Space Ambient (siehe Phase 32): Sternbeben, schwarzes Loch, Verschmelzung,

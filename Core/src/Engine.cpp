@@ -12,6 +12,7 @@
 #include "additiv/Shapes.h"
 #include "additiv/Spectrum.h"
 #include "additiv/Sun.h"
+#include "Wreck.inc"   // the wreck's modes (Phase 34, Tools/presets/make_wreck.py)
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -370,6 +371,17 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_holePhase = m_redPhase = 0.0;
     m_mergerWait = -1.0f;
     m_mergerOn = false;
+    m_scintOffset = 0.0;   // light and depth (Phase 34)
+    m_wreck.assign( WreckModes, WreckMode{} );
+    std::fill( std::begin( m_wreckKey ), std::end( m_wreckKey ), -1.0f );
+    m_wreckWait = 1.0f;
+    m_snapWait = 5.0f;
+    m_creaks = m_slips = 0;
+    m_sofarRing.assign( static_cast<size_t>( 1 ) << 21, 0.0f );   // 43 s at 48 kHz: the longest spread
+    m_sofarPos = 0;
+    m_sofarTaps.clear();
+    m_sofarKey[0] = m_sofarKey[1] = -1.0f;
+    for ( auto &z : m_sofarZ ) z[0] = z[1] = 0.0f;
     m_mergerEnv = 0.0f;
     m_journalClock = 30.0f;
     m_pose = HeadsetPose{};
@@ -2931,6 +2943,262 @@ void Engine::renderMerger( float *L, float *R, int n )
     m_mergerEnv = env;
 }
 
+void Engine::stepLight( float dt )
+{
+    // Scintillation: the screen drifts at Drift patches a second (a patch a Fresnel radius at 1 kHz), as strong as
+    // Scattering (0.5 .. 30 rad at 1 kHz: weak to strong).
+    {
+        Scintillation &S = m_cloud.scintillation();
+        const float    depth = std::clamp( cur( ParamIdE::SCINTILLATION ), 0.0f, 1.0f );
+        S.m_on = depth > 0.0f ? 1 : 0;
+        S.m_depth = depth;
+        S.m_fresnel = 24.0f;
+        S.m_strength = 0.5f * std::pow( 60.0f, std::clamp( cur( ParamIdE::SCINT_STRENGTH ), 0.0f, 1.0f ) );
+        m_scintOffset += static_cast<double>( dt ) * cur( ParamIdE::SCINT_SPEED ) * S.m_fresnel;
+        m_scintOffset -= std::floor( m_scintOffset / ScintScreen ) * ScintScreen;
+        S.m_offset = static_cast<float>( m_scintOffset );
+    }
+    // Absorption: hydrogen's lines on the key's tonic (Pfund alpha on it, in the octave from C1) -- a gas does not
+    // follow the harmony --, as broad as Heat,
+    // as deep as an optical depth of 4.
+    {
+        Absorption &A = m_cloud.absorption();
+        const float depth = std::clamp( cur( ParamIdE::ABSORPTION ), 0.0f, 1.0f );
+        A.m_on = depth > 0.0f ? 1 : 0;
+        A.m_depth = depth;
+        A.m_lineHz = static_cast<float>(
+            frequencyOf( 24 + std::clamp( static_cast<int>( std::lround( cur( ParamIdE::ROOT_NOTE ) ) ), 0, 11 ) ) );
+        A.m_width = 0.001f + 0.012f * std::clamp( cur( ParamIdE::LINE_HEAT ), 0.0f, 1.0f );
+        A.m_tau = 4.0f;
+    }
+}
+
+void Engine::renderWreck( float *L, float *R, int n )
+{
+    const float level = std::clamp( cur( ParamIdE::WRECK ), 0.0f, 1.0f );
+    if ( level <= 0.0f && m_wreckKey[4] <= 0.0f ) return;
+    const double fs = static_cast<double>( m_cfg.m_sampleRate ), dt = n / fs;
+    const int shape = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::WRECK_SHAPE ) ) ), 0, WreckShapes - 1 );
+    // Tuned anew when its shape, size, ring, the root or its level moved: the lowest mode the root (the octave from C2)
+    // moved by Size, each above by its ratio; every mode ringing Ring seconds at the lowest, shorter as it rises.
+    const float root = static_cast<float>( frequencyOf( 36 + ( ( m_rootPc % 12 ) + 12 ) % 12 ) );
+    const float key[5] = { static_cast<float>( shape ), cur( ParamIdE::WRECK_SIZE ), cur( ParamIdE::WRECK_DECAY ), root,
+                           level };
+    bool        moved = false;
+    for ( int k = 0; k < 5; ++k ) moved = moved || std::abs( key[k] - m_wreckKey[k] ) > 1.0e-4f;
+    if ( moved )
+    {
+        const double f1 = root * std::exp2( static_cast<double>( key[1] ) );
+        for ( int k = 0; k < WreckModes; ++k )
+        {
+            WreckMode   &m = m_wreck[static_cast<size_t>( k )];
+            const double f = f1 * WreckRatio[shape][k];
+            const double T60 = std::max( 0.2, key[2] * std::pow( WreckRatio[shape][k], -0.4 ) );
+            const double r = f < 0.45 * fs ? std::exp( -6.907755 / ( T60 * fs ) ) : 0.0;
+            m.m_cr = r * std::cos( 2.0 * 3.14159265358979 * f / fs );
+            m.m_ci = r * std::sin( 2.0 * 3.14159265358979 * f / fs );
+            m.m_gl = WreckPick[shape][k][0];
+            m.m_gr = WreckPick[shape][k][1];
+        }
+        std::copy( std::begin( key ), std::end( key ), std::begin( m_wreckKey ) );
+    }
+    auto strike = [&]( int at, double energy )
+    {   // an impulse at a struck place: each mode as much as it moves there, its sign a die of its own
+        for ( int k = 0; k < WreckModes; ++k )
+        {
+            const std::uint32_t h = static_cast<std::uint32_t>( k * 73856093 ) ^ static_cast<std::uint32_t>( at * 19349663 );
+            const double        sign = ( h >> 7 ) & 1U ? 1.0 : -1.0;
+            m_wreck[static_cast<size_t>( k )].m_re += sign * energy * WreckHit[shape][k][at];
+        }
+    };
+    if ( level > 0.0f )
+    {
+        // micrometeorites: a Poisson stream at Hits a minute, each at a place, its energy log-normal
+        const float hits = cur( ParamIdE::WRECK_HITS );
+        if ( hits > 0.0f && ( m_wreckWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            strike( static_cast<int>( m_eventRng.uniform() * WreckHits ) % WreckHits,
+                    1.0 * level * VoiceLevel *
+                        std::exp( 0.8 * ( m_eventRng.uniform() + m_eventRng.uniform() - 1.0 ) ) );
+            m_wreckWait = static_cast<float>(
+                -60.0 / hits * std::log( std::max( 1.0e-6, static_cast<double>( m_eventRng.uniform() ) ) ) );
+        }
+        // thermal snaps: runs of creaks, every forty seconds at Snaps 1 -- six times as often at dusk and dawn (the
+        // night arc's middle), when the structure cools or warms
+        const float snap = cur( ParamIdE::WRECK_SNAP );
+        if ( snap > 0.0f && m_creaks == 0 && ( m_snapWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            m_creaks = 3 + static_cast<int>( m_eventRng.uniform() * 9.0f );
+            m_creakWait = 0.0f;
+            const float dusk =
+                std::clamp( cur( ParamIdE::NIGHT_ARC ), 0.0f, 1.0f ) * ( 1.0f - std::abs( 2.0f * m_night - 1.0f ) );
+            const float mean = 40.0f / ( snap * ( 1.0f + 6.0f * dusk ) );
+            m_snapWait = -mean * std::log( std::max( 1.0e-6f, m_eventRng.uniform() ) );
+        }
+        if ( m_creaks > 0 && m_slips == 0 && ( m_creakWait -= static_cast<float>( dt ) ) <= 0.0f )
+        {   // a creak: a train of tiny slips at one place
+            --m_creaks;
+            m_slips = 6 + static_cast<int>( m_eventRng.uniform() * 24.0f );
+            m_slipGap = 0;
+            m_slipAt = static_cast<int>( m_eventRng.uniform() * WreckHits ) % WreckHits;
+            m_slipEnergy = 0.12f * snap * level * VoiceLevel * ( 0.5f + m_eventRng.uniform() );
+            m_creakWait = 0.1f + 0.5f * m_eventRng.uniform();
+        }
+    }
+    for ( int s = 0; s < n; ++s )
+    {
+        if ( m_slips > 0 && --m_slipGap <= 0 )
+        {
+            strike( m_slipAt, m_slipEnergy * ( 0.4 + 0.6 * m_eventRng.uniform() ) );
+            --m_slips;
+            m_slipGap = static_cast<int>( ( 0.003 + 0.009 * m_eventRng.uniform() ) * fs );
+        }
+        double l = 0.0, r = 0.0;
+        for ( WreckMode &m : m_wreck )
+        {
+            const double re = m.m_cr * m.m_re - m.m_ci * m.m_im;
+            m.m_im = m.m_ci * m.m_re + m.m_cr * m.m_im;
+            m.m_re = re;
+            l += m.m_gl * m.m_im;
+            r += m.m_gr * m.m_im;
+        }
+        L[s] += static_cast<float>( l );
+        R[s] += static_cast<float>( r );
+    }
+    double most = 0.0;   // rung out: flushed, and nothing more to do until it is struck again
+    for ( WreckMode &m : m_wreck )
+    {
+        most = std::max( most, std::abs( m.m_re ) + std::abs( m.m_im ) );
+        if ( std::abs( m.m_re ) + std::abs( m.m_im ) < 1.0e-9 ) m.m_re = m.m_im = 0.0;
+    }
+    if ( level <= 0.0f && most < 1.0e-9 ) m_wreckKey[4] = 0.0f;
+}
+
+void Engine::traceSofar( float rangeKm, float offAxis )
+{
+    auto c = []( double z )
+    {
+        const double eta = 2.0 * ( z - 1300.0 ) / 1300.0;
+        return 1500.0 * ( 1.0 + 0.00737 * ( eta + std::exp( -eta ) - 1.0 ) );
+    };
+    const double zs = 1300.0 + 1500.0 * offAxis, zr = 1300.0, R = 1000.0 * rangeKm, dr = 4000.0;
+    const int    rays = 400;   // 400 rays, 4 km steps: a few milliseconds even at 3000 km (it runs in the worker)
+    struct End
+    {
+        double z, t, gain;
+    };
+    std::vector<End> ends( rays );
+    for ( int i = 0; i < rays; ++i )
+    {
+        const double th0 = ( -14.0 + 28.0 * i / ( rays - 1 ) ) * 3.14159265358979 / 180.0;
+        double       z = zs, t = 0.0, gain = 1.0, sign = th0 >= 0.0 ? 1.0 : -1.0;
+        const double xi = std::cos( th0 ) / c( zs );   // Snell's invariant: cos(theta) / c
+        for ( double r = 0.0; r < R; r += dr )
+        {
+            double ct = xi * c( z );
+            if ( ct >= 1.0 )
+            {   // a turning point: the ray bends back
+                sign = -sign;
+                ct = 0.999999;
+            }
+            const double th = std::acos( ct );
+            z += sign * dr * std::tan( th );
+            t += dr / ( c( z ) * ct );
+            if ( z < 0.0 )
+            {
+                z = -z;
+                sign = -sign;
+                gain *= -0.9;   // the surface: the pressure inverted
+            }
+            else if ( z > 5000.0 )
+            {
+                z = 10000.0 - z;
+                sign = -sign;
+                gain *= 0.3;   // the bottom: much lost
+            }
+        }
+        ends[static_cast<size_t>( i )] = { z, t, gain };
+    }
+    // eigenrays: neighbours on either side of the receiver; a ray tube's narrowness its loudness
+    struct Arrival
+    {
+        double t, a;
+    };
+    std::vector<Arrival> arr;
+    for ( int i = 0; i + 1 < rays; ++i )
+    {
+        const End &a = ends[static_cast<size_t>( i )], &b = ends[static_cast<size_t>( i + 1 )];
+        if ( ( a.z - zr ) * ( b.z - zr ) > 0.0 ) continue;
+        const double u = std::abs( b.z - a.z ) > 1e-9 ? ( zr - a.z ) / ( b.z - a.z ) : 0.5;
+        const double dz = std::max( std::abs( b.z - a.z ), 1.0 );
+        arr.push_back( { a.t + u * ( b.t - a.t ), ( a.gain + u * ( b.gain - a.gain ) ) / std::sqrt( dz ) } );
+    }
+    m_sofarTaps.clear();
+    if ( arr.empty() ) return;
+    double first = arr[0].t, sq = 0.0;
+    for ( const Arrival &x : arr ) first = std::min( first, x.t );
+    const double fs = static_cast<double>( m_cfg.m_sampleRate );
+    const int    most = static_cast<int>( m_sofarRing.size() ) - 4096;
+    for ( size_t k = 0; k < arr.size(); ++k )
+    {
+        const int d = static_cast<int>( ( arr[k].t - first ) * fs );
+        if ( d >= most ) continue;
+        const float side = 0.15f * static_cast<float>( ( k * 2654435761U >> 9 ) % 200 ) / 100.0f - 0.15f;
+        m_sofarTaps.push_back(
+            { d, static_cast<float>( arr[k].a ) * ( 1.0f - side ), static_cast<float>( arr[k].a ) * ( 1.0f + side ) } );
+        sq += arr[k].a * arr[k].a;
+    }
+    const float norm = sq > 0.0 ? static_cast<float>( 1.0 / std::sqrt( sq ) ) : 0.0f;
+    for ( SofarTap &x : m_sofarTaps )
+    {
+        x.m_gl *= norm;
+        x.m_gr *= norm;
+    }
+    // the water's darkening: absorption grows as f^2 -- at 100 km 8 kHz pass, at 3000 km a few hundred hertz
+    m_sofarCut = static_cast<float>( std::clamp( 8000.0 * std::pow( 100.0 / rangeKm, 0.9 ), 150.0, 8000.0 ) );
+}
+
+void Engine::renderSofar( float *L, float *R, int n )
+{
+    const float wet = std::clamp( cur( ParamIdE::SOFAR ), 0.0f, 1.0f );
+    if ( wet <= 0.0f && m_sofarTaps.empty() ) return;
+    const float range = cur( ParamIdE::SOFAR_RANGE ), off = cur( ParamIdE::SOFAR_DEPTH );
+    if ( std::abs( range - m_sofarKey[0] ) > 1.0f || std::abs( off - m_sofarKey[1] ) > 0.01f )
+    {
+        traceSofar( range, off );
+        m_sofarKey[0] = range;
+        m_sofarKey[1] = off;
+    }
+    const int    mask = static_cast<int>( m_sofarRing.size() ) - 1;
+    const double w = 2.0 * 3.14159265358979 * m_sofarCut / m_cfg.m_sampleRate;
+    const float  a = static_cast<float>( w / ( 1.0 + w ) );   // a one-pole, twice
+    const float  g = 1.4f * wet;
+    for ( int s = 0; s < n; ++s )
+    {
+        m_sofarRing[static_cast<size_t>( m_sofarPos )] = 0.5f * ( L[s] + R[s] );
+        float l = 0.0f, r = 0.0f;
+        for ( const SofarTap &x : m_sofarTaps )
+        {
+            const float v = m_sofarRing[static_cast<size_t>( ( m_sofarPos - x.m_delay ) & mask )];
+            l += x.m_gl * v;
+            r += x.m_gr * v;
+        }
+        m_sofarPos = ( m_sofarPos + 1 ) & mask;
+        float *zl = m_sofarZ[0], *zr = m_sofarZ[1];
+        zl[0] += a * ( l - zl[0] );
+        zl[1] += a * ( zl[0] - zl[1] );
+        zr[0] += a * ( r - zr[0] );
+        zr[1] += a * ( zr[0] - zr[1] );
+        L[s] += g * zl[1];
+        R[s] += g * zr[1];
+    }
+    if ( wet <= 0.0f )
+    {   // let go: the taps forgotten (traced again when it opens), the ring left to be overwritten
+        m_sofarTaps.clear();
+        m_sofarKey[0] = m_sofarKey[1] = -1.0f;
+    }
+}
+
 void Engine::stepNight( float dt )
 {
     auto glide = [dt]( float &v, float want, float tau )
@@ -3678,6 +3946,7 @@ void Engine::renderBlock()
     stepRooms( dtf );
     stepNight( dtf );
     stepSpace( dtf );
+    stepLight( dtf );
     stepHeadset( dtf );   // after the rooms and the binaural cloud: the hands and the head on top
     stepJournal( dtf );
     int   sounding = 0;
@@ -3916,6 +4185,16 @@ void Engine::renderBlock()
         // them into two a beat apart (their clouds narrowed, so the beat is heard and not lost in the spread).
         cv.m_floorHz = v.m_source == FoundationSource ? 2.2f * static_cast<float>( v.m_hz ) : 0.0f;
         cv.m_floorGain = v.m_source == FoundationSource ? m_floorBoost : 1.0f;
+        // Lines (Phase 34): hydrogen's spectrum on every voice; each line a Doppler width in cents, as hot as Heat
+        // (2 .. 40 cents, the same at every line: Doppler's width is a share of the frequency).
+        cv.m_lines = std::clamp( cur( ParamIdE::LINES ), 0.0f, 1.0f );
+        cv.m_zeeman = cur( ParamIdE::ZEEMAN );
+        if ( cv.m_lines > 0.0f )
+        {
+            const float heat = 2.0f + 38.0f * std::clamp( cur( ParamIdE::LINE_HEAT ), 0.0f, 1.0f );
+            cv.m_width += ( heat - cv.m_width ) * cv.m_lines;
+            cv.m_widthSlope *= 1.0f - cv.m_lines;
+        }
         cv.m_beatHz = v.m_source == FoundationSource && m_blk.m_pressure > 0.0f ? m_blk.m_pressureRate : 0.0f;
         cv.m_beatShare = 0.5f * m_blk.m_pressure;
         if ( cv.m_beatHz > 0.0f )
@@ -4598,6 +4877,7 @@ void Engine::renderBlock()
         m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
         m_phantomR[k] = f[15];
     }
+    renderWreck( m_nearL.data(), m_nearR.data(), G );   // the wreck (Phase 34), into the near plane as the voices
     // A level from the last block's to this one's, across the block (no zipper when it is modulated).
     auto ramp = [G]( float from, float to, int s )
     { return from + ( to - from ) * static_cast<float>( s + 1 ) / static_cast<float>( G ); };
@@ -4704,6 +4984,7 @@ void Engine::renderBlock()
         m_prevModalLevel = ml;
     }
     renderMerger( m_nearL.data(), m_nearR.data(), G );   // a merger (Phase 33), into the mix as the rooms are
+    renderSofar( m_nearL.data(), m_nearR.data(), G );    // the deep channel (Phase 34): all of it heard again
     // Binaural: the master leaves the two ears alone (no mono bass, no width): both would undo the head.
     if ( cur( ParamIdE::BINAURAL ) >= 0.5f )
         m_midSide.set( 20.0f, 0.0f, 1.0f );

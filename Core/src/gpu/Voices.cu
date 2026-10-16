@@ -30,6 +30,28 @@ namespace
 
 /** @brief The halo's sites, as the update kernel places their partials (Rooms.cu keeps the same; filled at open()). */
 __constant__ signed char cHaloXY[HaloSites][2];
+__constant__ float       cLines[LineCount];       ///< hydrogen's lines over the lowest (Pfund alpha), rising (Phase 34)
+__device__ float         gScreen[ScintScreen];    ///< the scintillation's phase screen, unit RMS (Phase 34)
+__device__ float         gScint[ScintBins];       ///< its intensity in each band this block, mean 1
+__device__ float         gScintMean[ScintBins];   ///< each band's intensity followed over eight seconds (its mean)
+__device__ float         gAbsorb[AbsorbBins];     ///< the absorption's transmission in each band this block, 0 .. 1
+
+/**
+ * @brief A table over log frequency read at f, interpolated.
+ * @param[in] table  the table
+ * @param[in] bins   its bins
+ * @param[in] lo     Hz at its first bin
+ * @param[in] octs   octaves it spans
+ * @param[in] f      Hz
+ * @return the value
+ */
+__device__ __forceinline__ float logTable( const float *table, int bins, float lo, float octs, float f )
+{
+    const float x = fminf( fmaxf( log2f( fmaxf( f, 1.0f ) / lo ) / octs * static_cast<float>( bins - 1 ), 0.0f ),
+                           static_cast<float>( bins - 1 ) - 1.0e-3f );
+    const int   i = static_cast<int>( x );
+    return table[i] + ( table[min( i + 1, bins - 1 )] - table[i] ) * ( x - static_cast<float>( i ) );
+}
 
 /**
  * @brief A sine of a slow oscillator at `rate` Hz and phase offset `phase` (cycles) at time `t`,
@@ -1092,6 +1114,19 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                     ( isSub ? hr : partialRatio( h, cv.m_inharmonic, cv.m_stretch, cv.m_horizon, cv.m_horizonRatio ) ) *
                     exp2f( z * sigma * ( 1.0f / 1200.0f ) ) +
                 cv.m_shift;
+            // Lines (Phase 34): the h-th harmonic drawn to hydrogen's h-th line, the cloud's spread kept in cents (the
+            // Doppler width is a share of the frequency); Zeeman's triplet a quarter of the members either side.
+            if ( cv.m_lines > 0.0f && !isSub )
+            {
+                const float to = h <= LineCount ? cLines[h - 1] : static_cast<float>( h );
+                centre = ( centre - cv.m_shift ) * ( 1.0f + cv.m_lines * ( to / static_cast<float>( h ) - 1.0f ) ) +
+                         cv.m_shift;
+                if ( cv.m_zeeman > 0.0f )
+                {
+                    const float z = hash01( seed, up, 65 );
+                    centre += z < 0.25f ? -cv.m_zeeman : z < 0.5f ? cv.m_zeeman : 0.0f;
+                }
+            }
             // Pressure (Phase 32): a share of the members a beat above the rest, so the floor beats slowly -- as two
             // pipes a hair apart, each harmonic h times as fast.
             if ( cv.m_beatHz > 0.0f && !isSub && hash01( seed, up, 64 ) < cv.m_beatShare )
@@ -1133,6 +1168,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                                               ( fu * motion( 0U, 80U ) + ( 1.0f - fu ) * motion( own, 80U ) ) );
             }
             amp0 = cv.m_scale * harmonicShape( h, cv.m_tilt, cv.m_oddEven, cv.m_brightness );
+            if ( cv.m_lines > 0.0f && h > LineCount ) amp0 *= 1.0f - cv.m_lines;   // past hydrogen's lines: none
             if ( isSub )
             {   // Subharmonics: the engine's amplitude for the cloud, against harmonic 1's
                 amp0 *= cv.m_sub[sub];
@@ -1393,6 +1429,16 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                                   static_cast<float>( n ) / fs, z * ( 2.0f / 1200.0f ) );
         }
         f = home * exp2f( fieldOff * ( 1.0f / 1200.0f ) );
+        // Scintillation (Phase 34): the partial through the screen's intensity at its frequency (an amplitude: its square
+        // root); the absorption's transmission likewise, the air band's continuum too.
+        float skyGain = 1.0f;
+        if ( hdr->m_scint.m_on )
+            skyGain *=
+                1.0f - hdr->m_scint.m_depth +
+                hdr->m_scint.m_depth * sqrtf( fmaxf( logTable( gScint, ScintBins, 40.0f, 8.6438562f, f ), 0.0f ) );
+        if ( hdr->m_absorb.m_on )
+            skyGain *= 1.0f - hdr->m_absorb.m_depth +
+                       hdr->m_absorb.m_depth * logTable( gAbsorb, AbsorbBins, 20.0f, 9.9657843f, f );
         // The black hole (Phase 33): a share of the partials falls -- from Start Schwarzschild radii to the
         // horizon over a fall (r^(3/2) shrinking evenly, as a body falls from rest), seen from far away: redshifted by
         // sqrt(1 - rs/r), dimmed by its square, drawn to the hole, frozen at the horizon, reborn far out --; the light
@@ -1473,7 +1519,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         const float level = lateBy > 0.0f ? gainAgo( ring + static_cast<size_t>( v ) * GainRing, hdr->m_blockIndex,
                                                      lateBy * fs / static_cast<float>( n ) )
                                           : cv.m_gain;
-        target = amp0 * sh * fade * env * grainEnv * level * exp2f( -dist ) * absorb * colour * holeGain;
+        target = amp0 * sh * fade * env * grainEnv * level * exp2f( -dist ) * absorb * colour * holeGain * skyGain;
         // The hall's ear: this partial's amplitude in its band, in whole numbers (the sum is the same in
         // any order). Amplitudes, not powers: a chord's upper harmonics count as heard too, not only the
         // few loudest bands.
@@ -1741,13 +1787,120 @@ __global__ void phantomReduceKernel( const BlockHeader *hdr, const float *scratc
 }
 
 /**
- * @brief The halo's sites into this file's constant memory (the update kernel places their partials by them).
- * @param[in] xy  per site across and from front to back, HaloSites
- * @return the CUDA call's result
+ * @brief Scintillation (Phase 34), a CUDA block a band: the field a point source sends through a thin phase screen,
+ *        at the observer, by Fresnel's integral over the screen -- E = sum w(x) exp(i (s phi(x) + pi x^2 / rF^2)) --,
+ *        its intensity over the same sum without the screen. The band's wavelength scales the screen's phase (s = 1 kHz
+ *        over its frequency, as a plasma's does) and the Fresnel radius (by its square root); the aperture a Gaussian of
+ *        two Fresnel radii. Summed through shared memory in a fixed order.
+ * @param[in] hdr  the block header (its scintillation)
  */
-cudaError_t uploadVoiceTables( const signed char ( *xy )[2] )
+__global__ void __launch_bounds__( 256 ) scintKernel( const BlockHeader *hdr )
 {
-    return cudaMemcpyToSymbol( cHaloXY, xy, sizeof( cHaloXY ) );
+    __shared__ float     sRe[256], sIm[256], sRe0[256], sIm0[256];
+    const Scintillation &S = hdr->m_scint;
+    const int            b = static_cast<int>( blockIdx.x ), k = static_cast<int>( threadIdx.x );
+    if ( !S.m_on )
+    {
+        if ( k == 0 )
+        {
+            gScint[b] = 1.0f;
+            gScintMean[b] = 0.0f;   // begun again when it wakes
+        }
+        return;
+    }
+    const float nu = 40.0f * exp2f( 8.6438562f * static_cast<float>( b ) / static_cast<float>( ScintBins - 1 ) );
+    const float s = 1000.0f / nu;
+    const float rF = fmaxf( S.m_fresnel * sqrtf( s ), 1.5f );
+    const int   W = min( static_cast<int>( 6.0f * rF ) + 4, ScintScreen / 2 - 1 );
+    float       re = 0.0f, im = 0.0f, re0 = 0.0f, im0 = 0.0f;
+    for ( int x = -W + k; x <= W; x += 256 )
+    {
+        const float xf = static_cast<float>( x );
+        float       at = S.m_offset + xf;
+        at -= floorf( at / static_cast<float>( ScintScreen ) ) * static_cast<float>( ScintScreen );
+        const int   i0 = min( static_cast<int>( at ), ScintScreen - 1 ), i1 = i0 + 1 == ScintScreen ? 0 : i0 + 1;
+        const float phi = gScreen[i0] + ( gScreen[i1] - gScreen[i0] ) * ( at - static_cast<float>( i0 ) );
+        const float w = __expf( -0.5f * xf * xf / ( 4.0f * rF * rF ) );
+        const float q = 3.1415927f * xf * xf / ( rF * rF );
+        float       sn, cs, sn0, cs0;
+        sincosf( q + S.m_strength * s * phi, &sn, &cs );
+        sincosf( q, &sn0, &cs0 );
+        re += w * cs;
+        im += w * sn;
+        re0 += w * cs0;
+        im0 += w * sn0;
+    }
+    sRe[k] = re;
+    sIm[k] = im;
+    sRe0[k] = re0;
+    sIm0[k] = im0;
+    __syncthreads();
+    for ( int h = 128; h > 0; h >>= 1 )
+    {
+        if ( k < h )
+        {
+            sRe[k] += sRe[k + h];
+            sIm[k] += sIm[k + h];
+            sRe0[k] += sRe0[k + h];
+            sIm0[k] += sIm0[k + h];
+        }
+        __syncthreads();
+    }
+    if ( k == 0 )
+    {   // over its own mean, followed over eight seconds: a finite aperture loses what strong scattering throws wide,
+        // and only the twinkling is wanted, not a band growing dim
+        const float I =
+            ( sRe[0] * sRe[0] + sIm[0] * sIm[0] ) / fmaxf( sRe0[0] * sRe0[0] + sIm0[0] * sIm0[0], 1.0e-12f );
+        float m = gScintMean[b];
+        m = m <= 0.0f
+                ? I
+                : m + ( I - m ) * ( 1.0f - __expf( -static_cast<float>( hdr->m_n ) / ( 8.0f * hdr->m_sampleRate ) ) );
+        gScintMean[b] = m;
+        gScint[b] = I / fmaxf( m, 1.0e-6f );
+    }
+}
+
+/**
+ * @brief Absorption (Phase 34), a thread a band: the transmission exp(-tau sum of the lines' profiles) -- each line a
+ *        Lorentzian of the half width (the Doppler and the pressure together, roughly) round its frequency --, 20 Hz
+ *        .. 20 kHz.
+ * @param[in] hdr  the block header (its absorption)
+ */
+__global__ void absorbKernel( const BlockHeader *hdr )
+{
+    const int         b = static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x );
+    const Absorption &A = hdr->m_absorb;
+    if ( b >= AbsorbBins ) return;
+    if ( !A.m_on )
+    {
+        gAbsorb[b] = 1.0f;
+        return;
+    }
+    const float f = 20.0f * exp2f( 9.9657843f * static_cast<float>( b ) / static_cast<float>( AbsorbBins - 1 ) );
+    float       sum = 0.0f;
+    for ( int i = 0; i < LineCount; ++i )
+    {
+        const float nu = A.m_lineHz * cLines[i], g = A.m_width * nu;
+        const float d = ( f - nu ) / g;
+        sum += 1.0f / ( 1.0f + d * d );
+    }
+    gAbsorb[b] = __expf( -A.m_tau * sum );
+}
+
+/**
+ * @brief This file's tables into its constant and device memory: the halo's sites (the update kernel places their
+ *        partials by them), hydrogen's lines and the scintillation's phase screen (Phase 34).
+ * @param[in] xy      per site across and from front to back, HaloSites
+ * @param[in] lines   LineCount ratios over the lowest line, rising
+ * @param[in] screen  ScintScreen phases, unit RMS
+ * @return the first failing CUDA call's result, or success
+ */
+cudaError_t uploadVoiceTables( const signed char ( *xy )[2], const float *lines, const float *screen )
+{
+    cudaError_t e = cudaMemcpyToSymbol( cHaloXY, xy, sizeof( cHaloXY ) );
+    if ( e == cudaSuccess ) e = cudaMemcpyToSymbol( cLines, lines, sizeof( cLines ) );
+    if ( e == cudaSuccess ) e = cudaMemcpyToSymbol( gScreen, screen, sizeof( gScreen ) );
+    return e;
 }
 
 }   // namespace additiv::gpu

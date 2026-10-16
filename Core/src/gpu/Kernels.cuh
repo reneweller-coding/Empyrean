@@ -30,7 +30,9 @@ __global__ void renderKernel( const BlockHeader *hdr, const CloudVoice *voices, 
 __global__ void reduceKernel( const BlockHeader *hdr, const float *scratch, int chunks, int perVoice, int maxN,
                               float *out );
 __global__ void phantomReduceKernel( const BlockHeader *hdr, const float *scratch, int perVoice, int maxN, float *out );
-cudaError_t uploadVoiceTables( const signed char ( *xy )[2] );
+cudaError_t uploadVoiceTables( const signed char ( *xy )[2], const float *lines, const float *screen );
+__global__ void scintKernel( const BlockHeader *hdr );
+__global__ void absorbKernel( const BlockHeader *hdr );
 
 // Hall.cu
 __global__ void hallKernel( const BlockHeader *hdr, unsigned long long *hist, float *memory, float *density,

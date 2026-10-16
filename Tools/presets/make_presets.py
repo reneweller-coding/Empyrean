@@ -77,7 +77,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Organ Points", "Pressure Drones", "Sub Abysses", "Fifth Pillars", "Breathing Floors", "Cathedral Depths", "Abyssal Plains", "Black Monoliths",
           "Iron Pedals", "Tectonic Hum", "Cavern Drones", "Undertow", "Low Chapels", "Night Pressure", "Deep Bells", "Floors & Storms",
           "Sun Songs", "Red Giants", "White Dwarfs", "Spinning Stars", "Ageing Stars", "Star Choirs", "Accretion Disks", "Falling Light",
-          "Einstein Rings", "Mergers", "Distant Mergers", "Redshift Halls", "Receding Light", "Cosmic Floors", "Quiet Universe", "Gravity's Choir"]
+          "Einstein Rings", "Mergers", "Distant Mergers", "Redshift Halls", "Receding Light", "Cosmic Floors", "Quiet Universe", "Gravity's Choir",
+          "Twinkling Stars", "Turbulent Light", "Hydrogen Choirs", "Balmer Bells", "Zeeman Fields", "Dark Lines", "Nebula Glow", "Derelict Hulls",
+          "Orbital Tanks", "Broken Trusses", "Perforated Plates", "Thermal Snaps", "Deep Channels", "Ocean Crossings", "Whale Roads", "Lost Signals"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -562,6 +564,49 @@ NAMES = {
     "Gravity's Choir": (["Gravitational", "Tidal-Pulled", "Orbiting", "Massive", "Warped", "Held-Fast", "Heavy-Sky",
                          "Curving"],
                         ["Choir", "Chorus", "Ensemble", "Consort", "Assembly", "Congregation", "Gathering", "Concert"]),
+    "Twinkling Stars": (["Twinkling", "Flickering", "Glinting", "Scintillant", "Trembling", "Sparkling-Far",
+                         "Wavering", "Shivering"],
+                        ["Starlight", "Pinpoint", "Polaris", "Deneb", "Capella", "Rigel", "Spica", "Antares"]),
+    "Turbulent Light": (["Turbulent", "Seething", "Rippled", "Distorted", "Churning", "Boiling", "Roiling", "Unsteady"],
+                        ["Seeing", "Air Column", "Shimmer Veil", "Heat Haze", "Mirage Air", "Turbulence", "Eddy Light",
+                         "Speckle"]),
+    "Hydrogen Choirs": (["Lyman", "Balmer", "Paschen", "Brackett", "Pfund", "Rydberg", "Hydrogenic", "Quantised"],
+                        ["Choir", "Series", "Ladder", "Transition", "Emission", "Spectrum", "Line Choir", "Level"]),
+    "Balmer Bells": (["H-Alpha", "H-Beta", "H-Gamma", "H-Delta", "Emission", "Spectral", "Ionised", "Excited"],
+                     ["Bell", "Gong", "Chime", "Bowl", "Tubular Bell", "Glass Bell", "Handbell", "Singing Bowl"]),
+    "Zeeman Fields": (["Split", "Magnetised", "Polarised", "Triplet", "Field-Bent", "Sunspot", "Precessing",
+                       "Gyromagnetic"],
+                      ["Line", "Field", "Flux", "Magnetogram", "Dynamo", "Loop", "Pole", "Domain"]),
+    "Dark Lines": (["Fraunhofer", "Absorbed", "Shadowed", "Dark-Banded", "Notched", "Eclipsed", "Veiled", "Obscured"],
+                   ["Spectrum", "Rainbow", "Continuum", "Prism Light", "Band", "Shadow Line", "Gap", "Absorber"]),
+    "Nebula Glow": (["Nebular", "Glowing", "Ionised-Gas", "Rosette", "Emission-Red", "Orion", "Lagoon", "Eagle"],
+                    ["Nebula", "Cloud", "Pillar Gas", "Glow", "Nursery", "Veil Nebula", "Gas Bubble", "Plume"]),
+    "Derelict Hulls": (["Derelict", "Abandoned", "Tumbling", "Hollow-Hulled", "Gutted", "Silent-Hulled", "Ghost",
+                        "Scuttled"],
+                       ["Hull", "Module", "Airlock", "Corridor", "Habitat", "Capsule", "Fuselage", "Hab Ring"]),
+    "Orbital Tanks": (["Orbital", "Pressurised", "Spherical", "Cryogenic", "Empty", "Venting", "Riveted-Steel",
+                       "Frosted"],
+                      ["Tank", "Sphere", "Reservoir Tank", "Fuel Tank", "Dewar", "Vessel", "Canister", "Ballast Sphere"]),
+    "Broken Trusses": (["Broken", "Twisted", "Buckled", "Long-Span", "Skeletal", "Lattice", "Strutted", "Sheared"],
+                       ["Truss", "Boom", "Spar", "Gantry", "Mast", "Antenna", "Arm", "Frame"]),
+    "Perforated Plates": (["Perforated", "Pitted", "Holed", "Riddled", "Punched", "Pierced", "Scarred", "Cratered"],
+                          ["Plate", "Panel", "Shield", "Hatch", "Bulkhead Plate", "Solar Panel", "Deck", "Sheet"]),
+    "Thermal Snaps": (["Snapping", "Creaking", "Groaning", "Ticking", "Contracting", "Expanding", "Cooling-Metal",
+                       "Warming-Metal"],
+                      ["Structure", "Spar Joint", "Seam", "Rivet Line", "Joint", "Strut", "Frame Joint", "Weld"]),
+    "Deep Channels": (["Sounding", "Channelled", "Deep-Sea", "Abyssal-Water", "Pelagic-Deep", "Thermocline",
+                       "Hydrophone", "Submarine"],
+                      ["Channel", "Waveguide", "Sound Layer", "Depth", "Axis", "Water Column", "Duct", "Sea Lane"]),
+    "Ocean Crossings": (["Transoceanic", "Far-Shore", "Basin-Wide", "Ocean-Long", "Drifting-Sound", "Across-Sea",
+                         "Long-Range", "Wide-Water"],
+                        ["Crossing", "Passage", "Voyage", "Transit", "Current", "Gyre Sound", "Ocean Echo", "Far Call"]),
+    "Whale Roads": (["Leviathan", "Cetacean", "Fluked", "Breaching", "Migrating", "Blue-Deep", "Sounding-Whale",
+                     "Deep-Diving"],
+                    ["Road", "Song", "Path", "Way", "Route", "Call", "Moan", "Lament"]),
+    "Lost Signals": (["Lost", "Fading", "Garbled", "Faint-Signal", "Last-Known", "Unanswered", "Drifting-Signal",
+                      "Ghostly"],
+                     ["Signal", "Beacon Call", "Transmission", "Carrier", "Ping", "Telemetry", "Distress Call",
+                      "Echo Signal"]),
 }
 
 
@@ -4158,6 +4203,192 @@ def s_gravity_choir(r):
 RECIPES = RECIPES + [s_sun, s_giants, s_dwarfs, s_spinning, s_ageing, s_star_choirs, s_accretion, s_falling, s_rings,
                      s_mergers, s_distant_mergers, s_redshift_halls, s_receding, s_cosmic_floors, s_quiet,
                      s_gravity_choir]
+
+# ---- Phase 34 (16.10.2026): light and depth -- scintillation, hydrogen's lines and its dark lines, a derelict's modes,
+# the ocean's deep channel.
+
+WRECK_SHAPE = {"Hull": 0, "Tank": 1, "Truss": 2, "Plate": 3}
+
+
+def set_scint(r, depth=(0.4, 0.9), strength=(0.3, 0.8), speed=(0.2, 1.5)):
+    """Scintillation: how far the partials follow the screen, how strongly it scatters, how fast it drifts."""
+    r.set("scintillation", f(r.u(*depth), 2))
+    r.set("scint_strength", f(r.u(*strength), 2))
+    r.set("scint_speed", f(r.lg(*speed), 2))
+
+
+def set_lines(r, lines=(0.7, 1.0), heat=(0.1, 0.6), zeeman=None, absorb=None):
+    """Hydrogen's lines on the voices, their heat, Zeeman's triplets, the dark lines."""
+    r.set("lines", f(r.u(*lines), 2))
+    r.set("line_heat", f(r.u(*heat), 2))
+    if zeeman:
+        r.set("zeeman", f(r.lg(*zeeman), 2))
+    if absorb:
+        r.set("absorption", f(r.u(*absorb), 2))
+
+
+def set_wreck(r, shape, level=(0.4, 0.8), size=(-2.0, 0.0), hits=(2, 20), snap=(0.1, 0.6), decay=(4, 20)):
+    """A derelict: its structure, its level, its size against the root, its micrometeorites, its snaps, its ring."""
+    r.set("wreck", f(r.u(*level), 2))
+    r.set("wreck_shape", WRECK_SHAPE[shape])
+    r.set("wreck_size", f(r.u(*size), 2))
+    r.set("wreck_hits", f(r.lg(*hits), 1))
+    r.set("wreck_snap", f(r.u(*snap), 2))
+    r.set("wreck_decay", f(r.lg(*decay), 1))
+
+
+def set_sofar(r, wet=(0.3, 0.7), range_=(300, 1500), depth=(0.0, 0.5)):
+    """The deep channel: how much, how far, how far off its axis."""
+    r.set("sofar", f(r.u(*wet), 2))
+    r.set("sofar_range", f(r.lg(*range_), 0))
+    r.set("sofar_depth", f(r.u(*depth), 2))
+
+
+P34_POOLS = {
+    "scint": [("lfo3", "scintillation", (0.1, 0.3)), ("lfo2", "scint_speed", (0.1, 0.3))],
+    "lines": [("lfo3", "lines", (0.1, 0.3)), ("lfo2", "line_heat", (0.1, 0.3)), ("lfo3", "zeeman", (0.1, 0.25))],
+    "wreck": [("night", "wreck_snap", (0.2, 0.4)), ("lfo3", "wreck_hits", (0.1, 0.3))],
+    "sofar": [("lfo3", "sofar", (0.1, 0.3)), ("lfo2", "sofar_depth", (0.1, 0.3))],
+}
+
+
+def p34_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P34_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def l_twinkling(r):
+    based(r, "Glass", "Shimmer", "Strings", "Choirs", "Bells", "Deep Space")
+    set_scint(r)
+    p34_rows(r, ["scint"], 1)
+
+
+def l_turbulent(r):
+    based(r, *SPACE)
+    set_scint(r, depth=(0.7, 1.0), strength=(0.7, 1.0), speed=(0.5, 3.0))
+    p34_rows(r, ["scint"], 1)
+
+
+def l_hydrogen(r):
+    based(r, "Choirs", "Strings", "Organs", "Sleep Concert", "Deep Space")
+    set_lines(r)
+    p34_rows(r, ["lines"], 1)
+
+
+def l_balmer_bells(r):
+    based(r, "Bells", "Glass", "Keys")
+    set_lines(r, lines=(0.5, 1.0), heat=(0.0, 0.3))
+    p34_rows(r, ["lines"], 1)
+
+
+def l_zeeman(r):
+    based(r, *SPACE)
+    set_lines(r, zeeman=(0.1, 2.0))
+    p34_rows(r, ["lines"], 1)
+
+
+def l_dark_lines(r):
+    based(r, "Air & Noise", "Deep Space", "Shimmer", "Dark Drones")
+    r.set("cloud_width", f(r.u(50, 100), 1))
+    r.set("air", f(r.u(0.5, 1.0), 2))
+    r.set("air_width", f(r.u(1200, 2400), 0))
+    set_lines(r, lines=(0.0, 0.0), heat=(0.2, 0.8), absorb=(0.6, 1.0))
+    p34_rows(r, ["lines"], 1)
+
+
+def l_nebula(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_lines(r, lines=(0.6, 1.0), heat=(0.5, 1.0))
+    if r.rng.random() < 0.5:
+        set_scint(r, depth=(0.2, 0.5))
+    p34_rows(r, ["lines", "scint"], 1)
+
+
+def l_hulls(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Air & Noise")
+    set_wreck(r, "Hull")
+    p34_rows(r, ["wreck"], 1)
+
+
+def l_tanks(r):
+    based(r, "Dark Drones", "Deep Space", "Bells", "Choirs")
+    set_wreck(r, "Tank")
+    p34_rows(r, ["wreck"], 1)
+
+
+def l_trusses(r):
+    based(r, "Dark Drones", "Deep Space", "Strings", "Air & Noise")
+    set_wreck(r, "Truss", size=(-3.0, -1.0))
+    p34_rows(r, ["wreck"], 1)
+
+
+def l_plates(r):
+    based(r, "Bells", "Glass", "Shimmer", "Dark Drones")
+    set_wreck(r, "Plate", size=(-1.0, 1.0))
+    p34_rows(r, ["wreck"], 1)
+
+
+def l_snaps(r):
+    based(r, *CALM)
+    set_wreck(r, r.pick("Hull", "Tank", "Truss", "Plate"), hits=(0.5, 3), snap=(0.6, 1.0))
+    set_night(r, arc=(0.5, 1.0))
+    p34_rows(r, ["wreck"], 1)
+
+
+def l_channels(r):
+    based(r, *SPACE)
+    set_sofar(r)
+    p34_rows(r, ["sofar"], 1)
+
+
+def l_crossings(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Sleep Concert")
+    set_sofar(r, wet=(0.4, 0.8), range_=(1200, 3000), depth=(0.2, 0.8))
+    p34_rows(r, ["sofar"], 1)
+
+
+def l_whale_roads(r):
+    based(r, "Dark Drones", "Deep Space", "Strings", "Choirs")
+    low_register(r)
+    set_sofar(r, wet=(0.4, 0.8), range_=(500, 2000))
+    set_floor(r, pedal=(0.4, 1.0), sub=(0.3, 0.7))
+    p34_rows(r, ["sofar"], 1)
+
+
+def l_lost_signals(r):
+    based(r, *SPACE)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("scint", "lines", "wreck", "sofar") if r.rng.random() < 0.5]
+    if "scint" in kinds:
+        set_scint(r, depth=(0.3, 0.7))
+    if "lines" in kinds:
+        set_lines(r, lines=(0.4, 0.9))
+    if "wreck" in kinds:
+        set_wreck(r, r.pick("Hull", "Tank", "Truss", "Plate"), level=(0.3, 0.6))
+    if "sofar" in kinds:
+        set_sofar(r, wet=(0.2, 0.5))
+    p34_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [l_twinkling, l_turbulent, l_hydrogen, l_balmer_bells, l_zeeman, l_dark_lines, l_nebula,
+                     l_hulls, l_tanks, l_trusses, l_plates, l_snaps, l_channels, l_crossings, l_whale_roads,
+                     l_lost_signals]
 
 
 def foundation(r):

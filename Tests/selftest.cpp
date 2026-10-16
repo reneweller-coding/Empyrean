@@ -631,7 +631,7 @@ int main( int argc, char **argv )
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 14336 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 15360 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -4908,6 +4908,172 @@ int main( int argc, char **argv )
         const double plain = tail( 0.0f ), sunk = tail( 1.0f );
         check( sunk < plain - 0.7, "redshift hall: the tail sinks as it dies",
                fmt( "the tail's centre %.2f octaves over 60 Hz with Redshift, %.2f without", sunk, plain ) );
+    }
+
+    // 104. Scintillation (Phase 34): a note held, rendered twice alike but for the screen; its harmonics' levels in
+    //      half seconds differ between the two by the screen's patches -- by several decibels, back and forth -- and
+    //      on the whole stay as loud.
+    if ( from <= 104 )
+    {
+        auto levels = [&]( float scint, std::vector<double> &db )
+        {
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::MOTION_DEPTH, 0.0f );
+            e.setParam( ParamIdE::SHIMMER, 0.0f );
+            e.setParam( ParamIdE::SCINTILLATION, scint );
+            e.setParam( ParamIdE::SCINT_STRENGTH, 0.8f );
+            e.setParam( ParamIdE::SCINT_SPEED, 1.0f );
+            if ( !openOffline( e, false, 104 ) ) return false;
+            e.noteOn( 57, 1.0f, 0 );
+            (void)render( e, 10.0 );   // the screen's means settle
+            const std::vector<float> a = render( e, 12.0 );
+            const double             f0 = e.noteHz( 57 );
+            for ( int h : { 2, 3, 5, 8, 12 } )
+                for ( size_t s = 0; s + 24000 <= a.size() / 2; s += 24000 )
+                    db.push_back( toneDb( a, s, s + 24000, f0 * h ) );
+            return true;
+        };
+        std::vector<double> plain, twinkle;
+        const bool          ran = levels( 0.0f, plain ) && levels( 1.0f, twinkle ) && plain.size() == twinkle.size();
+        double              mean = 0.0, sq = 0.0;
+        for ( size_t k = 0; ran && k < plain.size(); ++k ) mean += twinkle[k] - plain[k];
+        mean /= std::max<size_t>( 1, plain.size() );
+        for ( size_t k = 0; ran && k < plain.size(); ++k )
+            sq += ( twinkle[k] - plain[k] - mean ) * ( twinkle[k] - plain[k] - mean );
+        const double spread = std::sqrt( sq / std::max<size_t>( 1, plain.size() ) );
+        check( ran && spread > 3.0 && mean > -5.0, "scintillation: the harmonics twinkle through the screen",
+               fmt( "with the screen against without: %.1f dB back and forth, %+.1f dB on the whole", spread, mean ) );
+    }
+
+    // 105. Lines (Phase 34): A2 with Lines: the eleventh harmonic's place is empty and Balmer alpha (11.36 times the
+    //      lowest line, Pfund alpha, on the note) sounds; without, the other way round.
+    if ( from <= 105 )
+    {
+        auto at = [&]( float lines, double &balmer, double &eleventh )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::MOTION_DEPTH, 0.0f );
+            e.setParam( ParamIdE::LINES, lines );
+            e.setParam( ParamIdE::TILT, 0.5f );
+            if ( !openOffline( e, false, 105 ) ) return false;
+            e.noteOn( 45, 1.0f, 0 );
+            (void)render( e, 1.0 );
+            const std::vector<float> a = render( e, 4.0 );
+            const double             f0 = e.noteHz( 45 );
+            const double             ratio = ( 1.0 / 4.0 - 1.0 / 9.0 ) / ( 1.0 / 25.0 - 1.0 / 36.0 );
+            balmer = toneDb( a, 0, a.size() / 2, f0 * ratio );
+            eleventh = toneDb( a, 0, a.size() / 2, f0 * 11.0 );
+            return true;
+        };
+        double     b1 = 0.0, e1 = 0.0, b0 = 0.0, e0 = 0.0;
+        const bool ran = at( 1.0f, b1, e1 ) && at( 0.0f, b0, e0 );
+        check(
+            ran && b1 > e1 + 10.0 && e0 > b0 + 10.0, "lines: the harmonics on hydrogen's lines",
+            fmt( "Balmer alpha against the 11th harmonic: %+.1f dB with Lines, %+.1f dB without", b1 - e1, b0 - e0 ) );
+    }
+
+    // 106. Absorption (Phase 34): a band of air round 440 Hz; with Absorption, Balmer alpha's place (on the root, D) is
+    //      dark against the air beside it.
+    if ( from <= 106 )
+    {
+        auto dip = [&]( float absorb )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::AIR, 1.0f );
+            e.setParam( ParamIdE::AIR_CENTER, 4.0f );
+            e.setParam( ParamIdE::AIR_WIDTH, 2400.0f );
+            e.setParam( ParamIdE::AIR_JITTER, 0.5f );   // the air's flicker slow: fast, its FM would smear the line
+            e.setParam( ParamIdE::ABSORPTION, absorb );
+            e.setParam( ParamIdE::LINE_HEAT, 0.3f );
+            if ( !openOffline( e, false, 106 ) ) return 0.0;
+            e.noteOn( 45, 1.0f, 0 );
+            (void)render( e, 1.0 );
+            const std::vector<float> a = render( e, 6.0 );
+            const double             line = e.noteHz( 26 ) * ( 1.0 / 4.0 - 1.0 / 9.0 ) / ( 1.0 / 25.0 - 1.0 / 36.0 );
+            double on = 0.0, off = 0.0;   // across the line (its half width some 2 Hz), and as wide beside it
+            for ( int k = -8; k <= 8; ++k )
+            {
+                on += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, line + 0.2 * k ) );
+                off += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, line * 1.1 + 0.2 * k ) );
+            }
+            return 10.0 * std::log10( std::max( on, 1e-30 ) / std::max( off, 1e-30 ) );
+        };
+        const double clear = dip( 0.0f ), dark = dip( 1.0f );
+        check( dark < clear - 8.0, "absorption: a dark line at Balmer alpha",
+               fmt( "the line's place against the air beside it: %+.1f dB with Absorption, %+.1f dB without", dark,
+                    clear ) );
+    }
+
+    // 107. Wreck (Phase 34): struck sixty times a minute, a hull rings at its modes -- its lowest eight stand far over
+    //      the gaps between them.
+    if ( from <= 107 )
+    {
+        auto    held = std::make_unique<Engine>();
+        Engine &e = *held;
+        quietEffects( e );
+        e.setParam( ParamIdE::WRECK, 1.0f );
+        e.setParam( ParamIdE::WRECK_SHAPE, 0.0f );
+        e.setParam( ParamIdE::WRECK_SIZE, 0.0f );
+        e.setParam( ParamIdE::WRECK_HITS, 60.0f );
+        e.setParam( ParamIdE::WRECK_SNAP, 0.0f );
+        if ( !openOffline( e, false, 107 ) ) return 1;
+        const std::vector<float> a = render( e, 12.0 );
+        const double             f1 = e.noteHz( 38 );   // the root, D2: the lowest mode at Size 0
+        const double             ratios[8] = { 1.0, 1.30829, 1.92036, 2.08520, 2.15744, 2.34476, 2.67375, 2.80016 };
+        double                   on = 0.0, off = 0.0;
+        for ( int k = 0; k < 8; ++k )
+        {
+            on += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, f1 * ratios[k] ) );
+            off += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, f1 * ratios[k] * 1.015 ) );
+        }
+        const double ratio = 10.0 * std::log10( std::max( on, 1e-30 ) / std::max( off, 1e-30 ) );
+        check( ratio > 10.0 && rmsDb( a, 0, a.size() / 2 ) > -60.0, "wreck: a hull rings at its modes",
+               fmt( "its lowest eight modes %.1f dB over the gaps; the wreck %.1f dBFS", ratio,
+                    rmsDb( a, 0, a.size() / 2 ) ) );
+    }
+
+    // 108. Deep channel (Phase 34): a short note across 800 km of ocean comes back as a swell -- the arrivals spread over
+    //      seconds, the loudest late -- and it ends at once.
+    if ( from <= 108 )
+    {
+        auto    held = std::make_unique<Engine>();
+        Engine &e = *held;
+        quietEffects( e );
+        e.setParam( ParamIdE::SOFAR, 1.0f );
+        e.setParam( ParamIdE::SOFAR_RANGE, 800.0f );
+        e.setParam( ParamIdE::SOFAR_DEPTH, 0.3f );
+        e.setParam( ParamIdE::ATTACK, 0.01f );
+        e.setParam( ParamIdE::RELEASE, 0.1f );
+        if ( !openOffline( e, false, 108 ) ) return 1;
+        e.noteOn( 50, 1.0f, 0 );
+        const std::vector<float> a = render( e, 0.2 );
+        e.noteOff( 50, 0 );
+        const std::vector<float> b = render( e, 12.0 );
+        // tenths of a second after the note has died (0.5 s on)
+        double loud = -200.0, at = 0.0, early = -200.0, last = 0.0;
+        for ( size_t s = static_cast<size_t>( 0.3 * 48000 ); s + 4800 <= b.size() / 2; s += 4800 )
+        {
+            const double db = rmsDb( b, s, s + 4800 ), t = static_cast<double>( s ) / 48000.0 + 0.2;
+            if ( db > loud )
+            {
+                loud = db;
+                at = t;
+            }
+            if ( t < 1.0 ) early = std::max( early, db );
+            if ( db > loud - 30.0 ) last = t;
+        }
+        check(
+            !a.empty() && at > 1.0 && loud > early + 3.0 && last - at < 1.5,
+            "deep channel: a note comes back as a swell that ends at once",
+            fmt( "the loudest arrival %.1f s after the note (%.1f dBFS), %.1f dB over the first second's; 30 dB down "
+                 "%.1f s later",
+                 at, loud, loud - early, last - at ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

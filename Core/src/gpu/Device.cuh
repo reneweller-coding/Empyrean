@@ -142,6 +142,8 @@ struct BlockHeader
     NightChorus   m_chorus;           ///< the night chorus for this block (Phase 31)
     StarField     m_star;             ///< the star for this block (Phase 33)
     BlackHole     m_hole;             ///< the black hole for this block (Phase 33)
+    Scintillation m_scint;            ///< the scintillation for this block (Phase 34)
+    Absorption    m_absorb;           ///< the absorption for this block (Phase 34)
 
     std::int32_t m_lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t m_lpad0;        ///< keeps the header 16-byte aligned

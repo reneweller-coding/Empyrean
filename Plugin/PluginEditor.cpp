@@ -459,7 +459,16 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                         IdsT{ ParamIdE::BLACK_HOLE } },
                       { "Merger", F::FILTER,
                         IdsT{ ParamIdE::MERGER, ParamIdE::MERGER_MASS, ParamIdE::MERGER_RATIO, ParamIdE::MERGER_TIME },
-                        IdsT{ ParamIdE::MERGER } } } );
+                        IdsT{ ParamIdE::MERGER } },
+                      { "Scintillation", F::MOTION,
+                        IdsT{ ParamIdE::SCINTILLATION, ParamIdE::SCINT_STRENGTH, ParamIdE::SCINT_SPEED },
+                        IdsT{ ParamIdE::SCINTILLATION } },
+                      { "Spectral Lines", F::SOURCE,
+                        IdsT{ ParamIdE::LINES, ParamIdE::LINE_HEAT, ParamIdE::ZEEMAN, ParamIdE::ABSORPTION } },
+                      { "Wreck", F::ENVELOPE,
+                        IdsT{ ParamIdE::WRECK, ParamIdE::WRECK_SHAPE, ParamIdE::WRECK_SIZE, ParamIdE::WRECK_HITS,
+                              ParamIdE::WRECK_SNAP, ParamIdE::WRECK_DECAY },
+                        IdsT{ ParamIdE::WRECK } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [tp] { return tp->describe(); } );
@@ -534,17 +543,18 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                                ParamIdE::BLOOM_GLIDE },
                          IdsT{ ParamIdE::BLOOM } } } );
     // Phase 29: the wave room and the topological halo.
-    page(
-        "Rooms",
-        { { "Wave Room", F::SPACE,
-            IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
-            IdsT{ ParamIdE::WAVE_ROOM } },
-          { "Halo", F::MOTION,
-            IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
-                  ParamIdE::HALO_TURN },
-            IdsT{ ParamIdE::HALO } },
-          { "Time Mirror", F::SPACE, IdsT{ ParamIdE::MIRROR, ParamIdE::MIRROR_TIME }, IdsT{ ParamIdE::MIRROR } },
-          { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING }, IdsT{ ParamIdE::VR_HANDS } } } );
+    page( "Rooms",
+          { { "Wave Room", F::SPACE,
+              IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
+              IdsT{ ParamIdE::WAVE_ROOM } },
+            { "Halo", F::MOTION,
+              IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
+                    ParamIdE::HALO_TURN },
+              IdsT{ ParamIdE::HALO } },
+            { "Time Mirror", F::SPACE, IdsT{ ParamIdE::MIRROR, ParamIdE::MIRROR_TIME }, IdsT{ ParamIdE::MIRROR } },
+            { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING }, IdsT{ ParamIdE::VR_HANDS } },
+            { "Deep Channel", F::SPACE, IdsT{ ParamIdE::SOFAR, ParamIdE::SOFAR_RANGE, ParamIdE::SOFAR_DEPTH },
+              IdsT{ ParamIdE::SOFAR } } } );
     {
         auto *h = new HallPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [h] { return h->describe(); } );
@@ -1147,7 +1157,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "14336 presets",
+        { &m_presetName, "15360 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1811,6 +1821,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstChorusGroup ) bank.addSectionHeader( "Chorus & Mirrors" );
         if ( g == additiv::FirstFloorGroup ) bank.addSectionHeader( "Deep Floors" );
         if ( g == additiv::FirstSpaceGroup ) bank.addSectionHeader( "Stars & Gravity" );
+        if ( g == additiv::FirstLightGroup ) bank.addSectionHeader( "Light & Depth" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

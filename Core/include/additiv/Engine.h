@@ -1102,6 +1102,38 @@ private:
      */
     void renderMerger( float *L, float *R, int n );
     /**
+     * @brief Light and depth, one block (Phase 34): the scintillation's screen drifting, the lines' and the absorption's
+     *        settings to the card.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepLight( float dt );
+    /**
+     * @brief The wreck, sample by sample (Phase 34), added to the near plane before the effects: its modes (Wreck.inc)
+     *        rung by micrometeorites (a Poisson stream, each at one of its struck places) and thermal snaps (creaking
+     *        runs of tiny slips, most at dusk and dawn).
+     * @param[in,out] L  left
+     * @param[in,out] R  right
+     * @param[in]     n  samples
+     */
+    void renderWreck( float *L, float *R, int n );
+    /**
+     * @brief The deep channel, sample by sample (Phase 34): the mix heard again through the arrivals of rays across an
+     *        ocean's sound channel (traced anew when Range or Off Axis moved), darkened by the water.
+     * @param[in,out] L  left
+     * @param[in,out] R  right
+     * @param[in]     n  samples
+     */
+    void renderSofar( float *L, float *R, int n );
+    /**
+     * @brief Traces the deep channel's rays (Phase 34): Munk's profile c(z) = 1500 (1 + 0.00737 (eta + e^-eta - 1)),
+     *        eta = 2 (z - 1300 m) / 1300 m; rays from the source by Snell's invariant, reflected at the surface (inverted)
+     *        and the bottom (lossy); the arrivals at the range where neighbouring rays bracket the receiver on the axis,
+     *        each as loud as its ray tube is narrow. Fills m_sofarTaps.
+     * @param[in] rangeKm  the range
+     * @param[in] offAxis  0 .. 1: the source on the axis .. 1500 m below it
+     */
+    void traceSofar( float rangeKm, float offAxis );
+    /**
      * @brief The headset, one block (Phase 30): the head's turn held off the binaural cloud and the thunder, the hands
      *        in the wind, the halo, the wave room and the physarum's food (after stepRooms, so its places are known).
      * @param[in] dt  the block's length, seconds
@@ -1244,27 +1276,62 @@ private:
     float                          m_rissetPulse = 0.0f;    ///< the pulse, 0 .. 1 (the source)
     float                          m_lightning = 0.0f;      ///< the last strike's flash, 0 .. 1 (the source)
     // Phase 33: space
-    float                     m_starLevel = 0.0f;   ///< the star's level as it glides
-    bool                      m_starWas = false;    ///< the star sounded in the last block
-    float                     m_starKey[5] = {};   ///< what its table was built from: kind, age, spin, pitch, root (Hz)
-    float                     m_holeLevel = 0.0f;                 ///< the black hole's amount as it glides
-    double                    m_holePhase = 0.0;                  ///< its fall's clock, 0 .. 1
-    double                    m_redPhase = 0.0;                   ///< the redshift hall's clock, 0 .. 1
-    float                     m_mergerWait = 0.0f;                ///< s until the next merger begins
-    bool                      m_mergerOn = false;                 ///< a merger sounds
-    double                    m_mergerT = 0.0;                    ///< s into it
-    double                    m_mergerTc = 0.0;                   ///< s from its beginning to the coalescence
-    double                    m_mergerTauIsco = 0.0;              ///< s before the coalescence at the last stable orbit
-    double                    m_mergerPhase = 0.0;                ///< the wave's phase, radians
-    double                    m_mergerPhase3 = 0.0;               ///< the second ringdown mode's phase
-    float                     m_mergerIsco = 20.0f;               ///< Hz: the wave at the last stable orbit
-    float                     m_mergerRing = 70.0f;               ///< Hz: the ringdown's l = m = 2 mode
-    float                     m_mergerQ = 3.2f;                   ///< its quality
-    float                     m_mergerRing3 = 110.0f;             ///< Hz: the l = m = 3 mode
-    float                     m_mergerQ3 = 5.0f;                  ///< its quality
-    float                     m_mergerA3 = 0.1f;                  ///< its share
-    float                     m_mergerEnv = 0.0f;                 ///< the wave's amplitude, 0 .. 1 (the source)
-    std::atomic<bool>         m_mergerAsk{ false };               ///< beginMerger(): the next block begins one
+    float             m_starLevel = 0.0f;       ///< the star's level as it glides
+    bool              m_starWas = false;        ///< the star sounded in the last block
+    float             m_starKey[5] = {};        ///< what its table was built from: kind, age, spin, pitch, root (Hz)
+    float             m_holeLevel = 0.0f;       ///< the black hole's amount as it glides
+    double            m_holePhase = 0.0;        ///< its fall's clock, 0 .. 1
+    double            m_redPhase = 0.0;         ///< the redshift hall's clock, 0 .. 1
+    float             m_mergerWait = 0.0f;      ///< s until the next merger begins
+    bool              m_mergerOn = false;       ///< a merger sounds
+    double            m_mergerT = 0.0;          ///< s into it
+    double            m_mergerTc = 0.0;         ///< s from its beginning to the coalescence
+    double            m_mergerTauIsco = 0.0;    ///< s before the coalescence at the last stable orbit
+    double            m_mergerPhase = 0.0;      ///< the wave's phase, radians
+    double            m_mergerPhase3 = 0.0;     ///< the second ringdown mode's phase
+    float             m_mergerIsco = 20.0f;     ///< Hz: the wave at the last stable orbit
+    float             m_mergerRing = 70.0f;     ///< Hz: the ringdown's l = m = 2 mode
+    float             m_mergerQ = 3.2f;         ///< its quality
+    float             m_mergerRing3 = 110.0f;   ///< Hz: the l = m = 3 mode
+    float             m_mergerQ3 = 5.0f;        ///< its quality
+    float             m_mergerA3 = 0.1f;        ///< its share
+    float             m_mergerEnv = 0.0f;       ///< the wave's amplitude, 0 .. 1 (the source)
+    std::atomic<bool> m_mergerAsk{ false };     ///< beginMerger(): the next block begins one
+    // Phase 34: light and depth
+    double m_scintOffset = 0.0;   ///< the scintillation's screen, points
+    /** @brief One of the wreck's modes: its complex state and its turn a sample. */
+    struct WreckMode
+    {
+        double m_re = 0.0;    ///< state, real
+        double m_im = 0.0;    ///< state, imaginary (heard)
+        double m_cr = 1.0;    ///< the turn and the decay a sample, real
+        double m_ci = 0.0;    ///< likewise, imaginary
+        float  m_gl = 0.0f;   ///< the left pick-up's gain
+        float  m_gr = 0.0f;   ///< the right's
+    };
+    std::vector<WreckMode> m_wreck;               ///< its modes (sized at prepare)
+    float                  m_wreckKey[5] = {};    ///< what they were tuned for: shape, size, decay, root, level
+    float                  m_wreckWait = 1.0f;    ///< s until the next micrometeorite
+    float                  m_snapWait = 5.0f;     ///< s until the next run of creaks
+    int                    m_creaks = 0;          ///< creaks left in this run
+    float                  m_creakWait = 0.0f;    ///< s until its next creak
+    int                    m_slips = 0;           ///< slips left in this creak
+    int                    m_slipGap = 0;         ///< samples until the next slip
+    int                    m_slipAt = 0;          ///< where it creaks (a struck place)
+    float                  m_slipEnergy = 0.0f;   ///< how hard
+    /** @brief One arrival of the deep channel: its delay and its gains. */
+    struct SofarTap
+    {
+        int   m_delay = 0;   ///< samples after the first arrival
+        float m_gl = 0.0f;   ///< left
+        float m_gr = 0.0f;   ///< right
+    };
+    std::vector<SofarTap>     m_sofarTaps;      ///< the arrivals
+    std::vector<float>        m_sofarRing;      ///< the mix, mono, as long as the longest spread (sized at prepare)
+    int                       m_sofarPos = 0;   ///< where the ring is written
+    float                     m_sofarKey[2] = { -1.0f, -1.0f };   ///< what the taps were traced for: range, off axis
+    float                     m_sofarCut = 1000.0f;               ///< Hz: the water's darkening at the range
+    float                     m_sofarZ[2][2] = {};                ///< its low pass's state, left and right (two poles)
     std::mutex                m_poseLock;                         ///< guards m_posePending
     HeadsetPose               m_posePending;                      ///< the pose as it arrived
     HeadsetPose               m_pose;                             ///< the pose this block works with

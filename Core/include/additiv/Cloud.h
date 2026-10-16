@@ -163,10 +163,14 @@ constexpr int   IceChirps = 64;           ///< chirps that may sound at once
 // Phase 31 (16.10.2026): the night chorus, the time mirror.
 constexpr int ChorusCallers = 2048;   ///< the night chorus's callers (crickets, katydids, frogs ...)
 constexpr int StarModes = 1024;       ///< Star (Phase 33): the star's modes at most
-constexpr int ChorusSpecies = 8;      ///< their kinds
-constexpr int ChorusPitches = 64;     ///< pitches the callers' carriers may be tuned to
-constexpr int RoomMirrors = 64;       ///< the time mirror's cells round the listener in the wave room
-constexpr int MirrorMax = 36864;      ///< samples at the room's rate a mirror cell records (6 s at 6 kHz)
+constexpr int ScintScreen = 2048;     ///< Scintillation (Phase 34): the phase screen's points (it wraps)
+constexpr int ScintBins = 256;        ///< its bands, 40 Hz .. 16 kHz on a log scale
+constexpr int LineCount = 150;        ///< Lines (Phase 34): hydrogen's lines, five series of thirty
+constexpr int AbsorbBins = 8192;   ///< the absorption's bands, 20 Hz .. 20 kHz on a log scale (a line's width resolved)
+constexpr int ChorusSpecies = 8;   ///< their kinds
+constexpr int ChorusPitches = 64;   ///< pitches the callers' carriers may be tuned to
+constexpr int RoomMirrors = 64;     ///< the time mirror's cells round the listener in the wave room
+constexpr int MirrorMax = 36864;    ///< samples at the room's rate a mirror cell records (6 s at 6 kHz)
 
 /**
  * @brief How Streams parts a voice's partials into streams (Phase 30): each stream moves with a vibrato and a tremolo
@@ -297,6 +301,11 @@ struct CloudVoice
                                 ///< (the harmonic times it above), so the floor beats slowly (0: off)
     float m_beatShare = 0.0f;   ///< 0 .. 0.5: that share of the members
     float m_floorGain = 1.0f;   ///< Floor: the amplitude under floorHz raised by (1 .. 8), over the octave above back
+    // Phase 34
+    float m_lines = 0.0f;    ///< 0 .. 1: the harmonics drawn to hydrogen's lines (the h-th harmonic to the h-th line)
+    float m_zeeman = 0.0f;   ///< Hz: Zeeman's triplet -- a quarter of the members this far below, a quarter above
+    float m_pad34a = 0.0f;   ///< keeps the voice a multiple of 16 bytes
+    float m_pad34b = 0.0f;   ///< likewise
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
@@ -940,6 +949,41 @@ struct BlackHole
 };
 static_assert( sizeof( BlackHole ) % 16 == 0, "BlackHole rides in the block header" );
 
+/**
+ * @brief Scintillation (Phase 34): the partials twinkle as starlight does -- a thin screen of Kolmogorov turbulence
+ *        drifts across the line of sight; every band hears it through its own Fresnel zone (the phase it lends scaling
+ *        as the wavelength, as a plasma's does), so bright and dark patches ("scintles") wander over frequency and time.
+ */
+struct Scintillation
+{
+    int   m_on = 0;            ///< 1: the screen drifts and the partials twinkle (0: nothing computed)
+    int   m_pad = 0;           ///< keeps the struct 16-byte aligned
+    float m_depth = 0.0f;      ///< 0 .. 1: how far the partials follow it
+    float m_offset = 0.0f;     ///< points: where the screen stands (wrapped at ScintScreen)
+    float m_strength = 3.0f;   ///< rad: the screen's phase at 1 kHz (weak .. strong scattering)
+    float m_fresnel = 24.0f;   ///< points: the Fresnel radius at 1 kHz
+    float m_pad1 = 0.0f;       ///< likewise
+    float m_pad2 = 0.0f;       ///< likewise
+};
+static_assert( sizeof( Scintillation ) % 16 == 0, "Scintillation rides in the block header" );
+
+/**
+ * @brief Absorption (Phase 34): dark lines -- hydrogen's, at the voices' root -- carved into everything that sounds, a
+ *        continuum's light through a cool gas.
+ */
+struct Absorption
+{
+    int   m_on = 0;           ///< 1: the lines absorb (0: nothing computed)
+    int   m_pad = 0;          ///< keeps the struct 16-byte aligned
+    float m_depth = 0.0f;     ///< 0 .. 1: how much
+    float m_lineHz = 55.0f;   ///< Hz: the lowest line (Pfund alpha), the others above it by their ratios
+    float m_width = 0.004f;   ///< a line's half width over its frequency (the Doppler width: the gas's heat)
+    float m_tau = 4.0f;       ///< the optical depth at a line's centre
+    float m_pad1 = 0.0f;      ///< likewise
+    float m_pad2 = 0.0f;      ///< likewise
+};
+static_assert( sizeof( Absorption ) % 16 == 0, "Absorption rides in the block header" );
+
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
 {
@@ -1315,6 +1359,10 @@ public:
      * @param[in] count  how many (StarModes at most)
      */
     void setStarModes( const float *in, int count );
+    /** @brief The scintillation's settings for the next block (Phase 34). @return them */
+    Scintillation &scintillation();
+    /** @brief The absorption's settings for the next block (Phase 34). @return them */
+    Absorption &absorption();
     /**
      * @brief What the night chorus did in the last block (Phase 31).
      * @param[out] out  receives 4 values: the calls begun, the callers calling, how far the most numerous kind's clocks
