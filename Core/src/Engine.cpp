@@ -400,6 +400,9 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_chorusWas = false;
     m_chorusCalls = 0;
     m_mirrorPos = m_mirrorBuf = 0;
+    m_mirrorDry = m_mirrorDrySmooth = m_mirrorWet = 0.0;   // the mirror's governor and the room's high pass afresh
+    m_mirrorGovern = 1.0f;
+    std::fill( std::begin( m_roomDc ), std::end( m_roomDc ), 0.0f );
     m_stormRng = Rng( m_cfg.m_seed ^ 0x53746F726Dull );
     m_haloGain = m_roomLevel = 0.0f;
     m_haloNote.fill( -1 );
@@ -3682,6 +3685,28 @@ void Engine::stepNight( float dt )
 
 /** @brief The time mirror's cells' share of what they heard, sent back (Phase 31, measured: selftest 98). */
 constexpr float MirrorShare = 0.08f;
+/** @brief Hz: the time mirror's recording is high-passed here (Phase 36; the room's uniform pressure, sent back on
+ *         every step of a window, rose without end). */
+constexpr double MirrorHighPass = 30.0;
+/** @brief The wave room's output high pass (Phase 36): one pole at 10 Hz at 48 kHz, its uniform pressure kept out. */
+constexpr float RoomDcPole = 0.99869f;
+/**
+ * @brief The time mirror's governor (Phase 36), the safety behind the high pass: the most the room's energy at its ears
+ *        may be against what the voices put in (the room's level divided out; the voices' held over MirrorHold, so a
+ *        chord the mirror sends back after it ended counts) before the mirror's gain is taken back -- fast
+ *        (MirrorAttack), and given back slowly (MirrorRelease). The room alone stands at 1e-5 .. 5e-3 there and the
+ *        mirror, high-passed, adds next to nothing on average; a small room whose walls take little still let a mode
+ *        near 2 kHz run away (Glassed Hermitage, 16.10.2026), which this holds.
+ */
+constexpr double MirrorRunaway = 0.005;
+/** @brief s: how fast the governor takes the mirror back. */
+constexpr double MirrorAttack = 0.05;
+/** @brief s: how slowly it gives the mirror its gain back. */
+constexpr double MirrorRelease = 4.0;
+/** @brief s: the energies it weighs are smoothed over this long. */
+constexpr double MirrorSmooth = 0.2;
+/** @brief s: what the voices put in is held this long (and falls slowly after). */
+constexpr double MirrorHold = 12.0;
 
 void Engine::stepRooms( float dt )
 {
@@ -3830,7 +3855,14 @@ void Engine::stepRooms( float dt )
             {
                 const float mirror = cur( ParamIdE::MIRROR );
                 W.m_mirrorOn = mirror > 0.0f ? 1 : 0;
-                W.m_mirrorGain = MirrorShare * mirror;
+                W.m_mirrorGain = MirrorShare * mirror * m_mirrorGovern;
+                {   // the recording's high pass (RBJ, Q 0.707) at the room's rate
+                    const double w = 2.0 * 3.14159265358979 * MirrorHighPass * RoomDecim / m_cfg.m_sampleRate;
+                    const double c = std::cos( w ), al = std::sin( w ) / ( 2.0 * 0.7071067811865476 ), a0 = 1.0 + al;
+                    W.m_mirrorB0 = static_cast<float>( 0.5 * ( 1.0 + c ) / a0 );
+                    W.m_mirrorA1 = static_cast<float>( -2.0 * c / a0 );
+                    W.m_mirrorA2 = static_cast<float>( ( 1.0 - al ) / a0 );
+                }
                 W.m_mirrorLen = std::clamp( static_cast<int>( cur( ParamIdE::MIRROR_TIME ) *
                                                               static_cast<float>( m_cfg.m_sampleRate ) / RoomDecim ),
                                             64, MirrorMax );
@@ -5144,6 +5176,49 @@ void Engine::renderBlock()
         m_roomR[k] = f[23];
         m_phantomL[k] = f[14];   // the phantom layer, heard dry at the end
         m_phantomR[k] = f[15];
+    }
+    for ( int s = 0; s < G; ++s )
+    {   // the wave room's output without its uniform pressure (Phase 36): a one-pole high pass at 10 Hz
+        const size_t k = static_cast<size_t>( s );
+        const float  l = m_roomL[k], r = m_roomR[k];
+        m_roomL[k] = l - m_roomDc[0] + RoomDcPole * m_roomDc[2];
+        m_roomR[k] = r - m_roomDc[1] + RoomDcPole * m_roomDc[3];
+        m_roomDc[0] = l;
+        m_roomDc[1] = r;
+        m_roomDc[2] = m_roomL[k];
+        m_roomDc[3] = m_roomR[k];
+    }
+    {   // The time mirror's governor (MirrorRunaway): the voices' energy and the room's at its ears -- after its high
+        // pass, so its uniform pressure, never heard, does not count -- its level divided out (the air, not the knob);
+        // over the ceiling the mirror's gain goes down within a twentieth of a second, under it back up over seconds.
+        const WaveRoom &W = m_cloud.room();
+        if ( W.m_on && W.m_mirrorOn && W.m_level > 0.0f )
+        {
+            double dry = 0.0, wet = 0.0;
+            for ( int s = 0; s < G; ++s )
+            {
+                const float *f = q + static_cast<size_t>( CloudOutChannels ) * s;
+                const size_t k = static_cast<size_t>( s );
+                dry += static_cast<double>( f[0] ) * f[0] + static_cast<double>( f[1] ) * f[1] +
+                       static_cast<double>( f[2] ) * f[2] + static_cast<double>( f[3] ) * f[3];
+                wet += static_cast<double>( m_roomL[k] ) * m_roomL[k] + static_cast<double>( m_roomR[k] ) * m_roomR[k];
+            }
+            const double blockS = static_cast<double>( G ) / m_cfg.m_sampleRate;
+            const double a = std::exp( -blockS / MirrorSmooth );
+            m_mirrorDrySmooth = a * m_mirrorDrySmooth + ( 1.0 - a ) * dry;
+            m_mirrorDry = std::max( m_mirrorDrySmooth, m_mirrorDry * std::exp( -blockS / MirrorHold ) );
+            m_mirrorWet = a * m_mirrorWet + ( 1.0 - a ) * wet / ( static_cast<double>( W.m_level ) * W.m_level );
+            const bool over = m_mirrorWet > MirrorRunaway * m_mirrorDry;
+            m_mirrorGovern =
+                static_cast<float>( over ? m_mirrorGovern * std::exp( -blockS / MirrorAttack )
+                                         : std::min( 1.0, m_mirrorGovern * std::exp( blockS / MirrorRelease ) ) );
+            m_mirrorGovern = std::max( m_mirrorGovern, 1.0e-4f );   // back up from where it can
+        }
+        else
+        {
+            m_mirrorDry = m_mirrorDrySmooth = m_mirrorWet = 0.0;
+            m_mirrorGovern = 1.0f;
+        }
     }
     renderWreck( m_nearL.data(), m_nearR.data(), G );     // the wreck (Phase 34), into the near plane as the voices
     renderMagneto( m_nearL.data(), m_nearR.data(), G );   // the magnetosphere and the throats (Phase 35), likewise

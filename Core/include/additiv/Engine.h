@@ -1416,8 +1416,13 @@ private:
     float     m_chorusLevel = 0.0f;                                ///< the night chorus's level as it glides
     long long m_chorusCalls = 0;                                   ///< the chorus's calls begun since prepare
     bool      m_chorusWas = false;                                 ///< the chorus called in the last block
-    int       m_mirrorPos = 0;   ///< the time mirror: where in its window the next block begins (the room's samples)
-    int       m_mirrorBuf = 0;   ///< which of its recordings records
+    int       m_mirrorPos = 0;    ///< the time mirror: where in its window the next block begins (the room's samples)
+    int       m_mirrorBuf = 0;    ///< which of its recordings records
+    float     m_roomDc[4] = {};   ///< the wave room's output high pass (Phase 36): last in, left and right; last out
+    double    m_mirrorDrySmooth = 0.0;   ///< the mirror's governor (Phase 36): the voices' energy a block, smoothed
+    double    m_mirrorDry = 0.0;         ///< ... held over the last seconds (MirrorHold), what it weighs by
+    double    m_mirrorWet = 0.0;         ///< ... the room's at its ears, its level divided out, smoothed
+    float     m_mirrorGovern = 1.0f;   ///< the share of its gain the mirror may send back (1 unless it would run away)
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =

@@ -19,6 +19,15 @@ Journeys to take along.
 - **Journey lengths:** the instrument's journey box shows every journey with its length (a pass at the middle of its
   ranges). The timeline under it counts a glide within its step, as a journey plays it -- it drew the glides ahead of
   the stays, and every journey looked longer by them (Whole Night - Plasma & Voice: 7:54:00 instead of 6:24:00).
+- **The bank levelled as it is played:** every preset's level measured as the panel plays it -- its conductor on, the
+  chord at once, 45 seconds for the halls, the floor and the conductor to build up -- instead of a fixed chord with the
+  conductor off, which put presets up to 6 dB (in places 25) above or below their neighbours. The loudest were
+  measured at their own gain, past the output's soft clip, which had made them seem quieter than they play (by up to
+  10 dB). Only the master gain moves; the bank's middle stays where it was.
+- **Time Mirror fixed:** with the conductor playing, 44 of the 48 mirror presets in a wave room rose to full scale
+  within a minute -- the room's uniform pressure, never heard, sent back on every step of the window. The mirror's
+  recording and the room's output are high-passed now, and a governor takes the mirror back should a room ring on.
+  The mirror is subtler for it: much of its swell was that pressure.
 
 ## 0.25.0 (16.10.2026, not released)
 

@@ -567,6 +567,34 @@ so wie sie gespielt wird (Dirigent an).
   der `JourneyPlayer` zählt sie darin („the glide is part of the stay“) -- jede Reise sah um ihre Glides länger aus
   (Whole Night - Plasma & Voice 7:54:00 statt 6:24:00), die Stundenmarken lagen falsch. Jetzt ist ein Schritt so breit
   wie seine Verweilzeit, die Rampe liegt in seinem Anfang.
+- **36d Die Bank, wie sie gespielt wird [M]:** `additiv_presets --played` misst ein Preset, wie das Panel es spielt --
+  Dirigent an, wo es einen hat, der Akkord sofort (`requestFill`), 45 s, damit Hallen, Boden und die Dichte des
+  Dirigenten stehen (bei 16 s unterschied sich der gespielte Pegel kaum vom Akkord, bei 48 s um bis zu +11,7 dB) --,
+  die lautesten drei Sekunden K-gewichtet (LUFS). Gespielt minus Akkord: Median +1,2 dB, 5 .. 95 % -2,6 .. +6,4 dB,
+  bis +25 dB -- so viel lauter oder leiser als ihre Nachbarn klangen Presets. `make_presets.py` liest
+  `levels_played.json`, Ziel -16,8 LUFS (der Median der Verstärkungen bleibt, wo er war); `grow.py` misst seine Kinder
+  ebenso. Nur `master_gain` ändert sich (16349 Zeilen); 35 Presets stehen an der Decke von +12 dB (gespielt unter
+  -28,8 LUFS: Glocken, Glas, spärliche Ringe), bis 3,7 dB unter dem Ziel; die Untergrenze liegt jetzt bei -30 dB statt
+  -18 (93 Presets brauchen weniger als -18, das lauteste -29,5).
+  **Gefunden [M]:** bei 0 dB Master liefen die lautesten Presets in den Softclip am Ausgang (x - 4/27 x³, ab 1,5 flach)
+  und maßen zu leise: Droning Flutter, gemessen +0,2 LUFS, spielte eingepegelt mit -10,8 statt -16,8. `--own-gain` misst
+  ein Preset bei seinem eigenen Gain und schreibt den Pegel wie bei 0 dB; die 3308 über -12 LUFS so nachgemessen (440
+  lagen mehr als 1 dB daneben, 80 mehr als 3, Tidal Machair 10), die 170 um mehr als 2 dB verschobenen ein zweites Mal
+  bei ihrem neuen Gain (Median 0,05 dB, fünf über 1 dB: Zufallsereignisse wie Lost Transmission). Nachgeprüft mit
+  einer eigenen Messung (`empy_render --fill` 45 s, K-gewichtet, die lautesten drei Sekunden): acht frühere Ausreißer
+  -16,6 .. -17,2 LUFS.
+  **Gefunden:** 44 der 48 Presets mit Zeitspiegel und Wellenraum liefen gespielt binnen einer Minute an die
+  Vollaussteuerung (Polished Sanctuary +3,5 LUFS bei 0 dB Master). Der Wellenraum (FDTD) hat eine ungedämpfte Mode:
+  den gleichförmigen Druck, der nie gehört wird; der Spiegel nahm ihn auf und sandte ihn in jedem Schritt des Fensters
+  zurück, so stieg er ohne Ende und nahm dem Ausgang den Platz. Jetzt ein Hochpass 30 Hz (RBJ, zweiter Ordnung, bei der
+  Raumrate) auf der Aufnahme jeder Spiegelzelle, ein Gleichanteil-Filter 10 Hz am Ausgang des Raums (`RoomDcPole`) und
+  dahinter ein Regler (`MirrorRunaway` 0,005: die Energie des Raums gegen die der Stimmen, die über 12 s gehalten wird;
+  darüber nimmt er den Spiegel in 0,05 s zurück, gibt ihn über 4 s wieder) -- eine kleine Kammer mit harten Wänden ließ
+  noch eine Mode bei 2 kHz davonlaufen (Glassed Hermitage). `MirrorShare` bleibt 0,08 (über 0,2 wird es im Hörbereich
+  instabil). Selbsttest 111: Dirigent, Wellenraum mit Absorption 0,1, Spiegel voll -- nach 40 s -19,5 dBFS wie ohne
+  Spiegel; 98 hört den Spiegel noch (-54,3 gegen -70 dBFS ohne). Die 993 Presets mit Wellenraum neu gemessen: 142
+  bewegten sich um mehr als 1 dB, die Ausreißer des Spiegels um bis zu -23 dB, einige um bis zu +8 dB. Der Spiegel
+  klingt damit zurückhaltender: was gespielt anschwoll, war zum großen Teil dieser Druck.
 
 ## Phase 35: Plasma und Stimme (gebaut, 16.10.2026, 0.25.0)
 
@@ -753,6 +781,7 @@ Wachsen und die neue Einpegelung der ganzen Bank.
   hören, im nächsten rückwärts zurücksenden -- die Wellen laufen zurück, woher sie kamen (Finks Zeitumkehrspiegel),
   jeder Klang kehrt als Anschwellen zu seiner Quelle zurück. **Gefunden [M]:** die erste Fassung nahm ihr eigenes
   Zurücksenden mit auf und schaukelte sich auf (-3,7 dBFS); jetzt hört der Spiegel nur im ersten Takt, Anteil 0,08.
+  (Phase 36d: auch so lief er gespielt davon -- der gleichförmige Druck des Raums; Hochpass und Regler.)
 - **31c MAP-Elites (`Tools/presets/grow.py`):** Mouret und Clune. Das Archiv (`work/grow/archive.json`) hält je Zelle
   der Karte (Helligkeit × Bewegung, wie `make_map`) den besten Klang; Kinder entstehen durch Mutation weniger Regler
   (in einem Viertel der Fälle mit einer anderen Elite gekreuzt, auch die Matrix), `additiv_presets --evaluate` misst

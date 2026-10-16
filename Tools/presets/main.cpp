@@ -5,7 +5,18 @@
  *
   *     additiv_presets [--from N] [--to M] [--names FILE] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
  *                     [--describe FILE] [--sensitivity FILE] [--register FILE [--step K] [--set "key=value;..."]]
- *                     [--evaluate FILE --out FILE] [--jobs N]
+ *                     [--evaluate FILE --out FILE] [--jobs N] [--played] [--own-gain]
+ *
+ * --played (16.10.2026) measures the level as the panel plays the preset: its conductor on when it has one, the chord
+ * filled at once (requestFill), the engine seeded as always -- so the foundation, the floor and the conductor's
+ * register count. Presets without a conductor play the chord as before. With --evaluate the level is the played one
+ * and the descriptors still the chord's (the map describes the timbre, not the conductor's dice), the played render at
+ * least PlayedSeconds long; with the levels it is meant without --describe (and --seconds 45: the bank was measured so).
+ *
+ * --own-gain (16.10.2026) measures a preset at its own master gain, not at 0 dB, and writes its level as at 0 dB (the
+ * measured one minus the gain), which is what make_presets.py reads. At 0 dB the loudest presets ran into the soft
+ * clip at the output (x - 4/27 x^3, flat beyond 1.5): measured at +0.2 LUFS, Droning Flutter played at -10.8 instead
+ * of -16.8 once levelled. At the gain the bank gave it, a preset sounds near the target and the clip is out of the way.
  *
  * --evaluate measures any sounds as the presets are measured (Phase 31, for Tools/presets/grow.py): a line a sound,
  * its knobs as "key=value key=value ..." (the others at their defaults), a '|' and its matrix (Modulation.h's text
@@ -33,8 +44,9 @@
  * spectral flatness of the bands). The spectrum is the power of left and right added, never of
  * their sum: decorrelated partials cancel in L+R and would fake motion.
  *
- * Each preset plays the same chord (D3 A3 D4 F#4) with the conductor off, its attack shortened to
- * at most half a second and the master at 0 dB; the level is the RMS of its loudest second.
+ * Each preset plays the same chord (D3 A3 D4 F#4) with the conductor off (or, with --played, as the panel plays it),
+ * its attack shortened to at most half a second and the master at 0 dB; the level is the loudness (LUFS) of its
+ * loudest three seconds.
  * @author Rene Weller
  */
 #include "additiv/Describe.h"
@@ -84,6 +96,10 @@ fs::path repoRoot()
     return fs::current_path();
 }
 
+/** @brief Seconds of a played render at least: long halls, the floor and the conductor's density take about a minute
+ *         to build up (at 16 s the played level hardly differed from the chord's; at 48 s by up to +11.7 dB). */
+constexpr double PlayedSeconds = 45.0;
+
 /**
  * @brief A sound's loudness as a preset's is measured (see the file comment): the chord with the conductor off, the
  *        attack at most half a second, the master at 0 dB; and what it sounds like when asked.
@@ -92,18 +108,22 @@ fs::path repoRoot()
  * @param[in]  seconds  how long it plays
  * @param[out] error    receives why the engine failed
  * @param[out] desc     receives what it sounds like (null: not asked)
+ * @param[in]  played   as the panel plays it: its conductor on when it has one (else the chord, conductor off)
+ * @param[in]  ownGain  at its own master gain, the level given back as at 0 dB (the soft clip kept out); else at 0 dB
  * @return LUFS of the loudest three seconds; NaN on failure
  */
-double measureSound( const float *values, const std::string &mod, double seconds, std::string *error,
-                     Description *desc )
+double measureSound( const float *values, const std::string &mod, double seconds, std::string *error, Description *desc,
+                     bool played, bool ownGain = false )
 {
     Engine e;
     e.setRealtime( false );
     for ( int i = 0; i < NumParams; ++i ) e.setParam( static_cast<ParamIdE>( i ), values[i] );
     e.setModText( mod );
-    e.setParam( ParamIdE::BRAIN_ON, 0.0f );
+    const bool conducted = played && values[static_cast<int>( ParamIdE::BRAIN_ON )] >= 0.5f;
+    e.setParam( ParamIdE::BRAIN_ON, conducted ? 1.0f : 0.0f );
     e.setParam( ParamIdE::ATTACK, std::min( values[static_cast<int>( ParamIdE::ATTACK )], 0.5f ) );
-    e.setParam( ParamIdE::MASTER_GAIN, 0.0f );
+    const float gain = ownGain ? values[static_cast<int>( ParamIdE::MASTER_GAIN )] : 0.0f;
+    e.setParam( ParamIdE::MASTER_GAIN, gain );
     EngineConfig c;
     c.m_maxHostBlock = 512;
     c.m_realtimeGpuClass = false;
@@ -111,7 +131,10 @@ double measureSound( const float *values, const std::string &mod, double seconds
     c.m_sunClock = DaySun;
     e.setLocation( 52.52, 13.40 );
     if ( !e.prepare( c, error ) ) return std::nan( "" );
-    for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
+    if ( conducted )
+        e.requestFill();   // as a preset chosen on the panel: the conductor's chord within seconds
+    else
+        for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
     // The loudest three seconds, K-weighted (ITU-R BS.1770's short-term loudness, LUFS): a pad's sustain, a bell's
     // strike -- what a listener levels by. (The last eight seconds measured the bells' and the glass's decay, 20 dB
     // under their strike. The loudest second's RMS weighed a wave room's bass as much as a rain's glints, which the ear
@@ -170,7 +193,7 @@ double measureSound( const float *values, const std::string &mod, double seconds
         }
     }
     if ( desc != nullptr ) *desc = describe( keptL, keptR, c.m_sampleRate );
-    return -0.691 + 10.0 * std::log10( std::max( loudest, 1e-20 ) );
+    return -0.691 + 10.0 * std::log10( std::max( loudest, 1e-20 ) ) - gain;
 }
 
 /**
@@ -180,16 +203,19 @@ double measureSound( const float *values, const std::string &mod, double seconds
  * @param[out] error      receives why the engine failed
  * @param[out] desc       receives what it sounds like (null: not asked)
  * @param[in]  overrides  knobs set after the preset's (the sensitivity mode)
+ * @param[in]  played     as the panel plays it (measureSound)
+ * @param[in]  ownGain    at its own master gain, the level as at 0 dB (measureSound)
  * @return LUFS of the loudest three seconds; NaN on failure
  */
 double measure( int index, double seconds, std::string *error, Description *desc,
-                const std::vector<std::pair<ParamIdE, float>> &overrides = {} )
+                const std::vector<std::pair<ParamIdE, float>> &overrides = {}, bool played = false,
+                bool ownGain = false )
 {
     float       values[NumParams];
     std::string mod;
     presetValues( index, values, &mod );
     for ( const auto &[id, v] : overrides ) values[static_cast<int>( id )] = v;
-    return measureSound( values, mod, seconds, error, desc );
+    return measureSound( values, mod, seconds, error, desc, played, ownGain );
 }
 
 /** @brief The knobs the sensitivity mode nudges: those that shape the sound and that a preset sets. */
@@ -445,6 +471,8 @@ int main( int argc, char **argv )
     std::string namesFile, describeFile, sensitivityFile, registerFile, setText, evaluateFile;
     bool        checkNudges = false;
     int         step = 1, jobs = 10;
+    bool        played = false;    // --played: the level as the panel plays it
+    bool        ownGain = false;   // --own-gain: at the preset's own master gain, the level as at 0 dB
     double      seconds = -1.0;
     fs::path    out = repoRoot() / "work" / "presets" / "levels.json";
     for ( int i = 1; i < argc; ++i )
@@ -477,12 +505,16 @@ int main( int argc, char **argv )
             jobs = std::clamp( std::atoi( argv[++i] ), 1, 16 );
         else if ( a == "--evaluate" && has )
             evaluateFile = argv[++i];
+        else if ( a == "--played" )
+            played = true;
+        else if ( a == "--own-gain" )
+            ownGain = true;
         else
         {
             std::fprintf(
                 stderr,
                 "additiv_presets [--from N] [--to M] [--step K] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE] "
-                "[--register FILE [--set \"key=value;...\"]] [--evaluate FILE] [--jobs N]\n" );
+                "[--register FILE [--set \"key=value;...\"]] [--evaluate FILE] [--jobs N] [--played] [--own-gain]\n" );
             return 1;
         }
     }
@@ -515,9 +547,11 @@ int main( int argc, char **argv )
                         values[static_cast<int>( d->m_id )] =
                             std::clamp( static_cast<float>( std::atof( kv.c_str() + eq + 1 ) ), d->m_min, d->m_max );
                 }
-                std::string error;
-                lufs[k] = measureSound( values, bar == std::string::npos ? std::string() : line.substr( bar + 1 ),
-                                        seconds, &error, &descs[k] );
+                std::string       error;
+                const std::string mod = bar == std::string::npos ? std::string() : line.substr( bar + 1 );
+                lufs[k] = measureSound( values, mod, seconds, &error, &descs[k], false );
+                if ( played && !std::isnan( lufs[k] ) )   // the level as played; the descriptors the chord's
+                    lufs[k] = measureSound( values, mod, std::max( seconds, PlayedSeconds ), &error, nullptr, true );
             }
         };
         {
@@ -605,7 +639,8 @@ int main( int argc, char **argv )
             const int    i = which[k];
             std::string  error;
             Description  desc;
-            const double db = measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc );
+            const double db =
+                measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc, {}, played, ownGain );
             const std::lock_guard<std::mutex> hold( lock );
             if ( std::isnan( db ) )
             {

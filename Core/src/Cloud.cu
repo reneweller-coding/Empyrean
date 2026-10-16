@@ -785,7 +785,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dChorus, sizeof( float4 ) * 4 * ChorusCallers ), "cudaMalloc chorus", error ) &&
            ok( cudaMalloc( &m.m_dChorusScratch, sizeof( float ) * 4 * static_cast<size_t>( n ) * ChorusBlocks ),
                "cudaMalloc chorus", error ) &&
-           ok( cudaMalloc( &m.m_dMirror, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ) ),
+           ok( cudaMalloc( &m.m_dMirror, sizeof( float ) * MirrorFloats ),
                "cudaMalloc mirror", error ) &&
            ok( cudaMalloc( &m.m_dStarModes, sizeof( float4 ) * StarModes ), "cudaMalloc star", error ) &&
            ok( cudaMalloc( &m.m_dStar, sizeof( float4 ) * 2 * StarModes ), "cudaMalloc star", error ) &&
@@ -924,7 +924,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         ok( cudaMemsetAsync( m.m_dChorusScratch, 0, sizeof( float ) * 4 * static_cast<size_t>( n ) * ChorusBlocks,
                              m.m_stream ),
             "cudaMemsetAsync", error ) &&
-        ok( cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ),
+        ok( cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * MirrorFloats,
                              m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dStarModes, 0, sizeof( float4 ) * StarModes, m.m_stream ), "cudaMemsetAsync",
@@ -1745,7 +1745,7 @@ void CloudEngine::launch()
         hdr->m_room.m_mirrorBuf &= 1;
         hdr->m_room.m_mirrorGain = std::max( m.m_room.m_mirrorGain, 0.0f );
         if ( mirror && !m.m_mirrorWas )
-            cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ),
+            cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * MirrorFloats,
                              m.m_stream );
         m.m_mirrorWas = mirror;
     }

@@ -5176,6 +5176,40 @@ int main( int argc, char **argv )
                     subOn, subOff, cI, cU ) );
     }
 
+    // 111. The time mirror stays bounded (Phase 36): the conductor playing into a wave room whose walls take little,
+    //      the mirror at its fullest -- the loop that drove 44 of 48 mirror presets to full scale within a minute --
+    //      sounds after 40 seconds within a few dB of the same room without the mirror, never near full scale.
+    if ( from <= 111 )
+    {
+        auto play = [&]( float mirror, double &early, double &late, double &peakDb )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::WAVE_ROOM, 1.0f );
+            e.setParam( ParamIdE::ROOM_ABSORB, 0.1f );
+            e.setParam( ParamIdE::MIRROR, mirror );
+            e.setParam( ParamIdE::MIRROR_TIME, 2.0f );
+            if ( !openOffline( e, true, 111 ) ) return false;
+            e.requestFill();
+            const std::vector<float> a = render( e, 10.0 );
+            (void)render( e, 30.0 );
+            const std::vector<float> b = render( e, 10.0 );
+            early = rmsDb( a, 0, a.size() / 2 );
+            late = rmsDb( b, 0, b.size() / 2 );
+            double peak = 0.0;
+            for ( float v : b ) peak = std::max( peak, static_cast<double>( std::fabs( v ) ) );
+            peakDb = 20.0 * std::log10( std::max( peak, 1e-12 ) );
+            return true;
+        };
+        double     early = -200.0, late = -200.0, peak = 0.0, early0 = -200.0, late0 = -200.0, peak0 = 0.0;
+        const bool ran = play( 1.0f, early, late, peak ) && play( 0.0f, early0, late0, peak0 );
+        check( ran && std::fabs( late - late0 ) < 6.0 && late < early + 6.0 && peak < -3.0,
+               "time mirror: bounded with the conductor playing",
+               fmt( "with the mirror %.1f dBFS the first 10 s, %.1f at 40 .. 50 s (peak %.1f); without %.1f, %.1f",
+                    early, late, peak, early0, late0 ) );
+    }
+
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }

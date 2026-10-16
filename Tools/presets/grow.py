@@ -8,8 +8,8 @@ much the spectrum changes) --, each cell holding its best sound, its elite (Mour
 spaces by mapping elites", 2015). It begins with the factory bank, placed by its measured descriptors
 (work/presets/descriptors.json). Every generation takes B elites at random, mutates each (one to a few knobs moved in
 their own scale, now and then crossed with another elite, matrices too), renders and measures the children as the
-presets are measured (additiv_presets --evaluate: the same chord, the loudness in LUFS and the four descriptors), and
-keeps a child where its cell is empty or it is better than the elite there.
+presets are measured (additiv_presets --evaluate --played: the four descriptors from the same chord, the loudness in
+LUFS as the panel plays it, conductor on), and keeps a child where its cell is empty or it is better than the elite there.
 
 Better means: nearer the player's stars (the favourites in %APPDATA%/Empyrean/player.settings -- the sounds the player
 likes), farther from every factory preset (new), and neither silent nor at the edge of clipping. Over the generations
@@ -152,8 +152,10 @@ def evaluate(lines, seconds, jobs):
     WORK.mkdir(parents=True, exist_ok=True)
     batch, result = WORK / "batch.txt", WORK / "batch.json"
     batch.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    # --played: the level as the panel plays a preset, conductor on, as the bank is levelled since 0.26.0 (its render
+    # at least 45 s: the halls and the conductor take a minute to build up); the descriptors still the chord's.
     subprocess.run([str(BIN / "additiv_presets.exe"), "--evaluate", str(batch), "--out", str(result), "--jobs",
-                    str(jobs), "--seconds", str(seconds)], check=True, capture_output=True)
+                    str(jobs), "--seconds", str(seconds), "--played"], check=True, capture_output=True)
     return json.loads(result.read_text(encoding="utf-8"))
 
 

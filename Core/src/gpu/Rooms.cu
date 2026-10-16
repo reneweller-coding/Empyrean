@@ -234,7 +234,8 @@ __device__ __forceinline__ int roomNow( const BlockHeader *hdr, int step )
  * @param[in,out] field   three fields of RoomCells
  * @param[in]     in      per source the block's samples at the room's rate
   * @param[out]    ears    two rows (left, right) of the block's samples at the room's rate
-  * @param[in,out] mirror  the time mirror's recording, RoomMirrors cells of MirrorMax samples each (Phase 31)
+  * @param[in,out] mirror  the time mirror's recording, RoomMirrors cells of MirrorMax samples each (Phase 31), then
+  *                        each cell's high pass state (Phase 36)
  */
 __global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, const float *in, float *ears,
                                 float *mirror )
@@ -281,9 +282,19 @@ __global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, 
             for ( int m = 0; m < RoomMirrors; ++m )
                 if ( W.m_mirror[m] == idx )
                 {
+                    // What the cell hears, high-passed at 30 Hz (Phase 36), every step: the room keeps a pressure
+                    // that does not change (its uniform mode is undamped), and sent back on every step of a window
+                    // it rose without end -- a DC offset at full scale within a minute.
+                    float *st = mirror + static_cast<size_t>( RoomMirrors ) * MirrorMax + static_cast<size_t>( m ) * 4;
+                    const float y =
+                        W.m_mirrorB0 * ( v - 2.0f * st[0] + st[1] ) - W.m_mirrorA1 * st[2] - W.m_mirrorA2 * st[3];
+                    st[1] = st[0];
+                    st[0] = v;
+                    st[3] = st[2];
+                    st[2] = y;
                     float *mine = mirror + static_cast<size_t>( m ) * MirrorMax;
                     if ( stroke == 0 )
-                        mine[pos] = v;
+                        mine[pos] = y;
                     else
                         v += W.m_mirrorGain * mine[W.m_mirrorLen - 1 - pos];
                 }

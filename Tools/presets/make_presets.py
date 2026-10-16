@@ -26,10 +26,17 @@ Then the swarms and currents (Phase 16), the halls and orbits (Phase 17), and th
 pile, subharmonics pumped from below, grains, the horizon and breathers -- sixteen groups, and the new
 means in the groups before where they fit, drawn after everything else (the conductor's floor too).
 
-Levelling: Tools/presets (additiv_presets) renders every preset and writes work/presets/levels.json;
-run this script again and every preset's master_gain brings it to the bank's common level.
+Levelling: Tools/presets (additiv_presets) renders every preset and writes its loudness; run this script again and
+every preset's master_gain brings it to the bank's common level. Since 0.26.0 (16.10.2026) the level is the one heard
+as the panel plays a preset -- its conductor on, the chord filled at once, 45 seconds for the halls, the floor and the
+conductor's density to build up (additiv_presets --played --seconds 45 --jobs 16, 6 hours for the bank) --, not the
+fixed chord with the conductor off: played minus chord spread -2.6 .. +6.4 dB (5 .. 95 %), up to +25 dB, so presets
+sounded up to that much louder or softer than their neighbours. TARGET_DB keeps the bank's median gain where it was.
 
-    python Tools/presets/make_presets.py            # the bank, levelled if levels.json is there
+    additiv_presets --played --seconds 45 --jobs 16 --out work/presets/levels_played.json
+    # then the loud ones (above -12 LUFS at 0 dB) again at the gain this script gave them, the soft clip out of the way
+    additiv_presets --played --own-gain --seconds 45 --jobs 16 --names LOUD.txt --out work/presets/levels_played.json
+    python Tools/presets/make_presets.py            # the bank, levelled if the levels are there
 """
 import json
 import pathlib
@@ -37,8 +44,10 @@ import random
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "Core" / "src" / "Presets.inc"
-LEVELS = ROOT / "work" / "presets" / "levels.json"
-TARGET_DB = -18.0   # the bank's common loudness for the measuring chord (LUFS, ITU-R BS.1770)
+LEVELS = ROOT / "work" / "presets" / "levels_played.json"
+# The bank's common loudness as played (LUFS, ITU-R BS.1770, the loudest three seconds): -18.0 for the measuring chord
+# until 0.26.0; -16.8 as played keeps the median gain (the played level's median is 1.2 dB above the chord's).
+TARGET_DB = -16.8
 
 # Choice indices, in the order of the tables in Core/src/Params.cpp.
 SCALE = {"12-TET": 0, "JI Major": 1, "JI Minor": 2, "JI 7-limit": 3, "Pythagorean": 4, "JI Pentatonic": 5, "Harmonic": 6,
@@ -4663,7 +4672,7 @@ def build():
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
             if name in levels:   # the measured level, brought to the common one (at most 18 dB either way)
-                r.set("master_gain", f(max(-18.0, min(12.0, TARGET_DB - levels[name])), 2))
+                r.set("master_gain", f(max(-30.0, min(12.0, TARGET_DB - levels[name])), 2))
             bank.append((name, g, " ".join(f"{k}={v}" for k, v in r.p.items()), ";".join(r.rows)))
     all_names = [name for name, *_ in bank]
     assert len(set(all_names)) == len(all_names), "preset names repeat"

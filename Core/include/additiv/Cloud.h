@@ -171,6 +171,8 @@ constexpr int ChorusSpecies = 8;   ///< their kinds
 constexpr int ChorusPitches = 64;   ///< pitches the callers' carriers may be tuned to
 constexpr int RoomMirrors = 64;     ///< the time mirror's cells round the listener in the wave room
 constexpr int MirrorMax = 36864;    ///< samples at the room's rate a mirror cell records (6 s at 6 kHz)
+/** @brief Floats of the mirror's buffer: every cell's recording, then every cell's high pass state (x1, x2, y1, y2). */
+constexpr size_t MirrorFloats = static_cast<size_t>( RoomMirrors ) * MirrorMax + static_cast<size_t>( RoomMirrors ) * 4;
 
 /**
  * @brief How Streams parts a voice's partials into streams (Phase 30): each stream moves with a vibrato and a tremolo
@@ -780,9 +782,9 @@ struct WaveRoom
     int   m_mirrorPos = 0;              ///< where in the window this block's first step is
     int   m_mirrorBuf = 0;              ///< its stroke at this block's first step: 0 listening, 1 sending back reversed
     float m_mirrorGain = 0.0f;          ///< how loud a cell sends the reversed field back in
-    float m_pad5 = 0.0f;                ///< keeps the struct 16-byte aligned
-    float m_pad6 = 0.0f;                ///< likewise
-    float m_pad7 = 0.0f;                ///< likewise
+    float m_mirrorB0 = 1.0f;            ///< the recording's high pass (Phase 36): b0 (b1 = -2 b0, b2 = b0), a0 = 1
+    float m_mirrorA1 = 0.0f;            ///< ... a1
+    float m_mirrorA2 = 0.0f;            ///< ... a2
     int   m_mirror[RoomMirrors] = {};   ///< the mirror's cells (a ring on the sources' plane)
 };
 static_assert( sizeof( WaveRoom ) % 16 == 0, "WaveRoom rides in the block header" );
