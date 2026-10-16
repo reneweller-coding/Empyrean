@@ -1,5 +1,26 @@
 # Release notes
 
+## 0.22.0 (16.10.2026, not released)
+
+The floor. Measured with the conductor playing, a quarter of the bank had a thin bass: its foundation went through
+formant and band-pass filters, or rain and harps covered it. Now every preset stands on one. 1024 presets.
+
+- **The foundation keeps its depth:** whatever filter the sound goes through, the foundation's fundamental and second
+  harmonic come through it.
+- **Floor** (Conductor): the share of the sound under 150 Hz the foundation holds at the least -- raised slowly, by
+  up to 12 dB, while the rest covers it.
+- **Pedal:** the foundation holds its note while the root moves, for up to three minutes, or for ever on the key's
+  tonic: an organ point.
+- **Pressure:** a share of the foundation's partials a beat above the rest -- the floor pulses slowly, as two organ
+  pipes a hair apart do. Pressure Rate.
+- **Sub Octave, Fifth, Breath:** a voice an octave under the foundation, one a fifth above it, swelling and ebbing.
+- **Every preset has a floor:** a foundation wherever the conductor plays (2387 presets that floated got one) and
+  Floor's share; nothing else changed.
+- **13312 presets:** sixteen new groups of deep floors for dark ambient (Organ Points, Pressure Drones, Sub Abysses,
+  Fifth Pillars, Breathing Floors, Cathedral Depths, Abyssal Plains, Black Monoliths, Iron Pedals, Tectonic Hum,
+  Cavern Drones, Undertow, Low Chapels, Night Pressure, Deep Bells, Floors & Storms); 432 journeys, sixteen whole
+  nights. The Nocturnes' "Nachtmusik" presets are now "Small-Hours Air".
+
 ## 0.21.0 (16.10.2026, not released)
 
 A night chorus of insects and frogs, a time-reversal mirror in the wave room, a map that grows itself, and the whole

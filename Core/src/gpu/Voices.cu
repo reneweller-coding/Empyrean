@@ -1092,6 +1092,10 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                     ( isSub ? hr : partialRatio( h, cv.m_inharmonic, cv.m_stretch, cv.m_horizon, cv.m_horizonRatio ) ) *
                     exp2f( z * sigma * ( 1.0f / 1200.0f ) ) +
                 cv.m_shift;
+            // Pressure (Phase 32): a share of the members a beat above the rest, so the floor beats slowly -- as two
+            // pipes a hair apart, each harmonic h times as fast.
+            if ( cv.m_beatHz > 0.0f && !isSub && hash01( seed, up, 64 ) < cv.m_beatShare )
+                centre += cv.m_beatHz * static_cast<float>( h );
             drift =
                 cv.m_drift *
                 ( 0.65f * slowSine( cv.m_driftRate * ( 0.5f + hash01( seed, up, 2 ) ), tp, hash01( seed, up, 3 ) ) +
@@ -1427,6 +1431,13 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
             colour *= ( 1.0f - K.m_depth * ( 0.5f - 0.5f * __cosf( 6.2831853f * x ) ) ) * K.m_makeup;
         }
         if ( !isAir ) colour *= presenceGain( f, cv.m_presenceDb, dist ) * lowCutGain( f, cv.m_lowCut );
+        // The floor (Phase 32): under floorHz nothing the voice is filtered through takes its depth -- a formant,
+        // a band pass, a low cut --, which comes back over the octave above; Floor's gain on it.
+        if ( cv.m_floorHz > 0.0f && !isAir )
+        {
+            const float keep = fminf( fmaxf( 2.0f - f / cv.m_floorHz, 0.0f ), 1.0f );
+            colour = fmaxf( colour, keep ) * ( 1.0f + ( cv.m_floorGain - 1.0f ) * keep );   // and Floor raises it
+        }
         // The voice's level, as late as this partial's clock (the dispersion), from the ring.
         const float level = lateBy > 0.0f ? gainAgo( ring + static_cast<size_t>( v ) * GainRing, hdr->m_blockIndex,
                                                      lateBy * fs / static_cast<float>( n ) )

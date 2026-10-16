@@ -468,6 +468,13 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::CHORUS_TUNE, "chorus_tune", "Tuned Calls", "Night Chorus", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::MIRROR, "mirror", "Time Mirror", "Time Mirror", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::MIRROR_TIME, "mirror_time", "Mirror Window", "Time Mirror", 1.f, 6.f, 4.f, 1.f, "s" ),
+    F( ParamIdE::FLOOR, "floor", "Floor", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::PEDAL, "pedal", "Pedal", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::PRESSURE, "pressure", "Pressure", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::PRESSURE_RATE, "pressure_rate", "Pressure Rate", "Floor", 0.03f, 0.5f, 0.12f, 0.5f, "Hz" ),
+    F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::FLOOR_FIFTH, "floor_fifth", "Fifth", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::FLOOR_BREATH, "floor_breath", "Breath", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
 } };
 
 }   // namespace

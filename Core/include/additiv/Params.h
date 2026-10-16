@@ -361,7 +361,15 @@ enum class ParamIdE : int
     CHORUS_TUNE,     ///< 0 .. 1: the callers' carriers pulled to the scale's pitches
     MIRROR,        ///< 0 .. 1: a time-reversal mirror round you in the wave room: what it heard runs back to its source
     MIRROR_TIME,   ///< s: the mirror's window (it listens for one, plays it back reversed during the next)
-    COUNT          ///< number of parameters
+    // Phase 32 (16.10.2026): the floor
+    FLOOR,   ///< 0 .. 1: the share of the sound under 150 Hz the foundation holds at the least (raised by up to 12 dB)
+    PEDAL,   ///< 0 .. 1: the foundation holds its note against the root's moves (up to 3 min; 1: on the key's tonic)
+    PRESSURE,        ///< 0 .. 1: a share of the foundation's partials a beat above the rest: the floor pulses slowly
+    PRESSURE_RATE,   ///< Hz: that beat at the foundation's fundamental (its harmonics beat faster)
+    FLOOR_SUB,       ///< 0 .. 1: a foundation voice an octave under the foundation (its level against it)
+    FLOOR_FIFTH,     ///< 0 .. 1: one a fifth above it (the chord then begins an octave above the foundation)
+    FLOOR_BREATH,    ///< 0 .. 1: the sub octave and the fifth swell and ebb slowly, each in its own time
+    COUNT            ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table

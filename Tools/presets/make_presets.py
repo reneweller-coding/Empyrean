@@ -73,7 +73,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Aeolian Harps", "Harp Gardens", "Distant Storms", "Summer Storms", "Rolling Thunder", "Singing Lakes", "Frozen Nights", "Thin Ice",
                     "Twin Streams", "Fusion Choirs", "Parting Clouds", "Endless Ritardando", "Endless Accelerando", "Night Arcs", "Inside the Cloud", "Night Weather",
           "Cricket Meadows", "Katydid Treetops", "Frog Ponds", "Summer Nights", "Warm Evenings", "Cool Nights", "Answering Choirs", "Tuned Choruses",
-          "Time Mirrors", "Reverse Halls", "Mirror Chapels", "Converging Halos", "Storm Choruses", "Lake Nights", "Night Concerts", "Nocturnes"]
+                    "Time Mirrors", "Reverse Halls", "Mirror Chapels", "Converging Halos", "Storm Choruses", "Lake Nights", "Night Concerts", "Nocturnes",
+          "Organ Points", "Pressure Drones", "Sub Abysses", "Fifth Pillars", "Breathing Floors", "Cathedral Depths", "Abyssal Plains", "Black Monoliths",
+          "Iron Pedals", "Tectonic Hum", "Cavern Drones", "Undertow", "Low Chapels", "Night Pressure", "Deep Bells", "Floors & Storms"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -468,8 +470,54 @@ NAMES = {
                         "Dreaming-Night"],
                        ["Concert", "Serenade", "Recital", "Soiree", "Vigil Song", "Night Music", "Evensong", "Matins"]),
     "Nocturnes": (["Velvet-Dark", "Midnight-Blue", "Ink", "Indigo", "Sable", "Obsidian", "Raven", "Coal"],
-                  ["Nocturne", "Night Piece", "Notturno", "Nachtmusik", "Night Song", "Lullaby Night", "Dark Hymn",
+                                    ["Nocturne", "Night Piece", "Notturno", "Small-Hours Air", "Night Song", "Lullaby Night", "Dark Hymn",
                    "Night Canticle"]),
+    "Organ Points": (["Pedal-Held", "Unmoving", "Tonic", "Grounded", "Anchored", "Founded", "Steadfast", "Moored"],
+                     ["Diapason", "Bourdon", "Pedalboard", "Subbass", "Contra Bourdon", "Open Wood", "Pipe Chamber",
+                      "Swell Box"]),
+    "Pressure Drones": (["Throbbing", "Pressing", "Low-Pulsing", "Heaving", "Labouring", "Weighted", "Compressed",
+                         "Bearing"],
+                        ["Bulkhead", "Caisson", "Ballast", "Depth Gauge", "Pressure Hull", "Diving Bell", "Bathysphere",
+                         "Sump"]),
+    "Sub Abysses": (["Bottomless", "Unsounded", "Sunken", "Abyssal", "Hadal", "Unlit", "Benthic", "Plunging"],
+                    ["Trench", "Abyss", "Chasm", "Sinkhole", "Hadal Zone", "Deep", "Gulf", "Pit"]),
+    "Fifth Pillars": (["Columned", "Twin-Pillared", "Fifth-Built", "Upright", "Load-Bearing", "Monumental", "Hewn",
+                       "Plinthed"],
+                      ["Pillar", "Pylon", "Obelisk", "Colonnade", "Buttress", "Plinth", "Architrave", "Pier"]),
+    "Breathing Floors": (["Breathing", "Slow-Heaving", "Tidal", "Inhaling", "Exhaling", "Lung-Slow", "Deep-Sighing",
+                          "Rising-Falling"],
+                         ["Floorboard", "Bedrock", "Undercroft", "Groundswell", "Seabed", "Lowland Floor", "Hearthstone",
+                          "Foundation Stone"]),
+    "Cathedral Depths": (["Vaulted", "Nave-Deep", "Cloistered", "Crypt-Cold", "Apsidal", "Basilican", "Choir-Deep",
+                          "Transept-Wide"],
+                         ["Crypt", "Ossuary", "Nave", "Reliquary", "Chancel", "Sepulchre", "Vault Below", "Catacomb"]),
+    "Abyssal Plains": (["Silted", "Lightless", "Still-Water", "Sediment", "Cold-Seep", "Manganese", "Ooze-Laid",
+                        "Pelagic"],
+                       ["Plain", "Basin", "Seafloor", "Mud Flat", "Nodule Field", "Abyssal Flat", "Silt Bed", "Ooze"]),
+    "Black Monoliths": (["Obsidian-Black", "Basalt", "Jet", "Monolithic", "Lightless-Black", "Pitch", "Onyx",
+                         "Graphite"],
+                        ["Monolith", "Menhir", "Slab", "Stele", "Megalith", "Dolmen", "Cairn", "Standing Stone"]),
+    "Iron Pedals": (["Iron", "Wrought", "Cast-Iron", "Forged", "Rusted", "Riveted", "Hammered", "Smelted"],
+                    ["Anvil Floor", "Girder", "Foundry", "Boiler", "Rail", "Crucible", "Furnace", "Rivet Hall"]),
+    "Tectonic Hum": (["Tectonic", "Seismic", "Subducting", "Faulted", "Shifting", "Grinding", "Rifting", "Quaking"],
+                     ["Fault", "Rift", "Plate", "Mantle", "Subduction", "Graben", "Crust", "Magma Chamber"]),
+    "Cavern Drones": (["Subterrene", "Dripping", "Stalactite", "Grotto-Deep", "Hollow", "Deep-Echoing", "Karst",
+                       "Limestone"],
+                      ["Cavern", "Grotto", "Cave Hall", "Sump Pool", "Flowstone", "Speleothem", "Chamber", "Sinter Pool"]),
+    "Undertow": (["Ebbing", "Dragging", "Receding", "Pulling", "Backwash", "Rip-Current", "Sinking", "Seaward"],
+                 ["Undertow", "Undercurrent", "Riptide", "Drawback", "Outflow", "Ebb Current", "Backflow", "Sink"]),
+    "Low Chapels": (["Lantern-Lit", "Low-Vaulted", "Hushed-Stone", "Candle-Dim", "Plainsong", "Vesper", "Compline",
+                     "Nocturn"],
+                    ["Chapel", "Oratory", "Chantry", "Hermitage", "Sanctuary", "Shrine", "Vestry", "Cell"]),
+    "Night Pressure": (["Moonless", "Starless", "Overcast", "Blackout", "Small-Hours", "Lights-Out", "Deep-Night",
+                        "Witching-Hour"],
+                       ["Pressure", "Weight", "Heaviness", "Gravity", "Burden", "Density", "Mass", "Load"]),
+    "Deep Bells": (["Drowned", "Slow-Tolled", "Muffled", "Lowered", "Grave", "Bourdon-Struck", "Leaden", "Underwater"],
+                   ["Bell", "Tenor Bell", "Great Bell", "Bell Pit", "Bell Chamber", "Carillon", "Knell", "Passing Bell"]),
+    "Floors & Storms": (["Storm-Floored", "Thunder-Founded", "Gale-Grounded", "Rain-Weighted", "Squall-Pressed",
+                         "Tempest-Deep", "Cloudburst", "Downpour"],
+                        ["Groundstorm", "Undercloud", "Storm Floor", "Rain Cellar", "Thunder Vault", "Squall Line",
+                         "Storm Cellar", "Low Front"]),
 }
 
 
@@ -3706,13 +3754,205 @@ def k_nocturnes(r):
 RECIPES = RECIPES + [k_meadows, k_treetops, k_ponds, k_summer, k_warm, k_cool, k_answering, k_tuned, k_mirrors,
                      k_reverse_halls, k_mirror_chapels, k_converging, k_storm, k_lake, k_concerts, k_nocturnes]
 
+# ---- Phase 32 (16.10.2026): the floor. After the bass audit (the conductor on, the share of the power under 150 Hz):
+# a floor under every preset, and sixteen groups of deep floors -- organ points, pressure, sub octaves, fifths.
+
+
+def set_floor(r, floor=(0.45, 0.8), foundation=(0.6, 0.95), pedal=None, pressure=None, rate=(0.04, 0.3), sub=None,
+              fifth=None, breath=None):
+    """The floor: the conductor on, its foundation, Floor's share, and what stands beside it."""
+    r.set("brain_on", 1)
+    r.set("brain_foundation", f(r.u(*foundation), 2))
+    r.set("floor", f(r.u(*floor), 2))
+    if pedal:
+        r.set("pedal", f(r.u(*pedal), 2))
+    if pressure:
+        r.set("pressure", f(r.u(*pressure), 2))
+        r.set("pressure_rate", f(r.lg(*rate), 3))
+        if float(num(r, "motion_depth", 1.0)) > 0.4:   # the clouds' breathing would cover the beat
+            r.set("motion_depth", f(r.u(0.15, 0.4), 2))
+    if sub:
+        r.set("floor_sub", f(r.u(*sub), 2))
+    if fifth:
+        r.set("floor_fifth", f(r.u(*fifth), 2))
+    if breath:
+        r.set("floor_breath", f(r.u(*breath), 2))
+
+
+def low_register(r, low=(31, 38), high=(55, 67)):
+    """The conductor deep: its register from low to high."""
+    r.set("brain_low", int(r.u(*low)))
+    r.set("brain_high", int(r.u(*high)))
+
+
+P32_POOLS = {
+    "floor": [("lfo3", "floor_sub", (0.1, 0.3)), ("lfo3", "floor_fifth", (0.1, 0.25)), ("night", "pressure", (0.1, 0.3)),
+              ("lfo2", "pressure_rate", (0.1, 0.25)), ("lfo3", "floor", (0.1, 0.25))],
+}
+
+
+def p32_rows(r, count, via_p=0.2):
+    """Rows onto the floor's knobs, their sources set slowly."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P32_POOLS["floor"])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+DARK = ("Dark Drones", "Deep Space", "Organs", "Choirs", "Sleep Concert", "Strings")
+
+
+def u_organ_points(r):
+    based(r, "Organs", "Choirs", "Dark Drones", "Strings")
+    set_floor(r, pedal=(1.0, 1.0), fifth=(0.3, 0.6) if r.rng.random() < 0.4 else None)
+    p32_rows(r, 1)
+
+
+def u_pressure(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Sleep Concert")
+    set_floor(r, pressure=(0.5, 1.0))
+    p32_rows(r, 1)
+
+
+def u_sub_abysses(r):
+    based(r, "Dark Drones", "Deep Space")
+    low_register(r)
+    set_floor(r, sub=(0.6, 1.0), breath=(0.2, 0.7))
+    p32_rows(r, 1)
+
+
+def u_fifth_pillars(r):
+    based(r, "Organs", "Strings", "Choirs", "Bells")
+    set_floor(r, fifth=(0.5, 0.9), sub=(0.2, 0.5) if r.rng.random() < 0.5 else None)
+    p32_rows(r, 1)
+
+
+def u_breathing(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_floor(r, sub=(0.4, 0.8), fifth=(0.3, 0.7), breath=(0.6, 1.0))
+    p32_rows(r, 1)
+
+
+def u_cathedral(r):
+    based(r, "Organs", "Choirs")
+    set_floor(r, pedal=(0.6, 1.0), fifth=(0.3, 0.6))
+    set_hall(r, level=(0.35, 0.55), decay=(25, 50))
+    p32_rows(r, 1)
+
+
+def u_abyssal(r):
+    based(r, "Dark Drones", "Deep Space", "Air & Noise")
+    low_register(r)
+    set_floor(r, sub=(0.5, 0.9), pressure=(0.3, 0.7))
+    p32_rows(r, 1)
+
+
+def u_monoliths(r):
+    based(r, "Dark Drones", "Organs", "Deep Space")
+    r.set("filter_model", 3)   # LP24: dark, the floor kept under it
+    r.set("cutoff", f(r.lg(150, 450), 0))
+    set_floor(r, pedal=(1.0, 1.0), pressure=(0.4, 0.8), sub=(0.3, 0.7))
+    p32_rows(r, 1)
+
+
+def u_iron(r):
+    based(r, "Bells", "Glass", "Shimmer")
+    set_floor(r, pedal=(0.7, 1.0), fifth=(0.4, 0.8))
+    p32_rows(r, 1)
+
+
+def u_tectonic(r):
+    based(r, "Dark Drones", "Deep Space")
+    set_floor(r, pressure=(0.6, 1.0), rate=(0.03, 0.12), sub=(0.3, 0.7))
+    set_thunder(r, level=(0.2, 0.45), distance=(6.0, 12.0), rumble=(0.6, 1.0))
+    p32_rows(r, 1)
+
+
+def u_caverns(r):
+    based(r, "Dark Drones", "Choirs", "Organs", "Deep Space")
+    set_room(r, size=(0.7, 1.0), absorb=(0.0, 0.3))
+    set_floor(r, sub=(0.3, 0.7))
+    p32_rows(r, 1)
+
+
+def u_undertow(r):
+    based(r, *CALM)
+    set_risset(r, "Slowing", depth=(0.3, 0.6))
+    set_floor(r, pedal=(0.5, 0.9), pressure=(0.2, 0.6))
+    p32_rows(r, 1)
+
+
+def u_low_chapels(r):
+    based(r, "Choirs", "Sleep Concert", "Strings")
+    set_room(r, size=(0.3, 0.6), absorb=(0.1, 0.4))
+    set_floor(r, pedal=(0.4, 1.0), fifth=(0.2, 0.5), breath=(0.3, 0.8))
+    p32_rows(r, 1)
+
+
+def u_night_pressure(r):
+    based(r, *CALM)
+    set_night(r, arc=(0.5, 1.0))
+    set_floor(r, pressure=(0.4, 0.9), sub=(0.3, 0.7))
+    if r.rng.random() < 0.3:
+        set_chorus(r, r.pick("Meadow", "Pond"), level=(0.2, 0.4), warmth=(8, 16))
+    p32_rows(r, 1)
+
+
+def u_deep_bells(r):
+    based(r, "Bells", "Glass", "Keys")
+    set_floor(r, sub=(0.5, 0.9), fifth=(0.3, 0.6), breath=(0.3, 0.8))
+    p32_rows(r, 1)
+
+
+def u_floors_storms(r):
+    based(r, *DARK)
+    set_floor(r, pedal=(0.5, 1.0) if r.rng.random() < 0.5 else None, pressure=(0.3, 0.8),
+              sub=(0.3, 0.7) if r.rng.random() < 0.5 else None)
+    set_thunder(r, level=(0.25, 0.6), distance=(2.0, 8.0))
+    if r.rng.random() < 0.6:
+        set_rain(r, r.pick("Water", "Leaves", "Stone", "Tin Roof"), level=(0.25, 0.5), rate=(400, 3000))
+        set_wind(r, wind=(0.3, 0.6))
+    p32_rows(r, 1)
+
+
+RECIPES = RECIPES + [u_organ_points, u_pressure, u_sub_abysses, u_fifth_pillars, u_breathing, u_cathedral, u_abyssal,
+                     u_monoliths, u_iron, u_tectonic, u_caverns, u_undertow, u_low_chapels, u_night_pressure,
+                     u_deep_bells, u_floors_storms]
+
 
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
-    a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was."""
+    a few float, and none whose register has no bass. Drawn last: what the preset had stays as it was
+    (a recipe that set its own foundation keeps it)."""
+    if "brain_foundation" in r.p:
+        return
     if int(num(r, "brain_low", 36)) >= 55 or r.rng.random() < 0.15:
         return
     r.set("brain_foundation", f(r.u(0.45, 0.85), 2))
+
+
+def floor_rule(r):
+    """The floor under every preset (Phase 32, 16.10.2026, after the bass audit: in a quarter of the bank the floor
+    was thin -- no foundation, or one covered by rain, a harp, a bright chord): a foundation wherever the conductor
+    plays, those that floated too, and Floor's share. Drawn after everything: what a preset had stays as it was."""
+    if int(num(r, "brain_on", 1)) < 1:
+        return
+    if float(num(r, "brain_foundation", 0)) <= 0.0:
+        r.set("brain_foundation", f(r.u(0.45, 0.8), 2))
+    if "floor" not in r.p:
+        r.set("floor", f(r.u(0.35, 0.65), 2))
 
 
 def build():
@@ -3740,6 +3980,7 @@ def build():
             foundation(r)   # and the conductor's floor after everything
             if g < 96:   # and phase 26 after it, so what a preset had stays as it was
                 p26_effects(r, GROUPS[g])
+            floor_rule(r)   # and the floor under every preset (Phase 32), after everything
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]

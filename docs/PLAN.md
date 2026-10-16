@@ -529,6 +529,47 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 32: Das Fundament (gebaut, 16.10.2026, 0.22.0)
+
+Der Nutzer, nach meinen Ideen für Dark und Space Ambient: „beachte bei den Presets bitte auf das Bass-Fundament“ und
+„Lass uns gerne gleich alles umsetzen“. Die Bass-Prüfung mit Dirigent (Phase 31) hatte gezeigt: in einem Viertel der
+Bank ist der Boden dünn, auch wo der Grundton unten liegt -- die Foundation ging durch Formant- und Bandpassfilter, und
+laute Schichten deckten sie zu. Also zuerst das Fundament, dann die Ideen (Phasen 33 ..).
+
+- **32a Die Foundation behält ihre Tiefe:** unter 2,2 x ihrem Grundton nehmen ihr Filter, Kamm, Low Cut und Präsenz
+  nichts (`CloudVoice::m_floorHz`, im Update-Kernel als Untergrenze der Farbe, über die Oktave darüber zurück).
+- **32b Floor:** der Anteil unter 150 Hz, den das Fundament mindestens hält (0,25 x Floor). Die Engine misst den Mix
+  vor dem Master (Tiefpass zweiter Ordnung wie `--register`, über 2 s geglättet) und hebt die Foundation-Stimmen mit
+  einem langsamen Integrator um bis zu 12 dB, solange der Rest sie zudeckt.
+- **32c Pedal:** die Foundation hält ihre Note gegen die Bewegungen des Grundtons (bis zu Pedal² x 3 min), bei 1 ein
+  Orgelpunkt auf der Tonika der Tonart (Root).
+- **32d Pressure:** ein Anteil der Teiltöne der Foundation (bis zur Hälfte) steht Pressure Rate höher (x Harmonische):
+  zwei Pfeifen, ein Haar auseinander. **Gefunden [M]:** die Wolkenbreite (±0,5 Hz bei 73 Hz) und Drift verwischten
+  die Schwebung in eine Bande von Schwebungen -- bei Druck werden Breite und Drift der Foundation auf 3 %, ihr
+  Schimmer auf 10 % genommen; die Bewegung „Breathe“ deckt sie trotzdem zu, also begrenzen die Rezepte bei Druck die
+  Bewegungstiefe auf 0,15 .. 0,4.
+- **32e Sub Octave, Fifth, Breath:** zwei Foundation-Stimmen daneben (eine Oktave tiefer, eine Quinte höher; dann
+  beginnt der Akkord eine Oktave über der Foundation), Breath lässt sie in 26 und 42 s an- und abschwellen.
+- **Seite:** auf Conductor die Kästen Floor (Foundation, Floor, Pedal, Pressure, Rate) und Sub & Fifth (sonst
+  scrollte die Seite bei 1280 x 860 um 10 px).
+- **Presets:** `floor_rule` zuletzt für alle: jedes Preset mit Dirigent bekommt eine Foundation (2387 hatten keine)
+  und Floor 0,35 .. 0,65; sonst bleibt alles, wie es war. 1024 neue in 16 Gruppen (Abschnitt „Deep Floors“: Organ
+  Points, Pressure Drones, Sub Abysses, Fifth Pillars, Breathing Floors, Cathedral Depths, Abyssal Plains, Black
+  Monoliths, Iron Pedals, Tectonic Hum, Cavern Drones, Undertow, Low Chapels, Night Pressure, Deep Bells, Floors &
+  Storms). Ein deutsches Wort im Namen („Nachtmusik“ in Nocturnes) heißt jetzt „Small-Hours Air“. 432 Reisen,
+  sechzehn ganze Nächte.
+
+**Gemessen [M]:** Selbsttest 99 (Formantfilter: unter 150 Hz 8,9 % mit Foundation gegen 1,3 % ohne; eine Harfe darüber
+7,0 %, mit Floor 1 27,1 %; Pedal 1: 100 % der Blicke auf der Tonika, während der Quantum Walk den Grundton bewegt;
+Druck: Autokorrelation der Hüllkurve bei 4 s minus bei 2 s 1,50 gegen 0,40 ohne; Sub Octave: unter 55 Hz -9,7 gegen
+-17,2 dB des Ganzen). **Bass-Prüfung [M]** (`--register`, Dirigent an, 60 s; dieselben 78 Presets wie in Phase 31 und 64 der neuen):
+in der alten Bank 10. Perzentil unter 150 Hz 2,0 -> 13,5 %, unter 8 % 8 -> 1 von 26; in Night & Illusions und Chorus
+& Mirrors 1,4 -> 10,3 %, unter 8 % 19 -> 0 von 52 (Median 12,1 -> 17,1 %); Deep Floors Median 21,5 %, 10. Perzentil
+15,4 %. **Gefunden:** Floor hob zuerst die ganze Foundation-Stimme (bis 12 dB) -- ihre Obertöne mit, im Formantfilter
+die lautesten: „Moored Diapason“ wurde 3 dB lauter, der Anteil unter 150 Hz stieg nur von 0,2 auf 1,6 %. Jetzt hebt
+Floor nur ihre Tiefe (die Teiltöne unter 2,2 f0, `m_floorGain`, bis 18 dB): 6,8 % bei +2,6 dB. Am dünnsten bleibt
+„Climbing Ladder“ (Shepard & Tides, 4,9 %).
+
 ## Phase 31: Nachtchor, Zeitspiegel, die Karte wächst selbst (gebaut, 16.10.2026, 0.21.0)
 
 Zweiter Teil von „Bitte alles einbauen, das klingt alles spannend.“ (siehe Phase 30): der Chor, der Spiegel, das

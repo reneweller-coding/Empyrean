@@ -824,6 +824,61 @@ private:
     static int foundationNote( int root, int low ) { return low + ( ( ( root - low ) % 12 ) + 12 ) % 12; }
     /** @brief The foundation follows the root, comes and goes with the conductor and Foundation, and comes back when its voice was taken. */
     void updateFoundation();
+    // Phase 32: the floor
+    float m_floorShare =
+        0.0f;   ///< Floor: the share of the power under 150 Hz the foundation holds at the least (0: off)
+    float  m_floorBoost = 1.0f;    ///< the foundation's depth (its partials under 2.2 f0) raised for it, 1 .. 8
+    double m_floorLow = 0.0;        ///< the mix's power under 150 Hz, followed over two seconds
+    double m_floorAll = 0.0;        ///< the mix's power, likewise
+    double m_floorZ[2][2] = {};     ///< the low pass's state, left and right
+    float  m_pedal = 0.0f;          ///< Pedal
+    int    m_pedalPc = -1;          ///< the pitch class the foundation holds (-1: it follows the root)
+    float  m_pedalWait = 0.0f;      ///< s the root has stood elsewhere
+    float  m_floorSub = 0.0f;       ///< Sub Octave
+    float  m_floorFifth = 0.0f;     ///< Fifth
+    float  m_floorBreath = 0.0f;    ///< Breath
+    double m_breathClock = 0.0;     ///< s, the breath's clock
+    int    m_floorSubNote = -1;     ///< the sub octave's note, -1 none
+    int    m_floorFifthNote = -1;   ///< the fifth's note, -1 none
+    /** @brief The root the foundation stands on: the conductor's, or the pitch class Pedal holds. @return a MIDI note or pitch class (only its class counts) */
+    int floorRoot() const { return m_pedalPc >= 0 ? m_pedalPc : m_brain.root(); }
+    /**
+     * @brief Pedal: the pitch class the foundation holds, against the root's moves for up to three minutes, or on the
+     *        key's tonic at 1.
+     * @param[in] dt  seconds since the last block
+     */
+    void stepPedal( float dt );
+    /**
+     * @brief Starts, moves or stops one of the foundation's voices beside it (the sub octave, the fifth).
+     * @param[in,out] note  the note it holds (-1 none), updated
+     * @param[in]     want  the note it should hold (-1 none)
+     */
+    void holdFloorVoice( int &note, int want );
+    /**
+     * @brief Floor: the mix's power under 150 Hz against all of it, followed; the foundation raised while the rest
+     *        covers it, let down as it comes through.
+     * @param[in] L  the mix, left
+     * @param[in] R  the mix, right
+     * @param[in] n  samples
+     */
+    void followFloor( const float *L, const float *R, int n );
+    /**
+     * @brief A foundation voice's level against the foundation's: 1 for the foundation, Sub Octave or Fifth for the
+     *        voices beside it, each breathing in its own time (Breath).
+     * @param[in] note  the voice's note
+     * @return the factor
+     */
+    float floorVoiceLevel( int note ) const
+    {
+        if ( note == m_floorSubNote && note != m_foundationNote )
+            return m_floorSub * ( 1.0f - 0.5f * m_floorBreath +
+                                  0.5f * m_floorBreath * static_cast<float>( std::sin( 0.2416609 * m_breathClock ) ) );
+        if ( note == m_floorFifthNote && note != m_foundationNote )
+            return m_floorFifth *
+                   ( 1.0f - 0.5f * m_floorBreath +
+                     0.5f * m_floorBreath * static_cast<float>( std::sin( 0.1493547 * m_breathClock + 1.0 ) ) );
+        return 1.0f;
+    }
     Modulators m_mods;   ///< the modulation sources
     /** @brief One setup of m_sound's own LFOs and envelopes, running (Morph.h: each row reads the modulators of the sound it came from). */
     struct OwnUnit
@@ -1217,6 +1272,8 @@ private:
         float m_streamDepth = 0.0f;       ///< Streams: their motion, 0 .. 1
         float m_streamRate = 2.0f;        ///< Streams: Hz
         float m_fusion = 0.0f;            ///< Streams: 0 apart .. 1 as one
+        float m_pressure = 0.0f;          ///< Pressure: 0 .. 1 (Phase 32)
+        float m_pressureRate = 0.12f;     ///< Pressure: Hz
         float m_stereo = 1.0f;            ///< 0 .. 1
         int   m_motion = 0;               ///< MotionKind
         float m_motionRate = 1.0f;        ///< times

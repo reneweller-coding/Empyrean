@@ -289,6 +289,13 @@ struct CloudVoice
     float m_streamDepth = 0.0f;   ///< Streams: 0 .. 1, each stream's slow vibrato and tremolo (0: none)
     float m_streamRate = 2.0f;    ///< Streams: Hz, their rate
     float m_fusion = 0.0f;        ///< Streams: 0 each stream its own motion (heard apart) .. 1 all as one (fused)
+    // Phase 32
+    float m_floorHz = 0.0f;     ///< Hz: under it the voice's filter, comb, low cut and presence give way, coming back
+                                ///< over the octave above (the foundation keeps its depth; 0: off)
+    float m_beatHz = 0.0f;      ///< Hz: Pressure -- a share of the members this far above the rest at the fundamental
+                                ///< (the harmonic times it above), so the floor beats slowly (0: off)
+    float m_beatShare = 0.0f;   ///< 0 .. 0.5: that share of the members
+    float m_floorGain = 1.0f;   ///< Floor: the amplitude under floorHz raised by (1 .. 8), over the octave above back
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */

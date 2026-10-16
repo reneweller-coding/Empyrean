@@ -1044,6 +1044,8 @@ void Engine::readParams()
     m_blk.m_streamDepth = g( ParamIdE::STREAM_DEPTH );
     m_blk.m_streamRate = g( ParamIdE::STREAM_RATE );
     m_blk.m_fusion = g( ParamIdE::FUSION );
+    m_blk.m_pressure = g( ParamIdE::PRESSURE );
+    m_blk.m_pressureRate = g( ParamIdE::PRESSURE_RATE );
     m_blk.m_stereo = g( ParamIdE::STEREO );
     m_blk.m_air = g( ParamIdE::AIR );
     m_blk.m_airCenter = g( ParamIdE::AIR_CENTER );
@@ -1131,18 +1133,27 @@ void Engine::readParams()
     // nothing crowds or doubles it there.
     m_foundation = std::clamp( g( ParamIdE::BRAIN_FOUNDATION ), 0.0f, 1.0f );
     m_foundationLow = std::min( { m_bp.m_low, m_bp.m_high, 36 } );
+    // The floor (Phase 32): what stands beside the foundation, and how it holds.
+    m_floorShare = 0.25f * std::clamp( g( ParamIdE::FLOOR ), 0.0f, 1.0f );
+    m_pedal = std::clamp( g( ParamIdE::PEDAL ), 0.0f, 1.0f );
+    m_floorSub = std::clamp( g( ParamIdE::FLOOR_SUB ), 0.0f, 1.0f );
+    m_floorFifth = std::clamp( g( ParamIdE::FLOOR_FIFTH ), 0.0f, 1.0f );
+    m_floorBreath = std::clamp( g( ParamIdE::FLOOR_BREATH ), 0.0f, 1.0f );
     if ( m_foundation > 0.0f && m_bp.m_on )
-    {
+    {   // the chord from a fifth above it -- from an octave above when the fifth sounds beside it
         const int hi = std::max( m_bp.m_low, m_bp.m_high );
-        const int f = foundationNote( m_brain.root(), m_foundationLow );
-        m_bp.m_low = std::max( std::min( m_bp.m_low, hi ), std::min( f + 7, hi - 12 ) );
+        const int f = foundationNote( floorRoot(), m_foundationLow );
+        m_bp.m_low = std::max( std::min( m_bp.m_low, hi ), std::min( f + ( m_floorFifth > 0.0f ? 12 : 7 ), hi - 12 ) );
         m_bp.m_high = hi;
     }
 }
 
 void Engine::updateFoundation()
 {
-    const int want = m_bp.m_on && m_foundation > 0.0f ? foundationNote( m_brain.root(), m_foundationLow ) : -1;
+    const int want = m_bp.m_on && m_foundation > 0.0f ? foundationNote( floorRoot(), m_foundationLow ) : -1;
+    // Beside it (Phase 32): the sub octave (not under C0) and the fifth.
+    holdFloorVoice( m_floorSubNote, want >= 0 && m_floorSub > 0.0f && want >= 24 ? want - 12 : -1 );
+    holdFloorVoice( m_floorFifthNote, want >= 0 && m_floorFifth > 0.0f ? want + 7 : -1 );
     if ( m_foundationNote >= 0 && want == m_foundationNote )
     {
         // Still sounding? Its voice may have been taken when every voice was busy.
@@ -1162,6 +1173,89 @@ void Engine::updateFoundation()
         startNote( want, m_foundation, m_blk.m_depth * 0.15f, FoundationSource,
                    0 );   // close, as the conductor's near notes: the floor is under you
     m_foundationNote = want;
+}
+
+void Engine::holdFloorVoice( int &note, int want )
+{
+    if ( note >= 0 && want == note )
+    {   // still sounding, or about to? (its voice may have been taken)
+        for ( const Voice &v : m_voices )
+            if ( ( v.m_source == FoundationSource && v.m_note == note && !v.m_released ) ||
+                 ( v.m_stealing && v.m_nextSource == FoundationSource && v.m_next.m_note == note ) )
+                return;
+        note = -1;
+    }
+    if ( want == note ) return;
+    if ( note >= 0 && note != m_foundationNote ) stopNote( note, FoundationSource );
+    if ( want >= 0 ) startNote( want, m_foundation, m_blk.m_depth * 0.15f, FoundationSource, 0 );
+    note = want;
+}
+
+void Engine::stepPedal( float dt )
+{
+    m_breathClock += dt;   // Breath's clock: the sub octave in 26 s, the fifth in 42 s
+    if ( m_pedal <= 0.0f || !m_bp.m_on )
+    {
+        m_pedalPc = -1;
+        m_pedalWait = 0.0f;
+        return;
+    }
+    const int rootPc = ( ( m_brain.root() % 12 ) + 12 ) % 12;
+    if ( m_pedal >= 0.999f )
+    {   // an organ point: the key's tonic, whatever the conductor does over it
+        m_pedalPc = std::clamp( static_cast<int>( std::lround( cur( ParamIdE::ROOT_NOTE ) ) ), 0, 11 );
+        m_pedalWait = 0.0f;
+        return;
+    }
+    if ( m_pedalPc < 0 || rootPc == m_pedalPc )
+    {
+        m_pedalPc = rootPc;
+        m_pedalWait = 0.0f;
+        return;
+    }
+    m_pedalWait += dt;   // the root moved: the foundation stays a while (Pedal^2 x 3 min), then follows
+    if ( m_pedalWait >= 180.0f * m_pedal * m_pedal )
+    {
+        m_pedalPc = rootPc;
+        m_pedalWait = 0.0f;
+    }
+}
+
+void Engine::followFloor( const float *L, const float *R, int n )
+{
+    // The power under 150 Hz: a second-order low pass on each side (RBJ, Q 0.707), as additiv_presets --register
+    // measures the floor.
+    const double fs = static_cast<double>( m_cfg.m_sampleRate );
+    const double w0 = 2.0 * 3.14159265358979 * 150.0 / fs, alpha = std::sin( w0 ) / ( 2.0 * 0.7071 ),
+                 cw = std::cos( w0 );
+    const double a0 = 1.0 + alpha, b0 = ( 1.0 - cw ) / 2.0 / a0, b1 = ( 1.0 - cw ) / a0, b2 = b0, a1 = -2.0 * cw / a0,
+                 a2 = ( 1.0 - alpha ) / a0;
+    double       low = 0.0, all = 0.0;
+    for ( int s = 0; s < n; ++s )
+    {
+        const double x[2] = { L[s], R[s] };
+        for ( int c = 0; c < 2; ++c )
+        {
+            const double y = b0 * x[c] + m_floorZ[c][0];
+            m_floorZ[c][0] = b1 * x[c] - a1 * y + m_floorZ[c][1];
+            m_floorZ[c][1] = b2 * x[c] - a2 * y;
+            low += y * y;
+            all += x[c] * x[c];
+        }
+    }
+    const double dt = n / fs, follow = 1.0 - std::exp( -dt / 2.0 );
+    m_floorLow += ( low / n - m_floorLow ) * follow;
+    m_floorAll += ( all / n - m_floorAll ) * follow;
+    if ( m_floorShare > 0.0f && m_foundationNote >= 0 && m_floorAll > 1.0e-12 )
+    {   // up while the floor is under its share, down while over it: a slow integrator, at most 18 dB
+        const double share = m_floorLow / m_floorAll;
+        const double step = std::clamp( 0.3 * dt * std::log( m_floorShare / std::max( share, 1.0e-5 ) ), -0.02, 0.02 );
+        m_floorBoost = std::clamp( static_cast<float>( m_floorBoost * std::exp( step ) ), 1.0f, 8.0f );
+    }
+    else
+    {
+        m_floorBoost += ( 1.0f - m_floorBoost ) * static_cast<float>( follow );
+    }
 }
 
 void Engine::refreshSpectrum()
@@ -3189,6 +3283,7 @@ void Engine::renderBlock()
             }
         m_brain.setRoot( std::clamp( best, 0, 127 ) );
     }
+    stepPedal( static_cast<float>( dt ) );
     updateFoundation();
     m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
     m_brain2.update( dt, m_bp2, -1, freqOf,
@@ -3438,9 +3533,11 @@ void Engine::renderBlock()
         // The foundation: as loud as the chord is (m_foundationMatch) -- a held voice beside voices that
         // spend half their lives fading in, or under a chord still arriving, would stand far over it --
         // and its knob on top.
-        float level = VoiceLevel * ( v.m_source == FoundationSource ? ( 0.6f + 0.4f * m_foundation ) * m_foundationMatch
-                                     : v.m_source != 0              ? 0.6f + 0.4f * v.m_velocity
-                                                                    : 0.4f + 0.6f * v.m_velocity );
+        float level =
+            VoiceLevel * ( v.m_source == FoundationSource
+                               ? ( 0.6f + 0.4f * m_foundation ) * m_foundationMatch * floorVoiceLevel( v.m_note )
+                           : v.m_source != 0 ? 0.6f + 0.4f * v.m_velocity
+                                             : 0.4f + 0.6f * v.m_velocity );
         cv.m_hz = static_cast<float>( v.m_hz * doppler * std::exp2( static_cast<double>( mpeBend ) / 12.0 ) );
         cv.m_level = level * landMakeup * std::exp2( expr( MpeTargetE::LEVEL ) );   // up to 6 dB
         cv.m_gain = gain * m_rissetGain;   // Risset's pulse (Phase 30), 1 when it is off
@@ -3521,6 +3618,18 @@ void Engine::renderBlock()
         cv.m_streamDepth = m_blk.m_streamDepth;
         cv.m_streamRate = m_blk.m_streamRate;
         cv.m_fusion = m_blk.m_fusion;
+        // The floor (Phase 32): the foundation's voices keep their depth through any filter, and Pressure splits
+        // them into two a beat apart (their clouds narrowed, so the beat is heard and not lost in the spread).
+        cv.m_floorHz = v.m_source == FoundationSource ? 2.2f * static_cast<float>( v.m_hz ) : 0.0f;
+        cv.m_floorGain = v.m_source == FoundationSource ? m_floorBoost : 1.0f;
+        cv.m_beatHz = v.m_source == FoundationSource && m_blk.m_pressure > 0.0f ? m_blk.m_pressureRate : 0.0f;
+        cv.m_beatShare = 0.5f * m_blk.m_pressure;
+        if ( cv.m_beatHz > 0.0f )
+        {
+            cv.m_width *= 1.0f - 0.97f * m_blk.m_pressure;   // a cent at most: one beat, not a band of them
+            cv.m_drift *= 1.0f - 0.97f * m_blk.m_pressure;
+            cv.m_shimmer *= 1.0f - 0.9f * m_blk.m_pressure;
+        }
         cv.m_stereo = m_blk.m_stereo;
         cv.m_partials = m_blk.m_partials;
         cv.m_distance = std::clamp( v.m_distance - 0.5f * expr( MpeTargetE::NEARER ), 0.0f, 1.0f );
@@ -4307,6 +4416,7 @@ void Engine::renderBlock()
         m_nearL[static_cast<size_t>( s )] += m_phantomL[static_cast<size_t>( s )];
         m_nearR[static_cast<size_t>( s )] += m_phantomR[static_cast<size_t>( s )];
     }
+    followFloor( m_nearL.data(), m_nearR.data(), G );   // Floor (Phase 32): how much of the mix is the floor
     for ( int s = 0; s < G; ++s )
     {
         const size_t at = static_cast<size_t>( ( pos + s ) & m_ringMask ) * 2;

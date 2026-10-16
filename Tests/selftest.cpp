@@ -630,7 +630,7 @@ int main( int argc, char **argv )
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 12288 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 13312 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -4621,6 +4621,147 @@ int main( int argc, char **argv )
                "time mirror: what the room heard comes back reversed, swelling",
                fmt( "the chord %.1f dBFS; with the mirror %.1f early in the next window, %.1f late; without %.1f, %.1f",
                     chord, early, late, early0, late0 ) );
+    }
+
+    // 99. The floor (Phase 32). A chord through a formant filter, which takes every voice's bass: the foundation keeps
+    //     its depth through it. A loud harp over it: Floor raises the foundation until the share under 150 Hz is near
+    //     its own. Pedal at 1 holds the foundation on the key's tonic while the conductor's root moves. Pressure
+    //     makes the floor beat; Sub Octave puts power an octave under it.
+    if ( from <= 99 )
+    {
+        // power under fc, a second-order low pass (RBJ, Q 0.707) over interleaved stereo, per window of w frames
+        auto lowWindows = []( const std::vector<float> &lr, double fc, size_t w )
+        {
+            const double        w0 = 2.0 * 3.14159265358979 * fc / 48000.0, alpha = std::sin( w0 ) / ( 2.0 * 0.7071 ),
+                                cw = std::cos( w0 );
+            const double        a0 = 1.0 + alpha, b0 = ( 1.0 - cw ) / 2.0 / a0, b1 = ( 1.0 - cw ) / a0, b2 = b0,
+                                a1 = -2.0 * cw / a0, a2 = ( 1.0 - alpha ) / a0;
+            double              z[2][2] = {};
+            std::vector<double> out;
+            double              sq = 0.0;
+            for ( size_t i = 0; i < lr.size() / 2; ++i )
+            {
+                for ( int c = 0; c < 2; ++c )
+                {
+                    const double x = lr[2 * i + static_cast<size_t>( c )], y = b0 * x + z[c][0];
+                    z[c][0] = b1 * x - a1 * y + z[c][1];
+                    z[c][1] = b2 * x - a2 * y;
+                    sq += y * y;
+                }
+                if ( ( i + 1 ) % w == 0 )
+                {
+                    out.push_back( sq / ( 2.0 * static_cast<double>( w ) ) );
+                    sq = 0.0;
+                }
+            }
+            return out;
+        };
+        auto power = []( const std::vector<float> &lr )
+        {
+            double sq = 0.0;
+            for ( float x : lr ) sq += static_cast<double>( x ) * x;
+            return sq / std::max<double>( 1.0, static_cast<double>( lr.size() ) );
+        };
+        auto mean = []( const std::vector<double> &v )
+        {
+            double s = 0.0;
+            for ( double x : v ) s += x;
+            return v.empty() ? 0.0 : s / static_cast<double>( v.size() );
+        };
+        struct Floor
+        {
+            double share = 0.0, deep = 0.0, swing = 0.0, tonic = 0.0, moved = 0.0;
+        };
+        auto play = [&]( float foundation, float floor, float harp, float pedal, float pressure, float sub, Floor &f )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::AUTO_MODE, 1.0f );
+            e.setParam( ParamIdE::AUTO_RATE, 4.0f );
+            e.setParam( ParamIdE::AUTO_ROOT_MOVE, 0.8f );
+            e.setParam( ParamIdE::BRAIN_DENSITY, 4.0f );
+            e.setParam( ParamIdE::BRAIN_LOW, 36.0f );
+            e.setParam( ParamIdE::BRAIN_HIGH, 79.0f );
+            e.setParam( ParamIdE::FILTER_MODEL, static_cast<float>( FilterModelE::FORMANT ) );
+            e.setParam( ParamIdE::CUTOFF, 1200.0f );
+            e.setParam( ParamIdE::BASS_MONO, 40.0f );
+            e.setParam( ParamIdE::MOTION_DEPTH, 0.0f );   // the floor itself, not the clouds breathing through it
+            e.setParam( ParamIdE::BRAIN_FOUNDATION, foundation );
+            e.setParam( ParamIdE::FLOOR, floor );
+            e.setParam( ParamIdE::HARP, harp );
+            e.setParam( ParamIdE::PEDAL, pedal );
+            e.setParam( ParamIdE::PRESSURE, pressure );
+            e.setParam( ParamIdE::PRESSURE_RATE, 0.25f );
+            e.setParam( ParamIdE::FLOOR_SUB, sub );
+            if ( pedal > 0.0f )
+            {   // the root moved by the quantum walk, every five seconds
+                e.setParam( ParamIdE::QUANTUM, 1.0f );
+                e.setParam( ParamIdE::QUANTUM_TIME, 5.0f );
+                e.setParam( ParamIdE::QUANTUM_SPREAD, 0.8f );
+            }
+            if ( !openOffline( e, true, 99 ) ) return false;
+            e.requestFill();
+            (void)render( e, 20.0 );   // the chord within seconds, the floor followed
+            std::vector<float> all;
+            int                looks = 0, onTonic = 0, moved = 0;
+            for ( int s = 0; s < 40; ++s )
+            {   // forty seconds, a look at the foundation and the root each second
+                const std::vector<float> a = render( e, 1.0 );
+                all.insert( all.end(), a.begin(), a.end() );
+                const int fn = e.foundationNow();
+                if ( fn < 0 ) continue;
+                ++looks;
+                if ( fn % 12 == 2 ) ++onTonic;   // the key's tonic: D, Root's default
+                if ( ( ( e.brainRoot() % 12 ) + 12 ) % 12 != 2 ) ++moved;
+            }
+            const std::vector<double> low = lowWindows( all, 150.0, 12000 );   // quarter seconds
+            const std::vector<double> deep = lowWindows( all, 55.0, 48000 );
+            f.share = mean( low ) / std::max( power( all ), 1e-20 );
+            f.deep = 10.0 * std::log10( std::max( mean( deep ) / std::max( power( all ), 1e-20 ), 1e-12 ) );
+            // the floor's envelope (quarter seconds): its autocorrelation at Pressure's period (4 s at 0.25 Hz) less
+            // that at half of it -- a beat is alike after a period and opposite after half of one; a random swell
+            // neither
+            const std::vector<double> sub90 = lowWindows( all, 90.0, 12000 );   // the fundamental, not its octave
+            std::vector<double>       env( sub90.size() );
+            double                    m = 0.0;
+            for ( size_t k = 0; k < sub90.size(); ++k ) m += env[k] = std::sqrt( sub90[k] );
+            m /= std::max<size_t>( 1, env.size() );
+            auto corr = [&]( size_t lag )
+            {
+                double xy = 0.0, xx = 0.0;
+                for ( size_t k = 0; k + lag < env.size(); ++k ) xy += ( env[k] - m ) * ( env[k + lag] - m );
+                for ( double x : env ) xx += ( x - m ) * ( x - m );
+                return xx > 0.0 ? xy / xx * static_cast<double>( env.size() ) / static_cast<double>( env.size() - lag )
+                                : 0.0;
+            };
+            f.swing = corr( 16 ) - corr( 8 );
+            f.tonic = looks > 0 ? static_cast<double>( onTonic ) / looks : 0.0;
+            f.moved = looks > 0 ? static_cast<double>( moved ) / looks : 0.0;
+            return foundation <= 0.0f || looks > 20;   // without a foundation there is nothing to look at
+        };
+        Floor      none, kept, covered, raised, pedal, beat, sub;
+        const bool ran =
+            play( 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, none ) && play( 0.7f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, kept ) &&
+            play( 0.7f, 0.0f, 0.9f, 0.0f, 0.0f, 0.0f, covered ) && play( 0.7f, 1.0f, 0.9f, 0.0f, 0.0f, 0.0f, raised ) &&
+            play( 0.7f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, pedal ) && play( 0.7f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, beat ) &&
+            play( 0.7f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, sub );
+        check( ran && kept.share > 0.06 && kept.share > 4.0 * none.share,
+               "floor: the foundation keeps its depth through a formant filter",
+               fmt( "under 150 Hz %.1f %% of the power with the foundation, %.1f %% without", 100.0 * kept.share,
+                    100.0 * none.share ) );
+        check( ran && raised.share > covered.share + 0.05, "floor: Floor raises the foundation while a harp covers it",
+               fmt( "under 150 Hz with the harp %.1f %%, with Floor %.1f %%", 100.0 * covered.share,
+                    100.0 * raised.share ) );
+        check( ran && pedal.tonic > 0.95 && pedal.moved > 0.2,
+               "floor: Pedal holds the foundation on the tonic while the root moves",
+               fmt( "on the tonic %.0f %% of the looks, the root elsewhere %.0f %%", 100.0 * pedal.tonic,
+                    100.0 * pedal.moved ) );
+        check( ran && beat.swing > 0.6 && beat.swing > kept.swing + 0.4,
+               "floor: Pressure makes the floor beat at its rate",
+               fmt( "the floor's envelope alike after 4 s less after 2 s: %.2f with Pressure, %.2f without", beat.swing,
+                    kept.swing ) );
+        check( ran && sub.deep > kept.deep + 6.0, "floor: Sub Octave puts power an octave under the foundation",
+               fmt( "under 55 Hz against the whole: %.1f dB with it, %.1f dB without", sub.deep, kept.deep ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

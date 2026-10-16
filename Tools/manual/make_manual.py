@@ -39,7 +39,7 @@ TABS = {
     "Weather": ["Wind", "Chimes", "Rain", "Leaves", "Surf"],
     "Night": ["Aeolian Harp", "Thunder", "Singing Ice", "Night Chorus", "Night"],
     "Tuning": ["Tuning"],
-    "Conductor": ["Conductor", "MPE", "Quantum Walk"],
+        "Conductor": ["Conductor", "Floor", "MPE", "Quantum Walk"],
     "Space": ["Space", "Master", "Binaural"],
     "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Bloom"],
     "Rooms": ["Wave Room", "Halo", "Time Mirror", "Headset"],

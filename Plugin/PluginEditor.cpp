@@ -466,9 +466,14 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               { { ParamIdE::BRAIN_HOLD_MIN, ParamIdE::BRAIN_HOLD_MAX } } },
             { "Register",
               F::MOTION,
-              IdsT{ ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH, ParamIdE::BRAIN_FOUNDATION },
+              IdsT{ ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH },
               {},
               { { ParamIdE::BRAIN_LOW, ParamIdE::BRAIN_HIGH } } },
+            { "Floor", F::ENVELOPE,
+              IdsT{ ParamIdE::BRAIN_FOUNDATION, ParamIdE::FLOOR, ParamIdE::PEDAL, ParamIdE::PRESSURE,
+                    ParamIdE::PRESSURE_RATE },
+              IdsT{ ParamIdE::BRAIN_FOUNDATION } },
+            { "Sub & Fifth", F::ENVELOPE, IdsT{ ParamIdE::FLOOR_SUB, ParamIdE::FLOOR_FIFTH, ParamIdE::FLOOR_BREATH } },
             { "Harmony", F::MOTION,
               IdsT{ ParamIdE::BRAIN_CONSONANCE, ParamIdE::BRAIN_WANDER, ParamIdE::AUTO_LEAD, ParamIdE::AUTO_TENSION,
                     ParamIdE::AUTO_ROOT_MOVE, ParamIdE::BRAIN_TIMBRE, ParamIdE::BRAIN_CASCADE, ParamIdE::BRAIN_LIGHT,
@@ -1133,7 +1138,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "12288 presets",
+        { &m_presetName, "13312 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1795,6 +1800,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
         if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
         if ( g == additiv::FirstChorusGroup ) bank.addSectionHeader( "Chorus & Mirrors" );
+        if ( g == additiv::FirstFloorGroup ) bank.addSectionHeader( "Deep Floors" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {
