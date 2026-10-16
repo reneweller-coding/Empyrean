@@ -82,7 +82,11 @@ void JourneyView::refreshJourneys()
                 m_journeys.addSectionHeading( Heads[kind] );
                 headed = true;
             }
-            m_journeys.addItem( j.m_name, static_cast<int>( i ) + 1 );
+            // with its length: a pass at the middle of its ranges (the dice make each night a little longer or shorter)
+            juce::String label = j.m_name;
+            if ( j.m_length > 0.0 )
+                label << "   (" << additiv::Journey::timeText( j.m_length ) << ( j.m_cyclic ? " a pass)" : ")" );
+            m_journeys.addItem( label, static_cast<int>( i ) + 1 );
         }
     }
     if ( keep > 0 && keep <= static_cast<int>( m_entries.size() ) )
@@ -321,16 +325,18 @@ std::vector<JourneyTimeline::Block> JourneyTimeline::blocks( const additiv::Jour
     std::vector<Block> out;
     double             total = 0.0;
     for ( const additiv::JourneyStep &s : j.m_steps )
-        total += 0.5 * ( s.m_fadeLo + s.m_fadeHi ) + 0.5 * ( s.m_dwellLo + s.m_dwellHi );
+        total += 0.5 * ( s.m_dwellLo + s.m_dwellHi );   // the glide is part of the stay (JourneyPlayer)
     if ( total <= 0.0 ) return out;
     double t = 0.0;
     for ( const additiv::JourneyStep &s : j.m_steps )
     {
-        Block b;
+        // A step lasts its dwell, the glide counted in it, as the player counts it (the glide drawn over the step's
+        // first part; before 16.10.2026 the glide was drawn ahead of the dwell and every journey looked longer).
+        Block        b;
+        const double dwell = 0.5 * ( s.m_dwellLo + s.m_dwellHi ), glide = 0.5 * ( s.m_fadeLo + s.m_fadeHi );
         b.m_x0 = r.getX() + r.getWidth() * static_cast<float>( t / total );
-        t += 0.5 * ( s.m_fadeLo + s.m_fadeHi );
-        b.m_xg = r.getX() + r.getWidth() * static_cast<float>( t / total );
-        t += 0.5 * ( s.m_dwellLo + s.m_dwellHi );
+        b.m_xg = r.getX() + r.getWidth() * static_cast<float>( ( t + std::min( glide, dwell ) ) / total );
+        t += dwell;
         b.m_x1 = r.getX() + r.getWidth() * static_cast<float>( t / total );
         out.push_back( b );
     }
@@ -362,7 +368,7 @@ void JourneyTimeline::drawBand( juce::Graphics &g, const additiv::Journey &j, ju
         {
             g.setColour( hue.withAlpha( 0.85f ) );
             g.fillRect( juce::Rectangle<float>::leftTopRightBottom(
-                b.m_xg, r.getY(), b.m_xg + ( b.m_x1 - 1.0f - b.m_xg ) * static_cast<float>( done ), r.getBottom() ) );
+                b.m_x0, r.getY(), b.m_x0 + ( b.m_x1 - 1.0f - b.m_x0 ) * static_cast<float>( done ), r.getBottom() ) );
         }
         if ( static_cast<int>( i ) == m_dropAt && r == band( 1 ) )
         {   // where a moved block would land
@@ -393,7 +399,7 @@ void JourneyTimeline::paint( juce::Graphics &g )
     const bool                    any = upper( j );
     double                        total = 0.0;
     for ( const additiv::JourneyStep &s : j.m_steps )
-        total += 0.5 * ( s.m_fadeLo + s.m_fadeHi ) + 0.5 * ( s.m_dwellLo + s.m_dwellHi );
+        total += 0.5 * ( s.m_dwellLo + s.m_dwellHi );   // the glide is part of the stay (JourneyPlayer)
     g.setFont( juce::FontOptions( 13.0f, juce::Font::bold ) );
     g.setColour( running ? hue : skin.m_dim );
     if ( !any )
@@ -442,8 +448,7 @@ void JourneyTimeline::paint( juce::Graphics &g )
     {
         const auto r1 = band( 1 );
         double     dt = 0.0;
-        for ( const additiv::JourneyStep &s : d.m_steps )
-            dt += 0.5 * ( s.m_fadeLo + s.m_fadeHi ) + 0.5 * ( s.m_dwellLo + s.m_dwellHi );
+        for ( const additiv::JourneyStep &s : d.m_steps ) dt += 0.5 * ( s.m_dwellLo + s.m_dwellHi );
         g.setColour( skin.m_accent );
         g.setFont( juce::FontOptions( 12.5f, juce::Font::bold ) );
         g.drawText(
@@ -544,7 +549,7 @@ void JourneyTimeline::mouseDown( const juce::MouseEvent &e )
     m_before = m_proc.journeyDraft().m_steps[static_cast<size_t>( i )];
     double total = 0.0;
     for ( const additiv::JourneyStep &s : m_proc.journeyDraft().m_steps )
-        total += 0.5 * ( s.m_fadeLo + s.m_fadeHi ) + 0.5 * ( s.m_dwellLo + s.m_dwellHi );
+        total += 0.5 * ( s.m_dwellLo + s.m_dwellHi );   // the glide is part of the stay (JourneyPlayer)
     m_perPixel = total / std::max( 1.0f, band( 1 ).getWidth() );
     startTimerHz( 10 );
 }

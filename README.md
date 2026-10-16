@@ -143,7 +143,8 @@ offline renderer and the manual, and a portable zip.
   grows itself (MAP-Elites, Tools/presets/grow.py) into presets of your own.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (531 come with it, nineteen of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (531 come with it, nineteen of them whole nights),
+  each shown with its length, and rendered into WAV, FLAC, Ogg Vorbis or MP3 by Empyrean Journeys.
 
 ## Build
 
@@ -168,6 +169,15 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 ```
 
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).
+
+**Empyrean Journeys** (`EmpyreanJourneys.exe`, in the Start menu) renders journeys into files with a small window of
+its own: every journey listed with its length, one or several chosen, written as WAV or FLAC (24 bit), Ogg Vorbis or
+MP3 (320 kbit/s), faster than real time. The same from the command line:
+
+```
+EmpyreanJourneys --render "Whole Night - Lullabies" --format flac --out lullabies.flac --seed 7
+EmpyreanJourneys --selftest 6
+```
 
 ## The family
 

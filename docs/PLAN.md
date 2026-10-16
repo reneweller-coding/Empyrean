@@ -529,6 +529,38 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 36: Reisen zum Mitnehmen, die Bank neu eingepegelt (gebaut, 16.10.2026, 0.26.0)
+
+Wünsche des Nutzers: eine Journey auswählen und daraus eine WAV oder MP3 machen, so schnell wie möglich (OGG und FLAC
+dazu), bei jeder Journey die Länge; „gerne ein kleines Extra-Progrämmchen mit eigener GUI“. Und die Bank neu einpegeln,
+so wie sie gespielt wird (Dirigent an).
+
+- **36a Empyrean Journeys** (`Tools/journeys`, `EmpyreanJourneys.exe`): JUCE-GUI-App neben dem Instrument. Links eine
+  Tabelle aller Reisen (eingebaute und `Documents/Empyrean/Journeys`) mit Schritten, Länge (Mitte der Spannen), kürzest
+  .. längst und Art, Suche, Sortierung, Mehrfachauswahl; rechts die genaue Länge dieser Aufnahme (die Würfel stehen vor
+  dem Start fest: `planLength` simuliert den `JourneyPlayer` mit demselben Seed), Format, Durchgänge zyklischer Reisen,
+  Neue Würfel, Ausblenden über 20 s, Nachtbogen ab 23:00 (Ort aus `Empyrean.frame`), Ordner (`Documents/Empyrean/
+  Renders`), Render/Cancel, Fortschritt, Tempo, Restzeit. `RenderQueue` (ein Thread, wartet auf Arbeit; Abbruch unter
+  derselben Sperre wie das Nehmen eines Auftrags; ein abgebrochenes Stück wird gelöscht). Die Engine offline
+  (`setRealtime(false)`), Blöcke von 4096, die Schritte wie im Instrument (Werks-Preset per `loadPreset` mit Glide,
+  eigene `.empyrean` per `beginMorph`), Dirigent an. Schreiber: WAV 24 bit (RF64 über 4 GB), FLAC 24 bit, Ogg Vorbis
+  „320 kbps“ (JUCE, hinter einem `ThreadedWriter`), MP3 320 kbit/s über Media Foundation (`IMFSinkWriter`, Windows'
+  eigener Encoder, TPDF-Dither auf 16 bit). Kommandozeile `--render`, `--selftest` (jedes Format zurückgelesen: Länge,
+  Pegel; die Warteschlange: zwei nacheinander, einer abgebrochen), `--shot` (das Bild fürs Handbuch). Im Setup als
+  eigene Komponente mit Startmenü-Eintrag.
+- **Tempo [M]** (Karte voll belegt von der Einpegelung, 16 Prozesse): der GPU-Block ist die Grenze -- ein Start und
+  ein Warten alle 128 Samples. 60 s von sechs Reisen: Block 128 1,5 .. 2,6x Echtzeit, 512 5,1 .. 8,3x, 1024 8,2 ..
+  11,6x, 2048 12 .. 15,6x. Klang gegen 128 mit demselben Seed (Pegel, Terzbänder, Modulationsspektrum der Hüllkurve
+  0,5 .. 25 Hz, Klicks): 512 Pegel ±0,2 dB, Terzen 0,1 .. 0,3 dB RMS (ein anderer Seed: 2,5 .. 8,7), Hüllkurve ±0,5
+  dB; nur Turbulent Light (Szintillation) verliert in den Lücken zwischen den Teiltönen 3 dB -- das schnellste Funkeln
+  wird glatter. Bei 1024 dort -5 dB und Sub-Bass-Seitenbänder -17 dB, bei 2048 -8 und -24. Also 512 als Vorgabe,
+  „Exactly as the instrument plays“ rechnet mit 128.
+- **36b Längen im Instrument:** die Journey-Box zeigt jede Reise mit ihrer Länge (`JourneyEntry::m_length`,
+  `meanLength`), zyklische mit „a pass“. **Gefunden:** die Zeitleiste (Phase 24) setzte die Glides vor die Verweilzeit,
+  der `JourneyPlayer` zählt sie darin („the glide is part of the stay“) -- jede Reise sah um ihre Glides länger aus
+  (Whole Night - Plasma & Voice 7:54:00 statt 6:24:00), die Stundenmarken lagen falsch. Jetzt ist ein Schritt so breit
+  wie seine Verweilzeit, die Rampe liegt in seinem Anfang.
+
 ## Phase 35: Plasma und Stimme (gebaut, 16.10.2026, 0.25.0)
 
 Die letzten beiden Ideen: die Magnetosphäre und die Kehle des Abgrunds -- beide auf der CPU.

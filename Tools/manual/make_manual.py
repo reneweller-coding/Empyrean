@@ -169,7 +169,8 @@ APPENDIX_NEEDS = [
     ("Graphics card", "NVIDIA GeForce RTX 20 or newer (Turing and later) with a current driver; the instrument computes every "
                       "partial there and is silent without one, saying so in the status line"),
     ("System", "Windows 10 or 11, 64-bit, a processor with AVX2"),
-    ("Formats", "standalone application and VST3 plug-in; the offline renderer empy_render for the command line"),
+    ("Formats", "standalone application and VST3 plug-in; Empyrean Journeys, which renders journeys into WAV, FLAC, "
+                "Ogg Vorbis or MP3; the offline renderer empy_render for the command line"),
     ("Latency", "two audio blocks and ten milliseconds, reported to the host, which compensates for it"),
 ]
 

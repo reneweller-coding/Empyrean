@@ -1119,15 +1119,23 @@ std::vector<AdditivProcessor::JourneyEntry> AdditivProcessor::journeys() const
         JourneyEntry e;
         e.m_name = j.m_name;
         e.m_builtin = i;
+        e.m_length = j.meanLength();
+        e.m_cyclic = j.m_cyclic;
         out.push_back( e );
     }
     juce::Array<juce::File> files = journeyFolder().findChildFiles( juce::File::findFiles, false, "*.journey" );
     files.sort();
     for ( const juce::File &f : files )
     {
-        JourneyEntry e;
+        JourneyEntry     e;
+        additiv::Journey j;
         e.m_name = f.getFileNameWithoutExtension();
         e.m_file = f;
+        if ( j.load( f.getFullPathName().toRawUTF8() ) )
+        {
+            e.m_length = j.meanLength();
+            e.m_cyclic = j.m_cyclic;
+        }
         out.push_back( e );
     }
     return out;

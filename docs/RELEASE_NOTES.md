@@ -1,5 +1,23 @@
 # Release notes
 
+## 0.26.0 (16.10.2026, not released)
+
+Journeys to take along.
+
+- **Empyrean Journeys:** a small program beside the instrument (Start menu, EmpyreanJourneys.exe) that renders
+  journeys into files -- WAV or FLAC at 24 bits, Ogg Vorbis or MP3 at 320 kbit/s -- faster than real time, the
+  instrument running offline as a journey plays it (every preset glided into, the conductor playing on). A table of
+  every journey, the instrument's and yours, with its steps, its length and its shortest to longest, searched and
+  sorted; several chosen are rendered one after another, with progress, speed and time left, and can be cancelled.
+  The dice are cast before a rendering begins, so the panel tells its exact length; the passes of a cyclic journey,
+  a fade over the last twenty seconds, the night arc as from 23:00. It sets every partial 94 times a second instead
+  of the instrument's 375 -- about three times faster, the same sound (only Scintillation's quickest twinkle a little
+  smoother); "Exactly as the instrument plays" renders sample for sample. The same from the command line
+  (`--render NAME --format wav|flac|ogg|mp3`), and a self-test of every format and the queue (ctest `journeys`).
+- **Journey lengths:** the instrument's journey box shows every journey with its length (a pass at the middle of its
+  ranges). The timeline under it counts a glide within its step, as a journey plays it -- it drew the glides ahead of
+  the stays, and every journey looked longer by them (Whole Night - Plasma & Voice: 7:54:00 instead of 6:24:00).
+
 ## 0.25.0 (16.10.2026, not released)
 
 Plasma and voice. 1024 presets; 16384 in all.

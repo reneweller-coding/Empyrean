@@ -589,9 +589,11 @@ public:
     /** @brief A journey to choose: one that comes with the instrument, or a file of the player's. */
     struct JourneyEntry
     {
-        juce::String m_name;           ///< as the box shows it
-        int          m_builtin = -1;   ///< the built-in journey, -1 for a file
-        juce::File   m_file;           ///< the file, for the player's own
+        juce::String m_name;            ///< as the box shows it
+        int          m_builtin = -1;    ///< the built-in journey, -1 for a file
+        juce::File   m_file;            ///< the file, for the player's own
+        double       m_length = 0.0;    ///< s: a pass at the middle of its ranges (Journey::meanLength)
+        bool         m_cyclic = true;   ///< it goes round again after its last step
     };
     /** @brief Where the player's journeys live: Documents/Empyrean/Journeys. @return the folder */
     static juce::File journeyFolder();

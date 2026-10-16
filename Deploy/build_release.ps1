@@ -11,7 +11,7 @@
          -SkipTests; then pluginval twice more with seeds of its own (a parameter missing from the state can pass
          one seed by coincidence)
       3. the manual: Tools\manual\make_shots.py with the release's standalone, make_manual.py with its empy_render
-      4. stage what is installed under dist\stage, and nothing else
+      4. stage what is installed under dist\stage, and nothing else (the instrument, empy_render, Empyrean Journeys)
       5. check the stage: every file there, the binaries without a DLL dependency on the MSVC or the CUDA runtime
          (nvcuda.dll, the driver's, is loaded at run time and is the only thing the card needs)
       6. SHA256SUMS.txt, the portable zip, and the setup with Inno Setup (ISCC), unless -NoSetup
@@ -50,6 +50,7 @@ $render = Join-Path $build "Release\empy_render.exe"
 $art = Join-Path $build "Plugin\$($product)_artefacts\Release"
 $standalone = Join-Path $art "Standalone\$product.exe"
 $vst3 = Join-Path $art "VST3\$product.vst3"
+$journeys = Join-Path $build "Tools\journeys\EmpyreanJourneys_artefacts\Release\EmpyreanJourneys.exe"
 
 # 2. Tests, and pluginval with two more seeds.
 if (-not $SkipTests) {
@@ -84,17 +85,18 @@ New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item $standalone $stage
 Copy-Item -Recurse $vst3 $stage
 Copy-Item $render $stage
+Copy-Item $journeys $stage
 Copy-Item $manual $stage
 Copy-Item (Join-Path $deploy "empyrean.ico") $stage
 Copy-Item (Join-Path $root "LICENSE") (Join-Path $stage "LICENSE.txt")
 Copy-Item (Join-Path $root "README.md") (Join-Path $stage "README.txt")
 
 # 5. Check: the files, and no dependency on the dynamic MSVC runtime or on a CUDA runtime DLL.
-$expected = @("$product.exe", "empy_render.exe", "$product.vst3", "$product-Manual.pdf", "empyrean.ico", "LICENSE.txt", "README.txt")
+$expected = @("$product.exe", "empy_render.exe", "EmpyreanJourneys.exe", "$product.vst3", "$product-Manual.pdf", "empyrean.ico", "LICENSE.txt", "README.txt")
 foreach ($f in $expected) { if (-not (Test-Path (Join-Path $stage $f))) { throw "missing in the stage: $f" } }
 $dumpbin = Get-ChildItem "C:\Program Files\Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($dumpbin) {
-    $binaries = @((Join-Path $stage "$product.exe"), (Join-Path $stage "empy_render.exe")) +
+    $binaries = @((Join-Path $stage "$product.exe"), (Join-Path $stage "empy_render.exe"), (Join-Path $stage "EmpyreanJourneys.exe")) +
                 @(Get-ChildItem -Recurse (Join-Path $stage "$product.vst3") -Filter *.vst3 -File | ForEach-Object { $_.FullName })
     foreach ($b in $binaries) {
         $deps = & $dumpbin.FullName /DEPENDENTS $b | Select-String -Pattern "(?i)((vcruntime|msvcp)\d+.*|cudart\w*|cublas\w*|nvrtc\w*)\.dll"

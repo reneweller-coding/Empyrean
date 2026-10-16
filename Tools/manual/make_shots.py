@@ -7,7 +7,8 @@ SETTLE seconds for the clouds to sound, then every tab on its own tick, the wind
 scrolls (ADDITIV_SHOT_FULL). Muted (ADDITIV_MUTE): the engine runs and is seen, nothing is heard. Besides:
 docs/screenshot.png, the first tab at the window's usual size, the picture on the project's front page. And the
 pictures a chapter asks for with a line "[name]" in chapters.txt (EXTRAS): the command palette, the preset browser,
-the modulation dock with a source dropped on a knob. A tab's name becomes a file name as slug() makes it.
+the modulation dock with a source dropped on a knob. A tab's name becomes a file name as slug() makes it. Last,
+Empyrean Journeys' window (journeys-app.png), from the same build tree.
 """
 import glob
 import os
@@ -85,6 +86,15 @@ def main():
             if os.path.exists(p):
                 os.remove(p)
         print("docs/screenshots/%s.png" % name)
+    # Empyrean Journeys, the program beside it: its window, a whole night chosen (EmpyreanJourneys --shot), from the
+    # same build tree as the standalone.
+    journeys = os.path.normpath(os.path.join(os.path.dirname(exe), "..", "..", "..", "..", "Tools", "journeys",
+                                             "EmpyreanJourneys_artefacts", "Release", "EmpyreanJourneys.exe"))
+    if not os.path.exists(journeys):
+        sys.exit("no Empyrean Journeys at " + journeys)
+    subprocess.run([journeys, "--shot", os.path.join(out, "journeys-app.png"), "--journey", "Whole Night - Lullabies"],
+                   timeout=120, check=True)
+    print("docs/screenshots/journeys-app.png")
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@
 # Built with CUDA 13.4 for the RTX 5090 (Blackwell, sm_120); the presets select CUDA 13.4 by its folder, whatever
 # CUDA_PATH or the nvcc on the PATH say. Windows only for now; no macOS path (user, 11.10.2026).
 cmake_minimum_required(VERSION 3.30)
-project(Empyrean VERSION 0.25.0 LANGUAGES C CXX CUDA)
+project(Empyrean VERSION 0.26.0 LANGUAGES C CXX CUDA)
 
 # The family's layout (01.10.2026): build/<preset>, bin/<preset>, dist/, work/ -- cmake/Family.cmake (the same file in
 # every repository of the family), CMakePresets.json and build.ps1.
@@ -127,6 +127,8 @@ endif()
 if(ADDITIV_BUILD_PLUGIN)
     family_juce(${ADDITIV_JUCE_TAG})
     add_subdirectory(Plugin)
+    # Empyrean Journeys: the journeys rendered into WAV, FLAC, Ogg Vorbis or MP3, faster than real time (16.10.2026).
+    add_subdirectory(Tools/journeys)
     # Tracktion's pluginval (unpacked into ThirdParty/pluginval or the sibling Ephemeris's, not in the repository) at its
     # highest strictness, where it is there -- as in Totality.
     if(ADDITIV_BUILD_TOOLS)

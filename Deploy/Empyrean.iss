@@ -4,14 +4,14 @@
 ; compiler. Nothing in here reaches into a build tree: what is in the staging folder is exactly what gets
 ; installed, so the payload can be looked at before the setup is made.
 ;
-;   ISCC.exe /DVersion=0.25.0 Deploy\Empyrean.iss
+;   ISCC.exe /DVersion=0.26.0 Deploy\Empyrean.iss
 ;
 ; The binaries are linked against the static MSVC runtime and the static CUDA runtime: no redistributable, no DLL
 ; beside the executable. What the graphics card needs is NVIDIA's driver (its nvcuda.dll), which the setup looks
 ; for and does not bring. Every sound is synthesised: nothing is downloaded, the VST3 needs no data files.
 
 #ifndef Version
-  #define Version "0.25.0"
+  #define Version "0.26.0"
 #endif
 #define AppName "Empyrean"
 #define Publisher "Rene Weller"
@@ -54,6 +54,7 @@ Name: "de"; MessagesFile: "compiler:Languages\German.isl"
 en.CompStandalone=Standalone application
 en.CompVst3=VST3 plug-in (for a DAW)
 en.CompRender=Offline renderer (empy_render, command line)
+en.CompJourneys=Empyrean Journeys (journeys into WAV, FLAC, Ogg Vorbis or MP3)
 en.CompManual=Manual (PDF)
 en.TaskDesktop=Create a desktop shortcut
 en.NoAvx2=This processor reports no AVX2 support.%n%n{#AppName} is built for AVX2, which every x86-64 processor since 2013 has. Without it, it will not start.%n%nInstall anyway?
@@ -61,6 +62,7 @@ en.NoCuda=No NVIDIA driver with CUDA was found on this computer.%n%n{#AppName} c
 de.CompStandalone=Eigenstaendiges Programm
 de.CompVst3=VST3-Plugin (fuer eine DAW)
 de.CompRender=Offline-Renderer (empy_render, Kommandozeile)
+de.CompJourneys=Empyrean Journeys (Journeys als WAV, FLAC, Ogg Vorbis oder MP3)
 de.CompManual=Handbuch (PDF)
 de.TaskDesktop=Verknuepfung auf dem Desktop anlegen
 de.NoAvx2=Dieser Prozessor meldet keine AVX2-Unterstuetzung.%n%n{#AppName} ist fuer AVX2 gebaut, das jeder x86-64-Prozessor seit 2013 hat. Ohne AVX2 startet es nicht.%n%nTrotzdem installieren?
@@ -74,6 +76,7 @@ Name: "custom"; Description: "Custom"; Flags: iscustom
 Name: "standalone"; Description: "{cm:CompStandalone}"; Types: full custom; Flags: fixed
 Name: "vst3";       Description: "{cm:CompVst3}";       Types: full custom
 Name: "render";     Description: "{cm:CompRender}";     Types: full custom
+Name: "journeys";   Description: "{cm:CompJourneys}";   Types: full custom
 Name: "manual";     Description: "{cm:CompManual}";     Types: full custom
 
 [Tasks]
@@ -92,12 +95,14 @@ Source: "{#Stage}\README.txt";              DestDir: "{app}";  Flags: ignorevers
 Source: "{#Stage}\LICENSE.txt";             DestDir: "{app}";  Flags: ignoreversion; Components: standalone
 Source: "{#Stage}\SHA256SUMS.txt";          DestDir: "{app}";  Flags: ignoreversion; Components: standalone
 Source: "{#Stage}\empy_render.exe";      DestDir: "{app}";  Flags: ignoreversion; Components: render
+Source: "{#Stage}\EmpyreanJourneys.exe"; DestDir: "{app}";  Flags: ignoreversion; Components: journeys
 Source: "{#Stage}\{#AppName}-Manual.pdf";   DestDir: "{app}";  Flags: ignoreversion; Components: manual
 Source: "{#Stage}\{#AppName}.vst3\*";       DestDir: "{autocf}\VST3\{#AppName}.vst3"; Flags: ignoreversion recursesubdirs createallsubdirs; Components: vst3
 
 [Icons]
 Name: "{autoprograms}\{#AppName}";          Filename: "{app}\{#AppName}.exe"; IconFilename: "{app}\empyrean.ico"
 Name: "{autoprograms}\{#AppName} Manual";   Filename: "{app}\{#AppName}-Manual.pdf"; Components: manual
+Name: "{autoprograms}\{#AppName} Journeys"; Filename: "{app}\EmpyreanJourneys.exe"; IconFilename: "{app}\empyrean.ico"; Components: journeys
 Name: "{autodesktop}\{#AppName}";           Filename: "{app}\{#AppName}.exe"; IconFilename: "{app}\empyrean.ico"; Tasks: desktopicon
 
 [Run]
