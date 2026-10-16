@@ -87,7 +87,8 @@ __global__ void physStatsKernel( const BlockHeader *hdr, const float *trail, flo
 __global__ void haloKernel( const BlockHeader *hdr, float2 *state, float *stats );
 __global__ void roomSourceKernel( const BlockHeader *hdr, const float *scratch, int perVoice, int maxN, float *hist,
                                   float *in );
-__global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, const float *in, float *ears );
+__global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, const float *in, float *ears,
+                                float *mirror );
 __global__ void roomOutKernel( const BlockHeader *hdr, const float *ears, float *hist, float *out );
 cudaError_t uploadRoomTables( const signed char ( *xy )[2], const short ( *nbr )[4], const float *fir );
 
@@ -99,6 +100,10 @@ __global__ void thunderRenderKernel( const BlockHeader *hdr, const float4 *seg, 
 __global__ void thunderOutKernel( const BlockHeader *hdr, int *ring, float *scratch, int maxN );
 __global__ void iceKernel( const BlockHeader *hdr, float *stress, float4 *chirps, int *meta, float *stats );
 __global__ void iceSingKernel( const BlockHeader *hdr, float4 *chirps, float *scratch, int maxN );
+__global__ void chorusStepKernel( const BlockHeader *hdr, float4 *state, float *stats );
+__global__ void chorusOrderKernel( const BlockHeader *hdr, const float4 *state, float *stats );
+__global__ void chorusSoundKernel( const BlockHeader *hdr, const float4 *state, float *scratch, int maxN );
+__global__ void chorusReduceKernel( const BlockHeader *hdr, const float *partial, float *scratch, int maxN );
 __global__ void nightMixKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out );
 
 // Spectral.cu

@@ -630,7 +630,7 @@ int main( int argc, char **argv )
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 10240 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 11264 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -4550,6 +4550,77 @@ int main( int argc, char **argv )
                fmt( "the ears %+.1f dB with the head ahead, %+.1f turned right; at 490 Hz %.1f dB with the hand, %.1f "
                     "without",
                     ahead, turned, fed, unfed ) );
+    }
+
+    // 97. Night chorus (Phase 31): warm crickets call faster than cold ones (Dolbear's law), and callers that answer
+    //     each other fall into step -- the most numerous kind's clocks gather.
+    if ( from <= 97 )
+    {
+        auto play = [&]( float warmth, float sync, double &perSecond, double &order )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::CHORUS, 1.0f );
+            e.setParam( ParamIdE::CHORUS_KIND, 0.0f );   // a meadow: crickets
+            e.setParam( ParamIdE::CHORUS_WARMTH, warmth );
+            e.setParam( ParamIdE::CHORUS_SYNC, sync );
+            if ( !openOffline( e, false, 301 ) ) return false;
+            render( e, 4.0 );
+            float s[4];
+            e.chorusStats( s );
+            const double from = s[0];
+            double       sum = 0.0;
+            for ( int k = 0; k < 80; ++k )
+            {
+                render( e, 0.1 );
+                e.chorusStats( s );
+                sum += s[2];
+            }
+            e.chorusStats( s );
+            perSecond = ( s[0] - from ) / 8.0;
+            order = sum / 80.0;
+            return true;
+        };
+        double     warm = 0.0, cold = 0.0, unused = 0.0, apart = 0.0, together = 0.0;
+        const bool ran = play( 28.0f, 0.5f, warm, unused ) && play( 10.0f, 0.5f, cold, unused ) &&
+                         play( 18.0f, 0.0f, unused, apart ) && play( 18.0f, 1.0f, unused, together );
+        check(
+            ran && warm > 2.0 * cold && cold > 0.0 && together > apart + 0.1,
+            "chorus: warm crickets call faster, and answering they fall into step",
+            fmt( "%.0f calls a second at 28 degrees, %.0f at 10; the kind's order %.2f not answering, %.2f answering",
+                 warm, cold, apart, together ) );
+    }
+
+    // 98. Time mirror (Phase 31): a chord struck and let go in the wave room; without the mirror the room dies away,
+    //     with it what the mirror heard comes back reversed in the next window, swelling towards its end.
+    if ( from <= 98 )
+    {
+        auto play = [&]( float mirror, double &chord, double &early, double &late )
+        {
+            Engine e;
+            quietEffects( e );
+            e.setParam( ParamIdE::WAVE_ROOM, 1.0f );
+            e.setParam( ParamIdE::ROOM_ABSORB, 0.6f );
+            e.setParam( ParamIdE::MIRROR, mirror );
+            e.setParam( ParamIdE::MIRROR_TIME, 2.0f );
+            e.setParam( ParamIdE::MEMORY_LEVEL, 0.0f );   // no ghosts rising after the chord: the room alone
+            if ( !openOffline( e, false, 303 ) ) return false;
+            for ( int note : { 48, 55, 64 } ) e.noteOn( note, 1.0f, 0 );
+            const std::vector<float> a = render( e, 0.3 );
+            for ( int note : { 48, 55, 64 } ) e.noteOff( note, 0 );
+            const std::vector<float> b = render( e, 3.7 );   // to 4 s: the second window
+            early =
+                rmsDb( b, static_cast<size_t>( 1.8 * 48000 ), static_cast<size_t>( 2.5 * 48000 ) );      // 2.1 .. 2.8 s
+            late = rmsDb( b, static_cast<size_t>( 2.9 * 48000 ), static_cast<size_t>( 3.6 * 48000 ) );   // 3.2 .. 3.9 s
+            chord = rmsDb( a, static_cast<size_t>( 0.1 * 48000 ), static_cast<size_t>( 0.3 * 48000 ) );
+            return !a.empty();
+        };
+        double     chord = 0.0, early = 0.0, late = 0.0, chord0 = 0.0, early0 = 0.0, late0 = 0.0;
+        const bool ran = play( 1.0f, chord, early, late ) && play( 0.0f, chord0, early0, late0 );
+        check( ran && late > early + 6.0 && late > late0 + 10.0 && late < chord + 3.0,
+               "time mirror: what the room heard comes back reversed, swelling",
+               fmt( "the chord %.1f dBFS; with the mirror %.1f early in the next window, %.1f late; without %.1f, %.1f",
+                    chord, early, late, early0, late0 ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

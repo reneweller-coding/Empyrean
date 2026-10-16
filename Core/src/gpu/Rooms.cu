@@ -233,9 +233,11 @@ __device__ __forceinline__ int roomNow( const BlockHeader *hdr, int step )
  * @param[in]     step    the step in the block, 0 .. n / RoomDecim - 1
  * @param[in,out] field   three fields of RoomCells
  * @param[in]     in      per source the block's samples at the room's rate
- * @param[out]    ears    two rows (left, right) of the block's samples at the room's rate
+  * @param[out]    ears    two rows (left, right) of the block's samples at the room's rate
+  * @param[in,out] mirror  the time mirror's recording, RoomMirrors cells of MirrorMax samples each (Phase 31)
  */
-__global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, const float *in, float *ears )
+__global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, const float *in, float *ears,
+                                float *mirror )
 {
     const WaveRoom &W = hdr->m_room;
     if ( !W.m_on || step >= hdr->m_n / RoomDecim ) return;
@@ -263,8 +265,30 @@ __global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, 
     const float l2 = W.m_lambda2, lb = sqrtf( l2 ) * W.m_beta * 0.5f * static_cast<float>( 6 - K );
     float v = ( ( 2.0f - static_cast<float>( K ) * l2 ) * p[idx] + l2 * sum - ( 1.0f - lb ) * pm[idx] ) / ( 1.0f + lb );
     if ( z == W.m_srcZ )
+    {
         for ( int s = 0; s < min( W.m_count, RoomSources ); ++s )
             if ( W.m_source[s] == idx ) v += in[static_cast<size_t>( s ) * ( 4096 / RoomDecim ) + step];
+        if ( W.m_mirrorOn && W.m_mirrorLen > 0 )
+        {   // the time mirror (Phase 31), in two strokes: a window its cells listen and record the field, the next they
+            // send it back reversed -- the waves run back to where they came from (Fink's time-reversal mirror) -- and
+            // do not listen, so the mirror never hears itself
+            int pos = W.m_mirrorPos + step, stroke = W.m_mirrorBuf;
+            if ( pos >= W.m_mirrorLen )
+            {
+                pos -= W.m_mirrorLen;
+                stroke ^= 1;
+            }
+            for ( int m = 0; m < RoomMirrors; ++m )
+                if ( W.m_mirror[m] == idx )
+                {
+                    float *mine = mirror + static_cast<size_t>( m ) * MirrorMax;
+                    if ( stroke == 0 )
+                        mine[pos] = v;
+                    else
+                        v += W.m_mirrorGain * mine[W.m_mirrorLen - 1 - pos];
+                }
+        }
+    }
     for ( int h = 0; h < 2; ++h )
     {   // the headset's open hands (Phase 30): each a soft absorber where it is
         const int a = W.m_absorb[h];

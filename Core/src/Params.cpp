@@ -50,6 +50,7 @@ const char *const ShoreNames[NumShores] = { "Sand", "Pebbles", "Rocks" };
 const char *const HaloTurnNames[NumHaloTurns] = { "Counter-clockwise", "Clockwise" };
 const char *const StreamsNames[NumStreams] = { "Odd & Even", "By Three", "Registers", "Members" };
 const char *const RissetWayNames[NumRissetWays] = { "Slowing", "Quickening" };
+const char *const ChorusKindNames[NumChorusKinds] = { "Meadow", "Treetops", "Pond", "Summer Night" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -460,6 +461,13 @@ const std::array<ParamDesc, NumParams> Table = { {
     B( ParamIdE::DREAM_JOURNAL, "dream_journal", "Dream Journal", "Dream", true ),
     F( ParamIdE::VR_HANDS, "vr_hands", "Hands", "Headset", 0.f, 1.f, 0.f, 1.f, "" ),
     B( ParamIdE::HEAD_TRACKING, "head_tracking", "Head Tracking", "Headset", true ),
+    F( ParamIdE::CHORUS, "chorus", "Night Chorus", "Night Chorus", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::CHORUS_KIND, "chorus_kind", "Who Calls", "Night Chorus", ChorusKindNames, NumChorusKinds, 3 ),
+    F( ParamIdE::CHORUS_WARMTH, "chorus_warmth", "Warmth", "Night Chorus", 5.f, 30.f, 18.f, 1.f, "C" ),
+    F( ParamIdE::CHORUS_SYNC, "chorus_sync", "Answering", "Night Chorus", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::CHORUS_TUNE, "chorus_tune", "Tuned Calls", "Night Chorus", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::MIRROR, "mirror", "Time Mirror", "Time Mirror", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::MIRROR_TIME, "mirror_time", "Mirror Window", "Time Mirror", 1.f, 6.f, 4.f, 1.f, "s" ),
 } };
 
 }   // namespace

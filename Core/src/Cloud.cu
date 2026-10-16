@@ -238,9 +238,14 @@ struct CloudEngine::Impl
     int           m_thunderRead = 0;             ///< where the thunder's ring is read next
     int           m_thunderOrigin = 0;           ///< where in it the last strike's moment is
     int           m_thunderChunk = ThunderChunks;   ///< the last strike's next part into the ring (ThunderChunks: done)
-    bool          m_thunderWas = false;   ///< thunder was on in the last block (the ring is cleared as it begins)
-    float        *m_hIceUp = nullptr;     ///< pinned host: an ice sheet's stress to send up
-    bool          m_iceUp = false;        ///< the next launch sends hIceUp up first
+    bool          m_thunderWas = false;         ///< thunder was on in the last block (the ring is cleared as it begins)
+    float        *m_hIceUp = nullptr;           ///< pinned host: an ice sheet's stress to send up
+    float4       *m_dChorus = nullptr;          ///< device: the chorus's callers, two entries each, two buffers
+    float        *m_dChorusScratch = nullptr;   ///< device: per chorus CUDA block four channels of the block
+    float        *m_dMirror = nullptr;          ///< device: the time mirror's recording
+    NightChorus   m_chorus;                     ///< the host's copy of the night chorus's settings
+    bool          m_mirrorWas = false;          ///< the time mirror ran in the last block (cleared as it begins)
+    bool          m_iceUp = false;              ///< the next launch sends hIceUp up first
 
     ChimeField m_chimes;              ///< the host's copy of the chime field's settings
     Dream      m_dream;               ///< the host's copy of the dream's settings
@@ -258,10 +263,11 @@ struct CloudEngine::Impl
         bool                         m_enabled = true;   ///< as the executable graph has them
         int                          m_rest = 0;         ///< blocks the feature has rested
     };
-    std::array<Gate, 19> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
-    ///< dream, phantom, reservoir, spectral echo, melt, harp, thunder, ice, the night's mix
-    float m_gpuMs = 0.0f;       ///< GPU time of the last finished block
-    bool  m_launched = false;   ///< a block is in flight
+    std::array<Gate, 20> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
+                                    ///< dream, phantom, reservoir, spectral echo, melt, harp, thunder, ice, the night's
+                                    ///< mix, the chorus
+    float m_gpuMs = 0.0f;           ///< GPU time of the last finished block
+    bool  m_launched = false;       ///< a block is in flight
 
     /** @brief Bytes of the upload: the header and the voices. @return bytes */
     size_t uploadBytes() const
@@ -374,7 +380,10 @@ struct CloudEngine::Impl
                           static_cast<void *>( m_dIceStress ),
                           static_cast<void *>( m_dIceChirps ),
                           static_cast<void *>( m_dIceMeta ),
-                          static_cast<void *>( m_dNightScratch ) } )
+                          static_cast<void *>( m_dNightScratch ),
+                          static_cast<void *>( m_dChorus ),
+                          static_cast<void *>( m_dChorusScratch ),
+                          static_cast<void *>( m_dMirror ) } )
             if ( p ) cudaFree( p );
         m_exec = nullptr;
         m_graph = nullptr;
@@ -446,6 +455,8 @@ struct CloudEngine::Impl
         m_dThunderSeg = m_dIceChirps = nullptr;
         m_dThunderRing = m_dIceMeta = nullptr;
         m_dIceStress = m_dNightScratch = nullptr;
+        m_dChorus = nullptr;
+        m_dChorusScratch = m_dMirror = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -753,7 +764,12 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dIceChirps, sizeof( float4 ) * 2 * IceChirps ), "cudaMalloc ice", error ) &&
            ok( cudaMalloc( &m.m_dIceMeta, sizeof( int ) * 8 ), "cudaMalloc ice", error ) &&
            ok( cudaMalloc( &m.m_dNightScratch, sizeof( float ) * NightRows * static_cast<size_t>( n ) ),
-               "cudaMalloc night", error );
+               "cudaMalloc night", error ) &&
+           ok( cudaMalloc( &m.m_dChorus, sizeof( float4 ) * 4 * ChorusCallers ), "cudaMalloc chorus", error ) &&
+           ok( cudaMalloc( &m.m_dChorusScratch, sizeof( float ) * 4 * static_cast<size_t>( n ) * ChorusBlocks ),
+               "cudaMalloc chorus", error ) &&
+           ok( cudaMalloc( &m.m_dMirror, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ) ),
+               "cudaMalloc mirror", error );
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -879,6 +895,14 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             error ) &&
         ok( cudaMemsetAsync( m.m_dIceMeta, 0, sizeof( int ) * 8, m.m_stream ), "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dNightScratch, 0, sizeof( float ) * NightRows * static_cast<size_t>( n ), m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dChorus, 0, sizeof( float4 ) * 4 * ChorusCallers, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dChorusScratch, 0, sizeof( float ) * 4 * static_cast<size_t>( n ) * ChorusBlocks,
+                             m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ),
+                             m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaStreamSynchronize( m.m_stream ), "cudaStreamSynchronize", error );
     if ( good )
@@ -1032,7 +1056,7 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                                                                    m.m_dRoomHist, m.m_dRoomIn );
             for ( int step = 0; step < n / RoomDecim; ++step )
                 roomStepKernel<<<( RoomCells + 255 ) / 256, 256, 0, m.m_stream>>>( hdr, step, m.m_dRoom, m.m_dRoomIn,
-                                                                                   m.m_dRoomEars );
+                                                                                   m.m_dRoomEars, m.m_dMirror );
             roomOutKernel<<<1, 256, 0, m.m_stream>>>( hdr, m.m_dRoomEars, m.m_dRoomOutHist, m.m_dOut );
 
             chimeKernel<<<static_cast<unsigned>( ChimeBlocks ), ChimeThreads, 0, m.m_stream>>>(
@@ -1057,6 +1081,13 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             thunderOutKernel<<<1, 128, 0, m.m_stream>>>( hdr, m.m_dThunderRing, m.m_dNightScratch, n );
             iceKernel<<<1, 1024, 0, m.m_stream>>>( hdr, m.m_dIceStress, m.m_dIceChirps, m.m_dIceMeta, m.m_dLifeStats );
             iceSingKernel<<<1, IceChirps, 0, m.m_stream>>>( hdr, m.m_dIceChirps, m.m_dNightScratch, n );
+            // The night chorus (Phase 31): the callers' clocks, their order, their calls, summed.
+            chorusStepKernel<<<ChorusCallers / 256, 256, 0, m.m_stream>>>( hdr, m.m_dChorus, m.m_dLifeStats );
+            chorusOrderKernel<<<1, 1024, 0, m.m_stream>>>( hdr, m.m_dChorus, m.m_dLifeStats );
+            chorusSoundKernel<<<ChorusBlocks, ChorusThreads, 0, m.m_stream>>>( hdr, m.m_dChorus, m.m_dChorusScratch,
+                                                                               n );
+            chorusReduceKernel<<<static_cast<unsigned>( ( 4 * n + 127 ) / 128 ), 128, 0, m.m_stream>>>(
+                hdr, m.m_dChorusScratch, m.m_dNightScratch, n );
             nightMixKernel<<<static_cast<unsigned>( ( n + 127 ) / 128 ), 128, 0, m.m_stream>>>( hdr, m.m_dNightScratch,
                                                                                                 n, m.m_dOut );
             modalKernel<<<static_cast<unsigned>( ModalBlocks ), ModalThreads, 0, m.m_stream>>>(
@@ -1136,6 +1167,10 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                     { reinterpret_cast<const void *>( &iceKernel ), 17 },
                     { reinterpret_cast<const void *>( &iceSingKernel ), 17 },
                     { reinterpret_cast<const void *>( &nightMixKernel ), 18 },
+                    { reinterpret_cast<const void *>( &chorusStepKernel ), 19 },
+                    { reinterpret_cast<const void *>( &chorusOrderKernel ), 19 },
+                    { reinterpret_cast<const void *>( &chorusSoundKernel ), 19 },
+                    { reinterpret_cast<const void *>( &chorusReduceKernel ), 19 },
                 };
                 size_t nodeCount = 0;
                 good = ok( cudaGraphGetNodes( m.m_graph, nullptr, &nodeCount ), "cudaGraphGetNodes", error );
@@ -1396,6 +1431,17 @@ void CloudEngine::dreamWrite( const float *in, int count )
     cudaMemcpy( m.m_dMeta + 2, &counts[2], sizeof( int ), cudaMemcpyHostToDevice );
 }
 
+NightChorus &CloudEngine::chorus()
+{
+    return m_impl->m_chorus;
+}
+
+void CloudEngine::chorusStats( float *out ) const
+{
+    for ( int k = 0; k < 4; ++k ) out[k] = m_impl ? m_impl->m_hLifeStats[60 + k] : 0.0f;
+    out[3] /= static_cast<float>( ChorusCallers );   // the waiting ones as a share
+}
+
 void CloudEngine::setIceStress( const float *in )
 {
     if ( !m_impl || !m_impl->m_hIceUp ) return;
@@ -1565,6 +1611,22 @@ void CloudEngine::launch()
         m.m_thunderWas = m.m_thunder.m_on != 0;
     }
     hdr->m_ice = m.m_ice;
+    hdr->m_chorus = m.m_chorus;
+    hdr->m_chorus.m_pitchCount = std::clamp( m.m_chorus.m_pitchCount, 0, ChorusPitches );
+    hdr->m_chorus.m_kind = std::clamp( m.m_chorus.m_kind, 0, static_cast<int>( ChorusKindE::COUNT ) - 1 );
+    m.m_chorus.m_reset = 0;   // asked for once
+    {                         // the time mirror (Phase 31): its window within bounds; it begins from silent recordings
+        const bool mirror = m.m_room.m_on && m.m_room.m_mirrorOn;
+        hdr->m_room.m_mirrorOn = mirror ? 1 : 0;
+        hdr->m_room.m_mirrorLen = std::clamp( m.m_room.m_mirrorLen, 1, MirrorMax );
+        hdr->m_room.m_mirrorPos = std::clamp( m.m_room.m_mirrorPos, 0, hdr->m_room.m_mirrorLen - 1 );
+        hdr->m_room.m_mirrorBuf &= 1;
+        hdr->m_room.m_mirrorGain = std::max( m.m_room.m_mirrorGain, 0.0f );
+        if ( mirror && !m.m_mirrorWas )
+            cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ),
+                             m.m_stream );
+        m.m_mirrorWas = mirror;
+    }
     m.m_ice.m_reset = 0;   // asked for once
     m.m_ice.m_crack = 0;
     hdr->m_phantomVoice = m.m_phantomVoice >= 0 && m.m_phantomVoice < m.m_cfg.m_voices ? m.m_phantomVoice : -1;
@@ -1606,7 +1668,7 @@ void CloudEngine::launch()
     // The gates: a resting feature's kernels switched off in the graph (on again at once when it wakes).
     {
         const int  pv = hdr->m_phantomVoice;
-        const bool want[19] = { hdr->m_life.m_mode != LifeModeE::OFF,
+        const bool want[20] = { hdr->m_life.m_mode != LifeModeE::OFF,
                                 hdr->m_weather.m_wind != 0,
                                 hdr->m_chimes.m_on != 0,
                                 hdr->m_weather.m_rainOn || hdr->m_weather.m_leavesOn || hdr->m_weather.m_surfOn,
@@ -1624,7 +1686,8 @@ void CloudEngine::launch()
                                 hdr->m_harp.m_on != 0,
                                 hdr->m_thunder.m_on != 0,
                                 hdr->m_ice.m_on != 0,
-                                hdr->m_harp.m_on || hdr->m_thunder.m_on || hdr->m_ice.m_on };
+                                hdr->m_harp.m_on || hdr->m_thunder.m_on || hdr->m_ice.m_on || hdr->m_chorus.m_on,
+                                hdr->m_chorus.m_on != 0 };
         for ( size_t g = 0; g < m.m_gates.size(); ++g )
         {
             Impl::Gate &gate = m.m_gates[g];

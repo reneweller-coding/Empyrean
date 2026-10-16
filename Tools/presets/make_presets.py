@@ -69,7 +69,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Rain on Water", "Tin Roofs", "Forest Rain", "Stone Gardens", "Rustling Woods", "Pine Winds", "Seashores", "Pebble Beaches",
           "Storm Coasts", "Tam-Tam Halls", "Thunder Sheets", "Swarm Rings", "Firefly Swarms", "Slime Veins", "Mycelium Nights", "Weather Gardens",
           "Chapel Air", "Stone Halls", "Curtained Rooms", "Walking Rooms", "Standing Waves", "Halo Rings", "Counter Halos", "Edge States",
-          "Still Halos", "Halo Chapels", "Quantum Harmony", "Interference Nights", "Tonnetz Walks", "Quantum Halos", "Resonant Spaces", "Topologies"]
+                    "Still Halos", "Halo Chapels", "Quantum Harmony", "Interference Nights", "Tonnetz Walks", "Quantum Halos", "Resonant Spaces", "Topologies",
+          "Aeolian Harps", "Harp Gardens", "Distant Storms", "Summer Storms", "Rolling Thunder", "Singing Lakes", "Frozen Nights", "Thin Ice",
+          "Twin Streams", "Fusion Choirs", "Parting Clouds", "Endless Ritardando", "Endless Accelerando", "Night Arcs", "Inside the Cloud", "Night Weather"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -392,8 +394,40 @@ NAMES = {
                       ["Halo", "Ring State", "Edge Mode", "Bound State", "Orbital", "Spin Ring", "Chern Ring", "Band"]),
     "Resonant Spaces": (["Resounding", "Reverberant", "Ringing-Stone", "Vibrant", "Sonorous", "Booming", "Plangent", "Echoic"],
                         ["Space", "Chamber", "Vault", "Cistern", "Silo", "Tank", "Dome", "Rotunda Space"]),
-    "Topologies": (["Twisted", "Knotted-Space", "Inverted", "Woven-Space", "Plaited", "Linked", "Wound", "Coiled"],
+        "Topologies": (["Twisted", "Knotted-Space", "Inverted", "Woven-Space", "Plaited", "Linked", "Wound", "Coiled"],
                    ["Topology", "Manifold", "Torus", "Surface", "Space-Time", "Lattice", "Fabric", "Continuum"]),
+    "Aeolian Harps": (["Aeolian", "Windblown", "Sighing", "Breath-Strung", "Gale-Tuned", "Zephyr", "Moaning", "Wind-Sung"],
+                      ["Harp", "Lyre", "Strings", "Wind Harp", "Psaltery", "Zither", "Sounding Board", "Kithara"]),
+    "Harp Gardens": (["Window", "Casement", "Gable", "Balcony", "Attic", "Dormer", "Veranda", "Belvedere"],
+                     ["Harp", "Strings", "Lyre", "Garden", "Bower", "Arbour", "Trellis", "Sill"]),
+    "Distant Storms": (["Distant", "Far-Off", "Remote", "Horizon", "Faint", "Muffled", "Hushed", "Gathering"],
+                       ["Storm", "Thunder", "Rumble", "Weather", "Front", "Cloudbank", "Squall", "Tempest"]),
+    "Summer Storms": (["Summer", "Sultry", "Humid", "August", "Midsummer", "Torrid", "Heavy-Air", "Close"],
+                      ["Storm", "Downpour", "Cloudburst", "Shower", "Thunderstorm", "Deluge", "Rainstorm", "Evening Storm"]),
+    "Rolling Thunder": (["Rolling", "Rumbling", "Grumbling", "Hillside", "Valley", "Mountain", "Reverberating", "Long"],
+                        ["Thunder", "Peal", "Roll", "Rumble", "Thunderroll", "Echo", "Drumroll", "Boom"]),
+    "Singing Lakes": (["Singing", "Frozen", "Ringing", "Whistling", "Chirping", "Lasering", "Humming", "Crystal"],
+                      ["Lake", "Ice", "Pond", "Mere", "Tarn", "Loch", "Floe", "Lagoon"]),
+    "Frozen Nights": (["Frosty", "Bitter", "Arctic", "Polar", "Hoarfrost", "Wintry", "Glacial", "Icebound"],
+                      ["Night", "Midnight", "Darkness", "Solstice", "Moonset", "Starlight", "Twilight", "Small Hours"]),
+    "Thin Ice": (["Thin", "Black", "Clear", "Glass", "New", "Brittle", "Taut", "Shining"],
+                 ["Ice", "Sheet", "Skin", "Veneer", "Crust", "Shelf", "Rime", "Glaze"]),
+    "Twin Streams": (["Twin", "Double", "Paired", "Doubled", "Divided", "Split", "Forked", "Parted"],
+                     ["Streams", "Voices", "Currents", "Rivers", "Choirs", "Threads", "Lines", "Tones"]),
+    "Fusion Choirs": (["Fused", "Melded", "Welded", "Joined", "United", "Merged", "Blended", "Bound"],
+                      ["Choir", "Voices", "Chorus", "Ensemble", "Chant", "Consort", "Schola", "Cantus"]),
+    "Parting Clouds": (["Parting", "Unravelling", "Dissolving", "Fraying", "Separating", "Scattering", "Splitting", "Unweaving"],
+                       ["Cloud", "Mist", "Veil", "Haze", "Fog", "Cirrus", "Nimbus", "Vapour"]),
+    "Endless Ritardando": (["Endless", "Eternal", "Unending", "Ever-Slowing", "Infinite", "Perpetual", "Ceaseless", "Boundless"],
+                           ["Ritardando", "Slowing", "Wane", "Settling", "Unwinding", "Easing", "Dwindling", "Lullaby"]),
+    "Endless Accelerando": (["Rising", "Quickening", "Hastening", "Mounting", "Climbing", "Gathering-Pace", "Racing", "Spiralling"],
+                            ["Accelerando", "Pulse", "Heartbeat", "Rush", "Run", "Flight", "Stride", "Gallop"]),
+    "Night Arcs": (["Dusk", "Nightfall", "Gloaming", "Vesper", "Owl-Light", "Moonrise", "Starrise", "Late"],
+                   ["Arc", "Hour", "Watch", "Turn", "Passage", "Curve", "Bow", "Sweep"]),
+    "Inside the Cloud": (["Inner", "Immersed", "Enveloping", "Surrounding", "Embracing", "Encircling", "Inward", "Engulfing"],
+                         ["Cloud", "Sphere", "Dome", "Space", "Presence", "Aura", "Atmosphere", "Field"]),
+    "Night Weather": (["Nocturnal", "Midnight", "Starless", "Moonless", "Sleepless", "Wakeful", "Owl-Hour", "Dark-Hour"],
+                      ["Weather", "Storm", "Squall", "Frost", "Rime", "Wind", "Gust", "Tempest"]),
 }
 
 
@@ -3222,6 +3256,231 @@ def z_topologies(r):
 RECIPES = RECIPES + [z_chapel, z_stone, z_curtained, z_walking, z_standing, z_halo_rings, z_counter, z_edge, z_still,
                      z_halo_chapels, z_quantum, z_interference, z_tonnetz, z_quantum_halos, z_resonant, z_topologies]
 
+# ---- Phase 30 (16.10.2026): the night -- the Aeolian harp, thunder, the singing ice --, streams and Risset's rhythm,
+# the night arc, the headset.
+
+STREAMS = {"Odd & Even": 0, "By Three": 1, "Registers": 2, "Members": 3}
+RISSET_WAY = {"Slowing": 0, "Quickening": 1}
+
+
+def set_harp(r, level=(0.4, 0.85), gauge=(0.2, 0.8), wind=(0.35, 0.75), gusts=(0.3, 0.8)):
+    """The Aeolian harp in the wind: its level, its octave (mostly as tuned), its gauge, and the wind it stands in."""
+    r.set("harp", f(r.u(*level), 2))
+    r.set("harp_pitch", r.pick(-1, 0, 0, 0, 1))
+    r.set("harp_gauge", f(r.u(*gauge), 2))
+    set_wind(r, wind=wind, gusts=gusts)
+
+
+def set_thunder(r, level=(0.3, 0.8), distance=(1.0, 6.0), rumble=(0.3, 0.9)):
+    """A thunderstorm: how often it strikes, how far off, how it rolls."""
+    r.set("thunder", f(r.u(*level), 2))
+    r.set("thunder_distance", f(r.lg(*distance), 2))
+    r.set("thunder_rumble", f(r.u(*rumble), 2))
+
+
+def set_ice(r, level=(0.4, 0.85), thickness=(0.05, 0.25), cold=(0.2, 0.7)):
+    """The singing ice: its level, its thickness, the cold that cracks it."""
+    r.set("ice", f(r.u(*level), 2))
+    r.set("ice_thickness", f(r.lg(*thickness), 3))
+    r.set("ice_cold", f(r.u(*cold), 2))
+
+
+def set_streams(r, kind, depth=(0.4, 0.9), rate=(0.5, 4.0), fusion=(0.0, 0.3)):
+    """Streams: how the partials part, how much and how fast they move, how fused they are."""
+    r.set("streams", STREAMS[kind])
+    r.set("stream_depth", f(r.u(*depth), 2))
+    r.set("stream_rate", f(r.lg(*rate), 2))
+    r.set("fusion", f(r.u(*fusion), 2))
+
+
+def set_risset(r, way, depth=(0.4, 0.8), rate=(0.6, 3.0), time=(20, 120)):
+    """Risset's rhythm: how deep it pulses, its middle tempo, an octave's time, which way."""
+    r.set("risset", f(r.u(*depth), 2))
+    r.set("risset_rate", f(r.lg(*rate), 2))
+    r.set("risset_time", f(r.lg(*time), 1))
+    r.set("risset_way", RISSET_WAY[way])
+
+
+def set_night(r, arc=(0.5, 1.0)):
+    """The night arc from the real sun."""
+    r.set("night_arc", f(r.u(*arc), 2))
+
+
+def set_headset(r, hands=(0.5, 1.0)):
+    """The headset in the cloud: the binaural cloud held in the room as the head turns, the hands reaching in."""
+    r.set("binaural", 1)
+    r.set("head_tracking", 1)
+    r.set("vr_hands", f(r.u(*hands), 2))
+
+
+P30_POOLS = {
+    "harp": [("lfo2", "harp_gauge", (0.1, 0.3)), ("lfo3", "wind", (0.1, 0.25))],
+    "thunder": [("lfo3", "thunder", (0.1, 0.3)), ("lightning", "brightness", (0.1, 0.3))],
+    "ice": [("lfo3", "ice_cold", (0.1, 0.3)), ("lfo2", "ice_thickness", (0.05, 0.15))],
+    "streams": [("lfo2", "fusion", (0.2, 0.45)), ("lfo3", "stream_depth", (0.1, 0.3))],
+    "risset": [("lfo3", "risset", (0.1, 0.25))],
+    "night": [("night", "cutoff", (-0.3, -0.1)), ("night", "far_level", (0.1, 0.25))],
+    "headset": [("lfo3", "vr_hands", (0.1, 0.25))],
+}
+
+
+def p30_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly (the night's own sources need no setup)."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P30_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def n_harps(r):
+    based(r, "Choirs", "Strings", "Glass", "Air & Noise", "Sleep Concert", "Deep Space", "Shimmer")
+    set_harp(r)
+    p30_rows(r, ["harp"], 1)
+
+
+def n_harp_gardens(r):
+    based(r, *CALM)
+    set_harp(r, level=(0.35, 0.7), wind=(0.3, 0.6))
+    if r.rng.random() < 0.6:
+        set_leaves(r, r.pick("Broadleaf", "Pine", "Grass"), level=(0.2, 0.5))
+    if r.rng.random() < 0.4:
+        set_chimes(r, r.pick("Tubes", "Glass", "Bamboo", "Bells"), level=(0.25, 0.55), wind=(0.3, 0.6))
+    p30_rows(r, ["harp"], 1)
+
+
+def n_distant(r):
+    based(r, "Dark Drones", "Deep Space", "Sleep Concert", "Organs", "Strings", "Choirs")
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_thunder(r, level=(0.3, 0.6), distance=(4.0, 10.0), rumble=(0.5, 1.0))
+    p30_rows(r, ["thunder"], 1)
+
+
+def n_summer(r):
+    based(r, *ALL)
+    set_thunder(r, distance=(1.0, 4.0))
+    set_rain(r, r.pick("Water", "Leaves", "Stone", "Tin Roof"), level=(0.3, 0.6), rate=(800, 6000), showers=(0.5, 1.0))
+    set_wind(r, wind=(0.4, 0.75), gusts=(0.5, 0.9))
+    p30_rows(r, ["thunder"], 1)
+
+
+def n_rolling(r):
+    based(r, "Dark Drones", "Deep Space", "Organs", "Air & Noise", "Strings")
+    set_thunder(r, level=(0.5, 0.9), distance=(1.5, 5.0), rumble=(0.7, 1.0))
+    p30_rows(r, ["thunder"], 1)
+
+
+def n_lakes(r):
+    based(r, "Glass", "Shimmer", "Choirs", "Deep Space", "Bells", "Sleep Concert", "Strings")
+    set_ice(r)
+    p30_rows(r, ["ice"], 1)
+
+
+def n_frozen(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_ice(r, level=(0.3, 0.6), thickness=(0.08, 0.3), cold=(0.1, 0.4))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def n_thin_ice(r):
+    based(r, "Glass", "Shimmer", "Air & Noise", "Bells", "Keys")
+    set_ice(r, level=(0.5, 0.9), thickness=(0.03, 0.08), cold=(0.5, 0.9))
+    p30_rows(r, ["ice"], 1)
+
+
+def n_twin(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Keys", "Air & Noise")
+    set_streams(r, "Odd & Even", fusion=(0.0, 0.2))
+    p30_rows(r, ["streams"], 1)
+
+
+def n_fusion(r):
+    based(r, "Choirs", "Organs", "Strings", "Sleep Concert", "Shimmer")
+    set_streams(r, r.pick("Odd & Even", "By Three", "Registers"), fusion=(0.3, 0.7))
+    setup(r, "wander")
+    r.row("lfo2", "fusion", round(r.u(0.3, 0.5), 3))
+    p30_rows(r, ["streams"], 1)
+
+
+def n_parting(r):
+    based(r, "Air & Noise", "Shimmer", "Deep Space", "Glass", "Choirs")
+    set_streams(r, "Members", depth=(0.3, 0.7), rate=(0.2, 1.5), fusion=(0.0, 0.4))
+    p30_rows(r, ["streams"], 1)
+
+
+def n_ritardando(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_risset(r, "Slowing")
+    p30_rows(r, ["risset"], 1)
+
+
+def n_accelerando(r):
+    based(r, "Glass", "Keys", "Bells", "Pendulums", "Shimmer", "Strings", "Air & Noise")
+    set_risset(r, "Quickening", rate=(1.0, 4.0))
+    p30_rows(r, ["risset"], 1)
+
+
+def n_arcs(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_night(r)
+    p30_rows(r, ["night"], 1)
+
+
+def n_inside(r):
+    based(r, "Choirs", "Strings", "Glass", "Shimmer", "Deep Space", "Organs", "Bells")
+    set_headset(r)
+    world = r.pick("halo", "room", "physarum", "wind")
+    if world == "halo":
+        set_halo(r, level=(0.3, 0.7))
+    elif world == "room":
+        set_room(r, level=(0.3, 0.7))
+    elif world == "physarum":
+        set_physarum(r, share=(0.2, 0.5))
+    else:
+        set_chimes(r, r.pick("Tubes", "Glass", "Bamboo", "Bells"), level=(0.25, 0.55))
+        if r.rng.random() < 0.5:
+            set_leaves(r, r.pick("Broadleaf", "Pine", "Grass"), level=(0.2, 0.45))
+    p30_rows(r, ["headset"], 1)
+
+
+def n_night_weather(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("harp", "thunder", "ice", "streams", "risset", "night") if r.rng.random() < 0.4]
+    if "harp" in kinds:
+        set_harp(r, level=(0.3, 0.65))
+    if "thunder" in kinds:
+        set_thunder(r, level=(0.25, 0.6), distance=(2.0, 8.0))
+    if "ice" in kinds:
+        set_ice(r, level=(0.3, 0.65))
+    if "streams" in kinds:
+        set_streams(r, r.pick("Odd & Even", "By Three", "Registers", "Members"), depth=(0.3, 0.7), fusion=(0.0, 0.6))
+    if "risset" in kinds:
+        set_risset(r, r.pick("Slowing", "Slowing", "Quickening"), depth=(0.3, 0.6))
+    if "night" in kinds:
+        set_night(r, arc=(0.4, 0.9))
+    p30_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [n_harps, n_harp_gardens, n_distant, n_summer, n_rolling, n_lakes, n_frozen, n_thin_ice, n_twin,
+                     n_fusion, n_parting, n_ritardando, n_accelerando, n_arcs, n_inside, n_night_weather]
+
 
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
@@ -3270,7 +3529,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-             "/// The factory presets: 160 groups of 64 (Presets.h).",
+                          "/// The factory presets: 176 groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

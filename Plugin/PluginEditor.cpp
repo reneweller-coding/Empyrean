@@ -446,6 +446,10 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::THUNDER } },
             { "Singing Ice", F::FILTER, IdsT{ ParamIdE::ICE, ParamIdE::ICE_THICKNESS, ParamIdE::ICE_COLD },
               IdsT{ ParamIdE::ICE } },
+            { "Night Chorus", F::MOTION,
+              IdsT{ ParamIdE::CHORUS, ParamIdE::CHORUS_KIND, ParamIdE::CHORUS_WARMTH, ParamIdE::CHORUS_SYNC,
+                    ParamIdE::CHORUS_TUNE },
+              IdsT{ ParamIdE::CHORUS } },
             { "Night", F::ENVELOPE, IdsT{ ParamIdE::NIGHT_ARC }, IdsT{ ParamIdE::NIGHT_ARC } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
@@ -516,15 +520,17 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                                ParamIdE::BLOOM_GLIDE },
                          IdsT{ ParamIdE::BLOOM } } } );
     // Phase 29: the wave room and the topological halo.
-    page( "Rooms", { { "Wave Room", F::SPACE,
-                       IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
-                       IdsT{ ParamIdE::WAVE_ROOM } },
-                     { "Halo", F::MOTION,
-                       IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
-                             ParamIdE::HALO_TURN },
-                       IdsT{ ParamIdE::HALO } },
-                     { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING },
-                       IdsT{ ParamIdE::VR_HANDS } } } );
+    page(
+        "Rooms",
+        { { "Wave Room", F::SPACE,
+            IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
+            IdsT{ ParamIdE::WAVE_ROOM } },
+          { "Halo", F::MOTION,
+            IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
+                  ParamIdE::HALO_TURN },
+            IdsT{ ParamIdE::HALO } },
+          { "Time Mirror", F::SPACE, IdsT{ ParamIdE::MIRROR, ParamIdE::MIRROR_TIME }, IdsT{ ParamIdE::MIRROR } },
+          { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING }, IdsT{ ParamIdE::VR_HANDS } } } );
     {
         auto *h = new HallPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [h] { return h->describe(); } );
@@ -1787,6 +1793,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstDreamGroup ) bank.addSectionHeader( "Dreams & Phantoms" );
         if ( g == additiv::FirstWeatherGroup ) bank.addSectionHeader( "Weather & Growth" );
         if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
+        if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

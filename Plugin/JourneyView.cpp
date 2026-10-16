@@ -139,6 +139,7 @@ void JourneyView::choosePreset( int slot )
         if ( g == additiv::FirstDreamGroup ) bank.addSectionHeader( "Dreams & Phantoms" );
         if ( g == additiv::FirstWeatherGroup ) bank.addSectionHeader( "Weather & Growth" );
         if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
+        if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

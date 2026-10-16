@@ -85,7 +85,11 @@ static_assert( RoomFirTaps % RoomDecim == 0, "the interpolation's phases are who
 
 // ---- Phase 30 (16.10.2026): the night -- the Aeolian harp, thunder, the singing ice.
 
-constexpr int NightRows = 12 + HarpStrings;   ///< the night's scratch: harp, thunder, ice (four rows each), the strings
+constexpr int NightStringRow = 16;                        ///< the night's scratch: the harp's strings from this row
+constexpr int NightRows = NightStringRow + HarpStrings;   ///< harp, thunder, ice, chorus (four rows each), the strings
+constexpr int ChorusThreads = 64;                         ///< callers per CUDA block of the chorus's sound
+constexpr int ChorusBlocks = ChorusCallers / ChorusThreads;   ///< CUDA blocks of the chorus's sound
+static_assert( ChorusCallers % 256 == 0 && ChorusCallers % ChorusThreads == 0, "the callers fill whole CUDA blocks" );
 static_assert( HarpModes == 32, "a string's modes are a warp's lanes" );
 static_assert( ThunderMain % 32 == 0 && ( ThunderSegments - ThunderMain ) % ( 32 * ThunderBranches ) == 0,
                "the channel's stretches split over a warp's lanes" );
@@ -133,6 +137,7 @@ struct BlockHeader
     AeolianHarp   m_harp;             ///< the Aeolian harp for this block (Phase 30)
     Thunder       m_thunder;          ///< thunder for this block (Phase 30)
     SingingIce    m_ice;              ///< the singing ice for this block (Phase 30)
+    NightChorus   m_chorus;           ///< the night chorus for this block (Phase 31)
 
     std::int32_t m_lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t m_lpad0;        ///< keeps the header 16-byte aligned

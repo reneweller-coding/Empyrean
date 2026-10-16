@@ -353,7 +353,15 @@ enum class ParamIdE : int
     DREAM_JOURNAL,      ///< the dream's memories kept with the state, and back with it
     VR_HANDS,           ///< 0 .. 1: the headset's hands reach into the cloud (wind, halo, room, physarum)
     HEAD_TRACKING,      ///< the binaural cloud and the thunder stay put as the head turns (the headset)
-    COUNT               ///< number of parameters
+    // Phase 31 (16.10.2026): the night chorus, the time mirror
+    CHORUS,          ///< 0 .. 1: a night chorus of insects and frogs, each kind in its own band, calling in turns
+    CHORUS_KIND,     ///< who calls: a meadow, the treetops, a pond, all of them
+    CHORUS_WARMTH,   ///< degrees Celsius: the night's warmth (warm insects call faster: Dolbear's law)
+    CHORUS_SYNC,     ///< 0 .. 1: how far a call heard resets a neighbour's clock (they fall into step, or into turns)
+    CHORUS_TUNE,     ///< 0 .. 1: the callers' carriers pulled to the scale's pitches
+    MIRROR,        ///< 0 .. 1: a time-reversal mirror round you in the wave room: what it heard runs back to its source
+    MIRROR_TIME,   ///< s: the mirror's window (it listens for one, plays it back reversed during the next)
+    COUNT          ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table
@@ -467,6 +475,8 @@ constexpr int            NumStreams = 4;                      ///< entries of St
 extern const char *const StreamsNames[NumStreams];            ///< "Odd & Even", "By Three", "Registers", "Members"
 constexpr int            NumRissetWays = 2;                   ///< entries of RissetWayNames
 extern const char *const RissetWayNames[NumRissetWays];       ///< "Slowing", "Quickening"
+constexpr int            NumChorusKinds = 4;                  ///< entries of ChorusKindNames (ChorusKindE)
+extern const char *const ChorusKindNames[NumChorusKinds];     ///< "Meadow", "Treetops", "Pond", "Summer Night"
 constexpr int            NumShores = 3;                       ///< entries of ShoreNames
 extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
 constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames

@@ -365,6 +365,10 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_rissetPulse = m_lightning = 0.0f;
     m_journalClock = 30.0f;
     m_pose = HeadsetPose{};
+    m_chorusLevel = 0.0f;
+    m_chorusWas = false;
+    m_chorusCalls = 0;
+    m_mirrorPos = m_mirrorBuf = 0;
     m_stormRng = Rng( m_cfg.m_seed ^ 0x53746F726Dull );
     m_haloGain = m_roomLevel = 0.0f;
     m_haloNote.fill( -1 );
@@ -2600,6 +2604,34 @@ void Engine::stepNight( float dt )
     }
     m_lightning *= std::exp( -dt / 0.6f );   // the last strike's flash fading
 
+    // The night chorus (Phase 31): scattered anew as it begins; its warmth the knob's, a few degrees cooler as the night
+    // arc's night deepens (and the insects slower); its carriers pulled to the scale's pitches 200 Hz .. 12 kHz.
+    {
+        NightChorus &C = m_cloud.chorus();
+        const float  want = cur( ParamIdE::CHORUS );
+        glide( m_chorusLevel, want, 0.5f );
+        C.m_on = ( want > 0.0f || m_chorusLevel > 0.0f ) ? 1 : 0;
+        if ( C.m_on && !m_chorusWas ) C.m_reset = 1;
+        m_chorusWas = C.m_on != 0;
+        if ( C.m_on )
+        {
+            C.m_level = 0.6f * m_chorusLevel * VoiceLevel;
+            C.m_kind =
+                std::clamp( static_cast<int>( std::lround( cur( ParamIdE::CHORUS_KIND ) ) ), 0, NumChorusKinds - 1 );
+            C.m_warmth =
+                cur( ParamIdE::CHORUS_WARMTH ) - 3.0f * m_night * std::clamp( cur( ParamIdE::NIGHT_ARC ), 0.0f, 1.0f );
+            C.m_sync = cur( ParamIdE::CHORUS_SYNC );
+            C.m_tune = cur( ParamIdE::CHORUS_TUNE );
+            int count = 0;
+            for ( int k = 0; k < 128 && count < ChorusPitches; ++k )
+            {
+                const double f = frequencyOf( k );
+                if ( f >= 200.0 && f < 12000.0 ) C.m_pitch[count++] = static_cast<float>( f );
+            }
+            C.m_pitchCount = count;
+        }
+    }
+
     // The Aeolian harp: twelve strings to the chord's pitch classes (the scale's root and fifth when nothing sounds),
     // each in the octave above 55 Hz moved by Harp Pitch, the tuning gliding (3 s) as the chord moves; their gauges
     // from thick to thin about Gauge's, so each sings another harmonic; spread across the front, near.
@@ -2724,6 +2756,9 @@ void Engine::stepNight( float dt )
         }
     }
 }
+
+/** @brief The time mirror's cells' share of what they heard, sent back (Phase 31, measured: selftest 98). */
+constexpr float MirrorShare = 0.08f;
 
 void Engine::stepRooms( float dt )
 {
@@ -2866,6 +2901,36 @@ void Engine::stepRooms( float dt )
             W.m_ear[0] = cell( xl - 1, yl, zl );
             W.m_ear[1] = cell( xl + 1, yl, zl );
             W.m_srcZ = std::min( nz - 2, static_cast<int>( std::lround( 1.4f / Cell ) ) );
+            // The time mirror (Phase 31): RoomMirrors cells on a ring round the listener on the sources' plane, its
+            // window the knob's; it listens for a window and sends it back reversed in the next, each cell by
+            // MirrorShare of what it heard (sixty-four of them, the swell measured about as loud as the sound itself).
+            {
+                const float mirror = cur( ParamIdE::MIRROR );
+                W.m_mirrorOn = mirror > 0.0f ? 1 : 0;
+                W.m_mirrorGain = MirrorShare * mirror;
+                W.m_mirrorLen = std::clamp( static_cast<int>( cur( ParamIdE::MIRROR_TIME ) *
+                                                              static_cast<float>( m_cfg.m_sampleRate ) / RoomDecim ),
+                                            64, MirrorMax );
+                if ( m_mirrorPos >= W.m_mirrorLen ) m_mirrorPos = 0;
+                W.m_mirrorPos = m_mirrorPos;
+                W.m_mirrorBuf = m_mirrorBuf;
+                m_mirrorPos += m_cfg.m_gpuBlock / RoomDecim;
+                if ( m_mirrorPos >= W.m_mirrorLen )
+                {
+                    m_mirrorPos -= W.m_mirrorLen;
+                    m_mirrorBuf ^= 1;
+                }
+                const float radius = 0.35f * static_cast<float>( std::min( nx, ny ) );
+                for ( int k = 0; k < RoomMirrors; ++k )
+                {
+                    const float a = 6.2831853f * static_cast<float>( k ) / RoomMirrors;
+                    const int   x =
+                        std::clamp( static_cast<int>( std::lround( xl + radius * std::cos( a ) ) ), 1, nx - 2 );
+                    const int y =
+                        std::clamp( static_cast<int>( std::lround( yl + radius * std::sin( a ) ) ), 1, ny - 2 );
+                    W.m_mirror[k] = cell( x, y, W.m_srcZ );
+                }
+            }
             int count = 0;
             for ( int i = 0; i < first && count < RoomSources; ++i )
             {
@@ -4056,6 +4121,12 @@ void Engine::renderBlock()
     m_cloud.launch();
     const float *q = m_cloud.wait();
     m_chimeStrikes.fetch_add( m_cloud.chimeStrikes(), std::memory_order_relaxed );
+    if ( m_chorusWas )
+    {   // the night chorus's calls, counted (Phase 31)
+        float chorus[4];
+        m_cloud.chorusStats( chorus );
+        m_chorusCalls += static_cast<long long>( chorus[0] );
+    }
     QueryPerformanceCounter( &qpcBack );
     {
         const float *dots = nullptr;

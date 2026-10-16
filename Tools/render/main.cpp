@@ -533,6 +533,11 @@ int main( int argc, char **argv )
                              "%.2f; quantum walk %lld moves (last %d)\n",
                              energy[0], energy[1], energy[2], angle[0] * 57.29578f, angle[1] * 57.29578f,
                              angle[2] * 57.29578f, rim[0], rim[1], rim[2], qwMoves, qwStep );
+            float chorus[4];   // Phase 31: the night chorus
+            e.chorusStats( chorus );
+            if ( chorus[1] > 0.0f )
+                std::printf( "         chorus: %.0f calls begun, %.0f calling, order %.2f, %.0f %% waiting\n",
+                             chorus[0], chorus[1], chorus[2], 100.0f * chorus[3] );
             float night[6];   // Phase 30: the harp, the ice, thunder
             e.nightStats( night );
             if ( night[0] + night[3] + night[4] > 0.0f )

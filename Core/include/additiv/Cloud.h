@@ -160,6 +160,13 @@ constexpr int   IceN = 32;                ///< the ice sheet's stress grid: IceN
 constexpr float IceShare = 0.2f;          ///< the stress a slipping cell hands each of its neighbours (OFC's alpha)
 constexpr int   IceChirps = 64;           ///< chirps that may sound at once
 
+// Phase 31 (16.10.2026): the night chorus, the time mirror.
+constexpr int ChorusCallers = 2048;   ///< the night chorus's callers (crickets, katydids, frogs ...)
+constexpr int ChorusSpecies = 8;      ///< their kinds
+constexpr int ChorusPitches = 64;     ///< pitches the callers' carriers may be tuned to
+constexpr int RoomMirrors = 64;       ///< the time mirror's cells round the listener in the wave room
+constexpr int MirrorMax = 36864;      ///< samples at the room's rate a mirror cell records (6 s at 6 kHz)
+
 /**
  * @brief How Streams parts a voice's partials into streams (Phase 30): each stream moves with a vibrato and a tremolo
  *        of its own, and the ear hears it as a sound of its own (Bregman's common fate).
@@ -304,8 +311,8 @@ constexpr int CloudChannels = 4;   ///< the voices' channels on the GPU: near le
 /**
  * @brief A finished frame: the four voice channels, the modal hall's left and right, the spectral echo's, the
  *        melt's, the chime field's four (near and far, left and right), the phantom layer's two (heard dry), the
- *        weather's four (near and far, left and right), the bloom's two, the wave room's two and the night's four
- *        (the harp, the thunder and the ice; near and far, left and right).
+  *        weather's four (near and far, left and right), the bloom's two, the wave room's two and the night's four
+ *        (the harp, the thunder, the ice and the chorus; near and far, left and right).
  */
 constexpr int CloudOutChannels = 28;
 constexpr int ModalModes = 65536;   ///< the modal hall's resonances
@@ -744,9 +751,18 @@ struct WaveRoom
     int   m_source[RoomSources] = {};    ///< each source's cell
     int   m_voiceOf[RoomSources] = {};   ///< and its GPU voice
     float m_gain[RoomSources] = {};      ///< and its gain
-    int   m_absorb[2] = { -1, -1 };   ///< the headset's open hands (Phase 30): each one's cell, an absorber (-1 none)
-    float m_absorbR2 = 4.0f;          ///< their radius squared, cells
-    float m_absorbK = 0.0f;           ///< the share of the pressure they take a step there
+    int   m_absorb[2] = { -1, -1 };     ///< the headset's open hands (Phase 30): each one's cell, an absorber (-1 none)
+    float m_absorbR2 = 4.0f;            ///< their radius squared, cells
+    float m_absorbK = 0.0f;             ///< the share of the pressure they take a step there
+    int   m_mirrorOn = 0;               ///< 1: the time mirror records and plays back (Phase 31)
+    int   m_mirrorLen = 0;              ///< its window, samples at the room's rate
+    int   m_mirrorPos = 0;              ///< where in the window this block's first step is
+    int   m_mirrorBuf = 0;              ///< its stroke at this block's first step: 0 listening, 1 sending back reversed
+    float m_mirrorGain = 0.0f;          ///< how loud a cell sends the reversed field back in
+    float m_pad5 = 0.0f;                ///< keeps the struct 16-byte aligned
+    float m_pad6 = 0.0f;                ///< likewise
+    float m_pad7 = 0.0f;                ///< likewise
+    int   m_mirror[RoomMirrors] = {};   ///< the mirror's cells (a ring on the sources' plane)
 };
 static_assert( sizeof( WaveRoom ) % 16 == 0, "WaveRoom rides in the block header" );
 
@@ -840,6 +856,41 @@ struct SingingIce
     float m_pad1 = 0.0f;     ///< keeps the struct 16-byte aligned
 };
 static_assert( sizeof( SingingIce ) % 16 == 0, "SingingIce rides in the block header" );
+
+/** @brief Who calls in the night chorus: the ChorusKind parameter's choices. */
+enum class ChorusKindE : std::int32_t
+{
+    MEADOW = 0,     ///< a meadow: field crickets, snowy tree crickets, mole crickets
+    TREETOPS,       ///< the treetops: tree crickets and katydids
+    POND,           ///< a pond: peepers, tree frogs, bullfrogs, toads
+    SUMMER_NIGHT,   ///< all of them
+    COUNT           ///< number of kinds
+};
+
+/**
+ * @brief The night chorus (Phase 31): ChorusCallers insects and frogs over the field, each calling in its own rhythm.
+ *
+ * Eight kinds, each in its own band of the spectrum and with its own call -- a cricket's chirp of a few pulses at
+ * 4.6 kHz, a tree cricket's trill, a katydid's rasp, a peeper's rising peep, a tree frog's pulsed call, a bullfrog's
+ * deep drone (each kind its niche: Krause's acoustic niche hypothesis). An insect's rates follow the night's warmth
+ * (Dolbear's law: the snowy tree cricket's chirps a minute are about 7 times the degrees Celsius less 30). Every caller
+ * is an oscillator that calls when it comes round; a call of its own kind heard close enough resets it towards its
+ * start (Greenfield's inhibitory resetting) -- so neighbours fall into step, or into turns --, and a caller about to
+ * call into a louder caller of another kind in its band waits a little (a gap in time as well as in pitch).
+ */
+struct NightChorus
+{
+    int   m_on = 0;                      ///< 1: the callers call (0: nothing computed)
+    int   m_reset = 0;                   ///< 1 for one block: the callers scattered anew over the field
+    int   m_kind = 0;                    ///< who calls (ChorusKindE)
+    int   m_pitchCount = 0;              ///< pitches in m_pitch
+    float m_level = 0.0f;                ///< the chorus's amplitude out
+    float m_warmth = 18.0f;              ///< degrees Celsius: the night's temperature (the insects' rates)
+    float m_sync = 0.5f;                 ///< 0 .. 1: how far a call heard resets a neighbour's clock
+    float m_tune = 0.0f;                 ///< 0 .. 1: the carriers pulled to the scale's pitches
+    float m_pitch[ChorusPitches] = {};   ///< Hz: the scale's pitches the carriers may be pulled to
+};
+static_assert( sizeof( NightChorus ) % 16 == 0, "NightChorus rides in the block header" );
 
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
@@ -1204,6 +1255,14 @@ public:
     Thunder &thunder();
     /** @brief The singing ice's settings for the next block (Phase 30). @return them */
     SingingIce &ice();
+    /** @brief The night chorus's settings for the next block (Phase 31). @return them */
+    NightChorus &chorus();
+    /**
+     * @brief What the night chorus did in the last block (Phase 31).
+     * @param[out] out  receives 4 values: the calls begun, the callers calling, how far the most numerous kind's clocks
+     *                  stand together (the order parameter, 0 .. 1), the share of the callers waiting for a gap
+     */
+    void chorusStats( float *out ) const;
     /**
      * @brief The dream's newest memories, brought down from the card (Phase 30, the dream journal); waits for the block
      *        in flight. The thread that launches.

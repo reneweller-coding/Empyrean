@@ -60,6 +60,8 @@ using namespace additiv;
 
 namespace
 {
+/** @brief Noon in Berlin on the June solstice 2026 (Unix seconds): the clock the presets are measured by. */
+constexpr double DaySun = 1782040080.0;
 
 /** @brief The repository root: the first folder above the program that holds CMakeLists.txt and Core. @return the root */
 fs::path repoRoot()
@@ -101,6 +103,9 @@ double measure( int index, double seconds, std::string *error, Description *desc
     EngineConfig c;
     c.m_maxHostBlock = 512;
     c.m_realtimeGpuClass = false;
+    // By day (Phase 30): the night arc moves nothing then, so a preset measures the same at any hour.
+    c.m_sunClock = DaySun;
+    e.setLocation( 52.52, 13.40 );
     if ( !e.prepare( c, error ) ) return std::nan( "" );
     for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
     // The loudest three seconds, K-weighted (ITU-R BS.1770's short-term loudness, LUFS): a pad's sustain, a bell's
@@ -310,6 +315,8 @@ int registerMode( const std::vector<int> &which, double seconds, const fs::path 
         EngineConfig c;
         c.m_maxHostBlock = 2048;
         c.m_realtimeGpuClass = false;
+        c.m_sunClock = DaySun;   // by day, as the levels are measured (Phase 30)
+        e.setLocation( 52.52, 13.40 );
         if ( !e.prepare( c, &error ) )
         {
             std::fprintf( stderr, "additiv_presets: %s\n", error.c_str() );

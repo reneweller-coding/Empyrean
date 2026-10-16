@@ -366,6 +366,20 @@ const Info InfoTable[] = {
                   "absorb the room or sound in it as they pinch, and the slime mould feeds where they are." },
     { "head_tracking",
       "The headset's head turning: the binaural cloud and the thunder stay where they are in the room." },
+    { "chorus",
+      "A night chorus of insects and frogs, two thousand of them over the field: each kind calls in a band of "
+      "its own, and they answer each other -- in step, or in turns." },
+    { "chorus_kind", "Who calls: a meadow's crickets, the treetops' tree crickets and katydids, a pond's frogs and "
+                     "toads, or all of them." },
+    { "chorus_warmth", "The night's warmth: warm crickets chirp faster (Dolbear's law); the night arc cools it as the "
+                       "night deepens." },
+    { "chorus_sync", "How far a call heard resets a neighbour's clock: nothing, each its own rhythm; much, they fall "
+                     "into step or into turns." },
+    { "chorus_tune", "The callers' carriers pulled to the scale's pitches." },
+    { "mirror", "A time-reversal mirror round you in the wave room: what it hears is sent back reversed, and runs back "
+                "to where it came from -- a swell that gathers into each sound." },
+    { "mirror_time", "The mirror's window: it listens for one, plays it back reversed during the next, and listens "
+                     "again." },
 };
 
 }   // namespace

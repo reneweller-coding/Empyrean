@@ -164,7 +164,7 @@ __device__ __forceinline__ float nWave( float j, float len, float rise )
  * @param[in]     wind     the wind's lattice (buffer A, after the block's steps)
  * @param[in,out] modes    per string and mode its complex amplitude y - i y'/w (in diameters)
  * @param[in,out] wakes    per string its wake (q, q')
- * @param[out]    scratch  the night's scratch: rows 0 .. 3 the harp's channels, rows 12 .. 12 + HarpStrings its strings
+  * @param[out]    scratch  the night's scratch: rows 0 .. 3 the harp's channels, rows NightStringRow .. its strings
  * @param[in]     maxN     the engine's block size (the scratch stride)
  * @param[out]    stats    [56] the strings' mean wake amplitude, [57] the harmonic they sound (by energy, averaged)
  */
@@ -207,7 +207,7 @@ __global__ void __launch_bounds__( HarpStrings * 32 )
     const float phi = live ? sinf( nh * 3.1415927f * 0.31f ) + 0.6f * sinf( nh * 3.1415927f * 0.73f ) : 0.0f;
     const float bridge = live ? rsqrtf( nh ) * fn * 1.0e-3f : 0.0f;
     const float lift = H.m_force * wf * wf, inv = live ? dt / wn : 0.0f;
-    float      *mine = scratch + static_cast<size_t>( 12 + s ) * maxN;
+    float      *mine = scratch + static_cast<size_t>( NightStringRow + s ) * maxN;
     float       energy = 0.0f;
     for ( int i = 0; i < n; ++i )
     {
@@ -256,7 +256,7 @@ __global__ void __launch_bounds__( HarpStrings * 32 )
         {
             float gl, gr;
             __sincosf( 0.78539816f * ( 1.0f + H.m_place[k] ), &gr, &gl );
-            const float v = scratch[static_cast<size_t>( 12 + k ) * maxN + i];
+            const float v = scratch[static_cast<size_t>( NightStringRow + k ) * maxN + i];
             l += gl * v;
             r += gr * v;
         }
@@ -561,9 +561,348 @@ __global__ void __launch_bounds__( IceChirps )
     chirps[2 * k] = a;
 }
 
+namespace
+{
+
+/** @brief A kind of caller of the night chorus: its carrier, its call, its rhythm. */
+struct ChorusKind
+{
+    float m_hz;          ///< the carrier, Hz
+    float m_spread;      ///< the callers' spread about it (a share)
+    float m_fm;          ///< the carrier's glide over a call (a share: +0.08 rises by 8 %)
+    float m_pulseRate;   ///< pulses a second within a call (at 20 degrees)
+    float m_pulses;      ///< pulses a call
+    float m_duty;        ///< the share of a pulse's time it sounds
+    float m_period;      ///< s between calls at 20 degrees
+    float m_warm;        ///< how much the warmth quickens it (1: Dolbear's crickets, 0: not at all)
+    float m_level;       ///< its loudness
+    float m_r2;          ///< its second partial's ratio to the carrier
+    float m_h2;          ///< and level
+    float m_r3;          ///< its third partial's ratio
+    float m_h3;          ///< and level
+    float m_pad0;        ///< keeps the struct 16-byte aligned
+    float m_pad1;        ///< likewise
+    float m_pad2;        ///< likewise
+};
+
 /**
- * @brief The night's mix (Phase 30): the harp's, the thunder's and the ice's four channels added, in that order, into
- *        the frames' channels 24 .. 27 (near left and right, far left and right); a source at rest adds nothing.
+ * @brief The eight kinds: field cricket, snowy tree cricket, katydid, mole cricket, spring peeper, tree frog, bullfrog,
+ *        natterjack toad (their bands and calls after recordings' published figures, rounded).
+ */
+__constant__ ChorusKind cChorus[ChorusSpecies] = {
+    { 4600.0f, 0.04f, 0.0f, 30.0f, 4.0f, 0.5f, 0.55f, 1.0f, 0.7f, 2.0f, 0.15f, 3.0f, 0.05f, 0.0f, 0.0f, 0.0f },
+    { 2800.0f, 0.03f, 0.0f, 55.0f, 9.0f, 0.6f, 0.55f, 1.0f, 0.6f, 2.0f, 0.10f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+    { 9500.0f, 0.08f, 0.0f, 70.0f, 6.0f, 0.3f, 1.3f, 0.8f, 0.5f, 1.37f, 0.6f, 1.81f, 0.4f, 0.0f, 0.0f, 0.0f },
+    { 2300.0f, 0.03f, 0.0f, 65.0f, 120.0f, 0.6f, 4.0f, 0.7f, 0.5f, 2.0f, 0.1f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+    { 2900.0f, 0.05f, 0.08f, 8.3f, 1.0f, 1.0f, 1.1f, 0.4f, 0.8f, 2.0f, 0.05f, 3.0f, 0.0f, 0.0f, 0.0f, 0.0f },
+    { 1100.0f, 0.05f, 0.0f, 25.0f, 9.0f, 0.5f, 2.2f, 0.5f, 0.8f, 2.0f, 0.6f, 3.0f, 0.2f, 0.0f, 0.0f, 0.0f },
+    { 230.0f, 0.08f, -0.05f, 70.0f, 45.0f, 0.6f, 7.0f, 0.2f, 1.0f, 2.0f, 0.8f, 3.0f, 0.6f, 0.0f, 0.0f, 0.0f },
+    { 1250.0f, 0.05f, 0.0f, 15.0f, 30.0f, 0.5f, 9.0f, 0.4f, 0.7f, 2.0f, 0.4f, 3.0f, 0.1f, 0.0f, 0.0f, 0.0f },
+};
+
+/**
+ * @brief How much the night's warmth quickens a kind (Dolbear's law for the crickets, milder for the rest): its rates
+ *        against 20 degrees.
+ * @param[in] k       the kind
+ * @param[in] warmth  degrees Celsius
+ * @return the factor (at least 0.15)
+ */
+__device__ __forceinline__ float chorusWarm( const ChorusKind &k, float warmth )
+{
+    return fmaxf( 0.15f, 1.0f + k.m_warm * ( warmth - 20.0f ) / 15.0f );
+}
+
+/**
+ * @brief Which kind a caller is, by who calls: the meadow's, the treetops', the pond's, or all, each kind's share
+ *        weighted.
+ * @param[in] mix  ChorusKindE
+ * @param[in] u    the caller's die, 0 .. 1
+ * @return the kind, 0 .. ChorusSpecies - 1
+ */
+__device__ int chorusKindOf( int mix, float u )
+{
+    const float  meadow[ChorusSpecies] = { 0.5f, 0.3f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f };
+    const float  treetops[ChorusSpecies] = { 0.0f, 0.4f, 0.6f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+    const float  pond[ChorusSpecies] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.45f, 0.3f, 0.1f, 0.15f };
+    const float  all[ChorusSpecies] = { 0.2f, 0.15f, 0.15f, 0.05f, 0.2f, 0.12f, 0.05f, 0.08f };
+    const float *w = mix == 0 ? meadow : mix == 1 ? treetops : mix == 2 ? pond : all;
+    float        acc = 0.0f;
+    for ( int k = 0; k < ChorusSpecies; ++k )
+    {
+        acc += w[k];
+        if ( u < acc ) return k;
+    }
+    return ChorusSpecies - 1;
+}
+
+}   // namespace
+
+/**
+ * @brief The night chorus's clocks, one thread a caller (Phase 31): what each heard in the last block -- from every
+ *        caller whose call began then, by its distance; and the loudness in its band of the other kinds calling --
+ *        then its clock: a call of its own kind heard close enough resets it towards its start by Sync (Greenfield's
+ *        inhibitory resetting, unless its own call is already under way), a clock come round calls, unless a louder
+ *        caller of another kind fills its band (then it waits, half a period at most). Reads the last block's states,
+ *        writes this block's: every caller the same picture of the field, so any order gives the same.
+ * @param[in]     hdr    the block header
+ * @param[in,out] state  per caller two entries in two buffers (by the block's parity): (clock, waited s, carrier Hz,
+ *                       level), (across, from near to far, kind, s since its call began at this block's start or -1)
+ * @param[in,out] stats  [26 .. 28] gather the calls begun, the callers calling and those waiting (whole numbers)
+ */
+__global__ void __launch_bounds__( 256 ) chorusStepKernel( const BlockHeader *hdr, float4 *state, float *stats )
+{
+    __shared__ float4  tile[256];
+    __shared__ float4  tileB[256];
+    __shared__ int     sBegun, sCalling, sWaiting;
+    const NightChorus &C = hdr->m_chorus;
+    if ( !C.m_on ) return;
+    const int     i = static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x );
+    const bool    odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float4 *src = state + ( odd ? 2 * ChorusCallers : 0 );
+    float4       *dst = state + ( odd ? 0 : 2 * ChorusCallers );
+    const float   fs = hdr->m_sampleRate, dt = static_cast<float>( hdr->m_n ) / fs;
+    if ( threadIdx.x == 0 ) sBegun = sCalling = sWaiting = 0;
+    float4 a = src[2 * i], b = src[2 * i + 1];
+    if ( C.m_reset )
+    {   // scattered over the field, each its kind, carrier, loudness, its clock anywhere
+        const std::uint32_t u = static_cast<std::uint32_t>( i );
+        const int           kind = chorusKindOf( C.m_kind, hash01( 0xC40125U, u, 1 ) );
+        const ChorusKind   &K = cChorus[kind];
+        float               hz = K.m_hz * ( 1.0f + K.m_spread * ( 2.0f * hash01( 0xC40125U, u, 2 ) - 1.0f ) );
+        if ( C.m_tune > 0.0f && C.m_pitchCount > 0 )
+        {   // pulled to the nearest of the scale's pitches
+            float best = C.m_pitch[0];
+            for ( int q = 1; q < min( C.m_pitchCount, ChorusPitches ); ++q )
+                if ( fabsf( logf( C.m_pitch[q] / hz ) ) < fabsf( logf( best / hz ) ) ) best = C.m_pitch[q];
+            hz = hz + C.m_tune * ( best - hz );
+        }
+        a = make_float4( hash01( 0xC40125U, u, 3 ), 0.0f, hz, K.m_level * ( 0.4f + 0.6f * hash01( 0xC40125U, u, 4 ) ) );
+        b = make_float4( hash01( 0xC40125U, u, 5 ), hash01( 0xC40125U, u, 6 ), static_cast<float>( kind ), -1.0f );
+    }
+    const int         kind = min( max( static_cast<int>( b.z ), 0 ), ChorusSpecies - 1 );
+    const ChorusKind &K = cChorus[kind];
+    const float       warm = chorusWarm( K, C.m_warmth );
+    const float       callLen = K.m_pulses / ( K.m_pulseRate * ( 0.5f + 0.5f * warm ) );
+    const float       period =
+        fmaxf( K.m_period / warm * ( 0.85f + 0.3f * hash01( 0xC40125U, static_cast<std::uint32_t>( i ), 7 ) ),
+               callLen * 1.2f );
+    // What it heard: the calls of its kind that began in the last block, the other kinds calling in its band.
+    float heard = 0.0f, masked = 0.0f;
+    __syncthreads();
+    for ( int base = 0; base < ChorusCallers; base += 256 )
+    {
+        tile[threadIdx.x] = src[2 * ( base + static_cast<int>( threadIdx.x ) )];
+        tileB[threadIdx.x] = src[2 * ( base + static_cast<int>( threadIdx.x ) ) + 1];
+        __syncthreads();
+        if ( !C.m_reset )
+            for ( int j = 0; j < 256; ++j )
+            {
+                const float4 oa = tileB[j];
+                if ( oa.w < 0.0f || base + j == i ) continue;   // silent, or itself
+                const float dx = oa.x - b.x, dy = oa.y - b.y;
+                const float w = tile[j].w / ( 1.0f + ( dx * dx + dy * dy ) * ( 1.0f / 0.0064f ) );
+                if ( static_cast<int>( oa.z ) == kind )
+                {
+                    if ( oa.w < dt * 1.5f ) heard += w;   // a call of its kind, begun in the last block
+                }
+                else if ( fabsf( __logf( tile[j].z / a.z ) ) < 0.35f )
+                {
+                    masked += w;   // another kind in its band
+                }
+            }
+        __syncthreads();
+    }
+    // Its clock.
+    float phase = a.x, waited = a.y, callT = b.w;
+    if ( callT >= 0.0f ) callT += dt;
+    if ( callT >= callLen ) callT = -1.0f;   // its call is over
+    phase += dt / period;
+    if ( heard > 0.25f && callT < 0.0f && phase < 0.92f ) phase = phase * ( 1.0f - C.m_sync ) - 0.05f * C.m_sync;
+    bool begun = false, waiting = false;
+    if ( phase >= 1.0f )
+    {
+        if ( masked > 0.6f * a.w && waited < 0.5f * period )
+        {   // a louder caller of another kind fills its band: it waits for a gap
+            waited += dt;
+            waiting = true;
+        }
+        else
+        {
+            phase = fminf( phase - 1.0f, 0.2f );
+            waited = 0.0f;
+            callT = 0.0f;
+            begun = true;
+        }
+    }
+    dst[2 * i] = make_float4( phase, waited, a.z, a.w );
+    dst[2 * i + 1] = make_float4( b.x, b.y, b.z, callT );
+    // The block's counts in whole numbers (any order the same), gathered in [26 .. 28] for the order's kernel.
+    if ( begun ) atomicAdd( &sBegun, 1 );
+    if ( callT >= 0.0f ) atomicAdd( &sCalling, 1 );
+    if ( waiting ) atomicAdd( &sWaiting, 1 );
+    __syncthreads();
+    if ( threadIdx.x == 0 )
+    {
+        atomicAdd( &stats[26], static_cast<float>( sBegun ) );
+        atomicAdd( &stats[27], static_cast<float>( sCalling ) );
+        atomicAdd( &stats[28], static_cast<float>( sWaiting ) );
+    }
+}
+
+/**
+ * @brief The night chorus's order (Phase 31), one CUDA block of 1024: the most numerous kind's clocks as phasors, their
+ *        mean's length (1: all in step, 0: spread), summed in a fixed order; and the step's counts moved to where the
+ *        host reads them, cleared for the next block.
+ * @param[in]     hdr    the block header
+ * @param[in]     state  the callers (this block's buffer)
+ * @param[in,out] stats  [62] receives the order, [60], [61], [63] the calls begun, calling and waiting ([26 .. 28],
+ *                       cleared)
+ */
+__global__ void __launch_bounds__( 1024 ) chorusOrderKernel( const BlockHeader *hdr, const float4 *state, float *stats )
+{
+    __shared__ float   re[1024], im[1024];
+    __shared__ int     count[ChorusSpecies];
+    const NightChorus &C = hdr->m_chorus;
+    if ( !C.m_on ) return;
+    const bool    odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float4 *now = state + ( odd ? 0 : 2 * ChorusCallers );
+    const int     t = static_cast<int>( threadIdx.x );
+    if ( t < ChorusSpecies ) count[t] = 0;
+    __syncthreads();
+    for ( int i = t; i < ChorusCallers; i += 1024 )
+        atomicAdd( &count[min( max( static_cast<int>( now[2 * i + 1].z ), 0 ), ChorusSpecies - 1 )], 1 );
+    __syncthreads();
+    int most = 0;
+    for ( int k = 1; k < ChorusSpecies; ++k )
+        if ( count[k] > count[most] ) most = k;
+    float r = 0.0f, s = 0.0f;
+    for ( int i = t; i < ChorusCallers; i += 1024 )
+        if ( static_cast<int>( now[2 * i + 1].z ) == most )
+        {
+            float sn, cs;
+            __sincosf( 6.2831853f * now[2 * i].x, &sn, &cs );
+            r += cs;
+            s += sn;
+        }
+    re[t] = r;
+    im[t] = s;
+    __syncthreads();
+    for ( int h = 512; h > 0; h >>= 1 )
+    {
+        if ( t < h )
+        {
+            re[t] += re[t + h];
+            im[t] += im[t + h];
+        }
+        __syncthreads();
+    }
+    if ( t == 0 )
+    {
+        stats[62] = count[most] > 0 ? sqrtf( re[0] * re[0] + im[0] * im[0] ) / static_cast<float>( count[most] ) : 0.0f;
+        stats[60] = stats[26];
+        stats[61] = stats[27];
+        stats[63] = stats[28];
+        stats[26] = stats[27] = stats[28] = 0.0f;
+    }
+}
+
+/**
+ * @brief The night chorus's calls (Phase 31), a thread a caller: within its call each pulse a raised sine of its kind's
+ *        duty, the carrier gliding by its kind's sweep with two partials more; placed by where it sits (across: the
+ *        pan, from near to far: the planes and the distance's loss); mixed through shared memory in a fixed order into
+ *        its CUDA block's four channels.
+ * @param[in]  hdr      the block header
+ * @param[in]  state    the callers (this block's buffer)
+ * @param[out] scratch  per CUDA block four channels of the block
+ * @param[in]  maxN     the engine's block size (the scratch stride)
+ */
+__global__ void __launch_bounds__( ChorusThreads )
+    chorusSoundKernel( const BlockHeader *hdr, const float4 *state, float *scratch, int maxN )
+{
+    __shared__ float   sV[ChorusThreads][MixTile + 1];
+    __shared__ float   sG[ChorusThreads][4];
+    const NightChorus &C = hdr->m_chorus;
+    if ( !C.m_on ) return;
+    const int         k = static_cast<int>( threadIdx.x );
+    const int         i = static_cast<int>( blockIdx.x ) * ChorusThreads + k;
+    const bool        odd = ( hdr->m_blockIndex & 1U ) != 0;
+    const float4     *now = state + ( odd ? 0 : 2 * ChorusCallers );
+    const float4      a = now[2 * i], b = now[2 * i + 1];
+    const int         n = hdr->m_n;
+    const float       fs = hdr->m_sampleRate;
+    const int         kind = min( max( static_cast<int>( b.z ), 0 ), ChorusSpecies - 1 );
+    const ChorusKind &K = cChorus[kind];
+    const float       warm = chorusWarm( K, C.m_warmth );
+    const float       rate = K.m_pulseRate * ( 0.5f + 0.5f * warm );
+    const float       callLen = K.m_pulses / rate;
+    {
+        float gl, gr, gn, gf;
+        __sincosf( 0.78539816f * ( 1.0f + 0.9f * ( 2.0f * b.x - 1.0f ) ), &gr, &gl );
+        __sincosf( 1.57079633f * fminf( b.y * 1.2f, 1.0f ), &gf, &gn );
+        const float g = b.w >= 0.0f ? C.m_level * a.w / ( 1.0f + 2.5f * b.y ) : 0.0f;
+        sG[k][0] = g * gl * gn;
+        sG[k][1] = g * gr * gn;
+        sG[k][2] = g * gl * gf;
+        sG[k][3] = g * gr * gf;
+    }
+    const float  w = 6.2831853f * a.z / fs;
+    float *const out = scratch + static_cast<size_t>( blockIdx.x ) * 4 * maxN;
+    for ( int t0 = 0; t0 < n; t0 += MixTile )
+    {
+        for ( int q = 0; q < MixTile; ++q )
+        {
+            float       v = 0.0f;
+            const float tc = b.w + static_cast<float>( t0 + q ) / fs;   // s into its call
+            if ( b.w >= 0.0f && t0 + q < n && tc < callLen )
+            {
+                const float pu = tc * rate;
+                const float u = pu - floorf( pu );
+                const float env = u < K.m_duty ? __sinf( 3.1415927f * u / K.m_duty ) : 0.0f;
+                const float edge = fminf( fminf( tc, callLen - tc ) * 200.0f, 1.0f );   // 5 ms in and out
+                float       ph = w * fs * ( tc + 0.5f * K.m_fm * tc * tc / callLen );
+                ph -= 6.2831853f * floorf( ph * 0.15915494f );
+                const float p2 = ph * K.m_r2, p3 = ph * K.m_r3;
+                v = env * env * edge *
+                    ( __sinf( ph ) + K.m_h2 * __sinf( p2 - 6.2831853f * floorf( p2 * 0.15915494f ) ) +
+                      K.m_h3 * __sinf( p3 - 6.2831853f * floorf( p3 * 0.15915494f ) ) );
+            }
+            sV[k][q] = v;
+        }
+        __syncthreads();
+        for ( int o = k; o < 4 * MixTile; o += ChorusThreads )
+        {
+            const int ch = o / MixTile, q = o - ch * MixTile;
+            if ( t0 + q >= n ) continue;
+            float acc = 0.0f;
+            for ( int c = 0; c < ChorusThreads; ++c ) acc += sG[c][ch] * sV[c][q];
+            out[static_cast<size_t>( ch ) * maxN + t0 + q] = acc;
+        }
+        __syncthreads();
+    }
+}
+
+/**
+ * @brief The night chorus's reduce (Phase 31): its CUDA blocks' four channels added sample by sample in their order into
+ *        the night's scratch (rows 12 .. 15).
+ * @param[in]  hdr      the block header
+ * @param[in]  partial  per CUDA block of the chorus's sound four channels
+ * @param[out] scratch  the night's scratch
+ * @param[in]  maxN     the engine's block size (the scratch stride)
+ */
+__global__ void chorusReduceKernel( const BlockHeader *hdr, const float *partial, float *scratch, int maxN )
+{
+    const int t = static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x );
+    const int ch = t / maxN, s = t - ch * maxN;
+    if ( !hdr->m_chorus.m_on || ch >= 4 || s >= hdr->m_n ) return;
+    float acc = 0.0f;
+    for ( int b = 0; b < ChorusBlocks; ++b ) acc += partial[static_cast<size_t>( b ) * 4 * maxN + t];
+    scratch[static_cast<size_t>( 12 + ch ) * maxN + s] = acc;
+}
+
+/**
+  * @brief The night's mix (Phases 30, 31): the harp's, the thunder's, the ice's and the chorus's four channels added, in
+ *        that order, into the frames' channels 24 .. 27 (near left and right, far left and right); a source at rest
+ *        adds nothing.
  * @param[in]  hdr      the block header
  * @param[in]  scratch  the night's scratch
  * @param[in]  maxN     the engine's block size (the scratch stride)
@@ -573,11 +912,12 @@ __global__ void nightMixKernel( const BlockHeader *hdr, const float *scratch, in
 {
     const int i = static_cast<int>( blockIdx.x * blockDim.x + threadIdx.x );
     if ( i >= hdr->m_n ) return;
-    const bool on[3] = { hdr->m_harp.m_on != 0, hdr->m_thunder.m_on != 0, hdr->m_ice.m_on != 0 };
+    const bool on[4] = { hdr->m_harp.m_on != 0, hdr->m_thunder.m_on != 0, hdr->m_ice.m_on != 0,
+                         hdr->m_chorus.m_on != 0 };
     for ( int c = 0; c < 4; ++c )
     {
         float v = 0.0f;
-        for ( int src = 0; src < 3; ++src )
+        for ( int src = 0; src < 4; ++src )
             if ( on[src] ) v += scratch[static_cast<size_t>( 4 * src + c ) * maxN + i];
         out[i * CloudOutChannels + 24 + c] = v;
     }

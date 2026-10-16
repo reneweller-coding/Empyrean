@@ -173,6 +173,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Quantum Halos",
     "Resonant Spaces",
     "Topologies",
+    "Aeolian Harps",
+    "Harp Gardens",
+    "Distant Storms",
+    "Summer Storms",
+    "Rolling Thunder",
+    "Singing Lakes",
+    "Frozen Nights",
+    "Thin Ice",
+    "Twin Streams",
+    "Fusion Choirs",
+    "Parting Clouds",
+    "Endless Ritardando",
+    "Endless Accelerando",
+    "Night Arcs",
+    "Inside the Cloud",
+    "Night Weather",
 };
 
 namespace

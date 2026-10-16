@@ -462,6 +462,16 @@ public:
      * @param[in] in  a journal as dreamJournal() gives it (anything else is ignored)
      */
     void setDreamJournal( const std::vector<std::uint8_t> &in );
+    /**
+     * @brief What the night chorus did (Phase 31; tests and tools, offline).
+     * @param[out] out  receives 4 values: the calls begun since prepare(), and as the last block left them the callers
+     *                  calling, the most numerous kind's order (0 .. 1), the share waiting for a gap
+     */
+    void chorusStats( float *out ) const
+    {
+        m_cloud.chorusStats( out );
+        out[0] = static_cast<float>( m_chorusCalls );
+    }
     /** @brief Risset's pulse as the last block left it (Phase 30; tests). @return the voices' gain factor */
     float rissetGain() const { return m_rissetGain; }
 
@@ -1171,6 +1181,12 @@ private:
     float                          m_headYaw = 0.0f;              ///< rad: the head's turn held off the binaural cloud
     float                          m_handFood[2] = { -1.0f, -1.0f };   ///< the hands' food lines, trail cells (-1 none)
     float                          m_handFoodWeight = 1.0f;            ///< their weight
+                                                                       // Phase 31
+    float     m_chorusLevel = 0.0f;                                    ///< the night chorus's level as it glides
+    long long m_chorusCalls = 0;                                       ///< the chorus's calls begun since prepare
+    bool      m_chorusWas = false;                                     ///< the chorus called in the last block
+    int       m_mirrorPos = 0;   ///< the time mirror: where in its window the next block begins (the room's samples)
+    int       m_mirrorBuf = 0;   ///< which of its recordings records
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
