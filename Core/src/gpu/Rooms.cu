@@ -57,6 +57,11 @@ __global__ void __launch_bounds__( HaloThreads ) haloKernel( const BlockHeader *
         const bool  inside = x * x + y * y < ( HaloRadius - 2 ) * ( HaloRadius - 2 );
         const float w = 2.0f * hash01( 0x4A10A10U, static_cast<std::uint32_t>( s ), 1 ) - 1.0f;
         onsite = ( o == 0 ? H.m_mass : -H.m_mass ) + ( inside ? H.m_disorder * w : 0.0f );
+        for ( int h = 0; h < 2; ++h )
+        {   // the headset's hands (Phase 30): a wall of potential where each one is, the rim's sound goes round it
+            const int dx = x - H.m_defectX[h], dy = y - H.m_defectY[h];
+            if ( static_cast<float>( dx * dx + dy * dy ) <= H.m_defectR2 ) onsite += H.m_defectV;
+        }
         if ( s == H.m_site[c] ) drive = H.m_drive[c];
         sPsi[t] = psi[t];
     }
@@ -260,6 +265,13 @@ __global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, 
     if ( z == W.m_srcZ )
         for ( int s = 0; s < min( W.m_count, RoomSources ); ++s )
             if ( W.m_source[s] == idx ) v += in[static_cast<size_t>( s ) * ( 4096 / RoomDecim ) + step];
+    for ( int h = 0; h < 2; ++h )
+    {   // the headset's open hands (Phase 30): each a soft absorber where it is
+        const int a = W.m_absorb[h];
+        if ( a < 0 ) continue;
+        const int dx = x - a % RoomNX, dy = y - ( a / RoomNX ) % RoomNY, dz = z - a / ( RoomNX * RoomNY );
+        if ( static_cast<float>( dx * dx + dy * dy + dz * dz ) <= W.m_absorbR2 ) v *= 1.0f - W.m_absorbK;
+    }
     if ( !( fabsf( v ) < 1.0e4f ) ) v = 0.0f;   // never blown up
     pn[idx] = v;
     if ( idx == W.m_ear[0] ) ears[step] = v;

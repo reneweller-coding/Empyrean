@@ -1101,6 +1101,33 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                                                                  tp, hash01( seed, up, 7 ) ) +
                                                 0.3f * slowSine( cv.m_shimmerRate * ( 1.3f + hash01( seed, up, 8 ) ),
                                                                  tp, hash01( seed, up, 9 ) ) ) );
+            // Streams (Phase 30): the partials parted into streams, each with a slow vibrato and tremolo of its own --
+            // common fate within a stream, none between them, so the ear hears each as a sound of its own (Bregman)
+            // -- or, by Fusion, all moving as one, and the voice fuses. On the voice's clock, so that a stream's
+            // members move exactly together.
+            if ( cv.m_streamDepth > 0.0f )
+            {
+                int s = 0;
+                switch ( static_cast<StreamsE>( cv.m_streams ) )
+                {
+                case StreamsE::ODD_EVEN: s = isSub ? 2 : ( h & 1 ); break;
+                case StreamsE::THIRDS: s = isSub ? 3 : h % 3; break;
+                case StreamsE::REGISTERS: s = isSub || h <= 2 ? 0 : h <= 6 ? 1 : h <= 16 ? 2 : 3; break;
+                default: s = 4 + k; break;
+                }
+                const float r = cv.m_streamRate, fu = cv.m_fusion;
+                auto        motion = [&]( std::uint32_t who, std::uint32_t salt )
+                {
+                    return 0.6f * slowSine( r * ( 0.8f + 0.5f * hash01( seed, who, salt ) ), t,
+                                            hash01( seed, who, salt + 1U ) ) +
+                           0.4f * slowSine( r * ( 1.7f + 0.6f * hash01( seed, who, salt + 2U ) ), t,
+                                            hash01( seed, who, salt + 3U ) );
+                };
+                const std::uint32_t own = static_cast<std::uint32_t>( s ) + 1U;
+                drift += cv.m_streamDepth * 20.0f * ( fu * motion( 0U, 70U ) + ( 1.0f - fu ) * motion( own, 70U ) );
+                sh *= fmaxf( 0.0f, 1.0f + cv.m_streamDepth * 0.45f *
+                                              ( fu * motion( 0U, 80U ) + ( 1.0f - fu ) * motion( own, 80U ) ) );
+            }
             amp0 = cv.m_scale * harmonicShape( h, cv.m_tilt, cv.m_oddEven, cv.m_brightness );
             if ( isSub )
             {   // Subharmonics: the engine's amplitude for the cloud, against harmonic 1's

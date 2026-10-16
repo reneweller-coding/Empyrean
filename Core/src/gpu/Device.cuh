@@ -83,6 +83,19 @@ constexpr int RoomHist = 128;       ///< samples of history a source keeps for t
 static_assert( HaloComponents <= HaloThreads, "a carrier's lattice in one CUDA block" );
 static_assert( RoomFirTaps % RoomDecim == 0, "the interpolation's phases are whole" );
 
+// ---- Phase 30 (16.10.2026): the night -- the Aeolian harp, thunder, the singing ice.
+
+constexpr int NightRows = 12 + HarpStrings;   ///< the night's scratch: harp, thunder, ice (four rows each), the strings
+static_assert( HarpModes == 32, "a string's modes are a warp's lanes" );
+static_assert( ThunderMain % 32 == 0 && ( ThunderSegments - ThunderMain ) % ( 32 * ThunderBranches ) == 0,
+               "the channel's stretches split over a warp's lanes" );
+static_assert( ThunderMain <= 2048, "the main stroke's wander fits in shared memory" );
+static_assert( ThunderSegments % ThunderChunks == 0, "the strike's segments split into whole chunks" );
+static_assert( ( ThunderRing & ( ThunderRing - 1 ) ) == 0 && ( IceN & ( IceN - 1 ) ) == 0,
+               "rings and grids wrap by masks" );
+static_assert( ( IceChirps & ( IceChirps - 1 ) ) == 0 && IceChirps % 32 == 0, "the chirps' slots wrap by a mask" );
+static_assert( IceN * IceN == 1024, "the ice sheet is one CUDA block, a cell a thread" );
+
 /** @brief What every kernel needs to know about the block; uploaded in front of the voices. */
 struct BlockHeader
 {
@@ -117,6 +130,9 @@ struct BlockHeader
     Physarum      m_phys;             ///< the physarum for this block (Phase 28)
     Halo          m_halo;             ///< the topological halo for this block (Phase 29)
     WaveRoom      m_room;             ///< the wave room for this block (Phase 29)
+    AeolianHarp   m_harp;             ///< the Aeolian harp for this block (Phase 30)
+    Thunder       m_thunder;          ///< thunder for this block (Phase 30)
+    SingingIce    m_ice;              ///< the singing ice for this block (Phase 30)
 
     std::int32_t m_lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t m_lpad0;        ///< keeps the header 16-byte aligned

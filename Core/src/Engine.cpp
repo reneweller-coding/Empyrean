@@ -11,6 +11,7 @@
 #include "additiv/Presets.h"
 #include "additiv/Shapes.h"
 #include "additiv/Spectrum.h"
+#include "additiv/Sun.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -19,6 +20,7 @@
 #include <xmmintrin.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 #include <limits>
@@ -143,6 +145,58 @@ double talbotClock( double age, double period )
     return q * ( k + g );
 }
 
+/**
+ * @brief An ice sheet that has cracked for a long time (Phase 30): Olami, Feder and Christensen's slider blocks
+ *        (IceN x IceN, IceShare to each neighbour, the rim's lost) driven as the GPU drives them -- every cell raised
+ *        until the most stressed one slips, the avalanche run out -- 30000 times from random stress. After about 20000
+ *        the cracks' sizes stop growing (measured on 32 x 32: median 1, one in a hundred past 90, the largest a few
+ *        hundred), so the sheet sings cracks of every size from its first. Once a process (about 10 ms).
+ * @return IceN x IceN stresses, row by row
+ */
+const std::vector<float> &warmIce()
+{
+    static const std::vector<float> sheet = []
+    {
+        constexpr int      N = IceN * IceN;
+        std::vector<float> F( N );
+        Rng                r( 0x1CE5EE7ull );
+        for ( float &f : F ) f = r.uniform();
+        std::vector<int> stack;
+        stack.reserve( 4 * N );
+        for ( int crack = 0; crack < 30000; ++crack )
+        {
+            const int   at = static_cast<int>( std::max_element( F.begin(), F.end() ) - F.begin() );
+            const float add = 1.0f - F[static_cast<size_t>( at )];
+            for ( float &f : F ) f += add;
+            F[static_cast<size_t>( at )] = 1.0f;
+            stack.push_back( at );
+            while ( !stack.empty() )
+            {
+                const int c = stack.back();
+                stack.pop_back();
+                if ( F[static_cast<size_t>( c )] < 1.0f ) continue;
+                const float give = IceShare * F[static_cast<size_t>( c )];
+                F[static_cast<size_t>( c )] = 0.0f;
+                const int x = c % IceN, y = c / IceN;
+                auto      to = [&]( int nx, int ny )
+                {
+                    if ( nx < 0 || ny < 0 || nx >= IceN || ny >= IceN ) return;
+                    float &g = F[static_cast<size_t>( ny * IceN + nx )];
+                    g += give;
+                    if ( g >= 1.0f ) stack.push_back( ny * IceN + nx );
+                };
+                to( x + 1, y );
+                to( x - 1, y );
+                to( x, y + 1 );
+                to( x, y - 1 );
+            }
+        }
+        for ( float &f : F ) f = std::min( f, 0.999f );
+        return F;
+    }();
+    return sheet;
+}
+
 }   // namespace
 
 Engine::Engine()
@@ -151,6 +205,9 @@ Engine::Engine()
     for ( auto &r : m_modRows ) r.store( packModRow( ModRow{} ), std::memory_order_relaxed );
     for ( auto &p : m_played ) p.store( std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed );
     for ( auto &s : m_chanSlide ) s.store( 0.5f, std::memory_order_relaxed );   // MPE: a slide at rest
+    double lat = 45.0, lon = 0.0;   // the night arc's place until one is set: the time zone's city
+    defaultLocation( lat, lon );
+    setLocation( lat, lon );
 }
 
 void Engine::setModRow( int i, const ModRow &row )
@@ -291,6 +348,24 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_rainWas = m_windWas = m_swarmWas = m_physWas = false;
     for ( float &s : m_shower ) s = 0.0f;
     m_showerRng = Rng( m_cfg.m_seed ^ 0x5261696Eull );
+    m_harpLevel = m_thunderLevel = m_iceLevel = 0.0f;
+    m_harpWas = m_iceWas = false;
+    m_harpHz.fill( 0.0f );
+    m_strikeIn = 0.0f;
+    m_strikes = 0;
+    m_crackIn = 0.0f;
+    warmIce();   // once a process, here rather than when the ice first sings
+    m_sunTime = m_cfg.m_sunClock > 0.0
+                    ? m_cfg.m_sunClock
+                    : std::chrono::duration<double>( std::chrono::system_clock::now().time_since_epoch() ).count();
+    m_night = 0.0f;
+    m_rissetPhase = 0.0;
+    m_rissetU = 0.0f;
+    m_rissetGain = 1.0f;
+    m_rissetPulse = m_lightning = 0.0f;
+    m_journalClock = 30.0f;
+    m_pose = HeadsetPose{};
+    m_stormRng = Rng( m_cfg.m_seed ^ 0x53746F726Dull );
     m_haloGain = m_roomLevel = 0.0f;
     m_haloNote.fill( -1 );
     m_haloAge.fill( 0.0f );
@@ -851,6 +926,9 @@ void Engine::readParams()
             if ( roughNow ) m_roughness = weight > 1.0e-12 ? static_cast<float>( 16.0 * rough / weight ) : 0.0f;
             in.m_roughness = m_roughness;
             if ( m_prepared ) m_cloud.reservoirOut( in.m_reservoir );
+            in.m_night = m_night;   // Phase 30: the night, Risset's pulse, the lightning
+            in.m_risset = m_rissetPulse;
+            in.m_lightning = m_lightning;
         }
         m_phraseStart = false;
         m_mods.advance( static_cast<float>( m_cfg.m_gpuBlock / m_cfg.m_sampleRate ), in );
@@ -891,6 +969,21 @@ void Engine::readParams()
         }
         for ( size_t m = 0; m < 4; ++m )
             if ( m_lessons[m].m_count >= 2 ) m_lessons[m].apply( in.m_macro[m], offset, modded );
+        // The night arc (Phase 30): the real night where the instrument is darkens, slows, thins and widens the sound
+        // -- a push on five knobs as the matrix's would be, by Night Arc and how deep the night is.
+        if ( const float arc = std::clamp( base( ParamIdE::NIGHT_ARC ), 0.0f, 1.0f ) * m_night; arc > 0.0f )
+        {
+            const std::pair<ParamIdE, float> push[] = { { ParamIdE::BRIGHTNESS, -0.35f },
+                                                        { ParamIdE::TILT, 0.15f },
+                                                        { ParamIdE::BRAIN_RATE, -0.3f },
+                                                        { ParamIdE::BRAIN_DENSITY, -0.2f },
+                                                        { ParamIdE::FAR_LEVEL, 0.15f } };
+            for ( const auto &[id, by] : push )
+            {
+                offset[static_cast<int>( id )] += by * arc;
+                modded[static_cast<int>( id )] = true;
+            }
+        }
         // A gated amount is heard by its gate, the matrix's push too: nothing where its kind changes.
         for ( int g = 0; g < MorphGates; ++g ) offset[static_cast<int>( GatedAmounts[g] )] *= m_sound.m_gate[g];
         m_cutoffPush = offset[static_cast<int>( ParamIdE::CUTOFF )];
@@ -943,6 +1036,10 @@ void Engine::readParams()
     m_blk.m_driftRate = g( ParamIdE::DRIFT_RATE );
     m_blk.m_shimmer = g( ParamIdE::SHIMMER );
     m_blk.m_shimmerRate = g( ParamIdE::SHIMMER_RATE );
+    m_blk.m_streams = std::clamp( static_cast<int>( std::lround( g( ParamIdE::STREAMS ) ) ), 0, NumStreams - 1 );
+    m_blk.m_streamDepth = g( ParamIdE::STREAM_DEPTH );
+    m_blk.m_streamRate = g( ParamIdE::STREAM_RATE );
+    m_blk.m_fusion = g( ParamIdE::FUSION );
     m_blk.m_stereo = g( ParamIdE::STEREO );
     m_blk.m_air = g( ParamIdE::AIR );
     m_blk.m_airCenter = g( ParamIdE::AIR_CENTER );
@@ -2192,7 +2289,8 @@ void Engine::stepNature( float dt )
     // The wind, for the chimes or the weather: its gust a slow random of three seconds' memory, its push by the knob
     // (measured with the chimes: a strike or none a second at 0.3, a few at half, dozens at 0.7, more than a hundred
     // at the top). It begins from calm air when it begins to blow.
-    const bool windOn = weather || C.m_on;
+    const bool windOn =
+        weather || C.m_on || cur( ParamIdE::HARP ) > 0.0f || m_harpLevel > 0.0f;   // and the harp (Phase 30)
     if ( windOn && !m_windWas ) W.m_windFresh = 1;
     m_windWas = windOn;
     const float wind = cur( ParamIdE::WIND );
@@ -2280,6 +2378,350 @@ void Engine::stepNature( float dt )
         S.m_rate = cur( ParamIdE::SWARMAL_RATE );
         S.m_speed = cur( ParamIdE::SWARMAL_SPEED );
         S.m_spread = cur( ParamIdE::SWARMAL_SPREAD );
+    }
+}
+
+void Engine::setLocation( double latitude, double longitude )
+{
+    m_latitude.store( std::clamp( latitude, -90.0, 90.0 ), std::memory_order_relaxed );
+    m_longitude.store( std::clamp( longitude, -180.0, 180.0 ), std::memory_order_relaxed );
+}
+
+void Engine::location( double &latitude, double &longitude ) const
+{
+    latitude = m_latitude.load( std::memory_order_relaxed );
+    longitude = m_longitude.load( std::memory_order_relaxed );
+}
+
+void Engine::setHeadsetPose( const HeadsetPose &p )
+{
+    const std::lock_guard<std::mutex> lock( m_poseLock );
+    m_posePending = p;
+}
+
+bool Engine::dreamJournal( std::vector<std::uint8_t> &out )
+{
+    const std::lock_guard<std::mutex> lock( m_snapLock );
+    out = m_journalPendingSet ? m_journalPending : m_journal;
+    return out.size() > 12;
+}
+
+void Engine::setDreamJournal( const std::vector<std::uint8_t> &in )
+{
+    if ( in.size() < 12 || std::memcmp( in.data(), "DRJ1", 4 ) != 0 ) return;
+    const std::lock_guard<std::mutex> lock( m_snapLock );
+    m_journalPending = in;
+    m_journalPendingSet = true;
+}
+
+void Engine::stepJournal( float dt )
+{
+    // A journal set (a state restored): onto the card before this block, its memories the dream's.
+    {
+        std::unique_lock<std::mutex> lock( m_snapLock, std::try_to_lock );
+        if ( lock.owns_lock() && m_journalPendingSet )
+        {
+            const std::vector<std::uint8_t> &j = m_journalPending;
+            std::uint32_t                    count = 0, bands = 0;
+            std::memcpy( &count, j.data() + 4, 4 );
+            std::memcpy( &bands, j.data() + 8, 4 );
+            const size_t per = 4 + static_cast<size_t>( bands );
+            if ( bands == static_cast<std::uint32_t>( DreamBands ) && count <= DreamJournalMost &&
+                 j.size() >= 12 + per * count )
+            {
+                m_journalScratch.assign( static_cast<size_t>( count ) * DreamBands, 0.0f );
+                for ( std::uint32_t m = 0; m < count; ++m )
+                {
+                    const std::uint8_t *at = j.data() + 12 + per * m;
+                    float               scale = 0.0f;
+                    std::memcpy( &scale, at, 4 );
+                    if ( !std::isfinite( scale ) ) scale = 0.0f;
+                    for ( int b = 0; b < DreamBands; ++b )
+                        m_journalScratch[static_cast<size_t>( m ) * DreamBands + b] =
+                            scale * static_cast<float>( at[4 + b] ) * ( 1.0f / 255.0f );
+                }
+                m_cloud.dreamWrite( m_journalScratch.data(), static_cast<int>( count ) );
+                m_journal = j;
+            }
+            m_journalPendingSet = false;
+            m_journalPending.clear();
+        }
+    }
+    // While the dream dreams, every half minute: its newest memories brought down, a byte a band (each memory's own
+    // scale), for the state to keep.
+    m_journalClock -= dt;
+    if ( m_journalClock > 0.0f ) return;
+    m_journalClock = 30.0f;
+    if ( m_dreamGain <= 0.0f || cur( ParamIdE::DREAM_JOURNAL ) < 0.5f ) return;
+    const int count = m_cloud.dreamRead( m_journalScratch, DreamJournalMost );
+    if ( count <= 0 ) return;
+    std::vector<std::uint8_t> j( 12 + static_cast<size_t>( count ) * ( 4 + DreamBands ) );
+    const std::uint32_t head[2] = { static_cast<std::uint32_t>( count ), static_cast<std::uint32_t>( DreamBands ) };
+    std::memcpy( j.data(), "DRJ1", 4 );
+    std::memcpy( j.data() + 4, head, 8 );
+    for ( int m = 0; m < count; ++m )
+    {
+        const float *v = m_journalScratch.data() + static_cast<size_t>( m ) * DreamBands;
+        float        scale = 0.0f;
+        for ( int b = 0; b < DreamBands; ++b ) scale = std::max( scale, v[b] );
+        std::uint8_t *at = j.data() + 12 + static_cast<size_t>( m ) * ( 4 + DreamBands );
+        std::memcpy( at, &scale, 4 );
+        for ( int b = 0; b < DreamBands; ++b )
+            at[4 + b] = static_cast<std::uint8_t>(
+                scale > 0.0f ? std::lround( std::clamp( v[b] / scale, 0.0f, 1.0f ) * 255.0f ) : 0 );
+    }
+    const std::lock_guard<std::mutex> lock( m_snapLock );
+    m_journal.swap( j );
+}
+
+void Engine::stepHeadset( float dt )
+{
+    (void)dt;
+    {
+        std::unique_lock<std::mutex> lock( m_poseLock, std::try_to_lock );
+        if ( lock.owns_lock() ) m_pose = m_posePending;
+    }
+    const HeadsetPose &P = m_pose;
+    const float        hands = P.m_valid ? std::clamp( cur( ParamIdE::VR_HANDS ), 0.0f, 1.0f ) : 0.0f;
+    // The head's turn: the binaural cloud and the thunder held where they are in the room as the head turns.
+    m_headYaw = P.m_valid && cur( ParamIdE::HEAD_TRACKING ) >= 0.5f ? P.m_yaw : 0.0f;
+    m_cloud.thunder().m_yaw = m_headYaw;
+    // The hands, each where it is (an arm's reach of 0.8 m across the field, ahead of the listener):
+    //   - in the wind a post that moves, its wake shedding vortices into the chimes and the leaves;
+    //   - in the halo a wall of potential (on the rim the sound goes round it: the rim cannot be stopped);
+    //   - in the wave room an absorber where the hand is open, the voices' source where it pinches;
+    //   - in the physarum's trail a line of food at the hand's height as a pitch (low at the hip, high above the head).
+    Weather  &W = m_cloud.weather();
+    Halo     &H = m_cloud.halo();
+    WaveRoom &R = m_cloud.room();
+    for ( int h = 0; h < 2; ++h )
+    {
+        const bool   on = hands > 0.0f && P.m_tracked[h];
+        const float *x = P.m_hand[h];
+        const float  across = std::clamp( x[0] / 0.8f, -1.0f, 1.0f ), ahead = std::clamp( x[2] / 0.8f, 0.0f, 1.0f );
+        W.m_handR[h] = on ? 2 + static_cast<int>( std::lround( 4.0f * hands ) ) : 0;
+        W.m_handX[h] =
+            std::clamp( static_cast<int>( std::lround( ( 0.5f + 0.5f * across ) * ( WindW - 1 ) ) ), 0, WindW - 1 );
+        W.m_handY[h] = std::clamp( static_cast<int>( std::lround( ahead * ( WindH - 1 ) ) ), 0, WindH - 1 );
+        H.m_defectX[h] = on ? static_cast<int>( std::lround( across * HaloRadius ) ) : 99;
+        H.m_defectY[h] = on ? static_cast<int>( std::lround( ahead * HaloRadius ) ) : 99;
+        R.m_absorb[h] = -1;
+        if ( on && R.m_on && R.m_nx > 2 && R.m_ny > 2 && R.m_nz > 2 )
+        {
+            constexpr float Cell = 0.1143f;
+            const int       ex = ( R.m_ear[0] % RoomNX + R.m_ear[1] % RoomNX ) / 2;
+            const int       ey = ( R.m_ear[0] / RoomNX ) % RoomNY, ez = R.m_ear[0] / ( RoomNX * RoomNY );
+            const int       cx = std::clamp( ex + static_cast<int>( std::lround( x[0] / Cell ) ), 1, R.m_nx - 2 );
+            const int       cy = std::clamp( ey - static_cast<int>( std::lround( x[2] / Cell ) ), 1, R.m_ny - 2 );
+            const int       cz = std::clamp( ez + static_cast<int>( std::lround( x[1] / Cell ) ), 1, R.m_nz - 2 );
+            const int       cell = cx + RoomNX * ( cy + RoomNY * cz );
+            if ( P.m_pinch[h] > 0.5f )
+            {   // the voices sound from the hand
+                R.m_srcZ = cz;
+                for ( int s = 0; s < R.m_count; ++s ) R.m_source[s] = cell;
+            }
+            else
+            {
+                R.m_absorb[h] = cell;
+            }
+        }
+        m_handFood[h] = -1.0f;
+        if ( on )
+        {   // food at the hand's height: 60 Hz at the hip (0.6 m below the head) .. 4 kHz above the head (0.4 m)
+            const float  u = std::clamp( ( x[1] + 0.6f ) / 1.0f, 0.0f, 1.0f );
+            const double f = 60.0 * std::pow( 4000.0 / 60.0, static_cast<double>( u ) );
+            m_handFood[h] = static_cast<float>( std::log2( f / 20.0 ) * PhysW / 9.96578428 );
+        }
+    }
+    m_handFoodWeight = 1.0f + 3.0f * hands;
+    H.m_defectV = 4.0f * hands;
+    H.m_defectR2 = 4.0f;
+    R.m_absorbR2 = 4.0f;
+    R.m_absorbK = 0.08f * hands;
+}
+
+void Engine::stepNight( float dt )
+{
+    auto glide = [dt]( float &v, float want, float tau )
+    {
+        v += ( want - v ) * ( 1.0f - std::exp( -dt / tau ) );
+        if ( want <= 0.0f && v < 1.0e-4f ) v = 0.0f;
+    };
+
+    // The night arc's sun (Phase 30): where it stands for the place and the clock, the clock running on with the time
+    // rendered.
+    {
+        m_sunTime += dt;
+        const double e = sunElevation( m_sunTime, m_latitude.load( std::memory_order_relaxed ),
+                                       m_longitude.load( std::memory_order_relaxed ) );
+        m_night = nightOf( e );
+        m_nightLive.store( m_night, std::memory_order_relaxed );
+        m_sunLive.store( static_cast<float>( e ), std::memory_order_relaxed );
+    }
+
+    // Risset's rhythm (Phase 30): five layers of a pulse an octave of tempo apart, all slowing (or quickening) an octave
+    // in Time, each weighted by a bell over its place in the octaves -- the slowest fading out below as a new fastest
+    // fades in above, the beats of every layer on the slowest's -- so the pulse slows for ever and never arrives (Risset's
+    // eternal ritardando). The voices' gain follows it; the pulse is a source of the matrix too.
+    {
+        constexpr int K = 5;
+        const float   depth = std::clamp( cur( ParamIdE::RISSET ), 0.0f, 1.0f );
+        const float   T = std::max( cur( ParamIdE::RISSET_TIME ), 1.0f );
+        const bool    quicker = cur( ParamIdE::RISSET_WAY ) >= 0.5f;
+        m_rissetU += ( quicker ? -dt : dt ) / T;
+        if ( m_rissetU >= 1.0f )
+        {   // an octave slower: every layer is now the one below it was
+            m_rissetU -= 1.0f;
+            m_rissetPhase = std::fmod( 2.0 * m_rissetPhase, static_cast<double>( 1 << K ) );
+        }
+        else if ( m_rissetU < 0.0f )
+        {   // an octave quicker: every layer is now the one above it was
+            m_rissetU += 1.0f;
+            m_rissetPhase *= 0.5;
+        }
+        const double slowest =
+            cur( ParamIdE::RISSET_RATE ) * std::exp2( 1.0 - 0.5 * K );   // the middle's pulse is Rate
+        m_rissetPhase += dt * slowest * std::exp2( -static_cast<double>( m_rissetU ) );
+        if ( m_rissetPhase >= static_cast<double>( 1 << K ) ) m_rissetPhase -= static_cast<double>( 1 << K );
+        float sum = 0.0f, weight = 0.0f;
+        for ( int k = 0; k < K; ++k )
+        {
+            const float  pos = static_cast<float>( k ) + 1.0f - m_rissetU;
+            const float  s = std::sin( 3.1415927f * pos / static_cast<float>( K ) );
+            const float  w = s * s;
+            const double ph = std::fmod( std::ldexp( m_rissetPhase, k ), 1.0 );
+            const float  bump = 0.5f - 0.5f * static_cast<float>( std::cos( 6.283185307179586 * ph ) );
+            const float  b2 = bump * bump;
+            sum += w * b2 * b2;   // sin^8: a pulse about a quarter of its period wide
+            weight += w;
+        }
+        m_rissetPulse = weight > 0.0f ? sum / weight : 0.0f;
+        m_rissetGain = depth > 0.0f ? std::clamp( 1.0f - depth + depth * 2.2f * m_rissetPulse, 0.0f, 2.0f ) : 1.0f;
+    }
+    m_lightning *= std::exp( -dt / 0.6f );   // the last strike's flash fading
+
+    // The Aeolian harp: twelve strings to the chord's pitch classes (the scale's root and fifth when nothing sounds),
+    // each in the octave above 55 Hz moved by Harp Pitch, the tuning gliding (3 s) as the chord moves; their gauges
+    // from thick to thin about Gauge's, so each sings another harmonic; spread across the front, near.
+    {
+        AeolianHarp &H = m_cloud.harp();
+        const float  want = cur( ParamIdE::HARP );
+        glide( m_harpLevel, want, 0.5f );
+        H.m_on = ( want > 0.0f || m_harpLevel > 0.0f ) ? 1 : 0;
+        if ( H.m_on && !m_harpWas )
+        {
+            H.m_clear = 1;
+            m_harpHz.fill( 0.0f );
+        }
+        m_harpWas = H.m_on != 0;
+        if ( H.m_on )
+        {
+            std::array<int, 12> pcs{};
+            int                 count = 0;
+            bool                seen[12] = {};
+            for ( const Voice &v : m_voices )
+            {
+                if ( v.m_note < 0 || v.m_stealing || v.m_lastGain < 0.02f ) continue;
+                seen[( ( v.m_note % 12 ) + 12 ) % 12] = true;
+            }
+            for ( int pc = 0; pc < 12; ++pc )
+                if ( seen[pc] ) pcs[static_cast<size_t>( count++ )] = pc;
+            if ( count == 0 )
+            {
+                pcs[0] = m_rootPc;
+                pcs[1] = ( m_rootPc + 7 ) % 12;
+                count = 2;
+            }
+            const float octave = std::exp2( cur( ParamIdE::HARP_PITCH ) );
+            const float gauge = 0.4e-3f + 1.4e-3f * cur( ParamIdE::HARP_GAUGE );
+            const float a = 1.0f - std::exp( -dt / 3.0f );
+            for ( int k = 0; k < HarpStrings; ++k )
+            {
+                const int   pc = pcs[static_cast<size_t>( k % count )];
+                const int   note = 33 + ( ( pc - 9 ) % 12 + 12 ) % 12;   // A1 = 55 Hz .. G#2
+                const float hz = std::max( 25.0f, static_cast<float>( frequencyOf( note ) ) * octave );
+                float      &g = m_harpHz[static_cast<size_t>( k )];
+                g = g <= 0.0f ? hz : std::exp( std::log( g ) + a * ( std::log( hz ) - std::log( g ) ) );
+                H.m_hz[k] = g;
+                H.m_diameter[k] = gauge * ( 0.7f + 0.6f * static_cast<float>( k ) / ( HarpStrings - 1 ) );
+                H.m_place[k] = -0.55f + 1.1f * static_cast<float>( k ) / ( HarpStrings - 1 );
+            }
+            H.m_level = 35.0f * m_harpLevel * VoiceLevel;   // measured: the strings at Wind 0.5 about -20 dBFS
+            H.m_speed = 120.0f;   // the lattice's mean speed at Wind 0.5, about 0.05, as 6 m/s
+            H.m_x = WindW / 2;
+            H.m_y = WindH / 3;
+        }
+    }
+
+    // Thunder: strikes as a Poisson stream (from one every two minutes to eight a minute), the first within two seconds
+    // of its beginning (heard as late as it is far: three seconds a kilometre); each strike's foot at the storm's distance (a lognormal spread) in any direction, the cloud's
+    // base 1.5 to 4 km up, its energy lognormal, its channel as tortuous and branched as Rumble says.
+    {
+        Thunder    &T = m_cloud.thunder();
+        const float want = cur( ParamIdE::THUNDER );
+        glide( m_thunderLevel, want, 0.5f );
+        const bool wasOn = T.m_on != 0;
+        T.m_on = ( want > 0.0f || m_thunderLevel > 0.0f ) ? 1 : 0;
+        if ( T.m_on && !wasOn ) m_strikeIn = 0.5f + 1.5f * m_stormRng.uniform();
+        if ( T.m_on )
+        {
+            T.m_level = 30.0f * m_thunderLevel * VoiceLevel;   // measured: a strike at 3 km peaks about -12 dBFS
+            T.m_yaw = 0.0f;
+            m_strikeIn -= dt;
+            if ( want > 0.0f && m_strikeIn <= 0.0f )
+            {
+                const float perMinute = 0.5f + 7.5f * want * want;
+                m_strikeIn = -std::log( std::max( 1.0e-6f, 1.0f - m_stormRng.uniform() ) ) * 60.0f / perMinute;
+                auto gauss = [this]
+                {
+                    const float u1 = std::max( 1.0e-6f, m_stormRng.uniform() ), u2 = m_stormRng.uniform();
+                    return std::sqrt( -2.0f * std::log( u1 ) ) * std::cos( 6.2831853f * u2 );
+                };
+                const float rumble = cur( ParamIdE::THUNDER_RUMBLE );
+                T.m_strike = 1;
+                T.m_seed = static_cast<int>( m_stormRng.next() & 0x7FFFFFFF );
+                T.m_distance = std::clamp( 1000.0f * cur( ParamIdE::THUNDER_DISTANCE ) * std::exp( 0.4f * gauss() ),
+                                           300.0f, 20000.0f );
+                T.m_azimuth = 6.2831853f * m_stormRng.uniform() - 3.1415927f;
+                T.m_height = 1500.0f + 2500.0f * m_stormRng.uniform();
+                T.m_energy = std::exp( 0.5f * gauss() );
+                T.m_tortuosity = 0.12f + 0.3f * rumble;
+                T.m_branches = rumble;
+                T.m_near = std::clamp( 1.0f - T.m_distance / 2500.0f, 0.05f, 0.5f );
+                ++m_strikes;
+                m_lastStrikeM = T.m_distance;
+                m_lightning = 1.0f;   // the flash, seen at once (the thunder comes three seconds a kilometre later)
+            }
+        }
+    }
+
+    // The singing ice: a sheet warmed into its critical state as it begins, the cold's cracks as often as Cold says,
+    // its flexural constant from its thickness, a lake of 400 m.
+    {
+        SingingIce &I = m_cloud.ice();
+        const float want = cur( ParamIdE::ICE );
+        glide( m_iceLevel, want, 0.5f );
+        I.m_on = ( want > 0.0f || m_iceLevel > 0.0f ) ? 1 : 0;
+        if ( I.m_on && !m_iceWas )
+        {   // a sheet that has cracked for a long time
+            I.m_reset = 1;
+            m_cloud.setIceStress( warmIce().data() );
+            m_crackIn = 0.3f * m_stormRng.uniform();
+        }
+        m_iceWas = I.m_on != 0;
+        if ( I.m_on )
+        {
+            I.m_level = 1.2f * m_iceLevel * VoiceLevel;
+            I.m_beta = 958.0f * cur( ParamIdE::ICE_THICKNESS );
+            I.m_size = 400.0f;
+            m_crackIn -= dt;
+            if ( want > 0.0f && m_crackIn <= 0.0f )
+            {   // the cold's cracks as a Poisson stream: 0.15 .. 6 a second
+                const float perSecond = 0.15f * std::pow( 40.0f, cur( ParamIdE::ICE_COLD ) );
+                m_crackIn = -std::log( std::max( 1.0e-6f, 1.0f - m_stormRng.uniform() ) ) / perSecond;
+                I.m_crack = 1;
+            }
+        }
     }
 }
 
@@ -2781,6 +3223,9 @@ void Engine::renderBlock()
     stepLayers( dtf );
     stepNature( dtf );
     stepRooms( dtf );
+    stepNight( dtf );
+    stepHeadset( dtf );   // after the rooms and the binaural cloud: the hands and the head on top
+    stepJournal( dtf );
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
@@ -2933,7 +3378,7 @@ void Engine::renderBlock()
                                                                     : 0.4f + 0.6f * v.m_velocity );
         cv.m_hz = static_cast<float>( v.m_hz * doppler * std::exp2( static_cast<double>( mpeBend ) / 12.0 ) );
         cv.m_level = level * landMakeup * std::exp2( expr( MpeTargetE::LEVEL ) );   // up to 6 dB
-        cv.m_gain = gain;
+        cv.m_gain = gain * m_rissetGain;   // Risset's pulse (Phase 30), 1 when it is off
         // MPE's Brightness: the tilt flattened (or steepened) by up to 0.6 and the window opened by up
         // to a half -- the window alone moves little under a falling spectrum.
         cv.m_tilt = std::max( 0.0f, m_blk.m_tilt - 0.6f * expr( MpeTargetE::BRIGHTNESS ) );
@@ -3007,6 +3452,10 @@ void Engine::renderBlock()
         cv.m_driftRate = m_blk.m_driftRate;
         cv.m_shimmer = std::clamp( m_blk.m_shimmer + 0.5f * expr( MpeTargetE::SHIMMER ), 0.0f, 1.0f );
         cv.m_shimmerRate = m_blk.m_shimmerRate;
+        cv.m_streams = m_blk.m_streams;
+        cv.m_streamDepth = m_blk.m_streamDepth;
+        cv.m_streamRate = m_blk.m_streamRate;
+        cv.m_fusion = m_blk.m_fusion;
         cv.m_stereo = m_blk.m_stereo;
         cv.m_partials = m_blk.m_partials;
         cv.m_distance = std::clamp( v.m_distance - 0.5f * expr( MpeTargetE::NEARER ), 0.0f, 1.0f );
@@ -3233,6 +3682,13 @@ void Engine::renderBlock()
                         ++count;
                     }
                 }
+                for ( int h = 0; h < 2 && count < PhysFood; ++h )
+                    if ( m_handFood[h] >= 0.0f )
+                    {   // the headset's hands (Phase 30, stepHeadset)
+                        P.m_food[count] = m_handFood[h];
+                        P.m_foodWeight[count] = m_handFoodWeight;
+                        ++count;
+                    }
                 P.m_count = count;
             }
         }
@@ -3545,7 +4001,7 @@ void Engine::renderBlock()
         m_binAngle += 6.2831853f * cur( ParamIdE::BINAURAL_ORBIT ) * dtf;
         if ( m_binAngle > 3.14159265f ) m_binAngle -= 6.2831853f;
         if ( m_binAngle < -3.14159265f ) m_binAngle += 6.2831853f;
-        b.m_angle = m_binAngle;
+        b.m_angle = m_binAngle - m_headYaw;   // the head's turn held off (Phase 30, the headset)
         SpectralEcho &se = m_cloud.spectralEcho();
         const bool    on = cur( ParamIdE::SPEC_MIX ) > 0.0f ||
                            cur( ParamIdE::SPEC_TO_FAR ) * cur( ParamIdE::SPEC_MIX ) > 0.0f || m_prevSpecMix > 0.0f;
@@ -3651,10 +4107,10 @@ void Engine::renderBlock()
         m_specR[k] = f[7];
         m_meltL[k] = f[8];
         m_meltR[k] = f[9];
-        m_nearL[k] += f[10] + f[16];   // the chime field and the weather, near and far, as the voices' planes
-        m_nearR[k] += f[11] + f[17];
-        m_farL[k] += ( f[12] + f[18] ) * m_blk.m_farLevel;
-        m_farR[k] += ( f[13] + f[19] ) * m_blk.m_farLevel;
+        m_nearL[k] += f[10] + f[16] + f[24];   // the chime field, the weather and the night, near and far, as the
+        m_nearR[k] += f[11] + f[17] + f[25];   // voices' planes
+        m_farL[k] += ( f[12] + f[18] + f[26] ) * m_blk.m_farLevel;
+        m_farR[k] += ( f[13] + f[19] + f[27] ) * m_blk.m_farLevel;
         m_bloomL[k] = f[20];   // the bloom (Phase 28), its level applied on the card
         m_bloomR[k] = f[21];
         m_roomL[k] = f[22];   // the wave room (Phase 29), likewise

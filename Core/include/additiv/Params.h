@@ -331,7 +331,29 @@ enum class ParamIdE : int
     QUANTUM,          ///< 0 .. 1: the conductor's root moves as a quantum walk on the Tonnetz
     QUANTUM_TIME,     ///< s: between the walk's looks
     QUANTUM_SPREAD,   ///< 0 .. 1: how far the walk's wave spreads between them
-    COUNT             ///< number of parameters
+    // Phase 30 (16.10.2026): the night -- the Aeolian harp, thunder, the singing ice
+    HARP,               ///< 0 .. 1: an Aeolian harp in the wind: each string locks onto a harmonic and sings it
+    HARP_PITCH,         ///< oct: the strings' tuning about 55 .. 110 Hz (to the chord)
+    HARP_GAUGE,         ///< 0 .. 1: thin to thick strings (thin ones sing higher harmonics)
+    THUNDER,            ///< 0 .. 1: a thunderstorm: how often lightning strikes
+    THUNDER_DISTANCE,   ///< km: how far off the storm is
+    THUNDER_RUMBLE,     ///< 0 .. 1: how tortuous and branched the channels are (a crack .. a long rumble)
+    ICE,                ///< 0 .. 1: a frozen lake that sings as it cracks
+    ICE_THICKNESS,      ///< m: the ice's thickness (thin ice sings longer)
+    ICE_COLD,           ///< 0 .. 1: how fast the cold builds the stress (how often it cracks)
+    STREAMS,            ///< how Streams parts the partials: odd and even, by three, registers, members
+    STREAM_DEPTH,       ///< 0 .. 1: each stream's own slow vibrato and tremolo (0: off)
+    STREAM_RATE,        ///< Hz: their rate
+    FUSION,             ///< 0 .. 1: the streams apart (heard as several sounds) .. moving as one (fused)
+    RISSET,             ///< 0 .. 1: the voices pulse in Risset's rhythm, which slows (or quickens) for ever
+    RISSET_RATE,        ///< Hz: the pulse in the middle of its octaves
+    RISSET_TIME,        ///< s: an octave of slowing
+    RISSET_WAY,         ///< slowing, quickening
+    NIGHT_ARC,          ///< 0 .. 1: the real night (the sun where you are) darkens, slows and widens the sound
+    DREAM_JOURNAL,      ///< the dream's memories kept with the state, and back with it
+    VR_HANDS,           ///< 0 .. 1: the headset's hands reach into the cloud (wind, halo, room, physarum)
+    HEAD_TRACKING,      ///< the binaural cloud and the thunder stay put as the head turns (the headset)
+    COUNT               ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table
@@ -441,6 +463,10 @@ constexpr int            NumFoliages = 4;                     ///< entries of Fo
 extern const char *const FoliageNames[NumFoliages];           ///< "Broadleaf", "Pine", "Grass", "Dry Leaves"
 constexpr int            NumHaloTurns = 2;                    ///< entries of HaloTurnNames
 extern const char *const HaloTurnNames[NumHaloTurns];         ///< "Counter-clockwise", "Clockwise"
+constexpr int            NumStreams = 4;                      ///< entries of StreamsNames (StreamsE)
+extern const char *const StreamsNames[NumStreams];            ///< "Odd & Even", "By Three", "Registers", "Members"
+constexpr int            NumRissetWays = 2;                   ///< entries of RissetWayNames
+extern const char *const RissetWayNames[NumRissetWays];       ///< "Slowing", "Quickening"
 constexpr int            NumShores = 3;                       ///< entries of ShoreNames
 extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
 constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames

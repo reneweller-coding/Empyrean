@@ -60,7 +60,25 @@ struct EngineConfig
     float         m_lookaheadMs = 10.0f;        ///< how far beyond two host blocks the worker renders ahead
     bool          m_realtimeGpuClass = true;    ///< raise the process's GPU scheduling class to REALTIME (PLAN.md)
     std::uint64_t m_seed = 0x5EEDu;             ///< the conductor's and the notes' dice
+    double m_sunClock = 0.0;   ///< the night arc's clock at prepare, Unix seconds (0: the computer's); it runs on
+                               ///< with the time rendered
 };
+
+/**
+ * @brief The headset as the Quest app sends it (Phase 30): the head's turn and both hands, in the room as it stood when
+ *        the app began (x to the right, y up, z ahead), from the head.
+ */
+struct HeadsetPose
+{
+    float m_yaw = 0.0f;     ///< rad: the head turned, positive to the right
+    float m_pitch = 0.0f;   ///< rad: the head tilted, up positive
+    float m_hand[2][3] = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };   ///< left, right: x, y, z, m from the head
+    float m_pinch[2] = { 0.0f, 0.0f };       ///< left, right: 0 open .. 1 the fingers touch
+    bool  m_tracked[2] = { false, false };   ///< left, right: the headset sees the hand
+    bool  m_valid = false;                   ///< a pose (false: none, or none for a second)
+};
+
+constexpr int DreamJournalMost = 1024;   ///< memories the dream journal keeps (Phase 30)
 
 /** @brief What a picture of the instrument needs to know about one voice (Engine::voiceView). */
 struct VoiceView
@@ -389,6 +407,63 @@ public:
         lastStep = m_qwLastStep;
         return m_qwMoves;
     }
+
+    /**
+     * @brief What the night did in the last block (Phase 30; tests and tools, offline).
+          * @param[out] out  receives 6 values: the harp's strings' mean wake amplitude, the harmonic they sound, the ice's
+     *                  last crack's size, the chirps begun, the strikes since prepare(), the last strike's distance (m)
+     */
+    void nightStats( float *out ) const
+    {
+        m_cloud.nightStats( out );
+        out[4] = static_cast<float>( m_strikes );
+        out[5] = m_lastStrikeM;
+    }
+
+    /**
+     * @brief Where the night arc reads the sun (Phase 30): a place, from now on. Any thread.
+     * @param[in] latitude   degrees, north positive
+     * @param[in] longitude  degrees, east positive
+     */
+    void setLocation( double latitude, double longitude );
+    /**
+     * @brief Where the night arc reads the sun. Any thread.
+     * @param[out] latitude   receives degrees, north positive
+     * @param[out] longitude  receives degrees, east positive
+     */
+    void location( double &latitude, double &longitude ) const;
+    /**
+     * @brief The sun as the last block saw it, for the panel. Any thread.
+     * @param[out] elevation  receives its elevation, degrees
+     * @return the night it makes, 0 .. 1
+     */
+    float nightNow( float &elevation ) const
+    {
+        elevation = m_sunLive.load( std::memory_order_relaxed );
+        return m_nightLive.load( std::memory_order_relaxed );
+    }
+    /**
+     * @brief The headset's pose, from now on (Phase 30). Any thread.
+     * @param[in] p  the head's turn and the hands (m_valid false: none)
+     */
+    void setHeadsetPose( const HeadsetPose &p );
+    /**
+     * @brief The dream journal (Phase 30): the dream's newest memories (up to DreamJournalMost), quantised to a byte a
+     *        band, as the worker last brought them down (every half minute while the dream dreams) or as they were last
+     *        set. Any thread but the worker's.
+     * @param[out] out  receives the journal: "DRJ1", the count and the bands (32-bit little-endian), then per memory
+     *                  its scale (a 32-bit float) and a byte a band
+     * @return true when it holds any memory
+     */
+    bool dreamJournal( std::vector<std::uint8_t> &out );
+    /**
+     * @brief A dream journal to dream from (a state restored): the worker writes it to the card before its next block.
+     *        Any thread but the worker's.
+     * @param[in] in  a journal as dreamJournal() gives it (anything else is ignored)
+     */
+    void setDreamJournal( const std::vector<std::uint8_t> &in );
+    /** @brief Risset's pulse as the last block left it (Phase 30; tests). @return the voices' gain factor */
+    float rissetGain() const { return m_rissetGain; }
 
     /** @brief Chimes that struck since the engine was prepared (Phase 27; tests, diagnostics). @return the count */
     long long chimeStrikes() const { return m_chimeStrikes.load( std::memory_order_relaxed ); }
@@ -936,6 +1011,25 @@ private:
      * @param[in] dt  the block's length, seconds
      */
     void stepRooms( float dt );
+    /**
+     * @brief The night, one block (Phase 30): the harp's strings tuned to the chord (thick to thin, gliding), thunder's
+     *        strikes drawn as they come (a Poisson stream; each its distance, direction, height, energy and channel),
+     *        the ice's load from the cold and its thickness.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepNight( float dt );
+    /**
+     * @brief The headset, one block (Phase 30): the head's turn held off the binaural cloud and the thunder, the hands
+     *        in the wind, the halo, the wave room and the physarum's food (after stepRooms, so its places are known).
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepHeadset( float dt );
+    /**
+     * @brief The dream journal, one block (Phase 30): a journal set goes onto the card first; while the dream dreams,
+     *        its newest memories come down every half minute, a byte a band.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepJournal( float dt );
 
     /** @brief A ghost of the memory: a voice as it was when it was let go, sounding on, fading, blurring. */
     struct Ghost
@@ -1043,6 +1137,40 @@ private:
     Rng                    m_qwRng;            ///< its dice
     std::vector<float>     m_roomL;            ///< the wave room's block from the GPU, left
     std::vector<float>     m_roomR;            ///< and right
+    // Phase 30
+    float                          m_harpLevel = 0.0f;      ///< the harp's level as it glides
+    bool                           m_harpWas = false;       ///< the harp sang in the last block
+    std::array<float, HarpStrings> m_harpHz{};              ///< each string's tuning as it glides (0: not yet tuned)
+    float                          m_thunderLevel = 0.0f;   ///< thunder's level as it glides
+    float                          m_strikeIn = 0.0f;       ///< s until the next strike
+    long long                      m_strikes = 0;           ///< strikes since prepare
+    float                          m_lastStrikeM = 0.0f;    ///< the last strike's distance, m
+    Rng                            m_stormRng;              ///< the storm's dice
+    float                          m_iceLevel = 0.0f;       ///< the ice's level as it glides
+    bool                           m_iceWas = false;        ///< the ice sang in the last block
+    float                          m_crackIn = 0.0f;        ///< s until the cold brings the next crack
+    double                         m_sunTime = 0.0;         ///< the night arc's clock, Unix seconds
+    std::atomic<double>            m_latitude{ 45.0 };      ///< where the sun is read: degrees north
+    std::atomic<double>            m_longitude{ 0.0 };      ///< and east
+    float                          m_night = 0.0f;          ///< the night the sun makes, 0 .. 1 (this block)
+    std::atomic<float>             m_nightLive{ 0.0f };     ///< the same, for the panel
+    std::atomic<float>             m_sunLive{ 0.0f };       ///< the sun's elevation, degrees, for the panel
+    double                         m_rissetPhase = 0.0;     ///< Risset: the slowest layer's beats, 0 .. 2^5
+    float                          m_rissetU = 0.0f;        ///< its way through the octave, 0 .. 1
+    float                          m_rissetGain = 1.0f;     ///< the voices' gain by its pulse this block
+    float                          m_rissetPulse = 0.0f;    ///< the pulse, 0 .. 1 (the source)
+    float                          m_lightning = 0.0f;      ///< the last strike's flash, 0 .. 1 (the source)
+    std::mutex                     m_poseLock;              ///< guards m_posePending
+    HeadsetPose                    m_posePending;           ///< the pose as it arrived
+    HeadsetPose                    m_pose;                  ///< the pose this block works with
+    std::vector<std::uint8_t>      m_journal;               ///< the dream journal brought down last (m_snapLock)
+    std::vector<std::uint8_t>      m_journalPending;        ///< a journal to write to the card (m_snapLock)
+    bool                           m_journalPendingSet = false;   ///< journalPending waits for the worker
+    float                          m_journalClock = 0.0f;         ///< s until the journal is brought down again
+    std::vector<float>             m_journalScratch;              ///< the worker's memories on their way (no lock)
+    float                          m_headYaw = 0.0f;              ///< rad: the head's turn held off the binaural cloud
+    float                          m_handFood[2] = { -1.0f, -1.0f };   ///< the hands' food lines, trail cells (-1 none)
+    float                          m_handFoodWeight = 1.0f;            ///< their weight
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength
     float m_turbAfter = 0.0f;   ///< s the cascade keeps settling after Turbulence went to nothing
     float m_cutoffPush =
@@ -1069,6 +1197,10 @@ private:
         float m_driftRate = 0.1f;         ///< Hz
         float m_shimmer = 0.4f;           ///< 0 .. 1
         float m_shimmerRate = 0.15f;      ///< Hz
+        int   m_streams = 0;              ///< Streams: how the partials part (StreamsE)
+        float m_streamDepth = 0.0f;       ///< Streams: their motion, 0 .. 1
+        float m_streamRate = 2.0f;        ///< Streams: Hz
+        float m_fusion = 0.0f;            ///< Streams: 0 apart .. 1 as one
         float m_stereo = 1.0f;            ///< 0 .. 1
         int   m_motion = 0;               ///< MotionKind
         float m_motionRate = 1.0f;        ///< times

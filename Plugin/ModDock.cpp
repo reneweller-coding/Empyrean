@@ -291,7 +291,8 @@ void ModDock::showMore()
     static constexpr Section Sections[] = { { "Fields and chaos", ModSourceE::LENIA1, ModSourceE::KURA4 },
                                             { "The piece", ModSourceE::BEAT, ModSourceE::RANDOM_NOTE },
                                             { "What it hears", ModSourceE::LOUDNESS, ModSourceE::ROUGHNESS },
-                                            { "The reservoir", ModSourceE::RESERVOIR1, ModSourceE::RESERVOIR4 } };
+                                            { "The reservoir", ModSourceE::RESERVOIR1, ModSourceE::RESERVOIR4 },
+                                            { "The night", ModSourceE::NIGHT, ModSourceE::LIGHTNING } };
     juce::PopupMenu          m;
     for ( const Section &sec : Sections )
     {
@@ -376,6 +377,10 @@ std::vector<ParamIdE> SourceInspector::ownParams( ModSourceE s )
     case ModSourceE::RESERVOIR3:
     case ModSourceE::RESERVOIR4:
         return { ParamIdE::RESERVOIR_CHAOS, ParamIdE::RESERVOIR_MEMORY, ParamIdE::RESERVOIR_INPUT };
+    case ModSourceE::NIGHT: return { ParamIdE::NIGHT_ARC };
+    case ModSourceE::RISSET:
+        return { ParamIdE::RISSET, ParamIdE::RISSET_RATE, ParamIdE::RISSET_TIME, ParamIdE::RISSET_WAY };
+    case ModSourceE::LIGHTNING: return { ParamIdE::THUNDER, ParamIdE::THUNDER_DISTANCE };
     default: return {};
     }
 }

@@ -224,6 +224,23 @@ struct CloudEngine::Impl
     float        *m_dRoomOutHist = nullptr;      ///< device: the ears' last samples, for the way up
     Halo          m_halo;                        ///< the host's copy of the halo's settings
     WaveRoom      m_room;                        ///< the host's copy of the wave room's settings
+    float2       *m_dHarpModes = nullptr;        ///< device: per harp string and mode its complex amplitude
+    float2       *m_dHarpWakes = nullptr;        ///< device: per harp string its wake (q, q')
+    float4       *m_dThunderSeg = nullptr;       ///< device: the last strike's channel, two entries a segment
+    int          *m_dThunderRing = nullptr;      ///< device: the thunder's ring, per ear ThunderRing whole numbers
+    float        *m_dIceStress = nullptr;        ///< device: the ice sheet's stress, IceN x IceN
+    float4       *m_dIceChirps = nullptr;        ///< device: the ice's chirps, two entries a slot
+    int          *m_dIceMeta = nullptr;          ///< device: the ice's running crack and its counters
+    float        *m_dNightScratch = nullptr;     ///< device: the night's scratch, NightRows rows of the block
+    AeolianHarp   m_harp;                        ///< the host's copy of the harp's settings
+    Thunder       m_thunder;                     ///< the host's copy of thunder's settings
+    SingingIce    m_ice;                         ///< the host's copy of the ice's settings
+    int           m_thunderRead = 0;             ///< where the thunder's ring is read next
+    int           m_thunderOrigin = 0;           ///< where in it the last strike's moment is
+    int           m_thunderChunk = ThunderChunks;   ///< the last strike's next part into the ring (ThunderChunks: done)
+    bool          m_thunderWas = false;   ///< thunder was on in the last block (the ring is cleared as it begins)
+    float        *m_hIceUp = nullptr;     ///< pinned host: an ice sheet's stress to send up
+    bool          m_iceUp = false;        ///< the next launch sends hIceUp up first
 
     ChimeField m_chimes;              ///< the host's copy of the chime field's settings
     Dream      m_dream;               ///< the host's copy of the dream's settings
@@ -241,10 +258,10 @@ struct CloudEngine::Impl
         bool                         m_enabled = true;   ///< as the executable graph has them
         int                          m_rest = 0;         ///< blocks the feature has rested
     };
-    std::array<Gate, 15> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
-                                    ///< dream, phantom, reservoir, spectral echo, melt
-    float m_gpuMs = 0.0f;           ///< GPU time of the last finished block
-    bool  m_launched = false;       ///< a block is in flight
+    std::array<Gate, 19> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
+    ///< dream, phantom, reservoir, spectral echo, melt, harp, thunder, ice, the night's mix
+    float m_gpuMs = 0.0f;       ///< GPU time of the last finished block
+    bool  m_launched = false;   ///< a block is in flight
 
     /** @brief Bytes of the upload: the header and the voices. @return bytes */
     size_t uploadBytes() const
@@ -349,7 +366,15 @@ struct CloudEngine::Impl
                           static_cast<void *>( m_dRoomHist ),
                           static_cast<void *>( m_dRoomIn ),
                           static_cast<void *>( m_dRoomEars ),
-                          static_cast<void *>( m_dRoomOutHist ) } )
+                          static_cast<void *>( m_dRoomOutHist ),
+                          static_cast<void *>( m_dHarpModes ),
+                          static_cast<void *>( m_dHarpWakes ),
+                          static_cast<void *>( m_dThunderSeg ),
+                          static_cast<void *>( m_dThunderRing ),
+                          static_cast<void *>( m_dIceStress ),
+                          static_cast<void *>( m_dIceChirps ),
+                          static_cast<void *>( m_dIceMeta ),
+                          static_cast<void *>( m_dNightScratch ) } )
             if ( p ) cudaFree( p );
         m_exec = nullptr;
         m_graph = nullptr;
@@ -395,6 +420,9 @@ struct CloudEngine::Impl
         m_dFilterTable = nullptr;
         if ( m_hHallMemory ) cudaFreeHost( m_hHallMemory );
         if ( m_hHallUp ) cudaFreeHost( m_hHallUp );
+        if ( m_hIceUp ) cudaFreeHost( m_hIceUp );
+        m_hIceUp = nullptr;
+        m_iceUp = false;
         m_dHallHist = nullptr;
         m_dHallMemory = m_dDensity = m_dTau = nullptr;
         m_dOrbitA = m_dOrbitB = nullptr;
@@ -414,6 +442,10 @@ struct CloudEngine::Impl
         m_dPhysDeposit = nullptr;
         m_dHalo = nullptr;
         m_dRoom = m_dRoomHist = m_dRoomIn = m_dRoomEars = m_dRoomOutHist = nullptr;
+        m_dHarpModes = m_dHarpWakes = nullptr;
+        m_dThunderSeg = m_dIceChirps = nullptr;
+        m_dThunderRing = m_dIceMeta = nullptr;
+        m_dIceStress = m_dNightScratch = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -635,6 +667,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dOrbitB, sizeof( float4 ) * partialsTotal ), "cudaMalloc orbit", error ) &&
            ok( cudaHostAlloc( &m.m_hHallMemory, sizeof( float ) * HallBins, cudaHostAllocDefault ),
                "cudaHostAlloc hall", error ) &&
+           ok( cudaHostAlloc( &m.m_hIceUp, sizeof( float ) * IceN * IceN, cudaHostAllocDefault ), "cudaHostAlloc ice",
+               error ) &&
            ok( cudaHostAlloc( &m.m_hHallUp, sizeof( float ) * HallBins, cudaHostAllocDefault ), "cudaHostAlloc hall",
                error ) &&
            ok( cudaMalloc( &m.m_dLifeStats, sizeof( float ) * StatsFloats ), "cudaMalloc life stats", error ) &&
@@ -709,7 +743,17 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                error ) &&
            ok( cudaMalloc( &m.m_dRoomEars, sizeof( float ) * 2 * ( 4096 / RoomDecim ) ), "cudaMalloc room", error ) &&
            ok( cudaMalloc( &m.m_dRoomOutHist, sizeof( float ) * 2 * ( RoomFirTaps / RoomDecim ) ), "cudaMalloc room",
-               error );
+               error ) &&
+           ok( cudaMalloc( &m.m_dHarpModes, sizeof( float2 ) * HarpStrings * HarpModes ), "cudaMalloc harp", error ) &&
+           ok( cudaMalloc( &m.m_dHarpWakes, sizeof( float2 ) * HarpStrings ), "cudaMalloc harp", error ) &&
+           ok( cudaMalloc( &m.m_dThunderSeg, sizeof( float4 ) * 2 * ThunderSegments ), "cudaMalloc thunder", error ) &&
+           ok( cudaMalloc( &m.m_dThunderRing, sizeof( int ) * 2 * static_cast<size_t>( ThunderRing ) ),
+               "cudaMalloc thunder", error ) &&
+           ok( cudaMalloc( &m.m_dIceStress, sizeof( float ) * IceN * IceN ), "cudaMalloc ice", error ) &&
+           ok( cudaMalloc( &m.m_dIceChirps, sizeof( float4 ) * 2 * IceChirps ), "cudaMalloc ice", error ) &&
+           ok( cudaMalloc( &m.m_dIceMeta, sizeof( int ) * 8 ), "cudaMalloc ice", error ) &&
+           ok( cudaMalloc( &m.m_dNightScratch, sizeof( float ) * NightRows * static_cast<size_t>( n ) ),
+               "cudaMalloc night", error );
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -820,6 +864,21 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         ok( cudaMemsetAsync( m.m_dRoomEars, 0, sizeof( float ) * 2 * ( 4096 / RoomDecim ), m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dRoomOutHist, 0, sizeof( float ) * 2 * ( RoomFirTaps / RoomDecim ), m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dHarpModes, 0, sizeof( float2 ) * HarpStrings * HarpModes, m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dHarpWakes, 0, sizeof( float2 ) * HarpStrings, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dThunderSeg, 0, sizeof( float4 ) * 2 * ThunderSegments, m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dThunderRing, 0, sizeof( int ) * 2 * static_cast<size_t>( ThunderRing ), m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dIceStress, 0, sizeof( float ) * IceN * IceN, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dIceChirps, 0, sizeof( float4 ) * 2 * IceChirps, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dIceMeta, 0, sizeof( int ) * 8, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dNightScratch, 0, sizeof( float ) * NightRows * static_cast<size_t>( n ), m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaStreamSynchronize( m.m_stream ), "cudaStreamSynchronize", error );
     if ( good )
@@ -988,6 +1047,18 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
             surfKernel<<<1, SurfSegments, 0, m.m_stream>>>( hdr, m.m_dSurf, m.m_dWeatherScratch, n, m.m_dMeta );
             weatherReduceKernel<<<static_cast<unsigned>( 4 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
                                   m.m_stream>>>( hdr, m.m_dWeatherScratch, n, m.m_dOut );
+            // The night (Phase 30): the harp in the wind, a strike's channel and its sixteenth into the ring, the
+            // ring read, the ice's stress and its chirps, their mix.
+            harpKernel<<<1, HarpStrings * 32, 0, m.m_stream>>>( hdr, m.m_dWindA, m.m_dHarpModes, m.m_dHarpWakes,
+                                                                m.m_dNightScratch, n, m.m_dLifeStats );
+            thunderChannelKernel<<<1, 32, 0, m.m_stream>>>( hdr, m.m_dThunderSeg );
+            thunderRenderKernel<<<ThunderSegments / ThunderChunks, 256, 0, m.m_stream>>>( hdr, m.m_dThunderSeg,
+                                                                                          m.m_dThunderRing );
+            thunderOutKernel<<<1, 128, 0, m.m_stream>>>( hdr, m.m_dThunderRing, m.m_dNightScratch, n );
+            iceKernel<<<1, 1024, 0, m.m_stream>>>( hdr, m.m_dIceStress, m.m_dIceChirps, m.m_dIceMeta, m.m_dLifeStats );
+            iceSingKernel<<<1, IceChirps, 0, m.m_stream>>>( hdr, m.m_dIceChirps, m.m_dNightScratch, n );
+            nightMixKernel<<<static_cast<unsigned>( ( n + 127 ) / 128 ), 128, 0, m.m_stream>>>( hdr, m.m_dNightScratch,
+                                                                                                n, m.m_dOut );
             modalKernel<<<static_cast<unsigned>( ModalBlocks ), ModalThreads, 0, m.m_stream>>>(
                 hdr, m.m_dOut, m.m_dModal, m.m_dModalScratch, n, m.m_dLand, m.m_dHallMemory );
             modalReduceKernel<<<static_cast<unsigned>( 2 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
@@ -1058,6 +1129,13 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                     { reinterpret_cast<const void *>( &reservoirReadKernel ), 12 },
                     { reinterpret_cast<const void *>( &spectralEchoKernel ), 13 },
                     { reinterpret_cast<const void *>( &meltKernel ), 14 },
+                    { reinterpret_cast<const void *>( &harpKernel ), 15 },
+                    { reinterpret_cast<const void *>( &thunderChannelKernel ), 16 },
+                    { reinterpret_cast<const void *>( &thunderRenderKernel ), 16 },
+                    { reinterpret_cast<const void *>( &thunderOutKernel ), 16 },
+                    { reinterpret_cast<const void *>( &iceKernel ), 17 },
+                    { reinterpret_cast<const void *>( &iceSingKernel ), 17 },
+                    { reinterpret_cast<const void *>( &nightMixKernel ), 18 },
                 };
                 size_t nodeCount = 0;
                 good = ok( cudaGraphGetNodes( m.m_graph, nullptr, &nodeCount ), "cudaGraphGetNodes", error );
@@ -1242,6 +1320,94 @@ WaveRoom &CloudEngine::room()
     return m_impl->m_room;
 }
 
+AeolianHarp &CloudEngine::harp()
+{
+    return m_impl->m_harp;
+}
+
+Thunder &CloudEngine::thunder()
+{
+    return m_impl->m_thunder;
+}
+
+SingingIce &CloudEngine::ice()
+{
+    return m_impl->m_ice;
+}
+
+int CloudEngine::dreamRead( std::vector<float> &out, int most )
+{
+    out.clear();
+    if ( !m_impl || !m_impl->m_dDreamMem ) return 0;
+    Impl &m = *m_impl;
+    m.settle();
+    int meta[3] = { 0, 0, 0 };
+    if ( cudaMemcpy( meta, m.m_dMeta, sizeof( meta ), cudaMemcpyDeviceToHost ) != cudaSuccess ) return 0;
+    const int count = std::clamp( std::min( meta[0], most ), 0, DreamMemories );
+    const int next = ( ( meta[2] % DreamMemories ) + DreamMemories ) % DreamMemories;
+    if ( count == 0 ) return 0;
+    // The newest `count` slots are one stretch before `next`, or two when it wraps: each brought down as a 2D copy
+    // (the memories are stored band by band), then turned memory by memory, the newest first.
+    std::vector<float> bands( static_cast<size_t>( count ) * DreamBands );
+    const int          first = next - count;
+    struct Stretch
+    {
+        int m_from;    ///< its first slot
+        int m_count;   ///< its slots
+        int m_at;      ///< where it lands among the copied columns
+    };
+    const Stretch parts[2] = { first >= 0 ? Stretch{ first, count, 0 } : Stretch{ first + DreamMemories, -first, 0 },
+                               first >= 0 ? Stretch{ 0, 0, 0 } : Stretch{ 0, next, -first } };
+    for ( const Stretch &s : parts )
+    {
+        if ( s.m_count <= 0 ) continue;
+        if ( cudaMemcpy2D( bands.data() + s.m_at, sizeof( float ) * static_cast<size_t>( count ),
+                           m.m_dDreamMem + s.m_from, sizeof( float ) * DreamMemories,
+                           sizeof( float ) * static_cast<size_t>( s.m_count ), DreamBands,
+                           cudaMemcpyDeviceToHost ) != cudaSuccess )
+            return 0;
+    }
+    out.resize( static_cast<size_t>( count ) * DreamBands );
+    for ( int j = 0; j < count; ++j )   // column count - 1 is the newest
+        for ( int b = 0; b < DreamBands; ++b )
+            out[static_cast<size_t>( j ) * DreamBands + b] =
+                bands[static_cast<size_t>( b ) * count + static_cast<size_t>( count - 1 - j )];
+    return count;
+}
+
+void CloudEngine::dreamWrite( const float *in, int count )
+{
+    if ( !m_impl || !m_impl->m_dDreamMem ) return;
+    Impl &m = *m_impl;
+    m.settle();
+    count = std::clamp( count, 0, DreamMemories );
+    // Stored oldest first, so that the newest is the slot before the next one, as the dream itself keeps them.
+    std::vector<float> bands( static_cast<size_t>( std::max( count, 1 ) ) * DreamBands );
+    for ( int j = 0; j < count; ++j )
+        for ( int b = 0; b < DreamBands; ++b )
+            bands[static_cast<size_t>( b ) * count + static_cast<size_t>( count - 1 - j )] =
+                in[static_cast<size_t>( j ) * DreamBands + b];
+    if ( count > 0 )
+        cudaMemcpy2D( m.m_dDreamMem, sizeof( float ) * DreamMemories, bands.data(),
+                      sizeof( float ) * static_cast<size_t>( count ), sizeof( float ) * static_cast<size_t>( count ),
+                      DreamBands, cudaMemcpyHostToDevice );
+    const int counts[3] = { count, 0, count % DreamMemories };
+    cudaMemcpy( m.m_dMeta, &counts[0], sizeof( int ), cudaMemcpyHostToDevice );
+    cudaMemcpy( m.m_dMeta + 2, &counts[2], sizeof( int ), cudaMemcpyHostToDevice );
+}
+
+void CloudEngine::setIceStress( const float *in )
+{
+    if ( !m_impl || !m_impl->m_hIceUp ) return;
+    std::memcpy( m_impl->m_hIceUp, in, sizeof( float ) * IceN * IceN );
+    m_impl->m_iceUp = true;
+}
+
+void CloudEngine::nightStats( float *out ) const
+{
+    for ( int k = 0; k < 4; ++k ) out[k] = m_impl ? m_impl->m_hLifeStats[56 + k] : 0.0f;
+}
+
 void CloudEngine::haloStats( float *energy, float *angle, float *rim ) const
 {
     for ( int c = 0; c < HaloCarriers; ++c )
@@ -1355,7 +1521,7 @@ void CloudEngine::launch()
     m.m_dream.m_clear = 0;
     hdr->m_weather = m.m_weather;
     hdr->m_weather.m_pitchCount = std::clamp( m.m_weather.m_pitchCount, 0, RainPitches );
-    hdr->m_weather.m_wind = ( m.m_weather.m_wind || m.m_chimes.m_on ) ? 1 : 0;
+    hdr->m_weather.m_wind = ( m.m_weather.m_wind || m.m_chimes.m_on || m.m_harp.m_on ) ? 1 : 0;
     m.m_weather.m_reset = 0;   // asked for once
     m.m_weather.m_rainFresh = 0;
     m.m_weather.m_windFresh = 0;
@@ -1374,6 +1540,33 @@ void CloudEngine::launch()
     hdr->m_room.m_ny = std::clamp( m.m_room.m_ny, 3, RoomNY );
     hdr->m_room.m_nz = std::clamp( m.m_room.m_nz, 3, RoomNZ );
     m.m_room.m_clear = 0;   // asked for once
+    hdr->m_harp = m.m_harp;
+    hdr->m_harp.m_x = std::clamp( m.m_harp.m_x, 0, WindW - 1 );
+    hdr->m_harp.m_y = std::clamp( m.m_harp.m_y, 0, WindH - 1 );
+    m.m_harp.m_clear = 0;   // asked for once
+    {   // thunder: the ring read on as the blocks pass; a strike's channel laid out, then sent in over ThunderChunks
+        // blocks (a strike asked for while one is still on its way waits for it)
+        hdr->m_thunder = m.m_thunder;
+        hdr->m_thunder.m_strike = 0;
+        hdr->m_thunder.m_read = m.m_thunderRead;
+        m.m_thunderRead = ( m.m_thunderRead + n ) & ( ThunderRing - 1 );
+        if ( m.m_thunder.m_on && m.m_thunder.m_strike && m.m_thunderChunk >= ThunderChunks )
+        {
+            hdr->m_thunder.m_strike = 1;
+            m.m_thunderOrigin = hdr->m_thunder.m_read;
+            m.m_thunderChunk = 0;
+            m.m_thunder.m_strike = 0;   // asked for once
+        }
+        hdr->m_thunder.m_origin = m.m_thunderOrigin;
+        hdr->m_thunder.m_chunk = m.m_thunderChunk < ThunderChunks ? m.m_thunderChunk++ : -1;
+        if ( !m.m_thunder.m_on ) m.m_thunderChunk = ThunderChunks;   // a strike on its way is dropped with the ring
+        if ( m.m_thunder.m_on && !m.m_thunderWas )                   // begins from a silent ring
+            cudaMemsetAsync( m.m_dThunderRing, 0, sizeof( int ) * 2 * static_cast<size_t>( ThunderRing ), m.m_stream );
+        m.m_thunderWas = m.m_thunder.m_on != 0;
+    }
+    hdr->m_ice = m.m_ice;
+    m.m_ice.m_reset = 0;   // asked for once
+    m.m_ice.m_crack = 0;
     hdr->m_phantomVoice = m.m_phantomVoice >= 0 && m.m_phantomVoice < m.m_cfg.m_voices ? m.m_phantomVoice : -1;
     hdr->m_dreamVoice = m.m_dreamVoice >= 0 && m.m_dreamVoice < m.m_cfg.m_voices ? m.m_dreamVoice : -1;
     m.m_melt.m_clear = 0;   // asked for once
@@ -1399,6 +1592,12 @@ void CloudEngine::launch()
         v.m_restart = 0;
         if ( v.m_active ) v.m_time += dt;
     }
+    if ( m.m_iceUp )
+    {   // an ice sheet: up before the block
+        cudaMemcpyAsync( m.m_dIceStress, m.m_hIceUp, sizeof( float ) * IceN * IceN, cudaMemcpyHostToDevice,
+                         m.m_stream );
+        m.m_iceUp = false;
+    }
     if ( m.m_hallUp )
     {   // a memory loaded (or a new hall): up before the block
         cudaMemcpyAsync( m.m_dHallMemory, m.m_hHallUp, sizeof( float ) * HallBins, cudaMemcpyHostToDevice, m.m_stream );
@@ -1407,7 +1606,7 @@ void CloudEngine::launch()
     // The gates: a resting feature's kernels switched off in the graph (on again at once when it wakes).
     {
         const int  pv = hdr->m_phantomVoice;
-        const bool want[15] = { hdr->m_life.m_mode != LifeModeE::OFF,
+        const bool want[19] = { hdr->m_life.m_mode != LifeModeE::OFF,
                                 hdr->m_weather.m_wind != 0,
                                 hdr->m_chimes.m_on != 0,
                                 hdr->m_weather.m_rainOn || hdr->m_weather.m_leavesOn || hdr->m_weather.m_surfOn,
@@ -1421,7 +1620,11 @@ void CloudEngine::launch()
                                 pv >= 0 && m.m_voices[static_cast<size_t>( pv )].m_active != 0,
                                 hdr->m_reservoir.m_on != 0,
                                 hdr->m_echo.m_on != 0,
-                                hdr->m_melt.m_on != 0 };
+                                hdr->m_melt.m_on != 0,
+                                hdr->m_harp.m_on != 0,
+                                hdr->m_thunder.m_on != 0,
+                                hdr->m_ice.m_on != 0,
+                                hdr->m_harp.m_on || hdr->m_thunder.m_on || hdr->m_ice.m_on };
         for ( size_t g = 0; g < m.m_gates.size(); ++g )
         {
             Impl::Gate &gate = m.m_gates[g];

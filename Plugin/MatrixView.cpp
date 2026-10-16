@@ -42,6 +42,11 @@ MatrixView::MatrixView( AdditivProcessor &proc ) : m_proc( proc )
                 row->m_source.addSectionHeading( "Reservoir" );
                 row->m_via.addSectionHeading( "Reservoir" );
             }
+            if ( s == static_cast<int>( ModSourceE::NIGHT ) )
+            {
+                row->m_source.addSectionHeading( "The night" );
+                row->m_via.addSectionHeading( "The night" );
+            }
             row->m_source.addItem( additiv::ModSourceNames[s], s + 1 );
             row->m_via.addItem( s == 0 ? juce::String( "-" ) : juce::String( additiv::ModSourceNames[s] ), s + 1 );
         }

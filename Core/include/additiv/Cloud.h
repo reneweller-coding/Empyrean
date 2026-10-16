@@ -31,6 +31,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "additiv/Spectrum.h"
 
@@ -147,6 +148,31 @@ constexpr int RoomNZ = 40;                            ///< from the floor up (4.
 constexpr int RoomCells = RoomNX * RoomNY * RoomNZ;   ///< its cells
 constexpr int RoomSources = 24;                       ///< voices that may sound in it at once
 
+// Phase 30 (16.10.2026): the night -- the Aeolian harp, thunder, the singing ice.
+constexpr int   HarpStrings = 12;         ///< the Aeolian harp's strings
+constexpr int   HarpModes = 32;           ///< harmonics a string rings (a warp's lanes)
+constexpr int   ThunderSegments = 4096;   ///< a lightning channel's segments: its main stroke and its branches
+constexpr int   ThunderMain = 2048;       ///< of them the main stroke's
+constexpr int   ThunderBranches = 4;      ///< branches off the main stroke
+constexpr int   ThunderRing = 1 << 21;    ///< samples the thunder's ring holds an ear (43.7 s at 48 kHz)
+constexpr int   ThunderChunks = 16;       ///< blocks a strike's segments are sent into the ring over
+constexpr int   IceN = 32;                ///< the ice sheet's stress grid: IceN x IceN cells (12.5 m each)
+constexpr float IceShare = 0.2f;          ///< the stress a slipping cell hands each of its neighbours (OFC's alpha)
+constexpr int   IceChirps = 64;           ///< chirps that may sound at once
+
+/**
+ * @brief How Streams parts a voice's partials into streams (Phase 30): each stream moves with a vibrato and a tremolo
+ *        of its own, and the ear hears it as a sound of its own (Bregman's common fate).
+ */
+enum class StreamsE : std::int32_t
+{
+    ODD_EVEN = 0,   ///< the odd harmonics and the even ones (the subharmonics a third)
+    THIRDS,         ///< the harmonics by their remainder over three (the subharmonics a fourth)
+    REGISTERS,      ///< the registers: harmonics 1 .. 2, 3 .. 6, 7 .. 16, above
+    MEMBERS,        ///< every member of a harmonic's cloud its own (the cloud parts into lines)
+    COUNT           ///< number of ways
+};
+
 /** @brief What a GPU voice plays: a note, or one of the layers that are not notes (Phase 27). */
 enum class VoiceKindE : std::int32_t
 {
@@ -251,6 +277,11 @@ struct CloudVoice
     float m_talbot[TalbotHarmonics] = {};   ///< Talbot: harmonics 1 .. 24, their amplitude factors (harmonicLife 8)
     // Phase 29
     float m_haloHz[HaloCarriers] = {};   ///< Halo: each carrier's pitch, Hz (0: silent)
+    // Phase 30
+    int   m_streams = 0;          ///< Streams: how the partials part into streams (StreamsE)
+    float m_streamDepth = 0.0f;   ///< Streams: 0 .. 1, each stream's slow vibrato and tremolo (0: none)
+    float m_streamRate = 2.0f;    ///< Streams: Hz, their rate
+    float m_fusion = 0.0f;        ///< Streams: 0 each stream its own motion (heard apart) .. 1 all as one (fused)
 };
 
 /** @brief The voice filter's models; on the GPU each is its analogue prototype's magnitude at the partial's frequency. */
@@ -273,9 +304,10 @@ constexpr int CloudChannels = 4;   ///< the voices' channels on the GPU: near le
 /**
  * @brief A finished frame: the four voice channels, the modal hall's left and right, the spectral echo's, the
  *        melt's, the chime field's four (near and far, left and right), the phantom layer's two (heard dry), the
- *        weather's four (near and far, left and right), the bloom's two and the wave room's two.
+ *        weather's four (near and far, left and right), the bloom's two, the wave room's two and the night's four
+ *        (the harp, the thunder and the ice; near and far, left and right).
  */
-constexpr int CloudOutChannels = 24;
+constexpr int CloudOutChannels = 28;
 constexpr int ModalModes = 65536;   ///< the modal hall's resonances
 constexpr int ModalTuned = 128;     ///< pitches the hall's tuned modes may sit on
 constexpr int HallBins =
@@ -569,6 +601,10 @@ struct Weather
     float m_advect = 0.15f;            ///< the showers' drift against the wind's speed
     float m_shower[4] = {};            ///< the windward feed across the field (near .. far): slow randoms, -1 .. 1
     float m_pitch[RainPitches] = {};   ///< Hz: the pitches tuned drops may sing
+    int   m_handX[2] = { 0, 0 };       ///< the headset's hands in the wind (Phase 30): each one's cell across
+    int   m_handY[2] = { 0, 0 };       ///< and from near to far
+    int   m_handR[2] = { 0, 0 };       ///< its radius, cells (0: no hand); the wind flows round it as round a post
+    int   m_pad3[2] = { 0, 0 };        ///< keeps the struct 16-byte aligned
 };
 static_assert( sizeof( Weather ) % 16 == 0, "Weather rides in the block header" );
 
@@ -675,6 +711,12 @@ struct Halo
     float m_damp = 0.1f;                ///< per second: how fast it fades
     float m_drive[HaloCarriers] = {};   ///< each carrier's drive this block (amplitude)
     int   m_site[HaloCarriers] = {};    ///< the rim site each carrier is driven at
+    int   m_defectX[2] = { 99, 99 };    ///< the headset's hands as defects (Phase 30): each one's site across (99 none)
+    int   m_defectY[2] = { 99, 99 };    ///< and from front to back
+    float m_defectV = 0.0f;             ///< their potential, in units of the hopping (a wall where it is large)
+    float m_defectR2 = 4.0f;            ///< their radius squared, sites
+    float m_pad1 = 0.0f;                ///< keeps the struct 16-byte aligned
+    float m_pad2 = 0.0f;                ///< likewise
 };
 static_assert( sizeof( Halo ) % 16 == 0, "Halo rides in the block header" );
 
@@ -702,8 +744,102 @@ struct WaveRoom
     int   m_source[RoomSources] = {};    ///< each source's cell
     int   m_voiceOf[RoomSources] = {};   ///< and its GPU voice
     float m_gain[RoomSources] = {};      ///< and its gain
+    int   m_absorb[2] = { -1, -1 };   ///< the headset's open hands (Phase 30): each one's cell, an absorber (-1 none)
+    float m_absorbR2 = 4.0f;          ///< their radius squared, cells
+    float m_absorbK = 0.0f;           ///< the share of the pressure they take a step there
 };
 static_assert( sizeof( WaveRoom ) % 16 == 0, "WaveRoom rides in the block header" );
+
+/**
+ * @brief The Aeolian harp (Phase 30): HarpStrings strings standing in the wind (ChimeField's lattice) where the harp
+ *        is.
+ *
+ * A string in the wind sheds a vortex street at Strouhal's frequency, 0.2 times the wind's speed over the string's
+ * diameter. The wake is a van der Pol oscillator at that frequency, driving the string's HarpModes harmonics and
+ * driven back by their acceleration (Facchinetti, de Langre and Biolley 2004): so a string locks onto the harmonic
+ * nearest its vortices and holds it -- the lock-in --, and jumps to the next when the wind has moved far enough. A
+ * harp's strings are tuned alike or to a chord and differ in their thickness: each sings another harmonic.
+ */
+struct AeolianHarp
+{
+    int   m_on = 0;                       ///< 1: the strings ring in the wind (0: nothing computed)
+    int   m_clear = 0;                    ///< 1 for one block: the strings at rest, their wakes begun again
+    int   m_x = 64;                       ///< where the harp stands in the wind's lattice: across (cells)
+    int   m_y = 32;                       ///< and from near to far
+    float m_level = 0.0f;                 ///< the harp's amplitude out
+    float m_speed = 120.0f;               ///< m/s of wind per lattice unit of the wind's speed
+    float m_eps = 0.3f;                   ///< the wake's van der Pol coefficient
+    float m_couple = 12.0f;               ///< A: how strongly a string's acceleration drives its wake
+    float m_force = 4.0e-5f;              ///< M: how strongly the wake's lift drives the string (air against gut)
+    float m_pad0 = 0.0f;                  ///< keeps the arrays 16-byte aligned
+    float m_pad1 = 0.0f;                  ///< likewise
+    float m_pad2 = 0.0f;                  ///< likewise
+    float m_hz[HarpStrings] = {};         ///< each string's fundamental, Hz
+    float m_diameter[HarpStrings] = {};   ///< each string's diameter, m
+    float m_place[HarpStrings] = {};      ///< each string's place, -1 (left) .. 1 (right)
+};
+static_assert( sizeof( AeolianHarp ) % 16 == 0, "AeolianHarp rides in the block header" );
+
+/**
+ * @brief Thunder (Phase 30): a strike lays out a lightning channel and every segment of it sends the listener an
+ *        N-wave.
+ *
+ * The channel runs from the cloud's base to the ground, tortuous at every scale (a segment turns 16 degrees from the
+ * straight way on average), with branches off its upper half. Each segment's N-wave is as long as the channel's
+ * radius says (Few 1969: the energy per metre, about 1e5 J/m), lengthening on its way; it claps where the segment
+ * stands across the line of sight and rumbles where it lies along it (its length then takes time to pass), and the air
+ * takes the highs of the far ones. The waves arrive by distance -- the near part's crack first, the rumble of the rest
+ * for seconds after -- and are summed once into a ring of whole numbers that the blocks read as it comes round.
+ */
+struct Thunder
+{
+    int   m_on = 0;         ///< 1: the ring is read and strikes are laid out (0: nothing computed)
+    int   m_strike = 0;     ///< 1 for one block: a strike, its channel laid out this block
+    int   m_chunk = -1;     ///< which of the channel's ThunderChunks parts goes into the ring this block (-1 none)
+    int   m_seed = 0;       ///< the strike's dice
+    int   m_read = 0;       ///< where in the ring this block is read
+    int   m_origin = 0;     ///< where in the ring the strike's moment is
+    int   m_pad0 = 0;       ///< keeps the floats 16-byte aligned
+    int   m_pad1 = 0;       ///< likewise
+    float m_level = 0.0f;   ///< the thunder's amplitude out
+    float m_near = 0.15f;   ///< its share in the near plane
+    float m_distance = 3000.0f;   ///< m: the strike's foot from the listener
+    float m_azimuth = 0.0f;       ///< rad: its direction, 0 ahead, positive to the right
+    float m_height = 3000.0f;     ///< m: the cloud's base, where the channel begins
+    float m_tortuosity = 0.28f;   ///< rad: a segment's mean turn from the straight way
+    float m_branches = 0.5f;      ///< 0 .. 1: how much the branches carry
+    float m_energy = 1.0f;        ///< the strike's energy per metre against a typical one's
+    float m_yaw = 0.0f;           ///< rad: the listener's head turned (the headset), positive to the right
+    float m_pad2 = 0.0f;          ///< keeps the struct 16-byte aligned
+    float m_pad3 = 0.0f;          ///< likewise
+    float m_pad4 = 0.0f;          ///< likewise
+};
+static_assert( sizeof( Thunder ) % 16 == 0, "Thunder rides in the block header" );
+
+/**
+ * @brief The singing ice (Phase 30): a frozen lake under the stress the cold builds, heard from its shore.
+ *
+  * The sheet is a grid of slider blocks (Olami, Feder and Christensen 1992): a cell past its threshold slips and hands
+ * a share of its stress to each neighbour, which may slip in turn -- so cracks come in avalanches of every size, the
+ * large ones rare. The cold raises every cell alike until the most stressed one reaches its threshold (the slow drive
+ * of the model, a crack at a time, as often as the cold says); the sheet begins in its critical state, warmed by many
+ * cracks before (setIceStress). A crack is heard across the ice as a chirp falling from the highs:
+ * waves of bending are dispersive, their speed growing as the square root of the frequency, so the highs arrive first
+ * and the frequency falls about as one over the time squared -- the laser-like song of lake ice. The thinner the ice,
+ * the slower the waves and the longer the song.
+ */
+struct SingingIce
+{
+    int   m_on = 0;          ///< 1: the sheet sings (0: nothing computed)
+    int   m_reset = 0;       ///< 1 for one block: no crack running, every chirp silent (the stress by setIceStress)
+    int   m_crack = 0;       ///< 1 for one block: the cold brings the most stressed cell to its threshold
+    int   m_pad0 = 0;        ///< keeps the floats 16-byte aligned
+    float m_level = 0.0f;    ///< the chirps' amplitude out
+    float m_beta = 96.0f;    ///< m^2/s: the sheet's flexural constant sqrt(D / (rho h)), 958 times its thickness
+    float m_size = 400.0f;   ///< m: the lake from side to side and from the shore out
+    float m_pad1 = 0.0f;     ///< keeps the struct 16-byte aligned
+};
+static_assert( sizeof( SingingIce ) % 16 == 0, "SingingIce rides in the block header" );
 
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
@@ -1057,6 +1193,43 @@ public:
     Halo &halo();
     /** @brief The wave room's settings and sources for the next block (Phase 29). @return them */
     WaveRoom &room();
+    /** @brief The Aeolian harp's settings for the next block (Phase 30). @return them */
+    AeolianHarp &harp();
+    /**
+     * @brief Thunder's settings for the next block (Phase 30). A strike asked for (m_strike) while the last one's
+     *        channel is still being sent into the ring waits for it; the ring's reading and the strike's moment are
+     *        kept here (m_read, m_origin, m_chunk are overwritten).
+     * @return them
+     */
+    Thunder &thunder();
+    /** @brief The singing ice's settings for the next block (Phase 30). @return them */
+    SingingIce &ice();
+    /**
+     * @brief The dream's newest memories, brought down from the card (Phase 30, the dream journal); waits for the block
+     *        in flight. The thread that launches.
+     * @param[out] out   receives up to `most` memories, the newest first, DreamBands values each (each of length 1)
+     * @param[in]  most  how many at most
+     * @return how many
+     */
+    int dreamRead( std::vector<float> &out, int most );
+    /**
+     * @brief Replaces the dream's memories (Phase 30: a journal read back); waits for the block in flight. The thread
+     *        that launches.
+     * @param[in] in     the memories, the newest first, DreamBands values each
+     * @param[in] count  how many (at most DreamMemories)
+     */
+    void dreamWrite( const float *in, int count );
+    /**
+     * @brief Replaces the ice sheet's stress at the next launch (Phase 30: a sheet warmed into its critical state).
+     * @param[in] in  IceN x IceN stresses, row by row (below 1)
+     */
+    void setIceStress( const float *in );
+    /**
+     * @brief What the night did in the last block (Phase 30).
+     * @param[out] out  receives 4 values: the harp's strings' mean wake amplitude, the harmonic they sound (by energy,
+     *                  averaged over the strings), the ice's last crack's size (slips), the chirps begun since open()
+     */
+    void nightStats( float *out ) const;
     /**
      * @brief The halo's carriers as the last block left them (Phase 29).
      * @param[out] energy  receives HaloCarriers values: each lattice's energy (the sum of its amplitudes squared)

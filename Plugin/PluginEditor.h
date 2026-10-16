@@ -119,6 +119,8 @@ private:
     void showHelp( bool on );
     /** @brief The settings menu under its button. */
     void showSettings();
+    /** @brief Asks for the night arc's place (latitude and longitude) and keeps it (Phase 30). */
+    void askPlace();
     /** @brief Whether this is the standalone. @return true there */
     bool standalone() const { return m_proc.wrapperType == juce::AudioProcessor::wrapperType_Standalone; }
     /** @brief The standalone's full screen on or off. */

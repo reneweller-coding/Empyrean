@@ -37,6 +37,28 @@ __device__ __forceinline__ bool windPost( int x, int y )
     return ax * ax + ay * ay <= 16 || bx * bx + by * by <= 16 || cx * cx + cy * cy <= 16;
 }
 
+/**
+ * @brief Whether a cell of the wind is inside one of the headset's hands (Phase 30): a post that moves, its distance on
+ *        the torus.
+ * @param[in] W  the weather (the hands' cells and radii)
+ * @param[in] x  across, 0 .. WindW - 1
+ * @param[in] y  from near to far, 0 .. WindH - 1
+ * @return true inside a hand
+ */
+__device__ __forceinline__ bool windHand( const Weather &W, int x, int y )
+{
+    for ( int h = 0; h < 2; ++h )
+    {
+        const int r = W.m_handR[h];
+        if ( r <= 0 ) continue;
+        int dx = abs( x - W.m_handX[h] ), dy = abs( y - W.m_handY[h] );
+        dx = min( dx, WindW - dx );
+        dy = min( dy, WindH - dy );
+        if ( dx * dx + dy * dy <= r * r ) return true;
+    }
+    return false;
+}
+
 }   // namespace
 
 /**
@@ -54,11 +76,12 @@ __global__ void windStepKernel( const BlockHeader *hdr, int node, float *a, floa
     if ( !hdr->m_weather.m_wind ) return;   // blowing for the chimes or the weather (Phase 28)
     const int idx = static_cast<int>( blockIdx.x ) * blockDim.x + threadIdx.x;
     if ( idx >= WindCells ) return;
-    const int    x = idx % WindW, y = idx / WindW;
-    const float *src = node == 0 ? a : b;
-    float       *dst = node == 0 ? b : a;
-    if ( ( hdr->m_weather.m_windFresh && node == 0 ) || windPost( x, y ) )
-    {   // at rest (a post's cells stay so)
+    const int      x = idx % WindW, y = idx / WindW;
+    const float   *src = node == 0 ? a : b;
+    float         *dst = node == 0 ? b : a;
+    const Weather &W = hdr->m_weather;
+    if ( ( W.m_windFresh && node == 0 ) || windPost( x, y ) || windHand( W, x, y ) )
+    {   // at rest (a post's cells stay so, and a hand's)
         for ( int k = 0; k < 9; ++k ) dst[k * WindCells + idx] = cWindW[k];
         return;
     }
@@ -66,7 +89,8 @@ __global__ void windStepKernel( const BlockHeader *hdr, int node, float *a, floa
     for ( int k = 0; k < 9; ++k )
     {
         const int xs = ( x - cWindX[k] ) & ( WindW - 1 ), ys = ( y - cWindY[k] ) & ( WindH - 1 );
-        f[k] = windPost( xs, ys ) ? src[cWindOpp[k] * WindCells + idx] : src[k * WindCells + ys * WindW + xs];
+        f[k] = windPost( xs, ys ) || windHand( W, xs, ys ) ? src[cWindOpp[k] * WindCells + idx]
+                                                           : src[k * WindCells + ys * WindW + xs];
         rho += f[k];
         ux += static_cast<float>( cWindX[k] ) * f[k];
         uy += static_cast<float>( cWindY[k] ) * f[k];

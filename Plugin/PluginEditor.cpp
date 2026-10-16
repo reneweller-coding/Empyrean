@@ -410,14 +410,21 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
           { { "Phantom", F::FILTER, IdsT{ ParamIdE::PHANTOM, ParamIdE::PHANTOM_LINE, ParamIdE::PHANTOM_WIDTH },
               IdsT{ ParamIdE::PHANTOM } },
             { "Dream", F::ENVELOPE,
-              IdsT{ ParamIdE::DREAM, ParamIdE::DREAM_FOCUS, ParamIdE::DREAM_DRIFT, ParamIdE::DREAM_DEPTH },
+              IdsT{ ParamIdE::DREAM, ParamIdE::DREAM_FOCUS, ParamIdE::DREAM_DRIFT, ParamIdE::DREAM_DEPTH,
+                    ParamIdE::DREAM_JOURNAL },
               IdsT{ ParamIdE::DREAM } },
             { "Premonition", F::MOTION, IdsT{ ParamIdE::PREMONITION, ParamIdE::PREMONITION_TIME },
               IdsT{ ParamIdE::PREMONITION } },
             { "Memory", F::ENVELOPE,
               IdsT{ ParamIdE::MEMORY_LEVEL, ParamIdE::MEMORY_TIME, ParamIdE::MEMORY_BLOOM, ParamIdE::MEMORY_BLUR,
                     ParamIdE::MEMORY_SINK },
-              IdsT{ ParamIdE::MEMORY_LEVEL } } } );
+              IdsT{ ParamIdE::MEMORY_LEVEL } },
+            { "Streams", F::SOURCE,
+              IdsT{ ParamIdE::STREAM_DEPTH, ParamIdE::STREAMS, ParamIdE::STREAM_RATE, ParamIdE::FUSION },
+              IdsT{ ParamIdE::STREAM_DEPTH } },
+            { "Risset", F::MOTION,
+              IdsT{ ParamIdE::RISSET, ParamIdE::RISSET_RATE, ParamIdE::RISSET_TIME, ParamIdE::RISSET_WAY },
+              IdsT{ ParamIdE::RISSET } } } );
     // Phase 28: the wind and what it moves -- the chimes (Phase 27), the rain, the leaves, the sea.
     page( "Weather",
           { { "Wind", F::SPACE, IdsT{ ParamIdE::WIND, ParamIdE::GUSTS } },
@@ -431,6 +438,15 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
             { "Leaves", F::SOURCE, IdsT{ ParamIdE::LEAVES, ParamIdE::FOLIAGE }, IdsT{ ParamIdE::LEAVES } },
             { "Surf", F::MOTION, IdsT{ ParamIdE::SURF, ParamIdE::SURF_SWELL, ParamIdE::SHORE, ParamIdE::SURF_DISTANCE },
               IdsT{ ParamIdE::SURF } } } );
+    // Phase 30: the night -- the Aeolian harp in the wind, thunder, the singing ice, the night arc from the real sun.
+    page( "Night",
+          { { "Aeolian Harp", F::SOURCE, IdsT{ ParamIdE::HARP, ParamIdE::HARP_PITCH, ParamIdE::HARP_GAUGE },
+              IdsT{ ParamIdE::HARP } },
+            { "Thunder", F::SPACE, IdsT{ ParamIdE::THUNDER, ParamIdE::THUNDER_DISTANCE, ParamIdE::THUNDER_RUMBLE },
+              IdsT{ ParamIdE::THUNDER } },
+            { "Singing Ice", F::FILTER, IdsT{ ParamIdE::ICE, ParamIdE::ICE_THICKNESS, ParamIdE::ICE_COLD },
+              IdsT{ ParamIdE::ICE } },
+            { "Night", F::ENVELOPE, IdsT{ ParamIdE::NIGHT_ARC }, IdsT{ ParamIdE::NIGHT_ARC } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [tp] { return tp->describe(); } );
@@ -506,7 +522,9 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                      { "Halo", F::MOTION,
                        IdsT{ ParamIdE::HALO, ParamIdE::HALO_SPEED, ParamIdE::HALO_TOPOLOGY, ParamIdE::HALO_DISORDER,
                              ParamIdE::HALO_TURN },
-                       IdsT{ ParamIdE::HALO } } } );
+                       IdsT{ ParamIdE::HALO } },
+                     { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING },
+                       IdsT{ ParamIdE::VR_HANDS } } } );
     {
         auto *h = new HallPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [h] { return h->describe(); } );
@@ -542,7 +560,9 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
         auto                            at = [&names]( const char *n ) { return names.indexOf( n ); };
         std::vector<PageStrip::Section> sections = {
             { "", { at( "Focus" ) } },
-            { "Sound", { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ) } },
+            { "Sound",
+              { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ),
+                at( "Night" ) } },
             { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
             { "Space", { at( "Space" ), at( "Effects" ), at( "Rooms" ), at( "Hall" ) } },
             { "Modulation", { at( "Modulation" ) } },
@@ -1793,6 +1813,27 @@ void AdditivEditor::showPresets()
                         } );
 }
 
+void AdditivEditor::askPlace()
+{
+    double lat = 0.0, lon = 0.0;
+    m_proc.engine().location( lat, lon );
+    auto *w = new juce::AlertWindow( "Night arc", "Where the sun is read: degrees, north and east positive.",
+                                     juce::MessageBoxIconType::NoIcon, this );
+    w->addTextEditor( "lat", juce::String( lat, 4 ), "Latitude" );
+    w->addTextEditor( "lon", juce::String( lon, 4 ), "Longitude" );
+    w->addButton( "Keep", 1, juce::KeyPress( juce::KeyPress::returnKey ) );
+    w->addButton( "Cancel", 0, juce::KeyPress( juce::KeyPress::escapeKey ) );
+    w->enterModalState( true,
+                        juce::ModalCallbackFunction::create(
+                            [this, w]( int result )
+                            {
+                                if ( result == 1 )
+                                    m_proc.setPlace( w->getTextEditorContents( "lat" ).getDoubleValue(),
+                                                     w->getTextEditorContents( "lon" ).getDoubleValue() );
+                            } ),
+                        true );
+}
+
 void AdditivEditor::showSettings()
 {
     frame::SettingsMenu m;
@@ -1807,6 +1848,10 @@ void AdditivEditor::showSettings()
             setSize( juce::roundToInt( 1280.0f * k ), juce::roundToInt( 860.0f * k ) );
     };
     m.m_headsetStatus = [this] { return m_proc.headset().statusText(); };
+    m.m_headsetItems = [this]( juce::PopupMenu &h )
+    {   // Phase 30: the head and the hands in the cloud
+        h.addItem( m_proc.pose().statusText(), false, false, nullptr );
+    };
     m.m_jamStatus = [this] { return m_proc.jamStatus(); };   // the family jam: Off, Lead, Follow
     m.m_moreItems = [this]( juce::PopupMenu &menu )
     {
@@ -1816,6 +1861,20 @@ void AdditivEditor::showSettings()
                           [this, pct] { setZoom( static_cast<float>( pct ) / 100.0f ); } );
         menu.addSubMenu( "Zoom", zoom );
         menu.addItem( "Night mode", true, m_night, [this] { setNight( !m_night ); } );
+        {   // Phase 30: where the night arc reads the sun
+            juce::PopupMenu place;
+            double          lat = 0.0, lon = 0.0;
+            m_proc.engine().location( lat, lon );
+            float       sun = 0.0f;
+            const float night = m_proc.engine().nightNow( sun );
+            place.addItem( juce::String( std::fabs( lat ), 2 ) + ( lat >= 0.0 ? " N, " : " S, " ) +
+                               juce::String( std::fabs( lon ), 2 ) + ( lon >= 0.0 ? " E" : " W" ) + ": the sun at " +
+                               juce::String( sun, 0 ) + " degrees, night " + juce::String( night, 2 ),
+                           false, false, nullptr );
+            place.addItem( "Set the place...", [this] { askPlace(); } );
+            place.addItem( "From the time zone", [this] { m_proc.placeFromTimeZone(); } );
+            menu.addSubMenu( "Night arc", place );
+        }
         menu.addItem( "The first steps (tour)", [this] { startTour(); } );
     };
     m.m_about = [this]

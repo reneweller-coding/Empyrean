@@ -80,7 +80,11 @@ enum class ModSourceE : int
     RESERVOIR2,   ///< its second
     RESERVOIR3,   ///< its third
     RESERVOIR4,   ///< its fourth
-    COUNT         ///< number of sources
+    // Phase 30: the night
+    NIGHT,       ///< the real night where the instrument is: 0 while the sun is up .. 1 in astronomical night
+    RISSET,      ///< Risset's pulse (the rhythm that slows for ever), 0 .. 1
+    LIGHTNING,   ///< a strike's flash (Thunder), 1 at the strike, fading over a second or two
+    COUNT        ///< number of sources
 };
 constexpr int            NumModSources = static_cast<int>( ModSourceE::COUNT );   ///< entries of ModSourceNames
 extern const char *const ModSourceNames[NumModSources];                           ///< "Off", "LFO 1", ... for menus
@@ -270,6 +274,9 @@ struct ModInputs
     float m_heardFlux = 0.0f;       ///< the change heard, 0 .. 1
     float m_roughness = 0.0f;       ///< the chord's roughness, 0 .. 1 (the engine finds it)
     float m_reservoir[4] = {};      ///< the reservoir's readouts, -1 .. 1 (from the GPU)
+    float m_night = 0.0f;           ///< the night where the instrument is, 0 .. 1 (Sun.h)
+    float m_risset = 0.0f;          ///< Risset's pulse, 0 .. 1
+    float m_lightning = 0.0f;       ///< the last strike's flash, 0 .. 1
 };
 
 /** @brief The sources, advanced once per block on the renderer's thread. */

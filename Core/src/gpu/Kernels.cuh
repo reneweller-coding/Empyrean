@@ -91,6 +91,16 @@ __global__ void roomStepKernel( const BlockHeader *hdr, int step, float *field, 
 __global__ void roomOutKernel( const BlockHeader *hdr, const float *ears, float *hist, float *out );
 cudaError_t uploadRoomTables( const signed char ( *xy )[2], const short ( *nbr )[4], const float *fir );
 
+// Night.cu
+__global__ void harpKernel( const BlockHeader *hdr, const float *wind, float2 *modes, float2 *wakes, float *scratch,
+                            int maxN, float *stats );
+__global__ void thunderChannelKernel( const BlockHeader *hdr, float4 *seg );
+__global__ void thunderRenderKernel( const BlockHeader *hdr, const float4 *seg, int *ring );
+__global__ void thunderOutKernel( const BlockHeader *hdr, int *ring, float *scratch, int maxN );
+__global__ void iceKernel( const BlockHeader *hdr, float *stress, float4 *chirps, int *meta, float *stats );
+__global__ void iceSingKernel( const BlockHeader *hdr, float4 *chirps, float *scratch, int maxN );
+__global__ void nightMixKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out );
+
 // Spectral.cu
 __global__ void spectralEchoKernel( const BlockHeader *hdr, float *io, float *hist, float *acc, float2 *ring, int *st );
 __global__ void meltKernel( const BlockHeader *hdr, float *io, float *hist, float *acc, float *energy, float *omega,

@@ -533,6 +533,12 @@ int main( int argc, char **argv )
                              "%.2f; quantum walk %lld moves (last %d)\n",
                              energy[0], energy[1], energy[2], angle[0] * 57.29578f, angle[1] * 57.29578f,
                              angle[2] * 57.29578f, rim[0], rim[1], rim[2], qwMoves, qwStep );
+            float night[6];   // Phase 30: the harp, the ice, thunder
+            e.nightStats( night );
+            if ( night[0] + night[3] + night[4] > 0.0f )
+                std::printf(
+                    "         harp: wake %.2f, harmonic %.1f; ice: last crack %.0f, chirps %.0f; strikes %.0f\n",
+                    night[0], night[1], night[2], night[3], night[4] );
             sq = 0.0;
             peak = 0.0;
             gpu = 0.0;

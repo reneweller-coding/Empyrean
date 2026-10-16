@@ -18,6 +18,7 @@ using additiv::ModSourceE;
 juce::Colour sourceColour( ModSourceE s )
 {
     const frame::Skin &skin = additivui::skin();
+    if ( s >= ModSourceE::NIGHT ) return skin.family( frame::FamilyE::FILTER );
     if ( s >= ModSourceE::RESERVOIR1 ) return additivui::colour::Violet;
     if ( s >= ModSourceE::LOUDNESS ) return skin.family( frame::FamilyE::SPACE );
     if ( s >= ModSourceE::BEAT ) return skin.family( frame::FamilyE::ENVELOPE );
@@ -44,6 +45,7 @@ constexpr Section Sections[] = {
     { "The piece", ModSourceE::BEAT, ModSourceE::RANDOM_NOTE },
     { "What it hears", ModSourceE::LOUDNESS, ModSourceE::ROUGHNESS },
     { "The reservoir", ModSourceE::RESERVOIR1, ModSourceE::RESERVOIR4 },
+    { "The night", ModSourceE::NIGHT, ModSourceE::LIGHTNING },
 };
 
 /**

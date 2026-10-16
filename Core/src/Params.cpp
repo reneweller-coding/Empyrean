@@ -48,6 +48,8 @@ const char *const RainSurfaceNames[NumRainSurfaces] = { "Water", "Leaves", "Ston
 const char *const FoliageNames[NumFoliages] = { "Broadleaf", "Pine", "Grass", "Dry Leaves" };
 const char *const ShoreNames[NumShores] = { "Sand", "Pebbles", "Rocks" };
 const char *const HaloTurnNames[NumHaloTurns] = { "Counter-clockwise", "Clockwise" };
+const char *const StreamsNames[NumStreams] = { "Odd & Even", "By Three", "Registers", "Members" };
+const char *const RissetWayNames[NumRissetWays] = { "Slowing", "Quickening" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -437,6 +439,27 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::QUANTUM, "quantum", "Quantum Walk", "Quantum Walk", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::QUANTUM_TIME, "quantum_time", "Look Every", "Quantum Walk", 5.f, 600.f, 90.f, 0.5f, "s" ),
     F( ParamIdE::QUANTUM_SPREAD, "quantum_spread", "Spread", "Quantum Walk", 0.f, 1.f, 0.4f, 1.f, "" ),
+    F( ParamIdE::HARP, "harp", "Aeolian Harp", "Aeolian Harp", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::HARP_PITCH, "harp_pitch", "Harp Pitch", "Aeolian Harp", -2.f, 2.f, 0.f, 1.f, "oct" ),
+    F( ParamIdE::HARP_GAUGE, "harp_gauge", "Gauge", "Aeolian Harp", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::THUNDER, "thunder", "Thunder", "Thunder", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::THUNDER_DISTANCE, "thunder_distance", "Storm Distance", "Thunder", 0.3f, 12.f, 3.f, 0.5f, "km" ),
+    F( ParamIdE::THUNDER_RUMBLE, "thunder_rumble", "Rumble", "Thunder", 0.f, 1.f, 0.5f, 1.f, "" ),
+    F( ParamIdE::ICE, "ice", "Singing Ice", "Singing Ice", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::ICE_THICKNESS, "ice_thickness", "Ice Thickness", "Singing Ice", 0.03f, 0.5f, 0.1f, 0.5f, "m" ),
+    F( ParamIdE::ICE_COLD, "ice_cold", "Cold", "Singing Ice", 0.f, 1.f, 0.4f, 1.f, "" ),
+    C( ParamIdE::STREAMS, "streams", "Streams", "Streams", StreamsNames, NumStreams, 0 ),
+    F( ParamIdE::STREAM_DEPTH, "stream_depth", "Stream Motion", "Streams", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::STREAM_RATE, "stream_rate", "Stream Rate", "Streams", 0.1f, 10.f, 2.f, 0.4f, "Hz" ),
+    F( ParamIdE::FUSION, "fusion", "Fusion", "Streams", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::RISSET, "risset", "Risset", "Risset", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::RISSET_RATE, "risset_rate", "Risset Pulse", "Risset", 0.25f, 8.f, 1.5f, 0.5f, "Hz" ),
+    F( ParamIdE::RISSET_TIME, "risset_time", "Octave Every", "Risset", 5.f, 240.f, 40.f, 0.5f, "s" ),
+    C( ParamIdE::RISSET_WAY, "risset_way", "Risset Way", "Risset", RissetWayNames, NumRissetWays, 0 ),
+    F( ParamIdE::NIGHT_ARC, "night_arc", "Night Arc", "Night", 0.f, 1.f, 0.f, 1.f, "" ),
+    B( ParamIdE::DREAM_JOURNAL, "dream_journal", "Dream Journal", "Dream", true ),
+    F( ParamIdE::VR_HANDS, "vr_hands", "Hands", "Headset", 0.f, 1.f, 0.f, 1.f, "" ),
+    B( ParamIdE::HEAD_TRACKING, "head_tracking", "Head Tracking", "Headset", true ),
 } };
 
 }   // namespace

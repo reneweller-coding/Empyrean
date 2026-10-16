@@ -11,6 +11,7 @@
 #pragma once
 
 #include "Jam.h"
+#include "Pose.h"
 
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
@@ -657,6 +658,20 @@ public:
     }
     /** @brief The hands arriving from a Quest app in bridge mode. @return the headset */
     frame::Headset &headset() { return m_headset; }
+    /** @brief The head and the hands from Empyrean's Quest app (Phase 30). @return the receiver */
+    PoseReceiver &pose() { return m_pose; }
+    /**
+     * @brief The night arc's place, kept in the settings and given to the engine (Phase 30).
+     * @param[in] latitude   degrees, north positive
+     * @param[in] longitude  degrees, east positive
+     * @pre called on the message thread
+     */
+    void setPlace( double latitude, double longitude );
+    /**
+     * @brief The night arc's place from the time zone again (the settings forget theirs).
+     * @pre called on the message thread
+     */
+    void placeFromTimeZone();
     /**
      * @brief A key played from the panel (the canvas's spectrum), as if from a keyboard on channel 1.
      *        Message thread.
@@ -706,6 +721,7 @@ private:
 
     frame::JamBus  m_jam{ App };            ///< the family jam's bus
     frame::Headset m_headset;               ///< the hands from the Quest app (bridge mode)
+    PoseReceiver   m_pose;                  ///< the head and the hands in the cloud (Phase 30)
     int            m_jamPostedRoot = -1;    ///< leading: the root posted last
     int            m_jamPostedScale = -1;   ///< leading: the scale posted last
 

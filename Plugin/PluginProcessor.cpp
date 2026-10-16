@@ -14,6 +14,7 @@
 #include "additiv/Find.h"
 #include "additiv/Focus.h"
 #include "additiv/Presets.h"
+#include "additiv/Sun.h"
 
 #include <algorithm>
 #include <cmath>
@@ -90,7 +91,32 @@ AdditivProcessor::AdditivProcessor()
     for ( auto &g : groups ) addParameterGroup( std::move( g ) );
     m_pushed.assign( m_params.size(), -1.0e30f );
     for ( auto &c : m_ccMap ) c.store( -1, std::memory_order_relaxed );
+    {   // the night arc's place, when the settings keep one (else the engine's, from the time zone)
+        const frame::Settings &st = frame::Settings::of( App );
+        const juce::String     lat = st.value( "night_lat" ), lon = st.value( "night_lon" );
+        if ( lat.isNotEmpty() && lon.isNotEmpty() ) m_engine.setLocation( lat.getDoubleValue(), lon.getDoubleValue() );
+    }
     startTimerHz( 30 );
+}
+
+void AdditivProcessor::setPlace( double latitude, double longitude )
+{
+    latitude = juce::jlimit( -90.0, 90.0, latitude );
+    longitude = juce::jlimit( -180.0, 180.0, longitude );
+    frame::Settings &st = frame::Settings::of( App );
+    st.setValue( "night_lat", juce::String( latitude, 4 ) );
+    st.setValue( "night_lon", juce::String( longitude, 4 ) );
+    m_engine.setLocation( latitude, longitude );
+}
+
+void AdditivProcessor::placeFromTimeZone()
+{
+    double lat = 45.0, lon = 0.0;
+    additiv::defaultLocation( lat, lon );
+    frame::Settings &st = frame::Settings::of( App );
+    st.setValue( "night_lat", {} );
+    st.setValue( "night_lon", {} );
+    m_engine.setLocation( lat, lon );
 }
 
 void AdditivProcessor::timerCallback()
@@ -106,6 +132,8 @@ void AdditivProcessor::pollHeadset()
 {
     frame::Settings &st = frame::Settings::of( App );
     m_headset.listen( st.headset() == frame::Settings::HeadsetModeE::OFF ? 0 : st.headsetPort() );
+    m_pose.listen( st.headset() == frame::Settings::HeadsetModeE::OFF ? 0 : st.headsetPort() + 100 );
+    m_engine.setHeadsetPose( m_pose.pose() );   // Phase 30: the head and the hands in the cloud
     const frame::HeadsetEvents e = m_headset.poll();
     // The family's grammar on what every preset means the same by: the left hand the brightness
     // (Macro 2), the right the motion (Macro 1); pinches play and stop the conductor, step it,
@@ -1486,6 +1514,18 @@ void AdditivProcessor::getStateInformation( juce::MemoryBlock &dest )
             h->setAttribute( "memory", hallText( m ) );
         }
     }
+    {   // the dream journal (Phase 30): the dream's newest memories, packed, when it keeps one
+        std::vector<std::uint8_t> j;
+        if ( value( static_cast<int>( ParamIdE::DREAM_JOURNAL ) ) >= 0.5f && m_engine.dreamJournal( j ) )
+        {
+            juce::MemoryOutputStream packed;
+            {
+                juce::GZIPCompressorOutputStream z( packed, 9 );
+                z.write( j.data(), j.size() );
+            }
+            xml.createNewChildElement( "Dream" )->setAttribute( "journal", packed.getMemoryBlock().toBase64Encoding() );
+        }
+    }
     for ( int cc = 0; cc < 128; ++cc )
     {
         const int id = m_ccMap[static_cast<size_t>( cc )].load( std::memory_order_relaxed );
@@ -1587,6 +1627,21 @@ void AdditivProcessor::setStateInformation( const void *data, int size )
         }
     }
     for ( int m = 0; m < 4; ++m ) m_engine.setMacroLesson( m, m_lessons[static_cast<size_t>( m )] );
+    if ( const juce::XmlElement *d = xml->getChildByName( "Dream" ) )
+    {   // the dream journal (Phase 30): the memories dreamt on (at most DreamJournalMost, a byte a band)
+        juce::MemoryBlock packed;
+        if ( packed.fromBase64Encoding( d->getStringAttribute( "journal" ) ) )
+        {
+            juce::MemoryInputStream           in( packed, false );
+            juce::GZIPDecompressorInputStream z( in );
+            juce::MemoryBlock                 raw;
+            constexpr size_t                  most = 12 + static_cast<size_t>( additiv::DreamJournalMost ) *
+                                                              ( 4 + static_cast<size_t>( additiv::DreamBands ) );
+            z.readIntoMemoryBlock( raw, static_cast<juce::ssize_t>( most ) );
+            const auto *b = static_cast<const std::uint8_t *>( raw.getData() );
+            m_engine.setDreamJournal( std::vector<std::uint8_t>( b, b + raw.getSize() ) );
+        }
+    }
     {   // the hall's memory as the state kept it; a state without one: a new hall
         std::vector<float>      m;
         const juce::XmlElement *h = xml->getChildByName( "Hall" );

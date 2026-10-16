@@ -336,6 +336,36 @@ const Info InfoTable[] = {
                  "that spreads and interferes." },
     { "quantum_time", "How often the walk is looked at, and the root moves to where it is found." },
     { "quantum_spread", "How far the walk's wave spreads between two looks." },
+    { "harp", "An Aeolian harp in the wind: each string's vortices lock onto one of its harmonics and sing it, and "
+              "jump to the next as the wind changes." },
+    { "harp_pitch", "The strings' tuning: the chord's notes about 55 to 110 Hz, moved by octaves." },
+    { "harp_gauge", "Thin to thick strings: thin ones sing higher harmonics in the same wind." },
+    { "thunder", "A thunderstorm: how often lightning strikes. Each strike's channel is laid out anew and heard as "
+                 "far as it is -- the crack of its near part first, the rumble of the rest for seconds after." },
+    { "thunder_distance", "How far off the storm is: three seconds a kilometre between the flash and the thunder, and "
+                          "the farther, the deeper." },
+    { "thunder_rumble", "How tortuous and branched the channels are: a single crack, or a long rolling rumble." },
+    { "ice", "A frozen lake that sings as the cold cracks it: each crack a chirp falling from the highs, the laser "
+             "sound of lake ice." },
+    { "ice_thickness", "The ice's thickness: thin ice sings longer and slower, thick ice short and quick." },
+    { "ice_cold", "How fast the cold builds the stress: a crack now and then, or several a second." },
+    { "streams", "How Streams parts the partials: the odd harmonics and the even, by three, the registers, or every "
+                 "member of a cloud on its own." },
+    { "stream_depth", "Each stream's own slow vibrato and tremolo: the ear hears each stream as a sound of its own." },
+    { "stream_rate", "How fast the streams move." },
+    { "fusion", "The streams apart -- several sounds -- or moving as one: they fuse into one sound again." },
+    { "risset", "The voices pulse in Risset's rhythm: it slows for ever and never arrives (or quickens for ever)." },
+    { "risset_rate", "The pulse in the middle of its octaves." },
+    { "risset_time", "Seconds for the pulse to slow by an octave." },
+    { "risset_way", "Slowing for ever, or quickening for ever." },
+    { "night_arc", "The real night where you are -- the sun's height from the place in the settings -- darkens, slows "
+                   "and widens the sound as dusk falls; the source Night does what you route it to." },
+    { "dream_journal",
+      "The dream's memories kept with the project or the set, and dreamt on when it is opened again." },
+    { "vr_hands", "Your hands from the headset in the cloud: the wind flows round them, the halo goes round them, they "
+                  "absorb the room or sound in it as they pinch, and the slime mould feeds where they are." },
+    { "head_tracking",
+      "The headset's head turning: the binaural cloud and the thunder stay where they are in the room." },
 };
 
 }   // namespace

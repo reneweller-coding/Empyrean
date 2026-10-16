@@ -8,3 +8,6 @@ bin/
 dist/
 work/
 __pycache__/
+# The Quest app's third-party parts (Quest/fetch_thirdparty.ps1): a junction into Noctuary's, and the debug key.
+ThirdParty/openxr-loader/
+ThirdParty/debug.keystore

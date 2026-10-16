@@ -22,7 +22,7 @@ juce_add_plugin(Empyrean
 # icon in the program (0.15.0). configure_file lays ours over it and configures again whenever the .ico changes.
 get_target_property(_empyrean_code Empyrean JUCE_GENERATED_SOURCES_DIRECTORY)
 configure_file("${CMAKE_SOURCE_DIR}/Deploy/empyrean.ico" "${_empyrean_code}/icon.ico" COPYONLY)
-target_sources(Empyrean PRIVATE PluginProcessor.cpp PluginEditor.cpp HeaderParts.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp SourcesView.cpp JourneyView.cpp MapView.cpp HallView.cpp KnobMod.cpp ModDock.cpp PageStrip.cpp SpaceView.cpp TuningView.cpp FocusView.cpp Palette.cpp Browser.cpp ParamInfo.cpp InfoLine.cpp Tour.cpp Theme.cpp Frame.cpp Jam.cpp)
+target_sources(Empyrean PRIVATE PluginProcessor.cpp PluginEditor.cpp HeaderParts.cpp ParamPage.cpp CloudView.cpp MatrixView.cpp SourcesView.cpp JourneyView.cpp MapView.cpp HallView.cpp KnobMod.cpp ModDock.cpp PageStrip.cpp SpaceView.cpp TuningView.cpp FocusView.cpp Palette.cpp Browser.cpp ParamInfo.cpp InfoLine.cpp Tour.cpp Theme.cpp Frame.cpp Jam.cpp Pose.cpp)
 # The picture behind the panel (frame::Backdrop) and the help's prose (frame::HelpView).
 juce_add_binary_data(AdditivData
     HEADER_NAME AdditivData.h

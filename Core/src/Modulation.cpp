@@ -58,14 +58,17 @@ const char *const ModSourceNames[NumModSources] = { "Off",
                                                     "Reservoir 1",
                                                     "Reservoir 2",
                                                     "Reservoir 3",
-                                                    "Reservoir 4" };
+                                                    "Reservoir 4",
+                                                    "Night",
+                                                    "Risset Pulse",
+                                                    "Lightning" };
 const char *const ModSourceTokens[NumModSources] = {
     "off",        "lfo1",       "lfo2",        "lfo3",     "lfo4",     "env1",     "env2",      "macro1",
     "macro2",     "macro3",     "macro4",      "wheel",    "pressure", "velocity", "random",    "lenia1",
     "lenia2",     "lenia3",     "lenia4",      "lorenz_x", "lorenz_y", "lorenz_z", "rossler_x", "rossler_y",
     "rossler_z",  "kura1",      "kura2",       "kura3",    "kura4",    "beat",     "cascade",   "root_age",
     "note",       "distance",   "random_note", "loudness", "centroid", "flux",     "roughness", "reservoir1",
-    "reservoir2", "reservoir3", "reservoir4"
+    "reservoir2", "reservoir3", "reservoir4",  "night",    "risset",   "lightning"
 };
 
 namespace
@@ -136,7 +139,10 @@ bool isUnipolarSource( ModSourceE s )
     case ModSourceE::LOUDNESS:
     case ModSourceE::CENTROID:
     case ModSourceE::FLUX:
-    case ModSourceE::ROUGHNESS: return true;
+    case ModSourceE::ROUGHNESS:
+    case ModSourceE::NIGHT:
+    case ModSourceE::RISSET:
+    case ModSourceE::LIGHTNING: return true;
     default: return false;
     }
 }
@@ -586,6 +592,9 @@ void Modulators::advance( float dt, const ModInputs &in )
     }
     for ( int k = 0; k < 4; ++k )
         m_values[static_cast<int>( ModSourceE::RESERVOIR1 ) + k] = std::clamp( in.m_reservoir[k], -1.0f, 1.0f );
+    m_values[static_cast<int>( ModSourceE::NIGHT )] = std::clamp( in.m_night, 0.0f, 1.0f );
+    m_values[static_cast<int>( ModSourceE::RISSET )] = std::clamp( in.m_risset, 0.0f, 1.0f );
+    m_values[static_cast<int>( ModSourceE::LIGHTNING )] = std::clamp( in.m_lightning, 0.0f, 1.0f );
 }
 
 }   // namespace additiv
