@@ -1,5 +1,24 @@
 # Release notes
 
+## 0.23.0 (16.10.2026, not released)
+
+Stars and gravity: a page Cosmos, the redshift hall. 1024 presets.
+
+- **Star** (Cosmos): a star's oscillations, as asteroseismology hears them, transposed into the audible -- hundreds of
+  modes, each kept ringing by the convection's noise (a Lorentzian line). A Sun (an almost even comb, its pairs of
+  lines drawing together with age), a Red Giant (clusters of narrow mixed modes), a White Dwarf (gravity modes evenly
+  spaced in period: an undertone series). Star Age, Spin (the azimuthal orders, a slow chorus), Star Pitch.
+- **Black Hole** (Cosmos): partials fall into it -- redshifted, dimmed, drawn to it, frozen at the horizon --, the
+  light behind it is bent into an Einstein ring and brightened. Fall, Hole Place.
+- **Merger** (Cosmos): now and then two black holes merge -- the wave rises for minutes from half a hertz (felt first
+  as the field's width breathing faster and faster), becomes a tone in the bass and rings down in the hole's
+  quasi-normal modes. Ringdown, Mass Ratio, Inspiral; the source Merger.
+- **Redshift** (Hall): the modal hall's modes glide down for ever and are reborn at the top -- every tail sinks.
+  Redshift Time.
+- **14336 presets:** sixteen new groups of stars and gravity (Sun Songs, Red Giants, White Dwarfs, Spinning Stars,
+  Ageing Stars, Star Choirs, Accretion Disks, Falling Light, Einstein Rings, Mergers, Distant Mergers, Redshift Halls,
+  Receding Light, Cosmic Floors, Quiet Universe, Gravity's Choir); 465 journeys, seventeen whole nights.
+
 ## 0.22.0 (16.10.2026, not released)
 
 The floor. Measured with the conductor playing, a quarter of the bank had a thin bass: its foundation went through

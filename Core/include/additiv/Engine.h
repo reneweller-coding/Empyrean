@@ -498,6 +498,8 @@ public:
     float conductorSpan() const { return m_conductorSpan.load( std::memory_order_relaxed ); }
     /** @brief The note the foundation holds, -1 none, for the picture. Any thread. @return MIDI */
     int foundationNow() const { return m_foundationView.load( std::memory_order_relaxed ); }
+    /** @brief Begins a merger at the next block, when Merger is up (Phase 33: for the tests). */
+    void beginMerger() { m_mergerAsk.store( true, std::memory_order_relaxed ); }
     /**
      * @brief The scale's pitches folded into one octave over the root, in cents above the root's equal-tempered
      *        pitch, for the panel (the scale itself, before Purity blends it with equal temperament). Any thread.
@@ -795,9 +797,10 @@ private:
     float              m_specKey[7] = {
         -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f
     };   ///< tilt, odd/even, brightness, inharmonic, stretch, horizon and its ratio the spectrum was built for
-    Rng              m_rng;    ///< the engine's dice (seeds, distances)
-    Rng              m_side;   ///< a side stream for the drifters, so switching them on never moves the notes' dice
-    Drifter          m_tide;   ///< the whole instrument's slow lean (Tide)
+    Rng              m_rng;        ///< the engine's dice (seeds, distances)
+    Rng              m_eventRng;   ///< the dice of the mergers (Phase 33), apart: they never shift the conductor's
+    Rng              m_side;       ///< a side stream for the drifters, so switching them on never moves the notes' dice
+    Drifter          m_tide;       ///< the whole instrument's slow lean (Tide)
     int              m_landChoice = -1;        ///< the landscape on the GPU
     Landscape        m_userLand;               ///< the player's own, as setUserLandscape left it (under m_userLandLock)
     float            m_userLandRms = 1.0f;     ///< its RMS
@@ -827,7 +830,7 @@ private:
     // Phase 32: the floor
     float m_floorShare =
         0.0f;   ///< Floor: the share of the power under 150 Hz the foundation holds at the least (0: off)
-    float  m_floorBoost = 1.0f;    ///< the foundation's depth (its partials under 2.2 f0) raised for it, 1 .. 8
+    float  m_floorBoost = 1.0f;     ///< the foundation's depth (its partials under 2.2 f0) raised for it, 1 .. 8
     double m_floorLow = 0.0;        ///< the mix's power under 150 Hz, followed over two seconds
     double m_floorAll = 0.0;        ///< the mix's power, likewise
     double m_floorZ[2][2] = {};     ///< the low pass's state, left and right
@@ -1084,6 +1087,21 @@ private:
      */
     void stepNight( float dt );
     /**
+     * @brief Space, one block (Phase 33): the star's table rebuilt when its kind, age, spin, pitch or the root moved;
+     *        the black hole's fall; a merger begun when its time comes (a Poisson stream) and its clock run on.
+     * @param[in] dt  the block's length, seconds
+     */
+    void stepSpace( float dt );
+    /**
+     * @brief A merger, sample by sample (Phase 33), added to the mix before the master: the wave's tone in the bass
+     *        once it is heard (its plus polarization in the middle, its cross on the sides), and the field's width
+     *        stretched and squeezed by it while it is still too slow to hear.
+     * @param[in,out] L  left
+     * @param[in,out] R  right
+     * @param[in]     n  samples
+     */
+    void renderMerger( float *L, float *R, int n );
+    /**
      * @brief The headset, one block (Phase 30): the head's turn held off the binaural cloud and the thunder, the hands
      *        in the wind, the halo, the wave room and the physarum's food (after stepRooms, so its places are known).
      * @param[in] dt  the block's length, seconds
@@ -1225,21 +1243,43 @@ private:
     float                          m_rissetGain = 1.0f;     ///< the voices' gain by its pulse this block
     float                          m_rissetPulse = 0.0f;    ///< the pulse, 0 .. 1 (the source)
     float                          m_lightning = 0.0f;      ///< the last strike's flash, 0 .. 1 (the source)
-    std::mutex                     m_poseLock;              ///< guards m_posePending
-    HeadsetPose                    m_posePending;           ///< the pose as it arrived
-    HeadsetPose                    m_pose;                  ///< the pose this block works with
-    std::vector<std::uint8_t>      m_journal;               ///< the dream journal brought down last (m_snapLock)
-    std::vector<std::uint8_t>      m_journalPending;        ///< a journal to write to the card (m_snapLock)
-    bool                           m_journalPendingSet = false;   ///< journalPending waits for the worker
-    float                          m_journalClock = 0.0f;         ///< s until the journal is brought down again
-    std::vector<float>             m_journalScratch;              ///< the worker's memories on their way (no lock)
-    float                          m_headYaw = 0.0f;              ///< rad: the head's turn held off the binaural cloud
-    float                          m_handFood[2] = { -1.0f, -1.0f };   ///< the hands' food lines, trail cells (-1 none)
-    float                          m_handFoodWeight = 1.0f;            ///< their weight
-                                                                       // Phase 31
-    float     m_chorusLevel = 0.0f;                                    ///< the night chorus's level as it glides
-    long long m_chorusCalls = 0;                                       ///< the chorus's calls begun since prepare
-    bool      m_chorusWas = false;                                     ///< the chorus called in the last block
+    // Phase 33: space
+    float                     m_starLevel = 0.0f;   ///< the star's level as it glides
+    bool                      m_starWas = false;    ///< the star sounded in the last block
+    float                     m_starKey[5] = {};   ///< what its table was built from: kind, age, spin, pitch, root (Hz)
+    float                     m_holeLevel = 0.0f;                 ///< the black hole's amount as it glides
+    double                    m_holePhase = 0.0;                  ///< its fall's clock, 0 .. 1
+    double                    m_redPhase = 0.0;                   ///< the redshift hall's clock, 0 .. 1
+    float                     m_mergerWait = 0.0f;                ///< s until the next merger begins
+    bool                      m_mergerOn = false;                 ///< a merger sounds
+    double                    m_mergerT = 0.0;                    ///< s into it
+    double                    m_mergerTc = 0.0;                   ///< s from its beginning to the coalescence
+    double                    m_mergerTauIsco = 0.0;              ///< s before the coalescence at the last stable orbit
+    double                    m_mergerPhase = 0.0;                ///< the wave's phase, radians
+    double                    m_mergerPhase3 = 0.0;               ///< the second ringdown mode's phase
+    float                     m_mergerIsco = 20.0f;               ///< Hz: the wave at the last stable orbit
+    float                     m_mergerRing = 70.0f;               ///< Hz: the ringdown's l = m = 2 mode
+    float                     m_mergerQ = 3.2f;                   ///< its quality
+    float                     m_mergerRing3 = 110.0f;             ///< Hz: the l = m = 3 mode
+    float                     m_mergerQ3 = 5.0f;                  ///< its quality
+    float                     m_mergerA3 = 0.1f;                  ///< its share
+    float                     m_mergerEnv = 0.0f;                 ///< the wave's amplitude, 0 .. 1 (the source)
+    std::atomic<bool>         m_mergerAsk{ false };               ///< beginMerger(): the next block begins one
+    std::mutex                m_poseLock;                         ///< guards m_posePending
+    HeadsetPose               m_posePending;                      ///< the pose as it arrived
+    HeadsetPose               m_pose;                             ///< the pose this block works with
+    std::vector<std::uint8_t> m_journal;                          ///< the dream journal brought down last (m_snapLock)
+    std::vector<std::uint8_t> m_journalPending;                   ///< a journal to write to the card (m_snapLock)
+    bool                      m_journalPendingSet = false;        ///< journalPending waits for the worker
+    float                     m_journalClock = 0.0f;              ///< s until the journal is brought down again
+    std::vector<float>        m_journalScratch;                   ///< the worker's memories on their way (no lock)
+    float                     m_headYaw = 0.0f;                   ///< rad: the head's turn held off the binaural cloud
+    float                     m_handFood[2] = { -1.0f, -1.0f };   ///< the hands' food lines, trail cells (-1 none)
+    float                     m_handFoodWeight = 1.0f;            ///< their weight
+                                                                  // Phase 31
+    float     m_chorusLevel = 0.0f;                               ///< the night chorus's level as it glides
+    long long m_chorusCalls = 0;                                  ///< the chorus's calls begun since prepare
+    bool      m_chorusWas = false;                                ///< the chorus called in the last block
     int       m_mirrorPos = 0;   ///< the time mirror: where in its window the next block begins (the room's samples)
     int       m_mirrorBuf = 0;   ///< which of its recordings records
     float m_turbDrive = 0.0f;   ///< Turbulence: the cascade's drive this block, per second, before each note's strength

@@ -84,7 +84,9 @@ enum class ModSourceE : int
     NIGHT,       ///< the real night where the instrument is: 0 while the sun is up .. 1 in astronomical night
     RISSET,      ///< Risset's pulse (the rhythm that slows for ever), 0 .. 1
     LIGHTNING,   ///< a strike's flash (Thunder), 1 at the strike, fading over a second or two
-    COUNT        ///< number of sources
+    // Phase 33: space
+    MERGER,   ///< a merger's wave (Merger): rising over the inspiral, 1 at the merger, gone with the ringdown
+    COUNT     ///< number of sources
 };
 constexpr int            NumModSources = static_cast<int>( ModSourceE::COUNT );   ///< entries of ModSourceNames
 extern const char *const ModSourceNames[NumModSources];                           ///< "Off", "LFO 1", ... for menus
@@ -277,6 +279,7 @@ struct ModInputs
     float m_night = 0.0f;           ///< the night where the instrument is, 0 .. 1 (Sun.h)
     float m_risset = 0.0f;          ///< Risset's pulse, 0 .. 1
     float m_lightning = 0.0f;       ///< the last strike's flash, 0 .. 1
+    float m_merger = 0.0f;          ///< a merger's wave, 0 .. 1
 };
 
 /** @brief The sources, advanced once per block on the renderer's thread. */

@@ -142,6 +142,7 @@ void JourneyView::choosePreset( int slot )
         if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
         if ( g == additiv::FirstChorusGroup ) bank.addSectionHeader( "Chorus & Mirrors" );
         if ( g == additiv::FirstFloorGroup ) bank.addSectionHeader( "Deep Floors" );
+        if ( g == additiv::FirstSpaceGroup ) bank.addSectionHeader( "Stars & Gravity" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

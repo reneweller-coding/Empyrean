@@ -221,6 +221,22 @@ const char *const PresetGroupNames[NumPresetGroups] = {
     "Night Pressure",
     "Deep Bells",
     "Floors & Storms",
+    "Sun Songs",
+    "Red Giants",
+    "White Dwarfs",
+    "Spinning Stars",
+    "Ageing Stars",
+    "Star Choirs",
+    "Accretion Disks",
+    "Falling Light",
+    "Einstein Rings",
+    "Mergers",
+    "Distant Mergers",
+    "Redshift Halls",
+    "Receding Light",
+    "Cosmic Floors",
+    "Quiet Universe",
+    "Gravity's Choir",
 };
 
 namespace

@@ -301,6 +301,7 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_foundationNote = -1;
     for ( Voice &v : m_voices ) v.m_env.setSampleRate( m_cfg.m_sampleRate / G );   // stepped once per GPU block
     m_rng.seed( m_cfg.m_seed );
+    m_eventRng.seed( m_cfg.m_seed ^ 0x5EAC0DEu );
     m_side.seed( m_cfg.m_seed ^ 0xA5A5A5A55A5A5A5Aull );
     m_tide.init( m_side );
     std::fill( std::begin( m_specKey ), std::end( m_specKey ), -1.0f );
@@ -363,6 +364,13 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_rissetU = 0.0f;
     m_rissetGain = 1.0f;
     m_rissetPulse = m_lightning = 0.0f;
+    m_starLevel = m_holeLevel = 0.0f;   // space (Phase 33)
+    m_starWas = false;
+    std::fill( std::begin( m_starKey ), std::end( m_starKey ), -1.0f );
+    m_holePhase = m_redPhase = 0.0;
+    m_mergerWait = -1.0f;
+    m_mergerOn = false;
+    m_mergerEnv = 0.0f;
     m_journalClock = 30.0f;
     m_pose = HeadsetPose{};
     m_chorusLevel = 0.0f;
@@ -933,6 +941,7 @@ void Engine::readParams()
             in.m_night = m_night;   // Phase 30: the night, Risset's pulse, the lightning
             in.m_risset = m_rissetPulse;
             in.m_lightning = m_lightning;
+            in.m_merger = m_mergerEnv;   // Phase 33
         }
         m_phraseStart = false;
         m_mods.advance( static_cast<float>( m_cfg.m_gpuBlock / m_cfg.m_sampleRate ), in );
@@ -2638,6 +2647,290 @@ void Engine::stepHeadset( float dt )
     R.m_absorbK = 0.08f * hands;
 }
 
+namespace
+{
+
+/**
+ * @brief A star's modes (Phase 33), transposed into the audible: four values a mode -- frequency, line width (Hz),
+ *        amplitude, place across.
+ *
+ * A sun (Kepler's solar-like stars): p modes nu = dnu (n + l/2 + eps) - l (l + 1) D0, degrees 0 .. 3 with their
+ * visibilities (1, 1.5, 0.5, 0.04), orders round n_max = 21 under a Gaussian of 2.4 orders, the small separation
+ * dnu02 = 6 D0 narrowing with age (0.09 .. 0.03 dnu: the core's hydrogen burnt), line widths rising as nu^4 to
+ * 0.008 dnu at n_max. A red giant: n_max 10, dnu02 0.12 dnu, every dipole mode mixed with the core's gravity modes --
+ * nine lines a cluster, the closer to the p mode the stronger and broader (the g-like ones narrow: they ring long),
+ * crowding as it ages. A white dwarf: g modes, evenly spaced in period (P = Pi_l (k + 1/2), Pi_l = Pi_0 /
+ * sqrt(l (l + 1))) -- an undertone series --, only some of them driven, their periods growing as it cools. Each mode
+ * split by the spin into its azimuthal orders, seen at an inclination of 60 degrees (Gizon and Solanki 2003), placed
+ * across by m / l. The amplitudes come out with their squares summing to one.
+ * @param[in]  kind  StarKind: 0 sun, 1 red giant, 2 white dwarf
+ * @param[in]  age   0 .. 1
+ * @param[in]  spin  0 .. 1
+ * @param[in]  dnu   Hz: the large separation (a dwarf: its period spacing's inverse over 24)
+ * @param[out] out   4 x StarModes values
+ * @return the modes written
+ */
+int starModes( int kind, float age, float spin, float dnu, float *out )
+{
+    int  count = 0;
+    auto add = [&]( double hz, double width, double amp, double place )
+    {
+        if ( count >= StarModes || hz < 20.0 || hz > 15000.0 || amp <= 1.0e-4 ) return;
+        float *o = out + 4 * count++;
+        o[0] = static_cast<float>( hz );
+        o[1] = static_cast<float>( std::max( width, 0.005 ) );
+        o[2] = static_cast<float>( amp );
+        o[3] = static_cast<float>( std::clamp( place, -1.0, 1.0 ) );
+    };
+    const double c = 0.5, s = 0.8660254037844386;   // cos and sin of the inclination
+    auto         vis = [&]( int l, int m ) -> double
+    {   // E_lm(i): the share of mode (l, m) seen
+        const int    a = std::abs( m );
+        const double c2 = c * c, s2 = s * s;
+        switch ( l )
+        {
+        case 0: return 1.0;
+        case 1: return a == 0 ? c2 : 0.5 * s2;
+        case 2: return a == 0 ? 0.25 * ( 3.0 * c2 - 1.0 ) * ( 3.0 * c2 - 1.0 ) : a == 1 ? 1.5 * s2 * c2 : 0.375 * s2 * s2;
+        default:
+            return a == 0   ? 0.25 * c2 * ( 5.0 * c2 - 3.0 ) * ( 5.0 * c2 - 3.0 )
+                   : a == 1 ? 0.1875 * s2 * ( 5.0 * c2 - 1.0 ) * ( 5.0 * c2 - 1.0 )
+                   : a == 2 ? 1.875 * c2 * s2 * s2
+                            : 0.3125 * s2 * s2 * s2;
+        }
+    };
+    const double V2[4] = { 1.0, 1.5, 0.5, 0.04 };
+    if ( kind == 2 )
+    {   // a white dwarf: g modes in period, an undertone series a degree
+        const double F = 24.0 * dnu, split = 0.012 * dnu * spin;
+        const double peak = 6.0 + 20.0 * age;
+        for ( int l = 1; l <= 2; ++l )
+            for ( int k = 1; k <= 60; ++k )
+            {
+                // only some are driven: a die of its own (as a dwarf shows a few of its many periods)
+                const double die =
+                    static_cast<double>( ( static_cast<unsigned>( l * 7919 + k * 104729 ) * 2654435761U ) >> 8 ) /
+                    16777216.0;
+                if ( die < 0.45 ) continue;
+                const double hz = F * std::sqrt( 0.5 * l * ( l + 1 ) ) / ( k + 0.5 );
+                const double env = std::exp( -0.5 * std::pow( ( k - peak ) / 7.0, 2.0 ) ) * ( 0.4 + 0.6 * die );
+                for ( int m = -l; m <= l; ++m )
+                    add( hz + m * split * ( 1.0 - 1.0 / ( l * ( l + 1 ) ) ), 0.02,
+                         env * std::sqrt( vis( l, m ) / ( l == 1 ? 1.0 : 1.6 ) ), 0.8 * m / l );
+            }
+    }
+    else
+    {
+        const bool   giant = kind == 1;
+        const int    nmax = giant ? 10 : 21;
+        const double sigma = giant ? 1.8 : 2.4, eps = giant ? 1.0 : 1.4;
+        const double d02 = ( giant ? 0.12 : 0.09 - 0.06 * age ) * dnu, D0 = d02 / 6.0;
+        const double split = ( giant ? 0.01 : 0.03 ) * dnu * spin;
+        const double numax = dnu * ( nmax + eps );
+        for ( int n = nmax - 9; n <= nmax + 9; ++n )
+        {
+            if ( n < 1 ) continue;
+            const double env = std::exp( -0.5 * std::pow( ( n - nmax ) / sigma, 2.0 ) );
+            for ( int l = 0; l <= 3; ++l )
+            {
+                const double nu = dnu * ( n + 0.5 * l + eps ) - l * ( l + 1 ) * D0;
+                const double width = dnu * std::clamp( 0.008 * std::pow( nu / numax, 4.0 ), 0.002, 0.05 );
+                const double amp = env * std::sqrt( V2[l] );
+                if ( giant && l == 1 )
+                {   // mixed modes: nine lines round the p mode, crowding with age
+                    const double gap = 0.09 * dnu * ( 1.0 - 0.5 * age );
+                    for ( int j = -4; j <= 4; ++j )
+                    {
+                        const double off = j * gap + 0.3 * gap * std::sin( 1.7 * j + n );
+                        const double w = 1.0 / ( 1.0 + std::pow( off / ( 0.06 * dnu ), 2.0 ) );
+                        for ( int m = -1; m <= 1; ++m )
+                            add( nu + off + m * split * ( 1.0 + 4.0 * ( 1.0 - w ) ), width * w + 0.002 * dnu,
+                                 amp * std::sqrt( w * vis( 1, m ) / 2.2 ), 0.8 * m );
+                    }
+                    continue;
+                }
+                for ( int m = -l; m <= l; ++m )
+                    add( nu + m * split, width, amp * std::sqrt( vis( l, m ) ), l > 0 ? 0.8 * m / l : 0.0 );
+            }
+        }
+    }
+    double sum = 0.0;
+    for ( int k = 0; k < count; ++k ) sum += static_cast<double>( out[4 * k + 2] ) * out[4 * k + 2];
+    const double norm = sum > 0.0 ? 1.0 / std::sqrt( sum ) : 0.0;
+    for ( int k = 0; k < count; ++k ) out[4 * k + 2] = static_cast<float>( out[4 * k + 2] * norm );
+    return count;
+}
+
+/**
+ * @brief The ringdown's l = m = 2 mode of a hole of spin a (Berti, Cardoso and Will 2006): omega M and the quality.
+ * @param[in]  a   the spin, 0 .. 0.99
+ * @param[out] F   receives omega M
+ * @param[out] Q   receives the quality
+ */
+void ringdown22( double a, double &F, double &Q )
+{
+    F = 1.5251 - 1.1568 * std::pow( 1.0 - a, 0.1292 );
+    Q = 0.7 + 1.4187 * std::pow( 1.0 - a, -0.4990 );
+}
+
+}   // namespace
+
+void Engine::stepSpace( float dt )
+{
+    auto glide = [dt]( float &v, float want, float tau )
+    {
+        v += ( want - v ) * ( 1.0f - std::exp( -dt / tau ) );
+        if ( want <= 0.0f && v < 1.0e-4f ) v = 0.0f;
+    };
+    // The star: its large separation the root's (in the octave from C2) moved by Star Pitch; its table built again when
+    // anything it is made of moved (a new key, a new star), its level gliding.
+    {
+        StarField  &S = m_cloud.star();
+        const float want = cur( ParamIdE::STAR );
+        glide( m_starLevel, want, 0.7f );
+        S.m_on = ( want > 0.0f || m_starLevel > 0.0f ) ? 1 : 0;
+        if ( S.m_on && !m_starWas ) S.m_reset = 1;
+        m_starWas = S.m_on != 0;
+        if ( S.m_on )
+        {
+            const float kind = std::round( cur( ParamIdE::STAR_KIND ) ), age = cur( ParamIdE::STAR_AGE ),
+                        spin = cur( ParamIdE::STAR_SPIN ), pitch = cur( ParamIdE::STAR_PITCH );
+            const float root = static_cast<float>( frequencyOf( 36 + ( ( m_rootPc % 12 ) + 12 ) % 12 ) );
+            const float key[5] = { kind, age, spin, pitch, root };
+            bool        moved = false;
+            for ( int k = 0; k < 5; ++k ) moved = moved || std::abs( key[k] - m_starKey[k] ) > 1.0e-3f;
+            if ( moved )
+            {
+                std::vector<float> table( 4 * StarModes );
+                const int          count =
+                    starModes( static_cast<int>( kind ), age, spin, root * std::exp2( pitch ), table.data() );
+                m_cloud.setStarModes( table.data(), count );
+                S.m_count = count;
+                std::copy( std::begin( key ), std::end( key ), std::begin( m_starKey ) );
+            }
+            S.m_level = 1.6f * m_starLevel * VoiceLevel;
+            S.m_far = 0.7f;
+        }
+        else
+        {
+            std::fill( std::begin( m_starKey ), std::end( m_starKey ), -1.0f );   // built anew when it wakes
+        }
+    }
+    // The black hole: a share of the partials falling (six tenths at 1), the Einstein ring a quarter of the field.
+    {
+        BlackHole  &B = m_cloud.hole();
+        const float want = cur( ParamIdE::BLACK_HOLE );
+        glide( m_holeLevel, want, 1.0f );
+        B.m_on = m_holeLevel > 0.0f ? 1 : 0;
+        m_holePhase += dt / std::max( cur( ParamIdE::HOLE_FALL ), 1.0f );
+        m_holePhase -= std::floor( m_holePhase );
+        B.m_fallPhase = static_cast<float>( m_holePhase );
+        B.m_share = 0.6f * m_holeLevel;
+        B.m_ring = 0.25f * m_holeLevel;
+        B.m_place = cur( ParamIdE::HOLE_PLACE );
+        B.m_start = 30.0f;
+    }
+    // A merger: a Poisson stream (Merger 1: one every three minutes on average); its masses' ratio gives the spin of
+    // what remains (Rezzolla et al.: a_f = 2 sqrt 3 eta - 3.871 eta^2 + 4.028 eta^3), the spin the ringdown's modes;
+    // Ringdown sets the l = m = 2 mode's pitch and with it the last stable orbit's (f_isco = f_ring / (6^1.5 F / 2)).
+    {
+        const float rate = cur( ParamIdE::MERGER );
+        if ( !m_mergerOn )
+        {
+            m_mergerEnv = 0.0f;
+            if ( m_mergerWait < 0.0f && rate > 0.0f )
+            {   // the next one's time: exponential, its mean three minutes over Merger squared
+                const double mean = 180.0 / std::max( 0.01, static_cast<double>( rate ) * rate );
+                m_mergerWait = static_cast<float>(
+                    -mean * std::log( std::max( 1.0e-6, static_cast<double>( m_eventRng.uniform() ) ) ) );
+            }
+            if ( m_mergerAsk.exchange( false, std::memory_order_relaxed ) ) m_mergerWait = 0.0f;
+            if ( rate > 0.0f && ( m_mergerWait -= dt ) <= 0.0f )
+            {
+                const double q = std::max( 1.0f, cur( ParamIdE::MERGER_RATIO ) ),
+                             eta = q / ( ( 1.0 + q ) * ( 1.0 + q ) );
+                const double a =
+                    std::clamp( 2.0 * std::sqrt( 3.0 ) * eta - 3.871 * eta * eta + 4.028 * eta * eta * eta, 0.0, 0.99 );
+                double F = 0.0, Q = 0.0;
+                ringdown22( a, F, Q );
+                m_mergerRing = cur( ParamIdE::MERGER_MASS );
+                m_mergerQ = static_cast<float>( Q );
+                m_mergerIsco = static_cast<float>( m_mergerRing / ( std::pow( 6.0, 1.5 ) * F ) * 2.0 );
+                // the l = m = 3 mode (Berti et al.), louder the more unequal the masses
+                const double F3 = 1.8956 - 1.3043 * std::pow( 1.0 - a, 0.1818 ),
+                             Q3 = 0.9 + 2.3431 * std::pow( 1.0 - a, -0.4810 );
+                m_mergerRing3 = static_cast<float>( m_mergerRing * F3 / F );
+                m_mergerQ3 = static_cast<float>( Q3 );
+                m_mergerA3 = static_cast<float>( 0.45 * ( q - 1.0 ) / ( q + 1.0 ) );
+                // the inspiral from half a hertz: f = f_isco (tau_isco / tau)^(3/8), tau the time to coalescence
+                m_mergerTc = std::max( cur( ParamIdE::MERGER_TIME ), 5.0f );
+                m_mergerTauIsco = m_mergerTc * std::pow( 0.5 / std::max( m_mergerIsco, 1.0f ), 8.0 / 3.0 );
+                m_mergerT = 0.0;
+                m_mergerPhase = m_mergerPhase3 = 0.0;
+                m_mergerOn = true;
+            }
+        }
+    }
+}
+
+void Engine::renderMerger( float *L, float *R, int n )
+{
+    if ( !m_mergerOn ) return;
+    const double dt = 1.0 / static_cast<double>( m_cfg.m_sampleRate );
+    const double level = 1.8 * VoiceLevel;                        // the ringdown's peak about -12 dBFS (selftest 102)
+    const double plunge = 1.5 / std::max( m_mergerIsco, 1.0f );   // s from the last orbit to the peak
+    float        env = 0.0f;
+    for ( int s = 0; s < n; ++s )
+    {
+        const double tau = m_mergerTc - m_mergerT;   // to the coalescence
+        double       f = 0.0, a = 0.0, a3 = 0.0;
+        if ( tau > m_mergerTauIsco )
+        {   // the inspiral: the wave rising (f^(2/3)), its frequency as the orbit shrinks
+            f = m_mergerIsco * std::pow( m_mergerTauIsco / tau, 3.0 / 8.0 );
+            a = 0.35 * std::pow( f / m_mergerIsco, 2.0 / 3.0 );
+        }
+        else if ( tau > m_mergerTauIsco - plunge )
+        {   // the plunge: from the last orbit to the ringdown's pitch, the wave at its height
+            const double u = ( m_mergerTauIsco - tau ) / plunge;
+            f = m_mergerIsco * std::pow( m_mergerRing / m_mergerIsco, u );
+            a = 0.35 + 0.65 * u;
+        }
+        else
+        {   // the ringdown: the hole's quasi-normal modes dying, each by its quality
+            const double t = m_mergerTauIsco - plunge - tau;
+            f = m_mergerRing;
+            a = std::exp( -3.14159265358979 * m_mergerRing * t / m_mergerQ );
+            a3 = m_mergerA3 * std::exp( -3.14159265358979 * m_mergerRing3 * t / m_mergerQ3 );
+            if ( a < 1.0e-4 && a3 < 1.0e-4 )
+            {
+                m_mergerOn = false;
+                m_mergerWait = -1.0f;   // the next one's time is drawn
+                break;
+            }
+        }
+        m_mergerPhase += 2.0 * 3.14159265358979 * f * dt;
+        if ( m_mergerPhase > 6.283185307179586 ) m_mergerPhase -= 6.283185307179586;
+        m_mergerPhase3 += 2.0 * 3.14159265358979 * m_mergerRing3 * dt;
+        if ( m_mergerPhase3 > 6.283185307179586 ) m_mergerPhase3 -= 6.283185307179586;
+        // heard: the tone once it is above 18 Hz (faded in over half an octave); felt: below it, the field's width
+        // stretched and squeezed by the wave's plus polarization
+        const double heard = std::clamp( std::log2( f / 18.0 ) * 2.0 + 1.0, 0.0, 1.0 );
+        const double hp = a * std::cos( m_mergerPhase ), hx = a * std::sin( m_mergerPhase );
+        const double tone = level * heard, ring3 = level * a3 * std::sin( m_mergerPhase3 );
+        const double mid = 0.5 * ( L[s] + R[s] ), side = 0.5 * ( L[s] - R[s] );
+        // the width's swing compressed (a fourth root of the wave): the early inspiral, physically a hundredth of the
+        // merger, is felt as the field breathing, faster and faster
+        const double stretch =
+            1.0 + 0.6 * ( 1.0 - heard ) * std::pow( std::min( a / 0.35, 1.0 ), 0.25 ) * std::cos( m_mergerPhase );
+        const double outMid = mid + tone * hp + ring3, outSide = side * stretch + 0.4 * tone * hx;
+        L[s] = static_cast<float>( outMid + outSide );
+        R[s] = static_cast<float>( outMid - outSide );
+        env = static_cast<float>( std::max( static_cast<double>( env ), std::min( 1.0, a ) ) );
+        m_mergerT += dt;
+    }
+    m_mergerEnv = env;
+}
+
 void Engine::stepNight( float dt )
 {
     auto glide = [dt]( float &v, float want, float tau )
@@ -3384,6 +3677,7 @@ void Engine::renderBlock()
     stepNature( dtf );
     stepRooms( dtf );
     stepNight( dtf );
+    stepSpace( dtf );
     stepHeadset( dtf );   // after the rooms and the binaural cloud: the hands and the head on top
     stepJournal( dtf );
     int   sounding = 0;
@@ -3777,6 +4071,12 @@ void Engine::renderBlock()
         mh.m_low = cur( ParamIdE::MODAL_LOW );
         mh.m_time = m_modalTime;
         mh.m_breath = cur( ParamIdE::MODAL_BREATH );
+        // The redshift hall (Phase 33): its clock an octave in Redshift Time, through three octaves.
+        mh.m_redshift = std::clamp( cur( ParamIdE::REDSHIFT ), 0.0f, 1.0f );
+        mh.m_redSpan = 3.0f;
+        m_redPhase += dtf / ( std::max( cur( ParamIdE::REDSHIFT_TIME ), 1.0f ) * mh.m_redSpan );
+        m_redPhase -= std::floor( m_redPhase );
+        mh.m_redPhase = static_cast<float>( m_redPhase );
         // The painted hall reads the landscape at its own clock, wrapped at the landscape's loop.
         mh.m_paint = cur( ParamIdE::MODAL_PAINT );
         mh.m_paintNorm = 1.0f / std::max( 0.125f, m_landRms );
@@ -4403,6 +4703,7 @@ void Engine::renderBlock()
         }
         m_prevModalLevel = ml;
     }
+    renderMerger( m_nearL.data(), m_nearR.data(), G );   // a merger (Phase 33), into the mix as the rooms are
     // Binaural: the master leaves the two ears alone (no mono bass, no width): both would undo the head.
     if ( cur( ParamIdE::BINAURAL ) >= 0.5f )
         m_midSide.set( 20.0f, 0.0f, 1.0f );

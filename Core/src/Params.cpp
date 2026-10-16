@@ -51,6 +51,7 @@ const char *const HaloTurnNames[NumHaloTurns] = { "Counter-clockwise", "Clockwis
 const char *const StreamsNames[NumStreams] = { "Odd & Even", "By Three", "Registers", "Members" };
 const char *const RissetWayNames[NumRissetWays] = { "Slowing", "Quickening" };
 const char *const ChorusKindNames[NumChorusKinds] = { "Meadow", "Treetops", "Pond", "Summer Night" };
+const char *const StarKindNames[NumStarKinds] = { "Sun", "Red Giant", "White Dwarf" };
 const char *const FarModeNames[NumFarModes] = { "Classic", "Scattering", "Colourless", "Rotating" };
 const char *const LfoShapeNames[NumLfoShapes] = { "Sine",   "Triangle", "Ramp Up", "Ramp Down",
                                                   "Square", "Random",   "Steps" };
@@ -475,6 +476,20 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::FLOOR_FIFTH, "floor_fifth", "Fifth", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::FLOOR_BREATH, "floor_breath", "Breath", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::STAR, "star", "Star", "Star", 0.f, 1.f, 0.f, 1.f, "" ),
+    C( ParamIdE::STAR_KIND, "star_kind", "Star Kind", "Star", StarKindNames, NumStarKinds, 0 ),
+    F( ParamIdE::STAR_AGE, "star_age", "Star Age", "Star", 0.f, 1.f, 0.4f, 1.f, "" ),
+    F( ParamIdE::STAR_SPIN, "star_spin", "Spin", "Star", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::STAR_PITCH, "star_pitch", "Star Pitch", "Star", -4.f, 1.f, -2.f, 1.f, "oct" ),
+    F( ParamIdE::BLACK_HOLE, "black_hole", "Black Hole", "Black Hole", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::HOLE_FALL, "hole_fall", "Fall", "Black Hole", 5.f, 300.f, 40.f, 0.5f, "s" ),
+    F( ParamIdE::HOLE_PLACE, "hole_place", "Hole Place", "Black Hole", -1.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::MERGER, "merger", "Merger", "Merger", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::MERGER_MASS, "merger_mass", "Ringdown", "Merger", 25.f, 250.f, 70.f, 0.5f, "Hz" ),
+    F( ParamIdE::MERGER_RATIO, "merger_ratio", "Mass Ratio", "Merger", 1.f, 10.f, 1.5f, 0.5f, "" ),
+    F( ParamIdE::MERGER_TIME, "merger_time", "Inspiral", "Merger", 20.f, 300.f, 90.f, 0.5f, "s" ),
+    F( ParamIdE::REDSHIFT, "redshift", "Redshift", "Modal", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::REDSHIFT_TIME, "redshift_time", "Redshift Time", "Modal", 4.f, 120.f, 20.f, 0.5f, "s" ),
 } };
 
 }   // namespace

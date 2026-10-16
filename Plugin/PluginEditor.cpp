@@ -451,6 +451,15 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                     ParamIdE::CHORUS_TUNE },
               IdsT{ ParamIdE::CHORUS } },
             { "Night", F::ENVELOPE, IdsT{ ParamIdE::NIGHT_ARC }, IdsT{ ParamIdE::NIGHT_ARC } } } );
+    page( "Cosmos", { { "Star", F::SOURCE,
+                        IdsT{ ParamIdE::STAR, ParamIdE::STAR_KIND, ParamIdE::STAR_AGE, ParamIdE::STAR_SPIN,
+                              ParamIdE::STAR_PITCH },
+                        IdsT{ ParamIdE::STAR } },
+                      { "Black Hole", F::SPACE, IdsT{ ParamIdE::BLACK_HOLE, ParamIdE::HOLE_FALL, ParamIdE::HOLE_PLACE },
+                        IdsT{ ParamIdE::BLACK_HOLE } },
+                      { "Merger", F::FILTER,
+                        IdsT{ ParamIdE::MERGER, ParamIdE::MERGER_MASS, ParamIdE::MERGER_RATIO, ParamIdE::MERGER_TIME },
+                        IdsT{ ParamIdE::MERGER } } } );
     {   // the tuning, with its picture: the octave over the root, the scale, the voices and Self-Tune's pull
         auto *tp = new TuningPage( m_proc, m_actions, &m_live );
         m_describe.push_back( [tp] { return tp->describe(); } );
@@ -573,7 +582,7 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
             { "", { at( "Focus" ) } },
             { "Sound",
               { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ),
-                at( "Night" ) } },
+                at( "Night" ), at( "Cosmos" ) } },
             { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
             { "Space", { at( "Space" ), at( "Effects" ), at( "Rooms" ), at( "Hall" ) } },
             { "Modulation", { at( "Modulation" ) } },
@@ -1138,7 +1147,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "13312 presets",
+        { &m_presetName, "14336 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1801,6 +1810,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
         if ( g == additiv::FirstChorusGroup ) bank.addSectionHeader( "Chorus & Mirrors" );
         if ( g == additiv::FirstFloorGroup ) bank.addSectionHeader( "Deep Floors" );
+        if ( g == additiv::FirstSpaceGroup ) bank.addSectionHeader( "Stars & Gravity" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

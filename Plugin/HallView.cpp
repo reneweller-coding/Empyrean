@@ -283,7 +283,11 @@ HallPage::HallPage( AdditivProcessor &proc, const frame::ControlActions &actions
                   { "Growth",
                     frame::FamilyE::ENVELOPE,
                     { ParamIdE::HALL_GROW, ParamIdE::HALL_MEMORY },
-                    { ParamIdE::HALL_GROW } } },
+                    { ParamIdE::HALL_GROW } },
+                  { "Redshift",
+                    frame::FamilyE::SPACE,
+                    { ParamIdE::REDSHIFT, ParamIdE::REDSHIFT_TIME },
+                    { ParamIdE::REDSHIFT } } },
                 live ),
       m_view( proc )
 {

@@ -28,7 +28,7 @@ struct Preset
     const char *m_mod;      ///< its matrix (Modulation.h text form)
 };
 
-constexpr int NumPresetGroups = 208;   ///< groups of the bank
+constexpr int NumPresetGroups = 224;   ///< groups of the bank
 constexpr int NumSoundGroups = 16;     ///< the first groups, the sounds
 constexpr int FirstSleepGroup = 32;    ///< the first of the sleep concerts (the living systems lie between)
 constexpr int FirstVisionGroup = 48;   ///< the first of the visions (animated pictures, comb, stretch, shift)
@@ -48,7 +48,8 @@ constexpr int FirstNightGroup =
     160;   ///< the first of the night and illusions (Phase 30: the harp, thunder, the ice, streams, Risset, the night arc)
 constexpr int FirstChorusGroup =
     176;   ///< the first of the choruses and mirrors (Phase 31: the night chorus, the time mirror)
-constexpr int FirstFloorGroup = 192;   ///< the first of the deep floors (Phase 32: organ points, pressure, sub octaves)
+constexpr int FirstFloorGroup = 192;    ///< the first of the deep floors (Phase 32: organ points, pressure, sub octaves)
+constexpr int FirstSpaceGroup = 208;    ///< the first of the stars and gravity (Phase 33: stars, black holes, mergers)
 extern const char *const PresetGroupNames[NumPresetGroups];   ///< "Sleep Concert", "Choirs", ...
 
 /** @brief How many presets there are. @return the count */

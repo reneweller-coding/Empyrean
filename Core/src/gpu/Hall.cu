@@ -117,6 +117,18 @@ __device__ ModalMode modalSetup( const BlockHeader *hdr, int mode, const float *
     float ph = rate * mh.m_time + modalUni( mode, 6 );
     ph -= floorf( ph );
     f *= exp2f( mh.m_drift * ( 1.0f / 1200.0f ) * __sinf( 6.2831853f * ph ) );
+    // The redshift hall (Phase 33): every mode glides down through Span octaves, each from a place of its own in the
+    // glide, and is reborn at the top -- a Shepard tail: heard in and out by a raised sine over the glide, so a ringing
+    // mode sinks away and none appears with a step.
+    float window = 1.0f;
+    if ( mh.m_redshift > 0.0f )
+    {
+        float u = mh.m_redPhase + modalUni( mode, 11 );
+        u -= floorf( u );
+        f *= exp2f( -mh.m_redshift * mh.m_redSpan * u );
+        const float s = __sinf( 3.1415927f * u );
+        window = 1.0f - mh.m_redshift + mh.m_redshift * s * s;
+    }
     const bool silent = f < 10.0f || f >= 0.49f * fs;
     // How fast it dies: the decay at and below 250 Hz, each octave above 2^damp times faster; with
     // breath, every mode's decay wanders by up to an octave on a slow sine of its own (again a whole
@@ -146,13 +158,13 @@ __device__ ModalMode modalSetup( const BlockHeader *hdr, int mode, const float *
     // Driven with sqrt(2 (1 - r^2) / N): white noise in, white noise of the same power out, whatever the decay.
     md.m_g = ( silent || mh.m_freeze )
                  ? 0.0f
-                 : sqrtf( 2.0f * fmaxf( 1.0f - r * r, 0.0f ) / static_cast<float>( ModalModes ) ) * weight;
+                 : sqrtf( 2.0f * fmaxf( 1.0f - r * r, 0.0f ) / static_cast<float>( ModalModes ) ) * weight * window;
     __sincosf( 1.5707963f * modalUni( mode, 7 ), &md.m_inR, &md.m_inL );   // its share of the left and the right input
     const float phL = 6.2831853f * modalUni( mode, 8 );
     const float phR = phL + mh.m_width * 3.1415927f * ( 2.0f * modalUni( mode, 9 ) - 1.0f );
     __sincosf( phL, &md.m_oLs, &md.m_oLc );
     __sincosf( phR, &md.m_oRs, &md.m_oRc );
-    float k = silent ? 0.0f : 1.0f;
+    float k = silent ? 0.0f : window;
     // The painted hall: the mode heard through the landscape at its frequency, as the landscape
     // moves on -- the tail draws the aurora, the rain, the tides. Made up by the landscape's RMS.
     if ( !silent && mh.m_paint > 0.0f && hdr->m_landColumns > 0 && hdr->m_landRows > 0 )

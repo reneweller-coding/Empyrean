@@ -162,6 +162,7 @@ constexpr int   IceChirps = 64;           ///< chirps that may sound at once
 
 // Phase 31 (16.10.2026): the night chorus, the time mirror.
 constexpr int ChorusCallers = 2048;   ///< the night chorus's callers (crickets, katydids, frogs ...)
+constexpr int StarModes = 1024;       ///< Star (Phase 33): the star's modes at most
 constexpr int ChorusSpecies = 8;      ///< their kinds
 constexpr int ChorusPitches = 64;     ///< pitches the callers' carriers may be tuned to
 constexpr int RoomMirrors = 64;       ///< the time mirror's cells round the listener in the wave room
@@ -365,6 +366,10 @@ struct ModalHall
         0.0f;   ///< -1 .. 1: how far the hall's memory lengthens (growth) or shortens (erosion) its modes' decays
     float m_memoryCoef = 0.0f;    ///< the memory's step this block, 1 - exp(-dt / Memory) (0: it does not learn)
     float m_densityCoef = 0.0f;   ///< the spectrum's density followed this block, 1 - exp(-dt / 0.3 s)
+    float m_redshift = 0.0f;      ///< 0 .. 1: every mode glides down, reborn at the top (Phase 33: the redshift hall)
+    float m_redPhase = 0.0f;      ///< 0 .. 1: the glide's clock (time over an octave's time and the span, wrapped)
+    float m_redSpan = 3.0f;       ///< octaves a mode glides through before it is reborn
+    float m_rpad = 0.0f;          ///< keeps the tuned pitches 16-byte aligned
     int   m_listen =
         0;   ///< 1: the partials' amplitudes are gathered over the octaves this block (for the memory or the partials' time)
     float m_tuned[ModalTuned] = {};   ///< Hz: the scale's pitches between `low` and 16 kHz
@@ -899,6 +904,42 @@ struct NightChorus
 };
 static_assert( sizeof( NightChorus ) % 16 == 0, "NightChorus rides in the block header" );
 
+/**
+ * @brief Star (Phase 33): a star's oscillations heard -- its modes (asteroseismology) transposed into the audible, each
+ *        a damped oscillator kept ringing by the convection's noise: a Lorentzian line of its own width. The modes
+ *        come as a table (CloudEngine::setStarModes); here what holds for all of them.
+ */
+struct StarField
+{
+    int   m_on = 0;         ///< 1: the star sounds (0: nothing computed)
+    int   m_count = 0;      ///< modes in the table (StarModes at most)
+    int   m_reset = 0;      ///< 1 for one block: the modes begin from silence (a new star)
+    int   m_pad = 0;        ///< keeps the struct 16-byte aligned
+    float m_level = 0.0f;   ///< the star's amplitude out
+    float m_far = 0.7f;     ///< 0 .. 1: its share in the far plane
+    float m_pad1 = 0.0f;    ///< likewise
+    float m_pad2 = 0.0f;    ///< likewise
+};
+static_assert( sizeof( StarField ) % 16 == 0, "StarField rides in the block header" );
+
+/**
+ * @brief Black hole (Phase 33): a share of the partials falls towards a hole across the field -- redshifted, dimmed
+ *        and drawn to it, frozen at the horizon, reborn far out -- and the rest is lensed: the light behind it bent
+ *        into a ring round it and brightened.
+ */
+struct BlackHole
+{
+    int   m_on = 0;             ///< 1: the hole bends the cloud (0: nothing)
+    int   m_pad = 0;            ///< keeps the struct 16-byte aligned
+    float m_share = 0.0f;       ///< 0 .. 1: the share of the partials falling
+    float m_fallPhase = 0.0f;   ///< 0 .. 1: the fall's clock (time over a fall's length, wrapped)
+    float m_place = 0.3f;       ///< -1 .. 1: where the hole stands across
+    float m_ring = 0.0f;        ///< the Einstein ring's radius across the field (0: no lensing)
+    float m_start = 30.0f;      ///< where a falling partial begins, in Schwarzschild radii
+    float m_pad1 = 0.0f;        ///< likewise
+};
+static_assert( sizeof( BlackHole ) % 16 == 0, "BlackHole rides in the block header" );
+
 /** @brief What lives in the field: the LifeMode parameter's choices. */
 enum class LifeModeE : std::int32_t
 {
@@ -1264,6 +1305,16 @@ public:
     SingingIce &ice();
     /** @brief The night chorus's settings for the next block (Phase 31). @return them */
     NightChorus &chorus();
+    /** @brief The star's settings for the next block (Phase 33). @return them */
+    StarField &star();
+    /** @brief The black hole's settings for the next block (Phase 33). @return them */
+    BlackHole &hole();
+    /**
+     * @brief Replaces the star's modes at the next launch (Phase 33).
+     * @param[in] in     four values a mode: its frequency (Hz), its line width (Hz), its amplitude, its place (-1 .. 1)
+     * @param[in] count  how many (StarModes at most)
+     */
+    void setStarModes( const float *in, int count );
     /**
      * @brief What the night chorus did in the last block (Phase 31).
      * @param[out] out  receives 4 values: the calls begun, the callers calling, how far the most numerous kind's clocks

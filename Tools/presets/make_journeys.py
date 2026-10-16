@@ -17,9 +17,9 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And sixteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
+And seventeen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
 currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
-topology, the night and illusions, the choruses and mirrors, the deep floors): twenty-four presets, the stillest few
+topology, the night and illusions, the choruses and mirrors, the deep floors, the stars and gravity): twenty-four presets, the stillest few
 of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
 
@@ -49,6 +49,8 @@ FEATURES = {
     "mirror": 0.5,
     # Phase 32: the floor beside the foundation
     "pedal": 0.4, "pressure": 0.5, "floor_sub": 0.5, "floor_fifth": 0.4,
+    # Phase 33: space
+    "star": 0.6, "black_hole": 0.5, "merger": 0.4, "redshift": 0.5,
 }
 # The stillness: what moves, brightens or hurries (lower is stiller).
 STILL = {"motion_depth": 1.0, "shimmer": 1.0, "brightness": 1.0, "ripple_depth": 1.0, "sync_depth": 0.7, "air": 0.5,
@@ -83,6 +85,8 @@ WHOLE_NIGHTS = [
                                         "Mirror Chapels", "Time Mirrors", "Nocturnes"]),
     ("Whole Night - Deep Floors", ["Breathing Floors", "Organ Points", "Low Chapels", "Abyssal Plains", "Sub Abysses",
                                    "Night Pressure", "Cavern Drones", "Undertow"]),
+    ("Whole Night - Stars & Gravity", ["Quiet Universe", "Sun Songs", "Red Giants", "Falling Light", "Redshift Halls",
+                                       "Cosmic Floors", "Star Choirs", "Distant Mergers"]),
 ]
 
 

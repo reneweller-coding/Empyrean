@@ -89,6 +89,8 @@ constexpr int NightStringRow = 16;                        ///< the night's scrat
 constexpr int NightRows = NightStringRow + HarpStrings;   ///< harp, thunder, ice, chorus (four rows each), the strings
 constexpr int ChorusThreads = 64;                         ///< callers per CUDA block of the chorus's sound
 constexpr int ChorusBlocks = ChorusCallers / ChorusThreads;   ///< CUDA blocks of the chorus's sound
+constexpr int StarThreads = 64;                               ///< modes per CUDA block of the star's sound
+constexpr int StarBlocks = StarModes / StarThreads;           ///< CUDA blocks of the star's sound
 static_assert( ChorusCallers % 256 == 0 && ChorusCallers % ChorusThreads == 0, "the callers fill whole CUDA blocks" );
 static_assert( HarpModes == 32, "a string's modes are a warp's lanes" );
 static_assert( ThunderMain % 32 == 0 && ( ThunderSegments - ThunderMain ) % ( 32 * ThunderBranches ) == 0,
@@ -138,6 +140,8 @@ struct BlockHeader
     Thunder       m_thunder;          ///< thunder for this block (Phase 30)
     SingingIce    m_ice;              ///< the singing ice for this block (Phase 30)
     NightChorus   m_chorus;           ///< the night chorus for this block (Phase 31)
+    StarField     m_star;             ///< the star for this block (Phase 33)
+    BlackHole     m_hole;             ///< the black hole for this block (Phase 33)
 
     std::int32_t m_lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t m_lpad0;        ///< keeps the header 16-byte aligned

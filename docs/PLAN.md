@@ -529,6 +529,55 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 33: Sterne und Schwerkraft (gebaut, 16.10.2026, 0.23.0)
+
+Die ersten vier der Ideen für Dark und Space Ambient (siehe Phase 32): Sternbeben, schwarzes Loch, Verschmelzung,
+Rotverschiebungshall. Neue Seite Cosmos (nach Night).
+
+- **33a Star (`gpu/Space.cu`):** die Moden eines Sterns, wie die Asteroseismologie sie mit Kepler und TESS hört, ins
+  Hörbare versetzt. Die Tabelle rechnet die Engine (`starModes`): Sonne -- p-Moden nu = dnu (n + l/2 + eps) - l (l + 1)
+  D0, Grade 0 .. 3 mit Sichtbarkeiten 1 / 1,5 / 0,5 / 0,04, Ordnungen um n_max = 21 unter einer Gaußglocke von 2,4,
+  kleine Trennung dnu02 = 6 D0 von 0,09 auf 0,03 dnu mit dem Alter, Linienbreiten mit nu^4 bis 0,008 dnu bei n_max;
+  Roter Riese -- n_max 10, jede Dipolmode als gemischte Mode in neun Linien (je näher der p-Mode, desto stärker und
+  breiter), dichter mit dem Alter; Weißer Zwerg -- g-Moden, gleich weit in der Periode (eine Untertonreihe), nur
+  manche angeregt, längere Perioden mit dem Alter. Jede Mode in ihre azimutalen Ordnungen gespalten (Spin), gesehen
+  unter 60° (Gizon und Solanki 2003), quer nach m/l platziert. Auf der GPU je Mode ein Ornstein-Uhlenbeck-Prozess in
+  der Ebene (gedämpft mit der Linienbreite, angestoßen mit Box-Muller-Rauschen aus Block und Mode) -- eine
+  Lorentz-Linie --, die Amplitude über den Block gleitend, gemischt in festen Reihenfolgen auf die Kanäle 24 .. 27
+  nach der Nacht. dnu ist der Grundton (Oktave ab C2) mal 2^Star Pitch.
+- **33b Black Hole (`Voices.cu`):** ein Anteil der Teiltöne fällt (6/10 bei 1): r^(3/2) schrumpft gleichmäßig über
+  Fall von 30 Schwarzschild-Radien bis zum Horizont, von fern gesehen rotverschoben (sqrt(1 - rs/r)), gedämpft (das
+  Quadrat), zum Loch gezogen, eingefroren, weit draußen neu geboren. Der Rest wird gelinst (Punktlinse): hinaus zu
+  seinem Bild jenseits des Einsteinrings (ein Viertel des Felds bei 1), heller um die Vergrößerung (höchstens 6 dB).
+- **33c Merger (CPU, `renderMerger`):** ein Poissonstrom (Merger 1: alle drei Minuten im Mittel). Das Massenverhältnis
+  gibt den Spin des Rests (a_f = 2 sqrt 3 eta - 3,871 eta² + 4,028 eta³), der Spin die Quasinormalmoden (Berti,
+  Cardoso und Will: l = m = 2 und l = m = 3); Ringdown setzt die Tonhöhe der 22-Mode und damit die letzte stabile
+  Bahn (f_isco = f_ring / (6^1,5 F / 2)). Das Einspiralen f = f_isco (tau_isco / tau)^(3/8) ab einem halben Hertz,
+  die Amplitude mit f^(2/3); unhörbar langsam dehnt und staucht es die Breite des Felds (Plus-Polarisation auf die
+  Seiten), hörbar wird es ein Ton im Bass (Plus in der Mitte, Kreuz an den Seiten), dann der Sturz und der Ringdown.
+  Quelle Merger. **Gefunden [M]:** die Dehnung mit der physikalischen Amplitude war im frühen Einspiralen ein
+  Hundertstel des Merger und nicht zu spüren -- jetzt mit der vierten Wurzel; der erste Pegel (14 x VoiceLevel)
+  hätte über 0 dBFS gespitzt, jetzt 1,8 x: -11,6 dBFS.
+- **33d Redshift (`Hall.cu`):** jede Mode des modalen Halls gleitet über drei Oktaven abwärts, jede von einem eigenen
+  Platz, oben neu geboren, ein- und ausgeblendet mit einem Sinus² über den Weg (Ein- und Ausgang) -- ein
+  Shepard-Nachhall; Redshift Time je Oktave.
+- **Gefunden [M]:** die Wartezeit bis zum nächsten Merger zog anfangs aus dem Würfel der Engine, auch mit Merger
+  aus -- das verschob jede Zufallsentscheidung danach (Entfernungen, Dirigent), und sechs alte Selbsttests fielen
+  (Freeze, Scale, Bilder, Orbit, Find, Headset). Jetzt ein eigener Würfel (`m_eventRng`), gezogen nur mit Merger.
+- **Selbsttest:** die Engines der Tests ab 99 auf dem Heap -- `main` lief mit 8 MB Stapel über (0xC00000FD), weil
+  jeder Testblock seine Engine im Rahmen von `main` hält.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Stars & Gravity“, 208 .. 223): Sun Songs, Red Giants, White Dwarfs,
+  Spinning Stars, Ageing Stars, Star Choirs, Accretion Disks, Falling Light, Einstein Rings, Mergers, Distant
+  Mergers, Redshift Halls, Receding Light, Cosmic Floors, Quiet Universe, Gravity's Choir; jedes mit dem Boden
+  (floor_rule). 465 Reisen, siebzehn ganze Nächte.
+
+**Gemessen [M]:** Selbsttest 100 .. 103 (Sonne bei dnu 18,35 Hz: die Radialmoden 25,3 dB über den Lücken, der Stern
+-28,7 dBFS; schwarzes Loch: 150 .. 300 Hz unter einer Note bei 440 Hz -36,9 dB gegen -125 ohne; Merger: 70 Hz auf
+der Höhe 44,5 dB, vorher -75,8; Breitenschwankung 4,76 gegen 3,91 dB; Redshift: Mitte des Nachhalls 1,64 gegen 2,41
+Oktaven über 60 Hz). GPU: der Stern etwa 0,02 .. 0,03 ms je Block (0,104 -> 0,126 .. 0,138 ms mit dem Standardklang).
+**Bass-Prüfung [M]** (64 der neuen, Dirigent an): unter 150 Hz Median 17,2 %, 10. Perzentil 11,8 %, eines unter 8 %
+(„Turbulent-Ring Halo Ring“, 6,8 %); der Grundton im Median 100 % der Zeit unten.
+
 ## Phase 32: Das Fundament (gebaut, 16.10.2026, 0.22.0)
 
 Der Nutzer, nach meinen Ideen für Dark und Space Ambient: „beachte bei den Presets bitte auf das Bass-Fundament“ und

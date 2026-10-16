@@ -1393,6 +1393,37 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                                   static_cast<float>( n ) / fs, z * ( 2.0f / 1200.0f ) );
         }
         f = home * exp2f( fieldOff * ( 1.0f / 1200.0f ) );
+        // The black hole (Phase 33): a share of the partials falls -- from Start Schwarzschild radii to the
+        // horizon over a fall (r^(3/2) shrinking evenly, as a body falls from rest), seen from far away: redshifted by
+        // sqrt(1 - rs/r), dimmed by its square, drawn to the hole, frozen at the horizon, reborn far out --; the light
+        // of the rest behind it is lensed (a point lens): moved out to its image beyond the Einstein ring, brightened
+        // by the magnification (at most 6 dB).
+        float holeGain = 1.0f;
+        if ( hdr->m_hole.m_on && !isAir )
+        {
+            const BlackHole &B = hdr->m_hole;
+            if ( hash01( seed, up, 66 ) < B.m_share )
+            {
+                float u = B.m_fallPhase + hash01( seed, up, 67 );
+                u -= floorf( u );
+                const float rho = 1.0f + ( B.m_start - 1.0f ) * __powf( 1.0f - u, 0.6666667f );
+                const float g = sqrtf( fmaxf( 1.0f - 1.0f / rho, 0.0f ) );
+                f *= g;
+                holeGain = g * g * fminf( u * 20.0f, 1.0f );
+                place += ( B.m_place - place ) * ( 1.0f - ( rho - 1.0f ) / ( B.m_start - 1.0f ) );
+            }
+            else if ( B.m_ring > 0.0f )
+            {
+                const float d = place - B.m_place;
+                const float x = fmaxf( fabsf( d ) / B.m_ring, 0.05f );
+                if ( x < 3.0f )
+                {
+                    const float root = sqrtf( x * x + 4.0f );
+                    holeGain = sqrtf( fminf( ( x * x + 2.0f ) / ( x * root ), 4.0f ) );
+                    place = fminf( fmaxf( B.m_place + copysignf( 0.5f * B.m_ring * ( x + root ), d ), -1.0f ), 1.0f );
+                }
+            }
+        }
         // The top fades out between 0.43 and 0.47 of the sample rate: nothing reaches Nyquist; a
         // partial the shift took down fades out between 20 and 5 Hz (and never runs below 1).
         const float fade = fminf( fmaxf( ( 0.47f * fs - f ) / ( 0.04f * fs ), 0.0f ), 1.0f ) *
@@ -1442,7 +1473,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         const float level = lateBy > 0.0f ? gainAgo( ring + static_cast<size_t>( v ) * GainRing, hdr->m_blockIndex,
                                                      lateBy * fs / static_cast<float>( n ) )
                                           : cv.m_gain;
-        target = amp0 * sh * fade * env * grainEnv * level * exp2f( -dist ) * absorb * colour;
+        target = amp0 * sh * fade * env * grainEnv * level * exp2f( -dist ) * absorb * colour * holeGain;
         // The hall's ear: this partial's amplitude in its band, in whole numbers (the sum is the same in
         // any order). Amplitudes, not powers: a chord's upper harmonics count as heard too, not only the
         // few loudest bands.

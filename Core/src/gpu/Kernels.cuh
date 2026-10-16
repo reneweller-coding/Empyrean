@@ -106,6 +106,11 @@ __global__ void chorusSoundKernel( const BlockHeader *hdr, const float4 *state, 
 __global__ void chorusReduceKernel( const BlockHeader *hdr, const float *partial, float *scratch, int maxN );
 __global__ void nightMixKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out );
 
+// Space.cu
+__global__ void starStepKernel( const BlockHeader *hdr, const float4 *modes, float4 *state );
+__global__ void starSoundKernel( const BlockHeader *hdr, const float4 *modes, float4 *state, float *scratch, int maxN );
+__global__ void spaceMixKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out );
+
 // Spectral.cu
 __global__ void spectralEchoKernel( const BlockHeader *hdr, float *io, float *hist, float *acc, float2 *ring, int *st );
 __global__ void meltKernel( const BlockHeader *hdr, float *io, float *hist, float *acc, float *energy, float *omega,

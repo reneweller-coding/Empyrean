@@ -34,6 +34,7 @@
 #include <cstring>
 #include <string>
 #include <thread>
+#include <memory>
 #include <vector>
 
 using namespace additiv;
@@ -630,7 +631,7 @@ int main( int argc, char **argv )
         const bool unique = std::adjacent_find( names.begin(), names.end() ) == names.end();
         bool       full = true;
         for ( int g = 0; g < NumPresetGroups; ++g ) full = full && perGroup[g] == 64;
-        check( numPresets() == 13312 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
+        check( numPresets() == 14336 && full && unique && bad == 0 && outOfRange == 0 && rowsLost == 0,
                "presets: the factory bank",
                fmt( "%d presets, %s, %d unreadable, %d out of range, %d with lost rows", numPresets(),
                     unique ? "names unique" : "NAMES REPEAT", bad, outOfRange, rowsLost ) );
@@ -4674,7 +4675,8 @@ int main( int argc, char **argv )
         };
         auto play = [&]( float foundation, float floor, float harp, float pedal, float pressure, float sub, Floor &f )
         {
-            Engine e;
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
             quietEffects( e );
             e.setParam( ParamIdE::AUTO_MODE, 1.0f );
             e.setParam( ParamIdE::AUTO_RATE, 4.0f );
@@ -4762,6 +4764,150 @@ int main( int argc, char **argv )
                     kept.swing ) );
         check( ran && sub.deep > kept.deep + 6.0, "floor: Sub Octave puts power an octave under the foundation",
                fmt( "under 55 Hz against the whole: %.1f dB with it, %.1f dB without", sub.deep, kept.deep ) );
+    }
+
+    // 100. Star (Phase 33): a sun's modes stand where asteroseismology puts them -- the radial ones at
+    //      dnu (n + 1.4), dnu the root's (D2) two octaves down -- and between them is little.
+    if ( from <= 100 )
+    {
+        auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+        Engine &e = *held;
+        quietEffects( e );
+        e.setParam( ParamIdE::STAR, 1.0f );
+        e.setParam( ParamIdE::STAR_KIND, 0.0f );
+        e.setParam( ParamIdE::STAR_PITCH, -2.0f );
+        if ( !openOffline( e, false, 100 ) ) return 1;
+        (void)render( e, 4.0 );
+        const std::vector<float> a = render( e, 10.0 );
+        const double             dnu = e.noteHz( 38 ) * 0.25;
+        double                   on = 0.0, off = 0.0;
+        for ( int n = 15; n <= 27; ++n )
+        {
+            on += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, dnu * ( n + 1.4 ) ) );
+            off += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, dnu * ( n + 1.6 ) ) );
+        }
+        const double ratio = 10.0 * std::log10( std::max( on, 1e-30 ) / std::max( off, 1e-30 ) );
+        check( ratio > 10.0 && rmsDb( a, 0, a.size() / 2 ) > -50.0, "star: a sun's radial modes on dnu (n + eps)",
+               fmt( "dnu %.2f Hz: the radial modes %.1f dB over the gaps between them; the star %.1f dBFS", dnu, ratio,
+                    rmsDb( a, 0, a.size() / 2 ) ) );
+    }
+
+    // 101. Black hole (Phase 33): a note held at 440 Hz; with the hole a share of its partials falls, redshifted, so
+    //      power appears far under the note where there was none.
+    if ( from <= 101 )
+    {
+        auto under = [&]( float hole )
+        {
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::BLACK_HOLE, hole );
+            e.setParam( ParamIdE::HOLE_FALL, 10.0f );
+            e.setParam( ParamIdE::MOTION_DEPTH, 0.0f );
+            if ( !openOffline( e, false, 101 ) ) return 0.0;
+            e.noteOn( 69, 1.0f, 0 );
+            (void)render( e, 6.0 );
+            const std::vector<float> a = render( e, 8.0 );
+            double                   p = 0.0;
+            for ( double hz : { 150.0, 200.0, 250.0, 300.0 } )
+                p += std::pow( 10.0, 0.1 * toneDb( a, 0, a.size() / 2, hz ) );
+            return 10.0 * std::log10( std::max( p, 1e-30 ) ) - toneDb( a, 0, a.size() / 2, e.noteHz( 69 ) );
+        };
+        const double without = under( 0.0f ), with = under( 1.0f );
+        check( with > without + 10.0, "black hole: falling partials redshifted far under their note",
+               fmt( "150 .. 300 Hz against the note: %.1f dB with the hole, %.1f dB without", with, without ) );
+    }
+
+    // 102. Merger (Phase 33): asked for at once with a 20 s inspiral and a 70 Hz ringdown -- the field's width swings
+    //      while the wave is too slow to hear (a swing of its own on top of the note's, the two adding as powers), and
+    //      the ringdown stands far over the bass before it.
+    if ( from <= 102 )
+    {
+        double loudest = -200.0;   // dBFS: the loudest sample of a render with a merger
+        auto   play = [&]( float merger, double &peak, double &before, double &swing )
+        {
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::MERGER, merger );
+            e.setParam( ParamIdE::MERGER_TIME, 20.0f );
+            e.setParam( ParamIdE::MERGER_MASS, 70.0f );
+            e.setParam( ParamIdE::MERGER_RATIO, 1.0f );
+            e.setParam( ParamIdE::MOTION_DEPTH, 0.0f );
+            if ( !openOffline( e, false, 102 ) ) return false;
+            e.noteOn( 72, 0.8f, 0 );
+            e.beginMerger();
+            const std::vector<float> a = render( e, 24.0 );
+            peak = -200.0;
+            for ( size_t s = 0; s + 4800 <= a.size() / 2; s += 2400 )
+                peak = std::max( peak, toneDb( a, s, s + 4800, 70.0 ) );
+            before = toneDb( a, 2 * 48000, 2 * 48000 + 4800, 70.0 );
+            if ( merger > 0.0f )
+                for ( float x : a )
+                    loudest = std::max( loudest,
+                                        20.0 * std::log10( std::max( static_cast<double>( std::abs( x ) ), 1e-12 ) ) );
+            // the width: side over mid in tenths of a second, 4 .. 12 s, its spread
+            std::vector<double> r;
+            for ( size_t s = 4 * 48000; s + 4800 <= 12 * 48000; s += 4800 )
+            {
+                double m = 0.0, d = 0.0;
+                for ( size_t i = s; i < s + 4800; ++i )
+                {
+                    const double l = a[2 * i], rr = a[2 * i + 1];
+                    m += ( l + rr ) * ( l + rr );
+                    d += ( l - rr ) * ( l - rr );
+                }
+                r.push_back( 10.0 * std::log10( std::max( d, 1e-30 ) / std::max( m, 1e-30 ) ) );
+            }
+            double mean = 0.0, sq = 0.0;
+            for ( double x : r ) mean += x;
+            mean /= std::max<size_t>( 1, r.size() );
+            for ( double x : r ) sq += ( x - mean ) * ( x - mean );
+            swing = std::sqrt( sq / std::max<size_t>( 1, r.size() ) );
+            return true;
+        };
+        double     peak = 0.0, before = 0.0, swing = 0.0, peak0 = 0.0, before0 = 0.0, swing0 = 0.0;
+        const bool ran = play( 1.0f, peak, before, swing ) && play( 0.0f, peak0, before0, swing0 );
+        check( ran && peak > before + 20.0 && peak > peak0 + 20.0 && swing * swing - swing0 * swing0 > 1.5 &&
+                   loudest < -6.0,
+               "merger: the inspiral swings the field's width, the ringdown rings in the bass",
+               fmt( "70 Hz at its height %.1f dB, before %.1f, without a merger %.1f; the width's swing %.2f dB, "
+                    "without %.2f; the loudest sample %.1f dBFS",
+                    peak, before, peak0, swing, swing0, loudest ) );
+    }
+
+    // 103. Redshift hall (Phase 33): a chord into the modal hall and let go; with Redshift the tail sinks -- three
+    //      seconds on, its power lies lower than without.
+    if ( from <= 103 )
+    {
+        auto tail = [&]( float red )
+        {
+            auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
+            Engine &e = *held;
+            quietEffects( e );
+            e.setParam( ParamIdE::MODAL_LEVEL, 1.0f );
+            e.setParam( ParamIdE::MODAL_DECAY, 12.0f );
+            e.setParam( ParamIdE::REDSHIFT, red );
+            e.setParam( ParamIdE::REDSHIFT_TIME, 2.0f );
+            e.setParam( ParamIdE::RELEASE, 0.2f );
+            if ( !openOffline( e, false, 103 ) ) return 0.0;
+            for ( int note : { 60, 64, 67, 72 } ) e.noteOn( note, 1.0f, 0 );
+            (void)render( e, 0.6 );
+            for ( int note : { 60, 64, 67, 72 } ) e.noteOff( note, 0 );
+            const std::vector<float> a = render( e, 5.0 );
+            // the power-weighted mean octave of the tail, 3 .. 5 s, over a comb of tones every sixth of an octave
+            double w = 0.0, sum = 0.0;
+            for ( double oct = 0.0; oct <= 7.0; oct += 1.0 / 6.0 )
+            {
+                const double p = std::pow( 10.0, 0.1 * toneDb( a, 3 * 48000, 5 * 48000, 60.0 * std::exp2( oct ) ) );
+                w += p;
+                sum += p * oct;
+            }
+            return w > 0.0 ? sum / w : 0.0;
+        };
+        const double plain = tail( 0.0f ), sunk = tail( 1.0f );
+        check( sunk < plain - 0.7, "redshift hall: the tail sinks as it dies",
+               fmt( "the tail's centre %.2f octaves over 60 Hz with Redshift, %.2f without", sunk, plain ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

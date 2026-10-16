@@ -244,6 +244,13 @@ struct CloudEngine::Impl
     float        *m_dChorusScratch = nullptr;   ///< device: per chorus CUDA block four channels of the block
     float        *m_dMirror = nullptr;          ///< device: the time mirror's recording
     NightChorus   m_chorus;                     ///< the host's copy of the night chorus's settings
+    float4       *m_dStarModes = nullptr;       ///< device: the star's modes (Phase 33)
+    float4       *m_dStar = nullptr;            ///< device: per star mode its amplitudes and its phase
+    float        *m_dStarScratch = nullptr;     ///< device: per star CUDA block four channels of the block
+    float        *m_hStarUp = nullptr;          ///< pinned host: a star's modes to send up
+    StarField     m_star;                       ///< the host's copy of the star's settings
+    BlackHole     m_hole;                       ///< the host's copy of the black hole's settings
+    bool          m_starUp = false;             ///< the next launch sends hStarUp up first
     bool          m_mirrorWas = false;          ///< the time mirror ran in the last block (cleared as it begins)
     bool          m_iceUp = false;              ///< the next launch sends hIceUp up first
 
@@ -263,9 +270,9 @@ struct CloudEngine::Impl
         bool                         m_enabled = true;   ///< as the executable graph has them
         int                          m_rest = 0;         ///< blocks the feature has rested
     };
-    std::array<Gate, 20> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
+    std::array<Gate, 21> m_gates;   ///< life, wind, chimes, weather, swarm, physarum, halo, room, modal hall, bloom,
                                     ///< dream, phantom, reservoir, spectral echo, melt, harp, thunder, ice, the night's
-                                    ///< mix, the chorus
+                                    ///< mix, the chorus, the star
     float m_gpuMs = 0.0f;           ///< GPU time of the last finished block
     bool  m_launched = false;       ///< a block is in flight
 
@@ -383,7 +390,10 @@ struct CloudEngine::Impl
                           static_cast<void *>( m_dNightScratch ),
                           static_cast<void *>( m_dChorus ),
                           static_cast<void *>( m_dChorusScratch ),
-                          static_cast<void *>( m_dMirror ) } )
+                          static_cast<void *>( m_dMirror ),
+                          static_cast<void *>( m_dStarModes ),
+                          static_cast<void *>( m_dStar ),
+                          static_cast<void *>( m_dStarScratch ) } )
             if ( p ) cudaFree( p );
         m_exec = nullptr;
         m_graph = nullptr;
@@ -431,6 +441,9 @@ struct CloudEngine::Impl
         if ( m_hHallUp ) cudaFreeHost( m_hHallUp );
         if ( m_hIceUp ) cudaFreeHost( m_hIceUp );
         m_hIceUp = nullptr;
+        if ( m_hStarUp ) cudaFreeHost( m_hStarUp );
+        m_hStarUp = nullptr;
+        m_starUp = false;
         m_iceUp = false;
         m_dHallHist = nullptr;
         m_dHallMemory = m_dDensity = m_dTau = nullptr;
@@ -457,6 +470,8 @@ struct CloudEngine::Impl
         m_dIceStress = m_dNightScratch = nullptr;
         m_dChorus = nullptr;
         m_dChorusScratch = m_dMirror = nullptr;
+        m_dStarModes = m_dStar = nullptr;
+        m_dStarScratch = nullptr;
     }
 
     /** @brief Waits for a block in flight, so the tables may be replaced. */
@@ -769,7 +784,13 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dChorusScratch, sizeof( float ) * 4 * static_cast<size_t>( n ) * ChorusBlocks ),
                "cudaMalloc chorus", error ) &&
            ok( cudaMalloc( &m.m_dMirror, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ) ),
-               "cudaMalloc mirror", error );
+               "cudaMalloc mirror", error ) &&
+           ok( cudaMalloc( &m.m_dStarModes, sizeof( float4 ) * StarModes ), "cudaMalloc star", error ) &&
+           ok( cudaMalloc( &m.m_dStar, sizeof( float4 ) * 2 * StarModes ), "cudaMalloc star", error ) &&
+           ok( cudaMalloc( &m.m_dStarScratch, sizeof( float ) * 4 * static_cast<size_t>( n ) * StarBlocks ),
+               "cudaMalloc star", error ) &&
+           ok( cudaHostAlloc( &m.m_hStarUp, sizeof( float4 ) * StarModes, cudaHostAllocDefault ), "cudaHostAlloc star",
+               error );
     // Cleared on our own stream and waited for: the stream does not synchronise with the default
     // stream, so a plain cudaMemset could still be running when the first block's update kernel
     // writes the same tables (it did: one render in three differed).
@@ -902,6 +923,12 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                              m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * RoomMirrors * static_cast<size_t>( MirrorMax ),
+                             m.m_stream ),
+            "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dStarModes, 0, sizeof( float4 ) * StarModes, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dStar, 0, sizeof( float4 ) * 2 * StarModes, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dStarScratch, 0, sizeof( float ) * 4 * static_cast<size_t>( n ) * StarBlocks,
                              m.m_stream ),
             "cudaMemsetAsync", error ) &&
         ok( cudaStreamSynchronize( m.m_stream ), "cudaStreamSynchronize", error );
@@ -1090,6 +1117,12 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                 hdr, m.m_dChorusScratch, m.m_dNightScratch, n );
             nightMixKernel<<<static_cast<unsigned>( ( n + 127 ) / 128 ), 128, 0, m.m_stream>>>( hdr, m.m_dNightScratch,
                                                                                                 n, m.m_dOut );
+            // The star (Phase 33): its modes' amplitudes walk, they sound, added after the night's.
+            starStepKernel<<<StarModes / 256, 256, 0, m.m_stream>>>( hdr, m.m_dStarModes, m.m_dStar );
+            starSoundKernel<<<StarBlocks, StarThreads, 0, m.m_stream>>>( hdr, m.m_dStarModes, m.m_dStar,
+                                                                         m.m_dStarScratch, n );
+            spaceMixKernel<<<static_cast<unsigned>( ( n + 127 ) / 128 ), 128, 0, m.m_stream>>>( hdr, m.m_dStarScratch,
+                                                                                                n, m.m_dOut );
             modalKernel<<<static_cast<unsigned>( ModalBlocks ), ModalThreads, 0, m.m_stream>>>(
                 hdr, m.m_dOut, m.m_dModal, m.m_dModalScratch, n, m.m_dLand, m.m_dHallMemory );
             modalReduceKernel<<<static_cast<unsigned>( 2 * n / ReduceLanes ), dim3( ReduceLanes, ReduceGroups ), 0,
@@ -1171,6 +1204,9 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                     { reinterpret_cast<const void *>( &chorusOrderKernel ), 19 },
                     { reinterpret_cast<const void *>( &chorusSoundKernel ), 19 },
                     { reinterpret_cast<const void *>( &chorusReduceKernel ), 19 },
+                    { reinterpret_cast<const void *>( &starStepKernel ), 20 },
+                    { reinterpret_cast<const void *>( &starSoundKernel ), 20 },
+                    { reinterpret_cast<const void *>( &spaceMixKernel ), 20 },
                 };
                 size_t nodeCount = 0;
                 good = ok( cudaGraphGetNodes( m.m_graph, nullptr, &nodeCount ), "cudaGraphGetNodes", error );
@@ -1442,6 +1478,25 @@ void CloudEngine::chorusStats( float *out ) const
     out[3] /= static_cast<float>( ChorusCallers );   // the waiting ones as a share
 }
 
+StarField &CloudEngine::star()
+{
+    return m_impl->m_star;
+}
+
+BlackHole &CloudEngine::hole()
+{
+    return m_impl->m_hole;
+}
+
+void CloudEngine::setStarModes( const float *in, int count )
+{
+    if ( !m_impl || !m_impl->m_hStarUp ) return;
+    const int c = std::clamp( count, 0, StarModes );
+    std::memset( m_impl->m_hStarUp, 0, sizeof( float4 ) * StarModes );
+    std::memcpy( m_impl->m_hStarUp, in, sizeof( float4 ) * static_cast<size_t>( c ) );
+    m_impl->m_starUp = true;
+}
+
 void CloudEngine::setIceStress( const float *in )
 {
     if ( !m_impl || !m_impl->m_hIceUp ) return;
@@ -1615,7 +1670,12 @@ void CloudEngine::launch()
     hdr->m_chorus.m_pitchCount = std::clamp( m.m_chorus.m_pitchCount, 0, ChorusPitches );
     hdr->m_chorus.m_kind = std::clamp( m.m_chorus.m_kind, 0, static_cast<int>( ChorusKindE::COUNT ) - 1 );
     m.m_chorus.m_reset = 0;   // asked for once
-    {                         // the time mirror (Phase 31): its window within bounds; it begins from silent recordings
+    hdr->m_star = m.m_star;   // the star and the black hole (Phase 33)
+    hdr->m_star.m_count = std::clamp( m.m_star.m_count, 0, StarModes );
+    m.m_star.m_reset = 0;   // asked for once
+    hdr->m_hole = m.m_hole;
+    hdr->m_hole.m_start = std::max( m.m_hole.m_start, 1.5f );
+    {   // the time mirror (Phase 31): its window within bounds; it begins from silent recordings
         const bool mirror = m.m_room.m_on && m.m_room.m_mirrorOn;
         hdr->m_room.m_mirrorOn = mirror ? 1 : 0;
         hdr->m_room.m_mirrorLen = std::clamp( m.m_room.m_mirrorLen, 1, MirrorMax );
@@ -1654,6 +1714,12 @@ void CloudEngine::launch()
         v.m_restart = 0;
         if ( v.m_active ) v.m_time += dt;
     }
+    if ( m.m_starUp )
+    {   // a star's modes: up before the block
+        cudaMemcpyAsync( m.m_dStarModes, m.m_hStarUp, sizeof( float4 ) * StarModes, cudaMemcpyHostToDevice,
+                         m.m_stream );
+        m.m_starUp = false;
+    }
     if ( m.m_iceUp )
     {   // an ice sheet: up before the block
         cudaMemcpyAsync( m.m_dIceStress, m.m_hIceUp, sizeof( float ) * IceN * IceN, cudaMemcpyHostToDevice,
@@ -1668,7 +1734,7 @@ void CloudEngine::launch()
     // The gates: a resting feature's kernels switched off in the graph (on again at once when it wakes).
     {
         const int  pv = hdr->m_phantomVoice;
-        const bool want[20] = { hdr->m_life.m_mode != LifeModeE::OFF,
+        const bool want[21] = { hdr->m_life.m_mode != LifeModeE::OFF,
                                 hdr->m_weather.m_wind != 0,
                                 hdr->m_chimes.m_on != 0,
                                 hdr->m_weather.m_rainOn || hdr->m_weather.m_leavesOn || hdr->m_weather.m_surfOn,
@@ -1687,7 +1753,8 @@ void CloudEngine::launch()
                                 hdr->m_thunder.m_on != 0,
                                 hdr->m_ice.m_on != 0,
                                 hdr->m_harp.m_on || hdr->m_thunder.m_on || hdr->m_ice.m_on || hdr->m_chorus.m_on,
-                                hdr->m_chorus.m_on != 0 };
+                                hdr->m_chorus.m_on != 0,
+                                hdr->m_star.m_on != 0 };
         for ( size_t g = 0; g < m.m_gates.size(); ++g )
         {
             Impl::Gate &gate = m.m_gates[g];

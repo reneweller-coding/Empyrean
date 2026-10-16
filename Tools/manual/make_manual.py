@@ -38,6 +38,7 @@ TABS = {
     "Dreams": ["Phantom", "Dream", "Premonition", "Memory", "Streams", "Risset"],
     "Weather": ["Wind", "Chimes", "Rain", "Leaves", "Surf"],
     "Night": ["Aeolian Harp", "Thunder", "Singing Ice", "Night Chorus", "Night"],
+    "Cosmos": ["Star", "Black Hole", "Merger"],
     "Tuning": ["Tuning"],
         "Conductor": ["Conductor", "Floor", "MPE", "Quantum Walk"],
     "Space": ["Space", "Master", "Binaural"],

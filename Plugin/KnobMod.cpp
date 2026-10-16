@@ -45,7 +45,7 @@ constexpr Section Sections[] = {
     { "The piece", ModSourceE::BEAT, ModSourceE::RANDOM_NOTE },
     { "What it hears", ModSourceE::LOUDNESS, ModSourceE::ROUGHNESS },
     { "The reservoir", ModSourceE::RESERVOIR1, ModSourceE::RESERVOIR4 },
-    { "The night", ModSourceE::NIGHT, ModSourceE::LIGHTNING },
+    { "Night and space", ModSourceE::NIGHT, ModSourceE::MERGER },
 };
 
 /**

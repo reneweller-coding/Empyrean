@@ -369,6 +369,21 @@ enum class ParamIdE : int
     FLOOR_SUB,       ///< 0 .. 1: a foundation voice an octave under the foundation (its level against it)
     FLOOR_FIFTH,     ///< 0 .. 1: one a fifth above it (the chord then begins an octave above the foundation)
     FLOOR_BREATH,    ///< 0 .. 1: the sub octave and the fifth swell and ebb slowly, each in its own time
+    // Phase 33 (16.10.2026): space
+    STAR,            ///< 0 .. 1: a star's oscillations -- its modes, kept ringing by the convection's noise
+    STAR_KIND,       ///< which star: a sun, a red giant, a white dwarf
+    STAR_AGE,        ///< 0 .. 1: young .. old (a sun's small separation narrows; a giant's and a dwarf's modes crowd)
+    STAR_SPIN,       ///< 0 .. 1: how fast it turns (every mode split into its azimuthal orders)
+    STAR_PITCH,      ///< oct: the star's spacing against the root (its large separation, a dwarf's period spacing)
+    BLACK_HOLE,      ///< 0 .. 1: a black hole in the field: partials fall into it, the light behind is lensed round it
+    HOLE_FALL,       ///< s: a fall from far out to the horizon
+    HOLE_PLACE,      ///< -1 .. 1: where the hole stands across
+    MERGER,          ///< 0 .. 1: how often two black holes merge (an inspiral rising for minutes, a ringdown)
+    MERGER_MASS,     ///< Hz: the ringdown's pitch (the heavier the hole, the lower)
+    MERGER_RATIO,    ///< 1 .. 10: the masses' ratio (the ringdown's spin, its second mode)
+    MERGER_TIME,     ///< s: the inspiral heard, from half a hertz to the last orbit
+    REDSHIFT,        ///< 0 .. 1: the modal hall's modes glide down for ever, reborn at the top
+    REDSHIFT_TIME,   ///< s: an octave of the glide
     COUNT            ///< number of parameters
 };
 
@@ -485,6 +500,8 @@ constexpr int            NumRissetWays = 2;                   ///< entries of Ri
 extern const char *const RissetWayNames[NumRissetWays];       ///< "Slowing", "Quickening"
 constexpr int            NumChorusKinds = 4;                  ///< entries of ChorusKindNames (ChorusKindE)
 extern const char *const ChorusKindNames[NumChorusKinds];     ///< "Meadow", "Treetops", "Pond", "Summer Night"
+constexpr int            NumStarKinds = 3;                    ///< entries of StarKindNames
+extern const char *const StarKindNames[NumStarKinds];         ///< "Sun", "Red Giant", "White Dwarf"
 constexpr int            NumShores = 3;                       ///< entries of ShoreNames
 extern const char *const ShoreNames[NumShores];               ///< "Sand", "Pebbles", "Rocks"
 constexpr int            NumFarModes = 4;                     ///< entries of FarModeNames

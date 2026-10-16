@@ -75,7 +75,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Cricket Meadows", "Katydid Treetops", "Frog Ponds", "Summer Nights", "Warm Evenings", "Cool Nights", "Answering Choirs", "Tuned Choruses",
                     "Time Mirrors", "Reverse Halls", "Mirror Chapels", "Converging Halos", "Storm Choruses", "Lake Nights", "Night Concerts", "Nocturnes",
           "Organ Points", "Pressure Drones", "Sub Abysses", "Fifth Pillars", "Breathing Floors", "Cathedral Depths", "Abyssal Plains", "Black Monoliths",
-          "Iron Pedals", "Tectonic Hum", "Cavern Drones", "Undertow", "Low Chapels", "Night Pressure", "Deep Bells", "Floors & Storms"]
+          "Iron Pedals", "Tectonic Hum", "Cavern Drones", "Undertow", "Low Chapels", "Night Pressure", "Deep Bells", "Floors & Storms",
+          "Sun Songs", "Red Giants", "White Dwarfs", "Spinning Stars", "Ageing Stars", "Star Choirs", "Accretion Disks", "Falling Light",
+          "Einstein Rings", "Mergers", "Distant Mergers", "Redshift Halls", "Receding Light", "Cosmic Floors", "Quiet Universe", "Gravity's Choir"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -518,6 +520,48 @@ NAMES = {
                          "Tempest-Deep", "Cloudburst", "Downpour"],
                         ["Groundstorm", "Undercloud", "Storm Floor", "Rain Cellar", "Thunder Vault", "Squall Line",
                          "Storm Cellar", "Low Front"]),
+    "Sun Songs": (["Helioseismic", "Photospheric", "Granular", "Coronal", "Solar", "Sunlit", "Golden-Disk", "Chromatic"],
+                  ["Sun", "Photosphere", "Corona", "Sunspot", "Solar Wind", "Granule", "Limb", "Prominence"]),
+    "Red Giants": (["Swollen", "Ember-Red", "Bloated", "Late-Life", "Dimming", "Crimson", "Convective", "Tired"],
+                   ["Giant", "Envelope", "Red Clump", "Helium Core", "Arcturus", "Aldebaran", "Mira", "Betelgeuse"]),
+    "White Dwarfs": (["Cooling", "Degenerate", "Compact", "Crystallising", "Faint", "Ash-White", "Pulsating", "Dense"],
+                     ["Dwarf", "Ember Star", "Remnant", "Carbon Core", "Sirius B", "Ice Star", "Cinder", "Diamond Core"]),
+    "Spinning Stars": (["Whirling", "Rotating", "Spun", "Flattened", "Fast-Turning", "Oblate", "Gyring", "Pirouetting"],
+                       ["Rotator", "Spin Star", "Vega", "Altair", "Achernar", "Regulus", "Top Star", "Wheel Star"]),
+    "Ageing Stars": (["Ageing", "Elder", "Waning", "Old-Light", "Grey-Haired", "Long-Lived", "Slow-Burning", "Venerable"],
+                     ["Star", "Old Sun", "Elder Light", "Ancient Fire", "Last Hydrogen", "Late Burn", "Evening Star",
+                      "Old Flame"]),
+    "Star Choirs": (["Stellar", "Star-Sung", "Constellated", "Astral", "Starlit", "Celestial-Choir", "Galactic",
+                     "Sidereal"],
+                    ["Chorale", "Choir", "Anthem", "Canticle", "Antiphon", "Motet", "Psalm", "Vespers"]),
+    "Accretion Disks": (["Swirling", "Infalling", "Accreting", "Winding", "Glowing", "Hot-Ringed", "Turbulent-Ring",
+                         "Whirlpool"],
+                        ["Disk", "Torus", "Inflow", "Vortex Ring", "Accretion Flow", "Halo Ring", "Maelstrom", "Gyre"]),
+    "Falling Light": (["Falling", "Sinking", "Redshifted", "Freezing", "Dwindling", "Slowing", "Captured", "Darkening"],
+                      ["Light", "Photon", "Glow", "Beacon", "Lantern Light", "Spark", "Signal", "Last Light"]),
+    "Einstein Rings": (["Haloed", "Encircled", "Doubled", "Wreathed", "Crowned", "Garlanded", "Annular", "Mirrored"],
+                       ["Einstein Ring", "Einstein Cross", "Twin Image", "Halo Image", "Light Ring", "Ghost Image", "Arclet",
+                        "Corona Ring"]),
+    "Mergers": (["Merging", "Coalescing", "Chirping", "Colliding", "Inspiralling", "Binary", "Paired", "Converging"],
+                ["Merger", "Binary Hole", "Chirp", "Ringdown", "Coalescence", "Inspiral", "Collision", "Union"]),
+    "Distant Mergers": (["Far-Off", "Ancient", "Billion-Year", "Remote", "Faraway", "Long-Travelled", "Distant-Sky",
+                         "Primordial"],
+                        ["Ripple", "Wave", "Tremor", "Strain", "Spacetime Wave", "Swell", "Undulation", "Echo Wave"]),
+    "Redshift Halls": (["Redshifted", "Receding", "Sinking-Tail", "Downward", "Stretched", "Lengthening", "Reddening",
+                        "Expanding"],
+                       ["Hall", "Nave", "Dome", "Rotunda", "Chamber Hall", "Vault", "Atrium", "Cupola"]),
+    "Receding Light": (["Receding", "Departing", "Withdrawing", "Fleeing", "Outbound", "Diminishing", "Retreating",
+                        "Vanishing"],
+                       ["Galaxy", "Quasar", "Nebula", "Cluster", "Supercluster", "Filament", "Void", "Horizon Light"]),
+    "Cosmic Floors": (["Cosmic", "Universal", "Deep-Sky", "Interstellar", "Intergalactic", "Boundless", "Starbound",
+                       "Firmament"],
+                      ["Floor", "Ground", "Bedrock Sky", "Foundation", "Basement", "Keel", "Footing", "Plinth Star"]),
+    "Quiet Universe": (["Quiet", "Soundless", "Hushed-Sky", "Still", "Sleeping", "Muted", "Soft-Lit", "Dormant"],
+                       ["Universe", "Cosmos", "Expanse", "Firmament Night", "Starfall", "Heavens", "Infinity",
+                        "Night Sky"]),
+    "Gravity's Choir": (["Gravitational", "Tidal-Pulled", "Orbiting", "Massive", "Warped", "Held-Fast", "Heavy-Sky",
+                         "Curving"],
+                        ["Choir", "Chorus", "Ensemble", "Consort", "Assembly", "Congregation", "Gathering", "Concert"]),
 }
 
 
@@ -3930,6 +3974,190 @@ def u_floors_storms(r):
 RECIPES = RECIPES + [u_organ_points, u_pressure, u_sub_abysses, u_fifth_pillars, u_breathing, u_cathedral, u_abyssal,
                      u_monoliths, u_iron, u_tectonic, u_caverns, u_undertow, u_low_chapels, u_night_pressure,
                      u_deep_bells, u_floors_storms]
+
+# ---- Phase 33 (16.10.2026): space -- a star's oscillations, a black hole in the field, mergers, the redshift hall.
+
+STAR_KIND = {"Sun": 0, "Red Giant": 1, "White Dwarf": 2}
+
+
+def set_star(r, kind, level=(0.4, 0.8), age=(0.1, 0.9), spin=(0.1, 0.6), pitch=(-3.0, -1.0)):
+    """A star: which, how loud, how old, how fast it turns, its spacing against the root."""
+    r.set("star", f(r.u(*level), 2))
+    r.set("star_kind", STAR_KIND[kind])
+    r.set("star_age", f(r.u(*age), 2))
+    r.set("star_spin", f(r.u(*spin), 2))
+    r.set("star_pitch", f(r.u(*pitch), 2))
+
+
+def set_hole(r, level=(0.4, 0.9), fall=(20, 120), place=(-0.6, 0.6)):
+    """A black hole: how much of the cloud it takes, how long a fall, where it stands."""
+    r.set("black_hole", f(r.u(*level), 2))
+    r.set("hole_fall", f(r.lg(*fall), 1))
+    r.set("hole_place", f(r.u(*place), 2))
+
+
+def set_merger(r, rate=(0.4, 0.9), mass=(35, 120), ratio=(1.0, 4.0), time=(40, 180)):
+    """Mergers: how often, the ringdown's pitch, the masses' ratio, the inspiral's length."""
+    r.set("merger", f(r.u(*rate), 2))
+    r.set("merger_mass", f(r.lg(*mass), 1))
+    r.set("merger_ratio", f(r.lg(*ratio), 2))
+    r.set("merger_time", f(r.lg(*time), 1))
+
+
+def set_redshift(r, amount=(0.5, 1.0), time=(8, 60)):
+    """The redshift hall (with the modal hall it needs, unless the recipe set it)."""
+    if float(num(r, "modal_level", 0)) <= 0.0:
+        set_hall(r, level=(0.3, 0.5), decay=(15, 40))
+    r.set("redshift", f(r.u(*amount), 2))
+    r.set("redshift_time", f(r.lg(*time), 1))
+
+
+P33_POOLS = {
+    "star": [("lfo3", "star_spin", (0.1, 0.3)), ("lfo2", "star_age", (0.1, 0.25)), ("lfo3", "star", (0.1, 0.25))],
+    "hole": [("lfo3", "black_hole", (0.1, 0.3)), ("lfo2", "hole_place", (0.2, 0.5))],
+    "merger": [("merger", "brightness", (-0.3, -0.1)), ("merger", "far_level", (0.1, 0.3))],
+    "redshift": [("lfo3", "redshift", (0.1, 0.3)), ("lfo2", "redshift_time", (0.1, 0.25))],
+}
+
+
+def p33_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly (Merger needs no setup)."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P33_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+SPACE = ("Deep Space", "Dark Drones", "Choirs", "Strings", "Sleep Concert", "Organs", "Shimmer", "Glass")
+
+
+def s_sun(r):
+    based(r, *SPACE)
+    set_star(r, "Sun")
+    p33_rows(r, ["star"], 1)
+
+
+def s_giants(r):
+    based(r, "Deep Space", "Dark Drones", "Organs", "Choirs")
+    set_star(r, "Red Giant", pitch=(-2.0, 0.0))
+    p33_rows(r, ["star"], 1)
+
+
+def s_dwarfs(r):
+    based(r, "Glass", "Bells", "Shimmer", "Deep Space", "Strings")
+    set_star(r, "White Dwarf", pitch=(-2.0, 0.5))
+    p33_rows(r, ["star"], 1)
+
+
+def s_spinning(r):
+    based(r, *SPACE)
+    set_star(r, r.pick("Sun", "Red Giant", "White Dwarf"), spin=(0.7, 1.0))
+    p33_rows(r, ["star"], 1)
+
+
+def s_ageing(r):
+    based(r, *CALM)
+    set_star(r, r.pick("Sun", "Red Giant"), age=(0.7, 1.0))
+    p33_rows(r, ["star"], 1)
+
+
+def s_star_choirs(r):
+    based(r, "Choirs", "Sleep Concert", "Strings")
+    set_star(r, r.pick("Sun", "Red Giant"), level=(0.3, 0.6))
+    if r.rng.random() < 0.5:
+        set_night(r, arc=(0.4, 0.9))
+    p33_rows(r, ["star"], 1)
+
+
+def s_accretion(r):
+    based(r, *SPACE)
+    set_hole(r, fall=(8, 30))
+    if r.rng.random() < 0.4:
+        set_turb(r, amount=(0.3, 0.7))
+    p33_rows(r, ["hole"], 1)
+
+
+def s_falling(r):
+    based(r, *CALM)
+    set_hole(r, level=(0.5, 1.0), fall=(60, 240))
+    p33_rows(r, ["hole"], 1)
+
+
+def s_rings(r):
+    based(r, "Glass", "Shimmer", "Choirs", "Bells", "Strings")
+    set_hole(r, level=(0.3, 0.6), fall=(120, 300), place=(-0.3, 0.3))
+    p33_rows(r, ["hole"], 1)
+
+
+def s_mergers(r):
+    based(r, *SPACE)
+    set_merger(r, rate=(0.7, 1.0), time=(30, 90))
+    p33_rows(r, ["merger"], 1)
+
+
+def s_distant_mergers(r):
+    based(r, *CALM)
+    set_merger(r, rate=(0.3, 0.6), mass=(30, 60), time=(120, 300))
+    p33_rows(r, ["merger"], 1)
+
+
+def s_redshift_halls(r):
+    based(r, "Organs", "Choirs", "Bells", "Strings", "Glass", "Dark Drones")
+    set_redshift(r)
+    p33_rows(r, ["redshift"], 1)
+
+
+def s_receding(r):
+    based(r, *SPACE)
+    set_redshift(r, amount=(0.3, 0.7), time=(20, 90))
+    r.set("far_level", f(r.u(0.8, 1.0), 2))
+    p33_rows(r, ["redshift"], 1)
+
+
+def s_cosmic_floors(r):
+    based(r, "Dark Drones", "Deep Space", "Organs")
+    set_star(r, r.pick("Sun", "Red Giant", "White Dwarf"), level=(0.3, 0.6))
+    set_floor(r, pedal=(0.6, 1.0), sub=(0.3, 0.7))
+    p33_rows(r, ["star"], 1)
+
+
+def s_quiet(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_star(r, r.pick("Sun", "Red Giant"), level=(0.25, 0.5))
+    set_redshift(r, amount=(0.3, 0.6), time=(30, 100))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def s_gravity_choir(r):
+    based(r, *SPACE)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("star", "hole", "merger", "redshift") if r.rng.random() < 0.5]
+    if "star" in kinds:
+        set_star(r, r.pick("Sun", "Red Giant", "White Dwarf"), level=(0.3, 0.6))
+    if "hole" in kinds:
+        set_hole(r, level=(0.3, 0.7))
+    if "merger" in kinds:
+        set_merger(r, rate=(0.3, 0.7))
+    if "redshift" in kinds:
+        set_redshift(r, amount=(0.3, 0.8))
+    p33_rows(r, kinds, 2)
+
+
+RECIPES = RECIPES + [s_sun, s_giants, s_dwarfs, s_spinning, s_ageing, s_star_choirs, s_accretion, s_falling, s_rings,
+                     s_mergers, s_distant_mergers, s_redshift_halls, s_receding, s_cosmic_floors, s_quiet,
+                     s_gravity_choir]
 
 
 def foundation(r):

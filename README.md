@@ -126,13 +126,17 @@ offline renderer and the manual, and a portable zip.
 - **The floor:** a foundation under the conductor that keeps its depth through any filter; Floor holds a share of the
   sound under 150 Hz (raising the foundation's depth while the rest covers it), Pedal an organ point, Pressure a slow
   beat as of two pipes a hair apart, a sub octave and a fifth that breathe. Every preset stands on one.
-- **13312 presets** in 208 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+- **Stars and gravity:** a star's oscillations heard (asteroseismology: a sun, a red giant, a white dwarf, each mode a
+  Lorentzian line kept ringing by noise), a black hole that redshifts the partials falling into it and lenses the
+  rest into a ring, black holes merging (an inspiral felt in the field's width, a ringdown in the bass), a modal hall
+  whose tails sink for ever.
+- **14336 presets** in 224 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
   visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms, weather and growth, rooms and
-  topology, night and illusions, choruses and mirrors, deep floors), levelled by their loudness (ITU-R BS.1770); and a map that
+  topology, night and illusions, choruses and mirrors, deep floors, stars and gravity), levelled by their loudness (ITU-R BS.1770); and a map that
   grows itself (MAP-Elites, Tools/presets/grow.py) into presets of your own.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (432 come with it, sixteen of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (465 come with it, seventeen of them whole nights).
 
 ## Build
 
