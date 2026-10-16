@@ -10,16 +10,33 @@
 namespace
 {
 
-constexpr int Head = 12;     ///< the headings' row
-constexpr int GapIn = 2;     ///< between the pages of a section
-constexpr int GapOut = 22;   ///< between the sections
-constexpr int DotSize = 7;   ///< a dot's size
-constexpr int DotStep = 9;   ///< a dot's place
+constexpr int Head = 12;   ///< the headings' row
+constexpr int GapIn = 2;   ///< between the pages of a section
 
-/** @brief The pages' names' font. @return it */
-juce::Font nameFont()
+/** @brief The strip's measures at one packing: as drawn, tighter, tightest (when it would not fit). */
+struct Packing
 {
-    return juce::Font( juce::FontOptions( 14.0f ) );
+    float m_font;      ///< the names' size
+    int   m_pad;       ///< room round a name
+    int   m_gapOut;    ///< between the sections
+    float m_dotSize;   ///< a dot's size
+    int   m_dotStep;   ///< a dot's place
+    bool  m_oneDot;    ///< one dot a page, lit when any of its groups is awake
+};
+
+/** @brief The three packings (fifteen pages overran 1280 pixels as drawn: Phase 28/29). */
+constexpr Packing Packings[3] = { { 14.0f, 20, 22, 7.0f, 9, false },
+                                  { 13.5f, 14, 14, 5.0f, 6, false },
+                                  { 12.5f, 10, 10, 5.0f, 6, true } };
+
+/**
+ * @brief The pages' names' font at a packing.
+ * @param[in] tight  the packing
+ * @return it
+ */
+juce::Font nameFont( int tight )
+{
+    return juce::Font( juce::FontOptions( Packings[tight].m_font ) );
 }
 
 }   // namespace
@@ -62,9 +79,10 @@ void PageStrip::refresh()
 
 int PageStrip::widthOf( int page ) const
 {
-    const Status &s = m_status[static_cast<size_t>( page )];
-    int           w = juce::GlyphArrangement::getStringWidthInt( nameFont(), m_names[page] ) + 20;
-    if ( !s.m_dots.empty() ) w += 4 + static_cast<int>( s.m_dots.size() ) * DotStep;
+    const Status  &s = m_status[static_cast<size_t>( page )];
+    const Packing &k = Packings[m_tight];
+    int            w = juce::GlyphArrangement::getStringWidthInt( nameFont( m_tight ), m_names[page] ) + k.m_pad;
+    if ( !s.m_dots.empty() ) w += 4 + ( k.m_oneDot ? 1 : static_cast<int>( s.m_dots.size() ) ) * k.m_dotStep;
     if ( s.m_badge.isNotEmpty() )
         w += 6 +
              juce::GlyphArrangement::getStringWidthInt( juce::Font( juce::FontOptions( 10.5f, juce::Font::bold ) ),
@@ -79,13 +97,17 @@ int PageStrip::idealWidth() const
     for ( const Section &sec : m_sections )
     {
         for ( int p : sec.m_pages ) w += widthOf( p ) + GapIn;
-        w += GapOut;
+        w += Packings[m_tight].m_gapOut;
     }
     return w;
 }
 
 void PageStrip::resized()
 {
+    // The loosest packing that fits.
+    for ( m_tight = 0; m_tight < 2 && idealWidth() > getWidth(); ++m_tight )
+    {
+    }
     m_heads.clear();
     int x = 0;
     for ( const Section &sec : m_sections )
@@ -98,7 +120,7 @@ void PageStrip::resized()
             x += w + GapIn;
         }
         m_heads.emplace_back( x0, 0, x - GapIn - x0, Head );
-        x += GapOut - GapIn;
+        x += Packings[m_tight].m_gapOut - GapIn;
     }
 }
 
@@ -143,19 +165,21 @@ void PageStrip::paint( juce::Graphics &g )
         juce::Colour text = front ? skin.m_accent : ( hover ? skin.m_ink : skin.m_dim );
         if ( s.m_quiet && !front ) text = text.withAlpha( 0.5f );
         g.setColour( text );
-        g.setFont( nameFont() );
-        const int nameW = juce::GlyphArrangement::getStringWidthInt( nameFont(), m_names[p] );
-        int       x = r.getX() + 10;
+        const Packing &k = Packings[m_tight];
+        g.setFont( nameFont( m_tight ) );
+        const int nameW = juce::GlyphArrangement::getStringWidthInt( nameFont( m_tight ), m_names[p] );
+        int       x = r.getX() + k.m_pad / 2;
         g.drawText( m_names[p], x, r.getY(), nameW + 2, r.getHeight() - 3, juce::Justification::centredLeft );
         x += nameW + 4;
-        // The groups: lit while awake, a faint ring while resting.
+        // The groups: lit while awake, a faint ring while resting (packed tightest: one dot, lit when any is awake).
         const float cy = static_cast<float>( r.getY() ) + static_cast<float>( r.getHeight() - 3 ) * 0.5f;
-        for ( const Dot &d : s.m_dots )
+        auto        drawDot = [&]( bool on, juce::Colour colour )
         {
-            const juce::Rectangle<float> dot( static_cast<float>( x ) + 1.0f, cy - DotSize * 0.5f, DotSize, DotSize );
-            if ( d.m_on )
+            const juce::Rectangle<float> dot( static_cast<float>( x ) + 1.0f, cy - k.m_dotSize * 0.5f, k.m_dotSize,
+                                              k.m_dotSize );
+            if ( on )
             {
-                g.setColour( d.m_colour );
+                g.setColour( colour );
                 g.fillEllipse( dot );
             }
             else
@@ -163,8 +187,17 @@ void PageStrip::paint( juce::Graphics &g )
                 g.setColour( skin.m_faint );
                 g.drawEllipse( dot.reduced( 0.5f ), 1.0f );
             }
-            x += DotStep;
+            x += k.m_dotStep;
+        };
+        if ( k.m_oneDot && !s.m_dots.empty() )
+        {
+            const Dot *lit = nullptr;
+            for ( const Dot &d : s.m_dots )
+                if ( d.m_on && lit == nullptr ) lit = &d;
+            drawDot( lit != nullptr, lit != nullptr ? lit->m_colour : skin.m_faint );
         }
+        else
+            for ( const Dot &d : s.m_dots ) drawDot( d.m_on, d.m_colour );
         if ( s.m_badge.isNotEmpty() )
         {
             const juce::Font             f( juce::FontOptions( 10.5f, juce::Font::bold ) );

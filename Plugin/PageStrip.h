@@ -107,4 +107,6 @@ private:
     std::vector<juce::Rectangle<int>> m_heads;         ///< every section's heading's place
     int                               m_current = 0;   ///< the page in front
     int                               m_hover = -1;    ///< the page under the mouse
+    int                               m_tight =
+        0;   ///< how tightly it is packed: 0 as drawn, 1 smaller dots and gaps, 2 smaller names, one dot a page
 };
