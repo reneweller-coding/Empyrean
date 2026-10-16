@@ -290,7 +290,7 @@ juce::File AdditivProcessor::presetFolder()
 void AdditivProcessor::refreshUserPresets()
 {
     m_userPresets.clear();
-    for ( const juce::File &f : presetFolder().findChildFiles( juce::File::findFiles, false, "*.empyrean" ) )
+    for ( const juce::File &f : presetFolder().findChildFiles( juce::File::findFiles, true, "*.empyrean" ) )
     {
         const std::unique_ptr<juce::XmlElement> xml = juce::XmlDocument::parse( f );
         if ( !xml || !xml->hasTagName( "EmpyreanPreset" ) ) continue;

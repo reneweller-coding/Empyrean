@@ -38,7 +38,7 @@ import random
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "Core" / "src" / "Presets.inc"
 LEVELS = ROOT / "work" / "presets" / "levels.json"
-TARGET_DB = -20.0   # the bank's common level for the measuring chord (dBFS RMS)
+TARGET_DB = -18.0   # the bank's common loudness for the measuring chord (LUFS, ITU-R BS.1770)
 
 # Choice indices, in the order of the tables in Core/src/Params.cpp.
 SCALE = {"12-TET": 0, "JI Major": 1, "JI Minor": 2, "JI 7-limit": 3, "Pythagorean": 4, "JI Pentatonic": 5, "Harmonic": 6,
@@ -71,7 +71,9 @@ GROUPS = ["Sleep Concert", "Choirs", "Glass", "Bells", "Strings", "Organs", "Air
           "Chapel Air", "Stone Halls", "Curtained Rooms", "Walking Rooms", "Standing Waves", "Halo Rings", "Counter Halos", "Edge States",
                     "Still Halos", "Halo Chapels", "Quantum Harmony", "Interference Nights", "Tonnetz Walks", "Quantum Halos", "Resonant Spaces", "Topologies",
           "Aeolian Harps", "Harp Gardens", "Distant Storms", "Summer Storms", "Rolling Thunder", "Singing Lakes", "Frozen Nights", "Thin Ice",
-          "Twin Streams", "Fusion Choirs", "Parting Clouds", "Endless Ritardando", "Endless Accelerando", "Night Arcs", "Inside the Cloud", "Night Weather"]
+                    "Twin Streams", "Fusion Choirs", "Parting Clouds", "Endless Ritardando", "Endless Accelerando", "Night Arcs", "Inside the Cloud", "Night Weather",
+          "Cricket Meadows", "Katydid Treetops", "Frog Ponds", "Summer Nights", "Warm Evenings", "Cool Nights", "Answering Choirs", "Tuned Choruses",
+          "Time Mirrors", "Reverse Halls", "Mirror Chapels", "Converging Halos", "Storm Choruses", "Lake Nights", "Night Concerts", "Nocturnes"]
 
 NAMES = {
     "Sleep Concert": (["Somnolent", "Nocturnal", "Drowsy", "Hushed", "Lunar", "Slow", "Velvet", "Deep"],
@@ -426,8 +428,48 @@ NAMES = {
                    ["Arc", "Hour", "Watch", "Turn", "Passage", "Curve", "Bow", "Sweep"]),
     "Inside the Cloud": (["Inner", "Immersed", "Enveloping", "Surrounding", "Embracing", "Encircling", "Inward", "Engulfing"],
                          ["Cloud", "Sphere", "Dome", "Space", "Presence", "Aura", "Atmosphere", "Field"]),
-    "Night Weather": (["Nocturnal", "Midnight", "Starless", "Moonless", "Sleepless", "Wakeful", "Owl-Hour", "Dark-Hour"],
+        "Night Weather": (["Nocturnal", "Midnight", "Starless", "Moonless", "Sleepless", "Wakeful", "Owl-Hour", "Dark-Hour"],
                       ["Weather", "Storm", "Squall", "Frost", "Rime", "Wind", "Gust", "Tempest"]),
+    "Cricket Meadows": (["Chirring", "Fiddling", "Trilling", "Grassy", "Hayfield", "Clover", "Fescue", "Meadowsweet"],
+                        ["Meadow", "Field", "Lea", "Pasture", "Paddock", "Hayloft", "Verge", "Glade"]),
+    "Katydid Treetops": (["Rasping", "Leafy-Crowned", "Canopied", "Lofty", "Sawing", "Arboreal", "Overhead", "High-Bough"],
+                         ["Treetops", "Canopy", "Crowns", "Boughs", "Limbs", "Branches", "Foliage", "Bower"]),
+    "Frog Ponds": (["Croaking", "Peeping", "Bellowing", "Reedy", "Marshy", "Boggy", "Lily", "Duckweed"],
+                   ["Pond", "Marsh", "Fen", "Slough", "Bog", "Mire", "Backwater", "Oxbow"]),
+    "Summer Nights": (["Balmy", "Humming", "Teeming", "Starry", "Fragrant", "Velvet", "Murmurous", "Lush"],
+                      ["Summer Night", "Midsummer", "Dog Days", "Solstice Night", "July Night", "Harvest Night",
+                       "Firefly Night", "Long Evening"]),
+    "Warm Evenings": (["Warm", "Loitering", "Sun-Warmed", "Amber", "Mild", "Tepid", "Honeyed", "Late-Summer"],
+                      ["Evening", "Dusk", "Eventide", "Sundown", "Gloaming Hour", "Twilight Hour", "Afterglow Hour",
+                       "Lamplight"]),
+    "Cool Nights": (["Cool", "Chill", "Dewfall", "Autumnal", "Misted", "Fading", "Slowing", "September"],
+                    ["Night", "Dewfall", "Hollow", "Coomb", "Dale", "Vale", "Lowland", "Wold"]),
+    "Answering Choirs": (["Answering", "Antiphonal", "Responding", "Echoing", "Calling", "Alternating", "Call-And-Answer",
+                          "Synchronous"],
+                         ["Choir", "Chorus", "Congregation", "Assembly", "Throng", "Gathering", "Host", "Multitude"]),
+    "Tuned Choruses": (["Tuned", "Harmonious", "Consonant", "Pitched", "Attuned", "Keyed", "Accorded", "Chiming"],
+                       ["Chorus", "Crickets", "Peepers", "Callers", "Singers", "Pipers", "Fiddlers", "Chirpers"]),
+    "Time Mirrors": (["Reversed", "Returning", "Time-Turned", "Backward", "Mirrored", "Recursive", "Retracing", "Rewound"],
+                     ["Mirror", "Looking-Glass", "Reflection", "Return", "Recall", "Rewind", "Retrace", "Echo Glass"]),
+    "Reverse Halls": (["Inward", "Imploding", "Gathering-In", "Converging", "Drawing-In", "Collapsing", "Infolding",
+                       "Ingathering"],
+                      ["Hall", "Nave", "Vault", "Cupola", "Dome Hall", "Cathedral", "Great Room", "Concourse Hall"]),
+    "Mirror Chapels": (["Glassed", "Silvered", "Quicksilver", "Mercurial", "Specular", "Burnished-Glass", "Polished",
+                        "Gleaming-Glass"],
+                       ["Chapel", "Oratory", "Shrine", "Hermitage", "Cell", "Sanctuary", "Retreat", "Alcove"]),
+    "Converging Halos": (["Converging", "Focusing", "Narrowing", "Spiralling-In", "Tightening", "Closing", "Homing",
+                          "Centripetal"],
+                         ["Halo", "Ring", "Circle", "Crown", "Wreath", "Corona", "Garland", "Round"]),
+    "Storm Choruses": (["Sodden", "Rain-Loud", "Downpour", "Stormlit", "Thunderous", "Teeming-Rain", "Wet", "Squally"],
+                       ["Chorus", "Bog", "Ditch", "Puddle", "Swamp", "Lowmarsh", "Rainpool", "Rill"]),
+    "Lake Nights": (["Lakeside", "Shoreline-Night", "Moonlit", "Still-Water", "Rippling", "Glassy", "Lapping", "Silver"],
+                    ["Lakeshore", "Jetty", "Lagoon Night", "Inlet", "Bay Night", "Mere Shore", "Waterside", "Pier"]),
+    "Night Concerts": (["Nocturnal", "Serenading", "Night-Long", "Twilit", "Moon-Hung", "Owl-Watched", "Dark-Bright",
+                        "Dreaming-Night"],
+                       ["Concert", "Serenade", "Recital", "Soiree", "Vigil Song", "Night Music", "Evensong", "Matins"]),
+    "Nocturnes": (["Velvet-Dark", "Midnight-Blue", "Ink", "Indigo", "Sable", "Obsidian", "Raven", "Coal"],
+                  ["Nocturne", "Night Piece", "Notturno", "Nachtmusik", "Night Song", "Lullaby Night", "Dark Hymn",
+                   "Night Canticle"]),
 }
 
 
@@ -3481,6 +3523,189 @@ def n_night_weather(r):
 RECIPES = RECIPES + [n_harps, n_harp_gardens, n_distant, n_summer, n_rolling, n_lakes, n_frozen, n_thin_ice, n_twin,
                      n_fusion, n_parting, n_ritardando, n_accelerando, n_arcs, n_inside, n_night_weather]
 
+# ---- Phase 31 (16.10.2026): the night chorus, the time mirror.
+
+CHORUS_KIND = {"Meadow": 0, "Treetops": 1, "Pond": 2, "Summer Night": 3}
+
+
+def set_chorus(r, kind, level=(0.35, 0.8), warmth=(14, 26), sync=(0.2, 0.8), tune=(0.0, 0.3)):
+    """The night chorus: who calls, how loud, how warm the night, how far they answer, how tuned."""
+    r.set("chorus", f(r.u(*level), 2))
+    r.set("chorus_kind", CHORUS_KIND[kind])
+    r.set("chorus_warmth", f(r.u(*warmth), 1))
+    r.set("chorus_sync", f(r.u(*sync), 2))
+    r.set("chorus_tune", f(r.u(*tune), 2))
+
+
+def set_mirror(r, level=(0.5, 1.0), time=(2.0, 5.0), room=True):
+    """The time mirror in the wave room (which it needs: set as well unless the recipe set it)."""
+    if room and float(r.p.get("wave_room", 0)) <= 0.0:
+        set_room(r, level=(0.35, 0.75))
+    r.set("mirror", f(r.u(*level), 2))
+    r.set("mirror_time", f(r.u(*time), 2))
+
+
+P31_POOLS = {
+    "chorus": [("lfo3", "chorus_warmth", (0.1, 0.25)), ("lfo2", "chorus_sync", (0.15, 0.35)),
+               ("night", "chorus", (0.2, 0.4))],
+    "mirror": [("lfo3", "mirror", (0.1, 0.3)), ("lfo2", "mirror_time", (0.1, 0.25))],
+}
+
+
+def p31_rows(r, kinds, count, via_p=0.2):
+    """Rows onto the new knobs, their sources set slowly (the night's own sources need no setup)."""
+    taken = {tuple(row.split(":")[0].split(">")) for row in r.rows}
+    for _ in range(count):
+        if len(r.rows) >= 16:
+            return
+        src, target, (lo, hi) = r.pick(*P31_POOLS[r.pick(*kinds)])
+        if (src, target) in taken:
+            continue
+        taken.add((src, target))
+        if src == "lfo2":
+            setup(r, "wander")
+        elif src == "lfo3":
+            setup(r, "tide")
+        via = r.pick(*SLEEP_VIAS) if r.rng.random() < via_p else None
+        r.row(src, target, round(r.u(lo, hi), 3), via)
+
+
+def k_meadows(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.4:
+        sleepy(r)
+    set_chorus(r, "Meadow")
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_treetops(r):
+    based(r, "Glass", "Shimmer", "Strings", "Air & Noise", "Deep Space", "Choirs")
+    set_chorus(r, "Treetops")
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_ponds(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.4:
+        sleepy(r)
+    set_chorus(r, "Pond")
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_summer(r):
+    based(r, *ALL)
+    set_chorus(r, "Summer Night", warmth=(18, 27))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_warm(r):
+    based(r, "Strings", "Choirs", "Glass", "Keys", "Shimmer", "Organs")
+    set_chorus(r, r.pick("Meadow", "Treetops", "Summer Night"), warmth=(24, 30))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_cool(r):
+    based(r, *CALM)
+    sleepy(r)
+    set_chorus(r, r.pick("Meadow", "Pond", "Summer Night"), level=(0.3, 0.6), warmth=(6, 12))
+    if r.rng.random() < 0.5:
+        set_night(r, arc=(0.4, 0.9))
+    sleep_rows(r, ["breath", "tide"], 1)
+
+
+def k_answering(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Bells")
+    set_chorus(r, r.pick("Meadow", "Treetops", "Pond"), sync=(0.8, 1.0))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_tuned(r):
+    based(r, "Glass", "Bells", "Keys", "Choirs", "Strings", "Shimmer")
+    set_chorus(r, r.pick("Meadow", "Treetops", "Pond", "Summer Night"), tune=(0.6, 1.0))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_mirrors(r):
+    based(r, "Choirs", "Strings", "Organs", "Glass", "Bells", "Keys")
+    set_mirror(r)
+    p31_rows(r, ["mirror"], 1)
+
+
+def k_reverse_halls(r):
+    based(r, "Choirs", "Organs", "Strings", "Dark Drones", "Deep Space")
+    set_room(r, size=(0.8, 1.0), absorb=(0.0, 0.3))
+    set_mirror(r, time=(3.0, 6.0), room=False)
+    p31_rows(r, ["mirror"], 1)
+
+
+def k_mirror_chapels(r):
+    based(r, "Choirs", "Bells", "Glass", "Sleep Concert", "Strings")
+    set_room(r, size=(0.3, 0.6), absorb=(0.05, 0.4))
+    set_mirror(r, time=(1.5, 3.0), room=False)
+    p31_rows(r, ["mirror"], 1)
+
+
+def k_converging(r):
+    based(r, "Glass", "Bells", "Choirs", "Strings", "Shimmer")
+    set_halo(r, level=(0.3, 0.7))
+    set_mirror(r, level=(0.4, 0.8))
+    p31_rows(r, ["mirror"], 1)
+
+
+def k_storm(r):
+    based(r, *ALL)
+    set_chorus(r, r.pick("Pond", "Summer Night"), level=(0.3, 0.65))
+    set_thunder(r, level=(0.25, 0.6), distance=(2.5, 8.0))
+    set_rain(r, r.pick("Water", "Leaves"), level=(0.25, 0.55), rate=(400, 3000), showers=(0.4, 0.9))
+    set_wind(r, wind=(0.3, 0.6))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_lake(r):
+    based(r, *CALM)
+    set_chorus(r, "Pond", level=(0.3, 0.65))
+    if r.rng.random() < 0.6:
+        set_harp(r, level=(0.25, 0.55), wind=(0.25, 0.5))
+    else:
+        set_surf(r, "Sand", level=(0.25, 0.5), distance=(0.6, 0.9))
+        set_wind(r, wind=(0.2, 0.45))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_concerts(r):
+    based(r, *CALM)
+    if r.rng.random() < 0.5:
+        sleepy(r)
+    set_chorus(r, r.pick("Meadow", "Treetops", "Pond", "Summer Night"), level=(0.3, 0.65))
+    set_night(r, arc=(0.4, 0.9))
+    if r.rng.random() < 0.5:
+        set_risset(r, "Slowing", depth=(0.2, 0.5))
+    p31_rows(r, ["chorus"], 1)
+
+
+def k_nocturnes(r):
+    based(r, *ALL)
+    kinds = []
+    while len(kinds) < 2:
+        kinds = [k for k in ("chorus", "mirror", "harp", "ice", "streams", "thunder") if r.rng.random() < 0.4]
+    if "chorus" in kinds:
+        set_chorus(r, r.pick("Meadow", "Treetops", "Pond", "Summer Night"), level=(0.25, 0.6))
+    if "mirror" in kinds:
+        set_mirror(r, level=(0.3, 0.7))
+    if "harp" in kinds:
+        set_harp(r, level=(0.25, 0.6))
+    if "ice" in kinds:
+        set_ice(r, level=(0.25, 0.6))
+    if "streams" in kinds:
+        set_streams(r, r.pick("Odd & Even", "Registers", "Members"), depth=(0.3, 0.6), fusion=(0.0, 0.6))
+    if "thunder" in kinds:
+        set_thunder(r, level=(0.2, 0.5), distance=(4.0, 10.0))
+    p31_rows(r, [k for k in kinds if k in ("chorus", "mirror")] or ["chorus"], 2)
+
+
+RECIPES = RECIPES + [k_meadows, k_treetops, k_ponds, k_summer, k_warm, k_cool, k_answering, k_tuned, k_mirrors,
+                     k_reverse_halls, k_mirror_chapels, k_converging, k_storm, k_lake, k_concerts, k_nocturnes]
+
 
 def foundation(r):
     """The conductor's floor (Foundation, 14.10.2026): most presets hold their root low under the chord;
@@ -3529,7 +3754,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-                          "/// The factory presets: 176 groups of 64 (Presets.h).",
+                                       "/// The factory presets: 192 groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')

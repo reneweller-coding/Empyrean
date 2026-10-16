@@ -20,12 +20,13 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 PRODUCT = "Empyrean"
 PRESET = "Velvet Dreaming"   # Sleep Concert: the conductor, Breathe, the far reverb
 SETTLE = 8                   # seconds: the preset fills its chord at speed (Engine::requestFill), the attack rises
-# The chapters' own pictures: name -> (what the screenshot mode is asked, the tab photographed).
+# The chapters' own pictures: name -> (what the screenshot mode is asked, the tab photographed, by its name: a new tab
+# moves the others).
 EXTRAS = {
-    "palette": ({"ADDITIV_SHOT_PALETTE": "dark calm wide"}, 0),
-    "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, 0),
-    "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, 1),
-    "journey": ({"ADDITIV_SHOT_JOURNEY": "Sleep Concert - Night"}, 9),
+    "palette": ({"ADDITIV_SHOT_PALETTE": "dark calm wide"}, "Focus"),
+    "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, "Focus"),
+    "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, "Cloud & Filter"),
+    "journey": ({"ADDITIV_SHOT_JOURNEY": "Sleep Concert - Night"}, "Journey"),
 }
 
 
@@ -76,9 +77,10 @@ def main():
     print("docs/screenshot.png")
     for name, (extra, tab) in EXTRAS.items():
         got = run(exe, os.path.join(out, "extra"), False, extra)
-        if len(got) <= tab:
+        shot = [p for p in got if p.endswith("-" + slug(tab) + ".png")]
+        if not shot:
             sys.exit("no picture for " + name)
-        shutil.move(got[tab], os.path.join(out, name + ".png"))
+        shutil.move(shot[0], os.path.join(out, name + ".png"))
         for p in got:
             if os.path.exists(p):
                 os.remove(p)

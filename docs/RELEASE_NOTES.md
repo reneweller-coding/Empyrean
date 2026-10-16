@@ -1,5 +1,61 @@
 # Release notes
 
+## 0.21.0 (16.10.2026, not released)
+
+A night chorus of insects and frogs, a time-reversal mirror in the wave room, a map that grows itself, and the whole
+bank levelled anew by its loudness. 1024 presets.
+
+- **Night Chorus** (Night): two thousand insects and frogs over the field, eight kinds -- field and tree crickets,
+  katydids, mole crickets, peepers, tree frogs, bullfrogs, toads --, each calling in a band of its own (the acoustic
+  niche). Every caller is a clock; a call of its own kind heard close enough resets it (Greenfield's inhibitory
+  resetting), so neighbours fall into step or into turns, and a caller about to call into a louder one of another kind
+  in its band waits for a gap. Who Calls (a meadow, the treetops, a pond, all), Warmth (warm insects call faster:
+  Dolbear's law; the night arc cools the night), Answering, Tuned Calls.
+- **Time Mirror** (Rooms): sixty-four cells round the listener in the wave room listen for a window, then send it back
+  reversed -- the waves run back to where they came from (Fink's time-reversal mirror): every sound returns as a swell
+  converging on its source. Two strokes, so it never hears itself. Time Mirror, Mirror Window.
+- **The map grows itself:** `Tools/presets/grow.py` (MAP-Elites) keeps the best sound in every cell of the map,
+  mutates them, renders and measures the children as the bank is measured (`additiv_presets --evaluate`) and keeps the
+  new ones -- nearer the player's stars when there are any -- as user presets in Documents/Empyrean/Presets/Grown,
+  levelled like the bank. The plugin now lists user presets from subfolders too.
+- **Loudness:** the bank measured anew, every preset by its loudest three seconds weighted as the ear weighs them
+  (ITU-R BS.1770, LUFS) rather than its loudest second's RMS, which weighed a wave room's bass as much as a rain's
+  glints; measured by day, so the night arc does not count.
+- **12288 presets:** sixteen new groups of choruses and mirrors (Cricket Meadows, Katydid Treetops, Frog Ponds, Summer
+  Nights, Warm Evenings, Cool Nights, Answering Choirs, Tuned Choruses, Time Mirrors, Reverse Halls, Mirror Chapels,
+  Converging Halos, Storm Choruses, Lake Nights, Night Concerts, Nocturnes); 399 journeys, fifteen whole nights.
+
+## 0.20.0 (16.10.2026, not released; its presets came with 0.21.0)
+
+The night: an Aeolian harp in the wind, thunder, singing ice; streams that part a voice or fuse it; Risset's rhythm;
+the real night where you are; the dream's journal; the headset in the cloud. A page Night, 1024 presets.
+
+- **Aeolian Harp** (the new page Night): twelve strings in the field's wind, tuned to the chord. Each sheds vortices
+  that lock onto one of its harmonics -- Facchinetti's wake oscillator, a van der Pol oscillator coupled to the string
+  -- and jump to the next as the wind changes. Harp Pitch, Gauge.
+- **Thunder** (Night): every strike lays out a lightning channel of its own, tortuous at every scale and branched; each
+  of its four thousand segments sends an N-wave (Few), clapping across the line of sight, rumbling along it, heard as
+  late as it is far and with the air's absorption. Storm Distance, Rumble; the source Lightning flashes at the strike.
+- **Singing Ice** (Night): a frozen lake as a sheet of slider blocks in its critical state (Olami, Feder and
+  Christensen), cracking in avalanches of every size; each crack a chirp falling from the highs, as bending waves in
+  ice are dispersive. Ice Thickness, Cold.
+- **Streams** (Dreams): the partials parted into streams -- odd and even, by three, registers, members -- each with a
+  vibrato and tremolo of its own, so the ear hears several sounds (Bregman's common fate); Fusion moves them as one
+  again.
+- **Risset** (Dreams): the voices pulse in Risset's rhythm that slows (or quickens) for ever and never arrives.
+- **Night Arc** (Night): the sun's height where you are (Settings > Night arc; at first the main city of your time
+  zone) as a night of 0 .. 1 that darkens, slows and widens the sound; the source Night for the matrix.
+- **Dream Journal** (Dreams): the dream's newest thousand memories kept with the project, and dreamt on when it opens.
+- **Headset** (Rooms) and **Empyrean for Meta Quest** (Quest/): the app sends the head's turn and the hands; Head
+  Tracking keeps the binaural cloud and the thunder in place, Hands puts them into the wind, the halo, the wave room
+  and the slime mould's trail. Built, not yet tried on a headset.
+- **Faster:** a resting feature's kernels are switched off in the CUDA graph; the modal hall rings four modes a thread;
+  the swarm's forces spread over 64 blocks; the presets measured in parallel. The kernels live in Core/src/gpu, a file
+  a subject.
+- **11264 presets:** sixteen new groups of night and illusions (Aeolian Harps, Harp Gardens, Distant Storms, Summer
+  Storms, Rolling Thunder, Singing Lakes, Frozen Nights, Thin Ice, Twin Streams, Fusion Choirs, Parting Clouds, Endless
+  Ritardando, Endless Accelerando, Night Arcs, Inside the Cloud, Night Weather).
+
 ## 0.19.0 (16.10.2026, not released)
 
 A room simulated as air, a topological insulator of sound round the listener, and a conductor whose root walks as a

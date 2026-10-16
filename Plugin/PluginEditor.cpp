@@ -1133,7 +1133,7 @@ void AdditivEditor::startTour()
         { &m_play, "Play",
           "The conductor plays by itself: chords in just intonation that change one voice at a time. Space starts and stops it in the standalone; play the keys over it." } );
     s.push_back(
-        { &m_presetName, "10240 presets",
+        { &m_presetName, "12288 presets",
           "Click the name to browse them: by name and group, by how they sound (darker, brighter, stiller, more moving ...), by your stars and the ones played lately. Hold a row's play mark to listen." } );
     s.push_back(
         { &m_cloud, "The partials themselves",
@@ -1794,6 +1794,7 @@ void AdditivEditor::showPresets()
         if ( g == additiv::FirstWeatherGroup ) bank.addSectionHeader( "Weather & Growth" );
         if ( g == additiv::FirstRoomsGroup ) bank.addSectionHeader( "Rooms & Topology" );
         if ( g == additiv::FirstNightGroup ) bank.addSectionHeader( "Night & Illusions" );
+        if ( g == additiv::FirstChorusGroup ) bank.addSectionHeader( "Chorus & Mirrors" );
         juce::PopupMenu group;
         for ( int i = 0; i < 64; ++i )
         {

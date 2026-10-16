@@ -3,8 +3,14 @@
  * @brief additiv_presets: measures every factory preset's level, so make_presets.py can bring the
  *        bank to one level (Noctuary's level matching, done once for the bank).
  *
- *     additiv_presets [--from N] [--to M] [--names FILE] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
+  *     additiv_presets [--from N] [--to M] [--names FILE] [--seconds S (14)] [--out FILE (work/presets/levels.json)]
  *                     [--describe FILE] [--sensitivity FILE] [--register FILE [--step K] [--set "key=value;..."]]
+ *                     [--evaluate FILE --out FILE] [--jobs N]
+ *
+ * --evaluate measures any sounds as the presets are measured (Phase 31, for Tools/presets/grow.py): a line a sound,
+ * its knobs as "key=value key=value ..." (the others at their defaults), a '|' and its matrix (Modulation.h's text
+ * form); --out receives a JSON list, a row a line in their order: the loudness (LUFS) and the four descriptors
+ * (brightness, motion, width, noise), or null where one failed.
  *
  * --register lets every K-th preset (or the named ones) play as its conductor plays it, alone, for
  * the seconds asked (240 by default) -- the chord arriving within seconds, as a preset chosen on the
@@ -52,6 +58,7 @@
 #include <fstream>
 #include <mutex>
 #include <string>
+#include <sstream>
 #include <thread>
 #include <vector>
 
@@ -78,23 +85,20 @@ fs::path repoRoot()
 }
 
 /**
- * @brief One preset's level, and what it sounds like.
- * @param[in]  index      the preset
- * @param[in]  seconds    how long to play
- * @param[out] error      receives the reason when the engine does not open
- * @param[out] desc       receives the description of the last eight seconds, when not null
- * @param[in]  overrides  knobs set after the preset's (the sensitivity mode)
- * @return dBFS RMS of the loudest second; NaN on failure
+ * @brief A sound's loudness as a preset's is measured (see the file comment): the chord with the conductor off, the
+ *        attack at most half a second, the master at 0 dB; and what it sounds like when asked.
+ * @param[in]  values   every knob (NumParams)
+ * @param[in]  mod      its matrix (Modulation.h's text form)
+ * @param[in]  seconds  how long it plays
+ * @param[out] error    receives why the engine failed
+ * @param[out] desc     receives what it sounds like (null: not asked)
+ * @return LUFS of the loudest three seconds; NaN on failure
  */
-double measure( int index, double seconds, std::string *error, Description *desc,
-                const std::vector<std::pair<ParamIdE, float>> &overrides = {} )
+double measureSound( const float *values, const std::string &mod, double seconds, std::string *error,
+                     Description *desc )
 {
     Engine e;
     e.setRealtime( false );
-    float       values[NumParams];
-    std::string mod;
-    presetValues( index, values, &mod );
-    for ( const auto &[id, v] : overrides ) values[static_cast<int>( id )] = v;
     for ( int i = 0; i < NumParams; ++i ) e.setParam( static_cast<ParamIdE>( i ), values[i] );
     e.setModText( mod );
     e.setParam( ParamIdE::BRAIN_ON, 0.0f );
@@ -167,6 +171,25 @@ double measure( int index, double seconds, std::string *error, Description *desc
     }
     if ( desc != nullptr ) *desc = describe( keptL, keptR, c.m_sampleRate );
     return -0.691 + 10.0 * std::log10( std::max( loudest, 1e-20 ) );
+}
+
+/**
+ * @brief A factory preset's loudness (measureSound), with knobs set after its own.
+ * @param[in]  index      the preset
+ * @param[in]  seconds    how long it plays
+ * @param[out] error      receives why the engine failed
+ * @param[out] desc       receives what it sounds like (null: not asked)
+ * @param[in]  overrides  knobs set after the preset's (the sensitivity mode)
+ * @return LUFS of the loudest three seconds; NaN on failure
+ */
+double measure( int index, double seconds, std::string *error, Description *desc,
+                const std::vector<std::pair<ParamIdE, float>> &overrides = {} )
+{
+    float       values[NumParams];
+    std::string mod;
+    presetValues( index, values, &mod );
+    for ( const auto &[id, v] : overrides ) values[static_cast<int>( id )] = v;
+    return measureSound( values, mod, seconds, error, desc );
 }
 
 /** @brief The knobs the sensitivity mode nudges: those that shape the sound and that a preset sets. */
@@ -419,7 +442,7 @@ int registerMode( const std::vector<int> &which, double seconds, const fs::path 
 int main( int argc, char **argv )
 {
     int         from = 0, to = numPresets() - 1;
-    std::string namesFile, describeFile, sensitivityFile, registerFile, setText;
+    std::string namesFile, describeFile, sensitivityFile, registerFile, setText, evaluateFile;
     bool        checkNudges = false;
     int         step = 1, jobs = 10;
     double      seconds = -1.0;
@@ -452,14 +475,71 @@ int main( int argc, char **argv )
             setText = argv[++i];
         else if ( a == "--jobs" && has )
             jobs = std::clamp( std::atoi( argv[++i] ), 1, 16 );
+        else if ( a == "--evaluate" && has )
+            evaluateFile = argv[++i];
         else
         {
             std::fprintf(
                 stderr,
                 "additiv_presets [--from N] [--to M] [--step K] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE] "
-                "[--register FILE [--set \"key=value;...\"]] [--jobs N]\n" );
+                "[--register FILE [--set \"key=value;...\"]] [--evaluate FILE] [--jobs N]\n" );
             return 1;
         }
+    }
+    if ( !evaluateFile.empty() )
+    {   // Phase 31: any sounds, a line each, measured in parallel, written in their order
+        std::ifstream            in( evaluateFile );
+        std::vector<std::string> lines;
+        for ( std::string line; std::getline( in, line ); )
+            if ( !line.empty() ) lines.push_back( line );
+        if ( seconds <= 0.0 ) seconds = 14.0;
+        std::vector<double>      lufs( lines.size(), std::nan( "" ) );
+        std::vector<Description> descs( lines.size() );
+        std::atomic<size_t>      next{ 0 };
+        auto                     work = [&]()
+        {
+            for ( ;; )
+            {
+                const size_t k = next++;
+                if ( k >= lines.size() ) return;
+                float values[NumParams];
+                for ( const ParamDesc &d : paramTable() ) values[static_cast<int>( d.m_id )] = d.m_def;
+                const std::string &line = lines[k];
+                const size_t       bar = line.find( '|' );
+                std::istringstream knobs( line.substr( 0, bar ) );
+                for ( std::string kv; knobs >> kv; )
+                {
+                    const size_t eq = kv.find( '=' );
+                    if ( eq == std::string::npos ) continue;
+                    if ( const ParamDesc *d = findParam( kv.substr( 0, eq ).c_str() ) )
+                        values[static_cast<int>( d->m_id )] =
+                            std::clamp( static_cast<float>( std::atof( kv.c_str() + eq + 1 ) ), d->m_min, d->m_max );
+                }
+                std::string error;
+                lufs[k] = measureSound( values, bar == std::string::npos ? std::string() : line.substr( bar + 1 ),
+                                        seconds, &error, &descs[k] );
+            }
+        };
+        {
+            std::vector<std::thread> pool;
+            for ( int j = 0; j < std::min<int>( jobs, static_cast<int>( lines.size() ) ); ++j )
+                pool.emplace_back( work );
+            for ( std::thread &th : pool ) th.join();
+        }
+        std::ofstream o( out );
+        o << "[\n";
+        for ( size_t k = 0; k < lines.size(); ++k )
+        {
+            if ( std::isnan( lufs[k] ) )
+                o << "  null";
+            else
+                o << "  [" << lufs[k] << ", " << descs[k].m_brightness << ", " << descs[k].m_motion << ", "
+                  << descs[k].m_width << ", " << descs[k].m_noise << "]";
+            o << ( k + 1 < lines.size() ? ",\n" : "\n" );
+        }
+        o << "]\n";
+        std::printf( "%zu sounds evaluated -> %s\n", lines.size(), out.string().c_str() );
+        return 0;
     }
     if ( seconds <= 0.0 ) seconds = registerFile.empty() ? 14.0 : 240.0;
     from = std::clamp( from, 0, numPresets() - 1 );

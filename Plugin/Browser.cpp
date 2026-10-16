@@ -16,10 +16,10 @@ namespace
 {
 
 /** @brief The bank's sections, as the menu sections them. */
-const char *const Sections[11] = { "Sounds",           "Living Systems",    "Sleep Concerts",
+const char *const Sections[12] = { "Sounds",           "Living Systems",    "Sleep Concerts",
                                    "Visions",          "Swarms & Currents", "Halls & Orbits",
                                    "Harmonic Lives",   "Dreams & Phantoms", "Weather & Growth",
-                                   "Rooms & Topology", "Night & Illusions" };
+                                   "Rooms & Topology", "Night & Illusions", "Chorus & Mirrors" };
 /** @brief The traits' ends. */
 const char *const TraitLow[4] = { "darker", "stiller", "narrower", "purer" };
 const char *const TraitHigh[4] = { "brighter", "more moving", "wider", "airier" };   ///< and their other ends

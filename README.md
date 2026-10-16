@@ -113,12 +113,23 @@ offline renderer and the manual, and a portable zip.
 - **Rooms and topology:** a room simulated as air (the wave equation on a quarter of a million cells: its modes and
   standing waves, a listener who walks through them); a topological insulator of sound round the listener, its rim
   carrying the notes round one way only; the conductor's root walking as a quantum wave on the Tonnetz.
-- **10240 presets** in 160 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
+- **The night:** an Aeolian harp in the wind (each string's vortices locking onto one of its harmonics), thunder from
+  a lightning channel laid out anew at every strike (an N-wave from each segment, heard as late as it is far), a frozen
+  lake singing as the cold cracks it (dispersive chirps from a sheet in its critical state), a night chorus of two
+  thousand insects and frogs answering each other in bands of their own; the real night where you are, from the sun's
+  height, darkening and slowing the sound.
+- **Illusions and mirrors:** streams that part a voice into several sounds or fuse it again (common fate), Risset's
+  rhythm that slows for ever, a time-reversal mirror in the wave room that sends every sound back to where it came from;
+  the dream's memories kept with the project.
+- **The headset in the cloud:** with Empyrean's own Quest app the binaural cloud and the thunder stay put as the head
+  turns, and the hands reach into the wind, the halo, the wave room and the slime mould's trail.
+- **12288 presets** in 192 groups (sounds, living systems, sleep concerts with slow modulations made for the night,
   visions, swarms and currents, halls and orbits, harmonic lives, dreams and phantoms, weather and growth, rooms and
-  topology), levelled by their loudest second.
+  topology, night and illusions, choruses and mirrors), levelled by their loudness (ITU-R BS.1770); and a map that
+  grows itself (MAP-Elites, Tools/presets/grow.py) into presets of your own.
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
-  journeys, presets in a row glided into each other for a whole night (333 come with it, thirteen of them whole nights).
+  journeys, presets in a row glided into each other for a whole night (399 come with it, fifteen of them whole nights).
 
 ## Build
 

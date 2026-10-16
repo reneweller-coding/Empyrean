@@ -17,9 +17,9 @@ For every group, two journeys of twelve:
                       the slowest attacks and the slowest conductor), chained the same way, ten to
                       eighteen minutes each, glides of two to four: the version for falling asleep.
 
-And thirteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
+And fifteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
 currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
-topology): twenty-four presets, the stillest few
+topology, the night and illusions, the choruses and mirrors): twenty-four presets, the stillest few
 of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
 hours before the first comes round again.
 
@@ -44,10 +44,13 @@ FEATURES = {
     "attack": 1.0, "release": 0.7, "depth": 1.0, "far_level": 0.7, "air": 0.8, "presence": 0.5,
     "motion_depth": 1.0, "modal_level": 0.6, "delay_mix": 0.4, "spec_mix": 0.5, "melt_mix": 0.7, "memory_level": 0.4,
     "life_depth": 0.6, "sync_depth": 0.6, "ripple_depth": 0.6, "auto_rate": 0.8, "purity": 0.4,
+    # Phases 30 and 31: nought in every preset before them, so their journeys stay as they were
+    "harp": 0.6, "thunder": 0.5, "ice": 0.5, "stream_depth": 0.5, "risset": 0.5, "night_arc": 0.4, "chorus": 0.6,
+    "mirror": 0.5,
 }
 # The stillness: what moves, brightens or hurries (lower is stiller).
 STILL = {"motion_depth": 1.0, "shimmer": 1.0, "brightness": 1.0, "ripple_depth": 1.0, "sync_depth": 0.7, "air": 0.5,
-         "attack": -1.0, "auto_rate": -1.0, "tilt": -0.8}
+         "attack": -1.0, "auto_rate": -1.0, "tilt": -0.8, "thunder": 0.5, "risset": 0.5, "chorus": 0.3}
 
 WHOLE_NIGHTS = [
     ("Whole Night - Sleep Concert", ["Sleep Concert", "Night Gardens", "Ghosts & Memory", "Choirs", "Strings"]),
@@ -72,6 +75,10 @@ WHOLE_NIGHTS = [
                                         "Swarm Rings", "Pine Winds", "Tam-Tam Halls"]),
     ("Whole Night - Rooms & Topology", ["Interference Nights", "Chapel Air", "Halo Rings", "Curtained Rooms",
                                         "Tonnetz Walks", "Standing Waves", "Still Halos", "Stone Halls"]),
+    ("Whole Night - Night & Illusions", ["Night Arcs", "Frozen Nights", "Distant Storms", "Endless Ritardando",
+                                         "Aeolian Harps", "Singing Lakes", "Fusion Choirs", "Harp Gardens"]),
+    ("Whole Night - Chorus & Mirrors", ["Cool Nights", "Cricket Meadows", "Frog Ponds", "Night Concerts", "Lake Nights",
+                                        "Mirror Chapels", "Time Mirrors", "Nocturnes"]),
 ]
 
 

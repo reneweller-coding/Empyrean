@@ -529,6 +529,113 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 31: Nachtchor, Zeitspiegel, die Karte wächst selbst (gebaut, 16.10.2026, 0.21.0)
+
+Zweiter Teil von „Bitte alles einbauen, das klingt alles spannend.“ (siehe Phase 30): der Chor, der Spiegel, das
+Wachsen und die neue Einpegelung der ganzen Bank.
+
+- **31a Nachtchor:** 2048 Rufer (Zustand als float4 × 4 je Rufer), acht Arten -- Feldgrille, Baumgrille,
+  Laubheuschrecke, Maulwurfsgrille, Frühlingspeeper, Laubfrosch, Ochsenfrosch, Kröte --, jede mit eigenem Träger,
+  Puls und Rhythmus in einem eigenen Band (akustische Nische). Wer ruft: Wiese, Baumkronen, Teich, alle. Die Raten nach
+  Dolbears Gesetz (Wärme 5 .. 30 °C, der Nachtbogen kühlt), milder für die Frösche. Jeder Rufer ist eine Uhr; ein Ruf
+  der eigenen Art, nah und laut genug gehört, setzt sie zurück (Greenfields inhibitorisches Zurücksetzen) -- Nachbarn
+  fallen in Gleichtakt oder in Wechsel; wer in einen lauteren fremden Rufer im eigenen Band riefe, wartet auf eine
+  Lücke. Tuned Calls zieht die Träger zu den Tönen der Skala. Vier Kernel (Uhren 64 Threads je Block, Ordnung als
+  Phasoren der häufigsten Art, Rufe als Pulse aus angehobenem Sinus, Summe in fester Reihenfolge); die Zählungen in
+  ganzen Zahlen (eine gebrochene float-Atomic wäre nicht deterministisch gewesen). Kanäle mit Harfe, Donner, Eis in
+  24 .. 27. GPU etwa 0,12 ms je Block.
+- **31b Zeitspiegel:** 64 Zellen rund um den Hörer im Wellenraum (Phase 29). Zwei Takte: einen Fenster lang (1 .. 6 s)
+  hören, im nächsten rückwärts zurücksenden -- die Wellen laufen zurück, woher sie kamen (Finks Zeitumkehrspiegel),
+  jeder Klang kehrt als Anschwellen zu seiner Quelle zurück. **Gefunden [M]:** die erste Fassung nahm ihr eigenes
+  Zurücksenden mit auf und schaukelte sich auf (-3,7 dBFS); jetzt hört der Spiegel nur im ersten Takt, Anteil 0,08.
+- **31c MAP-Elites (`Tools/presets/grow.py`):** Mouret und Clune. Das Archiv (`work/grow/archive.json`) hält je Zelle
+  der Karte (Helligkeit × Bewegung, wie `make_map`) den besten Klang; Kinder entstehen durch Mutation weniger Regler
+  (in einem Viertel der Fälle mit einer anderen Elite gekreuzt, auch die Matrix), `additiv_presets --evaluate` misst
+  sie wie die Bank (LUFS und die vier Beschreiber, parallel); ein Kind ersetzt die Elite seiner Zelle, wenn die leer
+  ist oder es besser ist: näher an den Sternen des Spielers (`player.settings`), weiter von jedem Werkspreset, weder
+  still noch am Clipping. Ausgabe als eigene Presets in Documents/Empyrean/Presets/Grown („Grown Dusky Drifting
+  7-12“), eingepegelt wie die Bank; das Plugin liest den Ordner jetzt mit Unterordnern. Ein nächster Lauf setzt das
+  Archiv fort.
+- **31d Lautheit:** die ganze Bank neu gemessen, jedes Preset als K-gewichtete Lautheit (ITU-R BS.1770) der
+  lautesten drei Sekunden statt des RMS der lautesten Sekunde, bei Tag (der Nachtbogen zählt nicht). TARGET so
+  gewählt, dass der mittlere master_gain bleibt.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Chorus & Mirrors“, Gruppen 176 .. 191); 399 Reisen, fünfzehn ganze
+  Nächte.
+
+**Gemessen [M]:** Selbsttest 98/98 (97 Nachtchor: 1072 Rufe/s bei 28 °C, 312 bei 10 °C; Ordnung 0,02 ohne, 0,49 mit
+Antworten; 98 Zeitspiegel: der späte Teil schwillt von -30,4 auf -21,3 dBFS, der Akkord -20). Referenzklänge bitgleich.
+Bank: alle 11264 in 4261 s neu in LUFS gemessen (zehn Engines), die 1024 neuen in 481 s. TARGET -18,0 LUFS (Median
+RMS -19,95 dB, Median LUFS -17,99; LUFS minus RMS 5 % +0,7, 95 % +2,9 dB): die alten Presets ändern nur master_gain,
+5 % -0,9 .. 95 % +1,3 dB, höchstens ±3,9; sechs bleiben am Anschlag von +12 dB (Feverish Spectra -39,8 LUFS, schon
+vorher -40 dB RMS). **Bass-Prüfung [M]** (`--register`, Dirigent an, 60 s, Stichprobe von 78): Median 18,9 % der
+Leistung unter 150 Hz in der alten Bank, 12,1 % in Night & Illusions, 15 von 44 unter 8 % -- auch mit dem Grundton
+unten: Formant- und Bandpassfilter nehmen der Foundation ihren Bass, laute Schichten (Harfe, Regen) decken ihn zu.
+Folgt in Phase 32.
+
+## Phase 30: die Nacht, Streams, Risset, Nachtbogen, Traumtagebuch, Headset (gebaut, 16.10.2026, 0.20.0)
+
+Der Nutzer zu meiner Liste von Ideen (Optimierungen, Kopf und Hände aus der Quest in der Wolke, Äolsharfe im
+LBM-Wind, Nachtchor, Zeitumkehr-Raum, Donner, singendes Eis, Fusion/Fission, Risset, Traumtagebuch, Nachtbogen nach
+der echten Sonne, MAP-Elites, je Phase 1024 Presets und eine neue LUFS-Messung): „Bitte alles einbauen, das klingt
+alles spannend.“ Phase 30 nahm die Nacht und die Illusionen, Phase 31 den Rest.
+
+- **30a Äolsharfe:** zwölf Saiten im Wind des LBM-Gitters (Phase 27), auf den Akkord gestimmt, je Saite eine Warp,
+  je Lane eine Mode (32, leicht gestreckt). Facchinettis Nachlaufoszillator (van der Pol, an die Beschleunigung der
+  Saite gekoppelt, Strouhal 0,2) rastet auf die Harmonische nahe der Wirbelfrequenz ein und springt mit dem Wind.
+  **Gefunden:** stumm, solange der Wind nur für Windspiele und Wetter wehte -- jetzt auch für die Harfe.
+- **30b Donner:** je Einschlag ein eigener Blitzkanal (2048 Segmente Hauptkanal, vier Äste, tortuos auf drei Skalen,
+  warp-parallel ausgelegt), je Segment eine N-Welle nach Few (Dauer τ = 2,6 R0/c · (r/10 R0)^(1/8)), verschmiert
+  entlang der Sichtlinie, Luftdämpfung; in einen Ring ganzer Zahlen (2^21) summiert, sechzehn Stücke je Block,
+  bitgleich. Erster Schlag 0,5 .. 2 s nach dem Einschalten; die Quelle Lightning blitzt beim Einschlag. **Gefunden
+  [M]:** mit Fews Exponent 1/4 grollte er bei 15 .. 23 Hz; mit 1/8 bei 44 .. 112 Hz. Der Test des Kopfdrehens maß
+  kaum Pegelunterschied, weil Bass Mono bei 150 Hz das Grollen faltet -- der Test setzt 40 Hz.
+- **30c Singendes Eis:** OFC-Gitter (Olami, Feder, Christensen) 32 × 32, α = 0,2, auf der CPU mit 30000
+  quasistatischen Lawinen in den kritischen Zustand vorgewärmt, dann Poisson-Risse (0,15 · 40^Kälte je s). Je Riss ein
+  fallender Chirp (f ∝ t^-1,9: Biegewellen im Eis sind dispersiv), Amplitude ∝ Größe^0,35. **Gefunden:** 64 × 64 ohne
+  Vorwärmen brauchte Minuten bis zum kritischen Zustand.
+- **30d Streams:** die Teiltöne in Ströme geteilt (ungerade/gerade, nach drei, Register, Mitglieder), je Strom eigenes
+  Vibrato und Tremolo auf der Stimmuhr -- das Ohr hört mehrere Klänge (Bregmans gemeinsames Schicksal); Fusion bewegt
+  sie wieder gemeinsam.
+- **30e Risset:** fünf Pulsschichten; an der Oktavgrenze verdoppelt oder halbiert sich die Phase -- ewig langsamer
+  (oder schneller), ohne anzukommen. Quelle Risset Pulse.
+- **30f Nachtbogen:** Sonnenstand nach dem Astronomical Almanac (`Sun.h`), Ort aus den Einstellungen oder der
+  Hauptstadt der Zeitzone; Nacht = Smoothstep bis -18°. Sie dunkelt (Brightness -0,35, Tilt +0,15), verlangsamt
+  (Brain Rate -0,3, Density -0,2) und weitet (Far Level +0,15). Quelle Night.
+- **30g Traumtagebuch:** die neuesten 1024 Erinnerungen des Traums (ein Byte je Band), gzip und Base64 im Zustand;
+  ein anderes Projekt träumt davon weiter.
+- **30h Headset:** `/pose` auf Port + 100 (`Plugin/Pose.h`), Hände an 9105. Die Kopfdrehung hält die binaurale Wolke
+  und den Donner im Raum; die Hände sind Pfosten im Wind, Defekte im Halo, Absorber oder Quellen im Wellenraum, Futter
+  für den Schleimpilz. Neue Quest-App (`Quest/`, OpenXR, NDK r27, 877 KB): gebaut, noch auf keinem Headset gelaufen.
+- **Seiten:** neue Seite Night (Aeolian Harp, Thunder, Singing Ice, Night Chorus, Night) nach Weather; Streams, Risset
+  und das Tagebuch auf Dreams; Time Mirror und Headset auf Rooms.
+- **Presets:** 1024 in 16 Gruppen (Abschnitt „Night & Illusions“, Gruppen 160 .. 175).
+
+**Gemessen [M]:** Selbsttest 96/96 (89 Harfe: Harmonische 21,6 bei Wind 0,3, 25,2 bei 0,9; 90 Donner: 6,4 s nach dem
+Blitz bei 2,1 km (erwartet 6,2), 97 .. 99 % unter 400 Hz; 91 Eis: 10 gegen 77 Chirps bei mild und kalt, 7 von 7
+Einsätzen fallend; 92 Streams: Hüllkurven-Korrelation 0,01 getrennt, 1,00 verschmolzen; 93 Risset: der Tempokamm
+gleitet 0,29 / 0,68 wie berechnet; 94 Sonne: Berlin zur Sonnenwende 60,9° mittags, -60,9° um Mitternacht, Nacht:
+Anteil über 2 kHz 4,0 → 2,1 %; 95 Tagebuch: 12 Erinnerungen, 6204 Byte; 96 Headset: Pegelunterschied -1,5 → +2,5 dB
+beim Kopfdrehen, Hände als Futter +44 dB). Die bestehenden Klänge bitgleich.
+
+## Optimierungen und Cloud.cu aufgeteilt (gebaut, 16.10.2026, 0.20.0)
+
+- **Ruhende Features aus dem Graphen:** Leben, Wind, Windspiele, Wetter, Schwarm, Physarum, Halo, Wellenraum, modaler
+  Hall, Bloom, Traum, Phantom, Reservoir, Echo, Melt (und mit Phase 30/31 Harfe, Donner, Eis, Chor, Nachtmischung)
+  werden im ausführbaren Graphen abgeschaltet (`cudaGraphNodeSetEnabled`, drei Blöcke nach dem Ruhen; die Frames
+  vorher geleert). **Gemessen [M]:** ein schlichter Akkord 0,135 → 0,10 ms je Block (die 16 leeren Raumschritte allein
+  waren 13 % der GPU-Zeit).
+- **Modaler Hall:** vier Moden je Thread, eine Warp-Summe für alle vier.
+- **Mit allem an (Nsight Systems):** Schwarmkräfte über 64 statt 4 CUDA-Blöcke, Regen mit einem Spawner, Laub und
+  Brandung über geteilten Speicher gemischt statt Warp-Summen je Sample, die mittlere Windgeschwindigkeit aus jeder
+  achten Zelle.
+- **Phantomschicht:** keine Heap-Allokation je Block mehr.
+- **Presets parallel gemessen:** `additiv_presets --jobs` (10 Engines): 48 Presets 58 → 18 s, gleiche Zahlen.
+- **Lautheit:** ITU-R BS.1770 (K-Gewichtung, lauteste drei Sekunden, LUFS) statt RMS der lautesten Sekunde.
+- **Cloud.cu aufgeteilt:** die Kernel in `Core/src/gpu` (Device.cuh, Kernels.cuh, Voices, Hall, Life, Weather, Dream,
+  Bloom, Agents, Rooms, Spectral, Reservoir, später Night), Namensraum `additiv::gpu`; jede Datei füllt ihre Tabellen im
+  Konstantenspeicher über eine eigene Upload-Funktion. Cloud.cu behält Engine, Graph und API. Drei Renderings mit fast
+  allen GPU-Features bitgleich.
+
 ## Phase 29: Wellenraum, topologischer Halo, Quantum Walk (gebaut, 16.10.2026, 0.19.0)
 
 Der zweite Teil der Nacht (siehe Phase 28). Absorb (Sidechain-Resynthese) blieb wie empfohlen außen vor.
