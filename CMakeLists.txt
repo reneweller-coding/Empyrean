@@ -47,6 +47,16 @@ find_package(CUDAToolkit 13.4 REQUIRED)
 # Noctuary's ThirdParty/dr_libs (public domain or MIT-0).
 add_library(AdditivCore STATIC
     Core/src/Cloud.cu
+    Core/src/gpu/Voices.cu
+    Core/src/gpu/Hall.cu
+    Core/src/gpu/Life.cu
+    Core/src/gpu/Weather.cu
+    Core/src/gpu/Dream.cu
+    Core/src/gpu/Bloom.cu
+    Core/src/gpu/Agents.cu
+    Core/src/gpu/Rooms.cu
+    Core/src/gpu/Spectral.cu
+    Core/src/gpu/Reservoir.cu
     Core/src/Shapes.cpp
     Core/src/Landscape.cpp
     Core/src/Motion.cpp
