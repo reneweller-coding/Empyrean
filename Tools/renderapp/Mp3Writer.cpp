@@ -1,26 +1,33 @@
 /**
  * @file Mp3Writer.cpp
  * @brief The MP3 file through Media Foundation's sink writer: an MP3 container (MFTranscodeContainerType_MP3), the
- *        encoder's output type MFAudioFormat_MP3 at the bit rate asked, 16-bit PCM in.
+ *        encoder's output type MFAudioFormat_MP3 at the bit rate asked, 16-bit PCM in. Elsewhere than on Windows every
+ *        call says no.
  * @author Rene Weller
  */
 #include "Mp3Writer.h"
 
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
+#if defined( _WIN32 )
 
-#include <mfapi.h>
-#include <mferror.h>
-#include <mfidl.h>
-#include <mfreadwrite.h>
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+  #endif
+  #include <windows.h>
 
-#include <algorithm>
-#include <cmath>
-#include <cstdio>
-#include <cstring>
+  #include <mfapi.h>
+  #include <mferror.h>
+  #include <mfidl.h>
+  #include <mfreadwrite.h>
 
-namespace journeys
+  #include <algorithm>
+  #include <cmath>
+  #include <cstdio>
+  #include <cstring>
+
+namespace renderkit
 {
 
 namespace
@@ -39,6 +46,20 @@ std::string failed( const char *what, HRESULT hr )
     return text;
 }
 
+/**
+ * @brief UTF-8 as Windows' UTF-16.
+ * @param[in] s  the text
+ * @return it
+ */
+std::wstring wide( const std::string &s )
+{
+    if ( s.empty() ) return {};
+    const int    n = MultiByteToWideChar( CP_UTF8, 0, s.data(), static_cast<int>( s.size() ), nullptr, 0 );
+    std::wstring w( static_cast<size_t>( n ), L'\0' );
+    MultiByteToWideChar( CP_UTF8, 0, s.data(), static_cast<int>( s.size() ), w.data(), n );
+    return w;
+}
+
 }   // namespace
 
 Mp3Writer::~Mp3Writer()
@@ -46,7 +67,12 @@ Mp3Writer::~Mp3Writer()
     close();
 }
 
-bool Mp3Writer::open( const std::wstring &path, int sampleRate, int kbps, std::string &why )
+bool Mp3Writer::available()
+{
+    return true;
+}
+
+bool Mp3Writer::open( const std::string &path, int sampleRate, int kbps, std::string &why )
 {
     close();
     const HRESULT co = CoInitializeEx( nullptr, COINIT_MULTITHREADED );
@@ -55,18 +81,21 @@ bool Mp3Writer::open( const std::wstring &path, int sampleRate, int kbps, std::s
     if ( FAILED( hr ) )
     {
         why = failed( "Media Foundation would not start", hr );
+        close();
         return false;
     }
+    m_started = true;
     m_rate = sampleRate;
     IMFAttributes *attributes = nullptr;
     hr = MFCreateAttributes( &attributes, 1 );
     if ( SUCCEEDED( hr ) ) hr = attributes->SetGUID( MF_TRANSCODE_CONTAINERTYPE, MFTranscodeContainerType_MP3 );
-    if ( SUCCEEDED( hr ) ) hr = MFCreateSinkWriterFromURL( path.c_str(), nullptr, attributes, &m_writer );
+    if ( SUCCEEDED( hr ) ) hr = MFCreateSinkWriterFromURL( wide( path ).c_str(), nullptr, attributes, &m_writer );
     if ( attributes ) attributes->Release();
     if ( FAILED( hr ) )
     {
         why = failed( "no MP3 writer (Windows' MP3 encoder)", hr );
         m_writer = nullptr;
+        close();
         return false;
     }
     IMFMediaType *out = nullptr, *in = nullptr;
@@ -96,6 +125,7 @@ bool Mp3Writer::open( const std::wstring &path, int sampleRate, int kbps, std::s
         why = failed( "the MP3 encoder would not take 16-bit stereo at this rate", hr );
         m_writer->Release();
         m_writer = nullptr;
+        close();
         return false;
     }
     m_time = 0;
@@ -136,9 +166,8 @@ bool Mp3Writer::write( const float *L, const float *R, int n )
     if ( SUCCEEDED( hr ) ) hr = sample->AddBuffer( buffer );
     // in 100 ns units from the samples written, so the blocks' times never drift
     const long long start = m_time * 10000000LL / m_rate, end = ( m_time + n ) * 10000000LL / m_rate;
-    const long long duration = end - start;
     if ( SUCCEEDED( hr ) ) hr = sample->SetSampleTime( start );
-    if ( SUCCEEDED( hr ) ) hr = sample->SetSampleDuration( duration );
+    if ( SUCCEEDED( hr ) ) hr = sample->SetSampleDuration( end - start );
     if ( SUCCEEDED( hr ) ) hr = m_writer->WriteSample( m_stream, sample );
     if ( sample ) sample->Release();
     if ( buffer ) buffer->Release();
@@ -148,14 +177,50 @@ bool Mp3Writer::write( const float *L, const float *R, int n )
 
 bool Mp3Writer::close()
 {
-    if ( !m_writer ) return true;
-    const HRESULT hr = m_writer->Finalize();
-    m_writer->Release();
-    m_writer = nullptr;
-    MFShutdown();
+    HRESULT hr = S_OK;
+    if ( m_writer )
+    {
+        hr = m_writer->Finalize();
+        m_writer->Release();
+        m_writer = nullptr;
+    }
+    if ( m_started ) MFShutdown();
+    m_started = false;
     if ( m_com ) CoUninitialize();
     m_com = false;
     return SUCCEEDED( hr );
 }
 
-}   // namespace journeys
+}   // namespace renderkit
+
+#else
+
+namespace renderkit
+{
+
+Mp3Writer::~Mp3Writer() = default;
+
+bool Mp3Writer::available()
+{
+    return false;
+}
+
+bool Mp3Writer::open( const std::string &, int, int, std::string &why )
+{
+    why = "MP3 is written on Windows only";
+    return false;
+}
+
+bool Mp3Writer::write( const float *, const float *, int )
+{
+    return false;
+}
+
+bool Mp3Writer::close()
+{
+    return true;
+}
+
+}   // namespace renderkit
+
+#endif

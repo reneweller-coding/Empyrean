@@ -535,7 +535,7 @@ Wünsche des Nutzers: eine Journey auswählen und daraus eine WAV oder MP3 mache
 dazu), bei jeder Journey die Länge; „gerne ein kleines Extra-Progrämmchen mit eigener GUI“. Und die Bank neu einpegeln,
 so wie sie gespielt wird (Dirigent an).
 
-- **36a Empyrean Journeys** (`Tools/journeys`, `EmpyreanJourneys.exe`): JUCE-GUI-App neben dem Instrument. Links eine
+- **36a Empyrean Journeys** (`Tools/renderapp`, `EmpyreanJourneys.exe`): JUCE-GUI-App neben dem Instrument. Links eine
   Tabelle aller Reisen (eingebaute und `Documents/Empyrean/Journeys`) mit Schritten, Länge (Mitte der Spannen), kürzest
   .. längst und Art, Suche, Sortierung, Mehrfachauswahl; rechts die genaue Länge dieser Aufnahme (die Würfel stehen vor
   dem Start fest: `planLength` simuliert den `JourneyPlayer` mit demselben Seed), Format, Durchgänge zyklischer Reisen,
@@ -555,6 +555,13 @@ so wie sie gespielt wird (Dirigent an).
   dB; nur Turbulent Light (Szintillation) verliert in den Lücken zwischen den Teiltönen 3 dB -- das schnellste Funkeln
   wird glatter. Bei 1024 dort -5 dB und Sub-Bass-Seitenbänder -17 dB, bei 2048 -8 und -24. Also 512 als Vorgabe,
   „Exactly as the instrument plays“ rechnet mit 128.
+- **36c Der Baukasten der Familie** (nach der Frage des Nutzers, ob es so ein Programm auch für die anderen
+  Instrumente geben kann): `Tools/renderapp` -- `RenderKit.h/.cpp` (Formate, `Source`/`Rendering`/`Item`/`Option`/
+  `Request`, Renderer, `RenderQueue`, Kommandozeile `--list`/`--render`/`--selftest`/`--shot`, die Anwendung),
+  `RenderWindow.h/.cpp` (Tabelle mit den Spalten der Quelle und der Länge dieser Aufnahme, ein `LengthWorker` rechnet
+  die Längen auf eigenem Faden, das Panel baut sich aus den `Option`s), `Mp3Writer` (außerhalb von Windows ohne MP3).
+  Gleich in allen sechs Instrumenten, kanonisch hier; das Eigene ist die `Source.cpp`. `seedFor` mischt den Namen in die
+  Würfel (FNV-1a): jede Zeile zieht ihr Eigenes, dieselben Würfel geben dieselbe Aufnahme.
 - **36b Längen im Instrument:** die Journey-Box zeigt jede Reise mit ihrer Länge (`JourneyEntry::m_length`,
   `meanLength`), zyklische mit „a pass“. **Gefunden:** die Zeitleiste (Phase 24) setzte die Glides vor die Verweilzeit,
   der `JourneyPlayer` zählt sie darin („the glide is part of the stay“) -- jede Reise sah um ihre Glides länger aus

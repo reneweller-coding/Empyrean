@@ -175,7 +175,8 @@ its own: every journey listed with its length, one or several chosen, written as
 MP3 (320 kbit/s), faster than real time. The same from the command line:
 
 ```
-EmpyreanJourneys --render "Whole Night - Lullabies" --format flac --out lullabies.flac --seed 7
+EmpyreanJourneys --render "Whole Night - Lullabies" --format flac --out lullabies.flac --seed 7 --passes 2
+EmpyreanJourneys --list --seed 7
 EmpyreanJourneys --selftest 6
 ```
 

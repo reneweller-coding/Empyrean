@@ -13,7 +13,9 @@ Journeys to take along.
   a fade over the last twenty seconds, the night arc as from 23:00. It sets every partial 94 times a second instead
   of the instrument's 375 -- about three times faster, the same sound (only Scintillation's quickest twinkle a little
   smoother); "Exactly as the instrument plays" renders sample for sample. The same from the command line
-  (`--render NAME --format wav|flac|ogg|mp3`), and a self-test of every format and the queue (ctest `journeys`).
+  (`--render NAME --format wav|flac|ogg|mp3`, `--list`), and a self-test of every format and the queue (ctest
+  `renderapp`). Built on the family's render app (Tools/renderapp: RenderKit.h, the window, the queue, the files),
+  which the other instruments share with their own sources.
 - **Journey lengths:** the instrument's journey box shows every journey with its length (a pass at the middle of its
   ranges). The timeline under it counts a glide within its step, as a journey plays it -- it drew the glides ahead of
   the stays, and every journey looked longer by them (Whole Night - Plasma & Voice: 7:54:00 instead of 6:24:00).

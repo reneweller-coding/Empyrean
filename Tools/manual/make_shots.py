@@ -88,11 +88,11 @@ def main():
         print("docs/screenshots/%s.png" % name)
     # Empyrean Journeys, the program beside it: its window, a whole night chosen (EmpyreanJourneys --shot), from the
     # same build tree as the standalone.
-    journeys = os.path.normpath(os.path.join(os.path.dirname(exe), "..", "..", "..", "..", "Tools", "journeys",
+    journeys = os.path.normpath(os.path.join(os.path.dirname(exe), "..", "..", "..", "..", "Tools", "renderapp",
                                              "EmpyreanJourneys_artefacts", "Release", "EmpyreanJourneys.exe"))
     if not os.path.exists(journeys):
         sys.exit("no Empyrean Journeys at " + journeys)
-    subprocess.run([journeys, "--shot", os.path.join(out, "journeys-app.png"), "--journey", "Whole Night - Lullabies"],
+    subprocess.run([journeys, "--shot", os.path.join(out, "journeys-app.png"), "--choose", "Whole Night - Lullabies"],
                    timeout=120, check=True)
     print("docs/screenshots/journeys-app.png")
 

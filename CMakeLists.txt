@@ -127,8 +127,9 @@ endif()
 if(ADDITIV_BUILD_PLUGIN)
     family_juce(${ADDITIV_JUCE_TAG})
     add_subdirectory(Plugin)
-    # Empyrean Journeys: the journeys rendered into WAV, FLAC, Ogg Vorbis or MP3, faster than real time (16.10.2026).
-    add_subdirectory(Tools/journeys)
+    # Empyrean Journeys: the journeys rendered into WAV, FLAC, Ogg Vorbis or MP3, faster than real time (16.10.2026),
+    # on the family's render app (Tools/renderapp/RenderKit.h).
+    add_subdirectory(Tools/renderapp)
     # Tracktion's pluginval (unpacked into ThirdParty/pluginval or the sibling Ephemeris's, not in the repository) at its
     # highest strictness, where it is there -- as in Totality.
     if(ADDITIV_BUILD_TOOLS)

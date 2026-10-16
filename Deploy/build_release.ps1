@@ -50,7 +50,7 @@ $render = Join-Path $build "Release\empy_render.exe"
 $art = Join-Path $build "Plugin\$($product)_artefacts\Release"
 $standalone = Join-Path $art "Standalone\$product.exe"
 $vst3 = Join-Path $art "VST3\$product.vst3"
-$journeys = Join-Path $build "Tools\journeys\EmpyreanJourneys_artefacts\Release\EmpyreanJourneys.exe"
+$journeys = Join-Path $build "Tools\renderapp\EmpyreanJourneys_artefacts\Release\EmpyreanJourneys.exe"
 
 # 2. Tests, and pluginval with two more seeds.
 if (-not $SkipTests) {
