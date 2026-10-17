@@ -197,7 +197,9 @@ public:
                       juce::String &why )
         : m_journey( journey ), m_own( ownPresets() )
     {
-        m_seconds = lengthOf( journey, seed, r.option( "passes" ) + 1 );
+        m_seed = seed;
+        m_passes = r.option( "passes" ) + 1;
+        m_seconds = lengthOf( journey, seed, m_passes );
         m_fade = r.option( "fade", 1 ) ? 20.0 : 0.0;
         m_engine = std::make_unique<additiv::Engine>();   // on the heap: it is large
         m_engine->setRealtime( false );
@@ -258,12 +260,39 @@ public:
         return "step " + juce::String( m_player.step() + 1 ) + " of " +
                juce::String( static_cast<int>( m_journey.m_steps.size() ) ) + ": " + juce::String( m_step );
     }
+    /**
+     * @brief The journey's time line: every step a new section for Kaleidoscope -- the first an intro, the fade over the
+     *        end an outro -- and a chapter with its preset's name, the pass named when a cyclic journey goes round more
+     *        than once; drawn as the rendering draws them (the same dice).
+     * @param[out] sheet  receives it
+     */
+    void timeline( renderkit::CueSheet &sheet ) const override
+    {
+        const int              per = static_cast<int>( m_journey.m_steps.size() );
+        const int              passes = m_journey.m_cyclic ? std::max( m_passes, 1 ) : 1;
+        additiv::JourneyPlayer p;
+        p.start( m_journey, m_seed );
+        additiv::JourneyStep st;
+        double               fade = 0.0, at = 0.0;
+        if ( per == 0 || !p.advance( 0.0, st, fade ) ) return;
+        for ( int k = 0; k < per * passes; ++k )
+        {
+            const juce::String pass = passes > 1 ? "Pass " + juce::String( k / per + 1 ) + ", " : juce::String();
+            sheet.section( at, k == 0 ? "Intro" : "Groove", k == 0 ? 0.25 : 0.4 );
+            sheet.chapter( at, pass + "Step " + juce::String( k % per + 1 ) + ": " + juce::String( st.m_preset ) );
+            at += p.remaining();
+            if ( k + 1 < per * passes && !p.advance( p.remaining(), st, fade ) ) break;
+        }
+        if ( m_fade > 0.0 ) sheet.section( std::max( 0.0, m_seconds - m_fade ), "Outro", 0.2 );
+    }
 
 private:
     additiv::Journey                 m_journey;         ///< the journey
     std::map<std::string, OwnPreset> m_own;             ///< the player's presets
     std::unique_ptr<additiv::Engine> m_engine;          ///< the instrument offline
     additiv::JourneyPlayer           m_player;          ///< the journey's clock
+    std::uint64_t                    m_seed = 1;        ///< its dice
+    int                              m_passes = 1;      ///< passes of a cyclic journey
     double                           m_seconds = 0.0;   ///< the length
     double                           m_fade = 0.0;      ///< the fade over the end, s
     double                           m_time = 0.0;      ///< s rendered
