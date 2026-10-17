@@ -1,5 +1,47 @@
 # Release notes
 
+## 1.0.0 (17.10.2026)
+
+The first public release: an additive synthesizer that does on a graphics card what no processor could -- and then
+keeps going.
+
+- **320,000 partials in real time.** Sixteen voices of twenty thousand sine waves each, every partial with its own
+  frequency and glide, three envelopes (loudness, pitch, place), the filter's exact response at its frequency and its
+  distance -- in one CUDA graph per block: on an RTX 5090, twelve voices sounding, 0.10 ms of GPU time per block of
+  2.7 ms, 0.17 ms with every effect on. The sum in a fixed order, so a render is bit-identical every time.
+- **A reverb made of the instrument's own stuff:** a modal hall of 65,536 decaying resonances on the card, tuned to the
+  scale, that remembers what it heard over minutes to hours and rings longer there; a spectral echo of 500 bands.
+- **Physics as sound:** a lattice-Boltzmann fluid the notes blow ink into, a room simulated as air (the wave equation
+  on 250,000 cells, with a time-reversal mirror), Lenia and Turing fields, Kuramoto sync, chimeras and swarmalators,
+  a slime mould between the harmonics, a gong's energy cascade, an Aeolian harp whose vortices lock onto a harmonic,
+  thunder from a lightning channel laid out anew at every strike, a frozen lake cracking in its critical state, a
+  night chorus of two thousand insects and frogs.
+- **The sky and the deep:** a star's oscillations (asteroseismology: a sun, a red giant, a white dwarf), a black hole
+  that redshifts the partials falling in and lenses the rest into a ring, black holes merging, hydrogen's spectral
+  lines with their Zeeman triplets, twinkling through Fresnel turbulence, the ocean's deep sound channel traced ray by
+  ray, whistlers in the magnetosphere, giant vocal tracts singing kargyraa.
+- **The ear:** binaural per partial (head shadow, pinna, the time round the head, each of 20,000 partials at its own
+  point), a melody heard only between the ears (dichotic pitch), streams that part and fuse by common fate, Risset's
+  rhythm that slows for ever.
+- **Tuning that listens:** a conductor in just intonation that changes one voice at a time; Self-Tune pulls nearly
+  meeting harmonics together; Sethares' scales from the cloud's own spectrum; the root walking as a quantum wave on the
+  Tonnetz.
+- **A mind of its own:** a reservoir of 2048 neurons on the card as a modulation source, the instrument dreaming of
+  what it played (a modern Hopfield network over its own spectra), macros taught by example, presets found by a
+  recording, a preset map that grows itself (MAP-Elites).
+- **16384 presets** in 256 groups, each levelled by its loudness as it is played (ITU-R BS.1770) and placed on a map
+  by how it sounds; glides in which the partials themselves travel and filters move into each other by transport; 531
+  journeys, nineteen of them whole nights.
+- **Real time on Windows:** a render-ahead ring (two host blocks and ten milliseconds), MMCSS, and Windows' REALTIME
+  GPU class, so another program's graphics cannot hold the card.
+- **New since 0.26.0:** the render app writes its score cues and chapters beside a journey (`--cues`, `--chapters`)
+  for KaleidoscopeEnhanced and Heliacal; the signal flow (`docs/flow.png`), the demos (`Tools/demo/make_demos.py`), the
+  social preview, and the publish script.
+
+VST3 and standalone for Windows 10 or 11 (x64) with an NVIDIA GeForce RTX card (20 series or newer) and a current
+driver; developed and tested on an RTX 5090 -- on a smaller card lower *Partials* (Cloud page) and leave the largest
+simulations off. The installer is not code-signed.
+
 ## 0.26.0 (16.10.2026, not released)
 
 Journeys to take along.

@@ -2,33 +2,94 @@
 
 # Empyrean
 
-An additive ambient synthesizer: every voice is **twenty thousand sine waves**, computed on the graphics card. Each
-harmonic of a note is not one sine but a cloud of slightly detuned ones, every partial with envelopes of its own --
-its loudness, its pitch and its place in the stereo field each follow a loop of their own -- so that a held chord never
-stands still. It plays by itself, after Noctuary's conductor: a chord in just intonation that changes one voice at a
-time, minutes apart, in the spirit of Robert Rich's sleep concerts.
+An additive ambient synthesizer on the graphics card: every voice is **twenty thousand sine waves**. Each harmonic of
+a note is not one sine but a cloud of slightly detuned ones, every partial with envelopes of its own -- its loudness,
+its pitch and its place in the stereo field each follow a loop of their own -- so that a held chord never stands
+still. It plays by itself, after Noctuary's conductor: a chord in just intonation that changes one voice at a time,
+minutes apart, in the spirit of Robert Rich's sleep concerts. And around the cloud, physics as sound: fluids, fields,
+stars, black holes, weather, giant throats.
 
 **VST3 plugin and standalone application** for Windows (x64) with an **NVIDIA GeForce RTX** card (20 series or newer),
-and a command-line renderer. Licence: AGPL-3.0. The empyrean is the highest heaven, the one made of light.
+a command-line renderer and Empyrean Journeys, which renders whole nights into files. Licence: AGPL-3.0. The empyrean
+is the highest heaven, the one made of light.
 
 <br clear="left" />
 
-![The Cloud page: the partials themselves as points with trails, the landscape beside them](docs/screenshot.png)
+![The panel: the partials themselves as points over the spectrum, the landscape beside them](docs/screenshot.png)
 
 ## Download
 
-Not released yet: build it from source (below). The release will bring a setup with the standalone, the VST3, the
-offline renderer and the manual, and a portable zip.
+**[Empyrean-1.0.0-Setup.exe](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/Empyrean-1.0.0-Setup.exe)**
+installs the standalone, the VST3, the offline renderer, Empyrean Journeys and the manual. Nothing else has to be
+installed but NVIDIA's driver: the MSVC and the CUDA runtime are linked in. There is a
+**[portable zip](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/Empyrean-1.0.0-portable.zip)**
+for anyone who would rather not run an installer, and the
+**[manual](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/Empyrean-Manual.pdf)** -- every
+page of the panel as a picture and what each control does.
+
+Requirements: Windows 10 or 11 (x64), an NVIDIA GeForce RTX card (20 series or newer) with a current driver, and a
+VST3 host if you want the plugin. Developed and tested on an RTX 5090: on a smaller card lower *Partials* (the Cloud
+page) and leave the largest simulations (the wave room, the fluid) off. No macOS (no CUDA there) and no Linux build
+yet. The installer is not code-signed: Windows' SmartScreen may warn once.
+
+## Demos
+
+[![Empyrean, the Convective Betelgeuse demo, with pictures by KaleidoscopeEnhanced (click for the video)](docs/demo.jpg)](https://github.com/reneweller-coding/Empyrean/releases/download/demos/convective_betelgeuse.mp4)
+
+Three minutes of a preset each, its conductor playing, rendered by `empy_render` and nothing else:
+[Lunar Hall](https://github.com/reneweller-coding/Empyrean/releases/download/demos/lunar_hall.mp3) (a sleep concert in
+just intonation), [Teeming Garden](https://github.com/reneweller-coding/Empyrean/releases/download/demos/teeming_garden.mp3)
+(a Lenia field the partials follow),
+[Thunderous Rainpool](https://github.com/reneweller-coding/Empyrean/releases/download/demos/thunderous_rainpool.mp3)
+(rain, thunder and a night chorus),
+[Convective Betelgeuse](https://github.com/reneweller-coding/Empyrean/releases/download/demos/convective_betelgeuse.mp3)
+(a red giant's oscillations),
+[Sliding Whistler](https://github.com/reneweller-coding/Empyrean/releases/download/demos/sliding_whistler.mp3)
+(whistlers in the magnetosphere) and
+[Rumbling-Voice Steppe Night](https://github.com/reneweller-coding/Empyrean/releases/download/demos/steppe_night.mp3)
+(giant throats singing kargyraa) -- MP3, brought to -16 LUFS by their gain alone. The video is the Betelgeuse demo
+with pictures by [KaleidoscopeEnhanced](https://github.com/reneweller-coding/KaleidoscopeEnhanced).
+`Tools/demo/make_demos.py` renders them all again; they live on the release
+[demos](https://github.com/reneweller-coding/Empyrean/releases/tag/demos).
+
+## Beyond the usual
+
+- **320,000 partials in real time.** Sixteen voices of twenty thousand partials, each with its own frequency and glide,
+  three envelopes, the filter's exact response at its frequency and its distance -- computed per partial, per block,
+  on the card: with twelve voices sounding 0.10 ms of an RTX 5090 per block of 2.7 ms, 0.17 ms with every effect on.
+  Additive synthesizers on a processor commonly work with a few hundred partials a voice.
+- **Bit-identical on a GPU.** The partials are summed in a fixed order, so a render comes out the same, sample for
+  sample, every time -- the self-tests hold the instrument to it.
+- **A reverb made of the instrument's own stuff:** 65,536 decaying resonances on the card, tuned to the scale like
+  sympathetic strings, and a hall that **grows** -- it remembers what it heard over minutes to hours and rings longer
+  there.
+- **Physics as sound:** a lattice-Boltzmann fluid, a room simulated as air on a quarter of a million cells (with a
+  time-reversal mirror), Lenia and Turing fields, Kuramoto sync, chimeras and swarmalators, a slime mould, a gong's
+  energy cascade, an Aeolian harp, thunder, a cracking frozen lake, a night chorus of two thousand voices.
+- **The sky:** asteroseismology (a sun, a red giant, a white dwarf), a black hole that redshifts and lenses the
+  partials, merging black holes, hydrogen's spectral lines with their Zeeman triplets, starlight twinkling through
+  Fresnel turbulence, whistlers in the magnetosphere.
+- **The ear:** binaural per partial -- head shadow, pinna and the time round the head worked out for every one of the
+  near plane's partials --, a melody heard only between the ears, streams that part and fuse by common fate.
+- **Tuning that listens:** just intonation, Self-Tune pulling nearly meeting harmonics together, Sethares' scales from
+  the cloud's own spectrum, the conductor's root walking as a quantum wave on the Tonnetz.
+- **A mind of its own:** a reservoir of 2048 neurons as a modulation source, the instrument dreaming of what it
+  played (a modern Hopfield network over its own spectra), macros taught by example, presets found by a recording, a
+  preset map that grows itself (MAP-Elites).
+- **16384 presets**, each levelled by its loudness as it is played and placed on a map by how it sounds; glides in
+  which the partials themselves travel; 531 journeys, nineteen of them whole nights.
 
 ## How it is put together
 
-- **The GPU** (`Core/src/Cloud.cu`, CUDA 13.4): 16 voices x 20,000 partials. Per block of 128 samples one CUDA graph:
-  an update kernel per partial (its frequency and glide, four amplitude ramps, its three envelopes, the filter's
-  response at its frequency, its distance), a render kernel (a thread per sample, 512 partials per chunk, phases in
-  32-bit fixed point), a reduction in a fixed order (bit-identical renders); then, in the same graph, the **modal
-  hall**: 65,536 decaying resonances, a thread each, fed by the block the voices just made, summed with warp shuffles.
-  The spectral echo, an FFT of its own in one CUDA block, runs after it. On an RTX 5090, with twelve voices and the
-  second conductor sounding: 0.10 ms of GPU time per block of 2.7 ms, and 0.17 ms with every effect on (6 %).
+![The signal flow](docs/flow.png)
+
+- **The GPU** (`Core/src/Cloud.cu` and `Core/src/gpu`, CUDA 13.4): 16 voices x 20,000 partials. Per block of 128
+  samples one CUDA graph: an update kernel per partial (its frequency and glide, four amplitude ramps, its three
+  envelopes, the filter's response at its frequency, its distance), a render kernel (a thread per sample, 512
+  partials per chunk, phases in 32-bit fixed point), a reduction in a fixed order (bit-identical renders); then, in
+  the same graph, the **modal hall**: 65,536 decaying resonances, a thread each, fed by the block the voices just
+  made, summed with warp shuffles. The spectral echo, an FFT of its own in one CUDA block, runs after it, and the
+  living systems, the weather, the night and the rooms step on the card beside them.
 - **The real-time path** (`Core/src/Engine.cpp`): a worker thread (MMCSS Pro Audio) renders ahead into a ring by two
   host blocks and ten milliseconds; the audio callback stamps notes and copies. A note begins on its exact sample. The
   standalone puts the process into Windows' REALTIME GPU priority class: without it another program's graphics could
@@ -182,9 +243,10 @@ EmpyreanJourneys --selftest 6
 
 ## The family
 
-Noctuary, Ephemeris, Phosphene, Totality, Parhelion: the same window frame, the same keys, the family jam (one
-leads, the others follow its root) and the Meta Quest app's hands in bridge mode. The Quest itself has no card for
-twenty thousand partials per voice; this instrument stays on the computer.
+[Noctuary, Ephemeris, Phosphene, Totality and Parhelion](https://reneweller-coding.github.io/VRAudio/): the same window
+frame, the same keys, the family jam (one leads, the others follow its root) and the Meta Quest app's hands in bridge
+mode. The Quest itself has no card for twenty thousand partials per voice; this instrument stays on the computer, and
+its own Quest app brings the head and the hands into the cloud.
 
 ## Licence
 
