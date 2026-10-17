@@ -38,10 +38,6 @@ keeps going.
   for KaleidoscopeEnhanced and Heliacal; the signal flow (`docs/flow.png`), the demos (`Tools/demo/make_demos.py`), the
   social preview, and the publish script.
 
-VST3 and standalone for Windows 10 or 11 (x64) with an NVIDIA GeForce RTX card (20 series or newer) and a current
-driver; developed and tested on an RTX 5090 -- on a smaller card lower *Partials* (Cloud page) and leave the largest
-simulations off. The installer is not code-signed.
-
 ## 0.26.0 (16.10.2026, not released)
 
 Journeys to take along.

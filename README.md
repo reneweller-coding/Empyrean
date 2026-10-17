@@ -23,7 +23,10 @@ is the highest heaven, the one made of light.
 installs the standalone, the VST3, the offline renderer, Empyrean Journeys and the manual. Nothing else has to be
 installed but NVIDIA's driver: the MSVC and the CUDA runtime are linked in. There is a
 **[portable zip](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/Empyrean-1.0.0-portable.zip)**
-for anyone who would rather not run an installer, and the
+for anyone who would rather not run an installer, the
+**[Quest app](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/EmpyreanQuest-1.0.0.apk)**
+(the head and the hands in the binaural cloud, the sound on the computer; installed with `adb install -r`, developer
+mode), and the
 **[manual](https://github.com/reneweller-coding/Empyrean/releases/download/v1.0.0/Empyrean-Manual.pdf)** -- every
 page of the panel as a picture and what each control does.
 
