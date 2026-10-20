@@ -331,6 +331,12 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_early.prepare( m_cfg.m_sampleRate );
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
+    // The image's ranges (20.10.2026): the width per band of Ultimae's and Robert Rich's masters, first and third quartile -- side over mid in
+    // dB, 536 recordings (Family/tools/mix_audit.py --image-ranges ultimae+robertrich).
+    static const float ImageLo[ImageMatch::Bands] = { -12.7f, -5.7f, -4.3f, -5.0f, -6.4f };
+    static const float ImageHi[ImageMatch::Bands] = { -2.8f, -1.3f, -0.9f, -1.2f, -0.8f };
+    m_image.prepare( m_cfg.m_sampleRate );
+    m_image.setRanges( ImageLo, ImageHi );
     m_limiter.prepare( m_cfg.m_sampleRate, 1.5f );   // its latency is part of latencySamples()
     m_limiter.set( -1.0f, 120.0f );
     m_limiter.reset();
@@ -4998,6 +5004,7 @@ void Engine::renderBlock()
         C.m_amount = cur( ParamIdE::CLARITY );
         C.m_attack = 1.0f - std::exp( -dtf / 0.03f );
         C.m_release = 1.0f - std::exp( -dtf / 0.3f );
+        m_cloud.focus().m_amount = cur( ParamIdE::FOCUS );   // Focus (20.10.2026)
     }
 
     // The reservoir: stepped only while a row reads it; fed with what the instrument hears and
@@ -5348,6 +5355,9 @@ void Engine::renderBlock()
     else
         m_midSide.set( cur( ParamIdE::BASS_MONO ), 0.0f, cur( ParamIdE::STEREO_WIDTH ) );
     m_midSide.process( m_nearL.data(), m_nearR.data(), G );
+    // The image (20.10.2026, Image.h): the width per band, but not on the two ears of the binaural mode.
+    m_image.set( cur( ParamIdE::BINAURAL ) >= 0.5f ? 0.0f : cur( ParamIdE::IMAGE ) );
+    m_image.process( m_nearL.data(), m_nearR.data(), G );
     // The phantom layer after everything (Phase 27): the turn of phase between the ears is all there is to hear,
     // and the echoes, the rooms and the width would blur it.
     for ( int s = 0; s < G; ++s )

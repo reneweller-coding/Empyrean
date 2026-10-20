@@ -415,6 +415,8 @@ enum class ParamIdE : int
     THROAT_VOICES,   ///< 1 .. 4: throats (the root, its fifth, its octave, the fifth above)
     // 20.10.2026: the mix
     CLARITY,   ///< 0 .. 1: every crowded critical band thinned by its weaker partials, before they sound (Cloud.h)
+    FOCUS,     ///< 0 .. 1: every partial's place drawn towards its voice's (Cloud.h)
+    IMAGE,     ///< 0 .. 1: the width per band toward Ultimae's and Robert Rich's masters (Image.h)
     COUNT      ///< number of parameters
 };
 

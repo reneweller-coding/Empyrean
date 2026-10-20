@@ -964,6 +964,16 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
     float      fieldOff = cv.m_restart ? 0.0f : __uint_as_float( run[gid].w );   // the field's offset, cents
     float      place = cv.m_stereo * ( 2.0f * hash01( seed, up, 10 ) - 1.0f );   // -1 .. 1 across the field
     const int  H = cv.m_harmonics, K = cv.m_members, S = cv.m_subClouds;
+    // Focus (20.10.2026, Cloud.h): the partial's place drawn towards its voice's, its cloud a quarter apart.
+    const float focus = hdr->m_focus.m_amount;
+    float       focusThere = 0.0f;
+    if ( focus > 0.0f )
+    {
+        const std::uint32_t cloud = static_cast<std::uint32_t>( p / max( K, 1 ) );
+        focusThere = cv.m_stereo * ( 0.75f * ( 2.0f * hash01( seed, 0xFFFFu, 13 ) - 1.0f ) +
+                                     0.25f * ( 2.0f * hash01( seed, cloud, 12 ) - 1.0f ) );
+        place += focus * ( focusThere - place );
+    }
     const int  HP = cv.m_harmonicPartials;
     const bool isAir = p >= HP;
     float      phantomTurn = 0.0f;          // the phantom layer: the turn of phase from the left ear to the right
@@ -1097,6 +1107,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                 grainEnv = w * w * cv.m_grainNorm;
                 jitterSeed = hash32( seed ^ ( static_cast<std::uint32_t>( idx ) * 0x9E3779B9U ) );
                 place = cv.m_stereo * ( 2.0f * hash01( jitterSeed, up, 10 ) - 1.0f );
+                if ( focus > 0.0f ) place += focus * ( focusThere - place );   // reborn, focused as before
             }
             // The member's place in its harmonic's cloud: stratified over the bell curve, so K members
             // always cover it evenly and only jitter within their own slice (a grain anywhere in it).

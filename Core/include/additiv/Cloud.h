@@ -515,6 +515,27 @@ struct Clarity
 static_assert( sizeof( Clarity ) % 16 == 0, "Clarity rides in the block header" );
 
 /**
+ * @brief Focus (20.10.2026): every partial's place drawn towards its voice's.
+ *
+ * A voice's partials take each a place of their own across the field (Stereo): a wash, wide and nowhere -- measured on
+ * the demos, the two channels' coherence over 250 Hz .. 8 kHz lay at 0.02 .. 0.11, where 308 Ultimae recordings lie at
+ * 0.27 (the median; their highs at 0.41 .. 0.49: details one can point at, over a diffuse body). Focus draws each
+ * partial's place towards one place per voice (its seed's, across Stereo), its harmonic's cloud a quarter apart:
+ * the voices stand where they stand, apart from each other, and their width is the rooms'. At 0.5 the highs'
+ * coherence rose from 0.12 to 0.19 on three demos -- Robert Rich's 228 studio recordings lie at 0.17 .. 0.19 there,
+ * the sleep concert's own; the mids stay the halls'. 0 by default: the bank's map (Find, Like) and its levels were
+ * measured without it.
+ */
+struct Focus
+{
+    float m_amount = 0.0f;   ///< 0 .. 1 (0: every partial its own place)
+    float m_pad0 = 0.0f;     ///< keeps the struct 16 bytes
+    float m_pad1 = 0.0f;     ///< likewise
+    float m_pad2 = 0.0f;     ///< likewise
+};
+static_assert( sizeof( Focus ) % 16 == 0, "Focus rides in the block header" );
+
+/**
  * @brief Turbulence: the energy cascade of a struck gong or tam-tam, along every voice's harmonics.
  *
  * In a plate or a shell the modes are not alone: struck hard they hand their energy on to modes
@@ -1329,6 +1350,9 @@ public:
     /** @brief The host's copy of Clarity's settings (20.10.2026), edited between wait() and the next launch().
      *  @return the settings */
     Clarity &clarity();
+    /** @brief The host's copy of Focus's settings (20.10.2026), edited between wait() and the next launch().
+     *  @return the settings */
+    Focus &focus();
     /** @brief The energy cascade's settings for the next block (the voices carry their drives). @return them */
     Turbulence &turbulence();
     /** @brief The chime field's settings for the next block (Phase 27). @return them */

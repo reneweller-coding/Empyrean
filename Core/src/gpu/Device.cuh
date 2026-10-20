@@ -145,6 +145,7 @@ struct BlockHeader
     Scintillation m_scint;            ///< the scintillation for this block (Phase 34)
     Absorption    m_absorb;           ///< the absorption for this block (Phase 34)
     Clarity       m_clarity;          ///< Clarity for this block (20.10.2026)
+    Focus         m_focus;            ///< Focus for this block (20.10.2026)
 
     std::int32_t m_lifeParity;   ///< which of the two field buffers holds the field before this block's steps
     std::int32_t m_lpad0;        ///< keeps the header 16-byte aligned

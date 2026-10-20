@@ -131,6 +131,7 @@ struct CloudEngine::Impl
     Melt         m_melt;                   ///< the host's copy of the melt's settings
     SpectralComb m_comb;                   ///< the host's copy of the spectral comb
     Clarity      m_clarity;                ///< the host's copy of Clarity's settings (20.10.2026)
+    Focus        m_focus;                  ///< the host's copy of Focus's settings (20.10.2026)
     Turbulence   m_turb;                   ///< the host's copy of the energy cascade's settings
     float       *m_dCascadeA =
         nullptr;   ///< device: per voice and harmonic its power against the spectrum's, buffer A (even blocks read it)
@@ -1627,6 +1628,11 @@ Clarity &CloudEngine::clarity()
     return m_impl->m_clarity;
 }
 
+Focus &CloudEngine::focus()
+{
+    return m_impl->m_focus;
+}
+
 void CloudEngine::reservoirOut( float *out ) const
 {
     for ( int k = 0; k < ReservoirOutputs; ++k ) out[k] = m_impl->m_hLifeStats[5 + k];
@@ -1690,6 +1696,7 @@ void CloudEngine::launch()
     hdr->m_melt = m.m_melt;
     hdr->m_comb = m.m_comb;
     hdr->m_clarity = m.m_clarity;
+    hdr->m_focus = m.m_focus;
     hdr->m_turb = m.m_turb;
     hdr->m_chimes = m.m_chimes;
     hdr->m_chimes.m_pitchCount = std::clamp( m.m_chimes.m_pitchCount, 0, ChimePitches );

@@ -138,6 +138,10 @@ const Info InfoTable[] = {
     { "throat_voices", "How many throats: the root, its fifth, its octave, the fifth above." },
     { "clarity", "Thins every crowded critical band by its weaker partials before they sound: the strongest stands "
                  "clear, nothing smears, nothing waits." },
+    { "focus", "Draws every partial towards its voice's place: 0 a wash across the field, 1 voices one can point at, "
+               "their width left to the rooms." },
+    { "image", "Brings the width of five bands into the range of Ultimae's and Robert Rich's masters, and keeps every "
+               "side under its mid, so nothing cancels in mono. Off in the binaural mode." },
     { "brain_consonance", "How consonant the conductor's choices are: 0 anything goes, 1 strictly sweet." },
     { "brain_wander", "How far the conductor's register wanders." },
     { "auto_lead", "How far, in semitones, a voice may move when it is exchanged." },
