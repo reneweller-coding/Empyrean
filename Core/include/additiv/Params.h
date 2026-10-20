@@ -413,7 +413,9 @@ enum class ParamIdE : int
     THROAT_SUB,      ///< 0 .. 1: the ventricular folds closing every other cycle: kargyraa, an octave below
     THROAT_VOWEL,    ///< 0 .. 1: the vowel, u o a e i
     THROAT_VOICES,   ///< 1 .. 4: throats (the root, its fifth, its octave, the fifth above)
-    COUNT            ///< number of parameters
+    // 20.10.2026: the mix
+    CLARITY,   ///< 0 .. 1: every crowded critical band thinned by its weaker partials, before they sound (Cloud.h)
+    COUNT      ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table

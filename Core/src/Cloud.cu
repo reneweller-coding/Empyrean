@@ -130,6 +130,7 @@ struct CloudEngine::Impl
     Reservoir    m_reservoir;              ///< the host's copy of the reservoir's settings
     Melt         m_melt;                   ///< the host's copy of the melt's settings
     SpectralComb m_comb;                   ///< the host's copy of the spectral comb
+    Clarity      m_clarity;                ///< the host's copy of Clarity's settings (20.10.2026)
     Turbulence   m_turb;                   ///< the host's copy of the energy cascade's settings
     float       *m_dCascadeA =
         nullptr;   ///< device: per voice and harmonic its power against the spectrum's, buffer A (even blocks read it)
@@ -138,6 +139,8 @@ struct CloudEngine::Impl
     unsigned long long *m_dHallHist = nullptr;      ///< device: per band the partials' power this block (fixed point)
     float              *m_dHallMemory = nullptr;    ///< device: the hall's memory, per band
     float              *m_dDensity = nullptr;       ///< device: the spectrum's density, per band
+    unsigned long long *m_dClarHist = nullptr;      ///< device: per band the partials' power this block, for Clarity
+    float              *m_dClarCut = nullptr;       ///< device: per band Clarity's cut in dB
     float              *m_dTau = nullptr;           ///< device: per partial its own clock
     float4             *m_dOrbitA = nullptr;        ///< device: the Orbit field's state, buffer A
     float4             *m_dOrbitB = nullptr;        ///< device: buffer B
@@ -346,6 +349,8 @@ struct CloudEngine::Impl
                           static_cast<void *>( m_dHallHist ),
                           static_cast<void *>( m_dHallMemory ),
                           static_cast<void *>( m_dDensity ),
+                          static_cast<void *>( m_dClarHist ),
+                          static_cast<void *>( m_dClarCut ),
                           static_cast<void *>( m_dTau ),
                           static_cast<void *>( m_dOrbitA ),
                           static_cast<void *>( m_dOrbitB ),
@@ -449,6 +454,8 @@ struct CloudEngine::Impl
         m_iceUp = false;
         m_dHallHist = nullptr;
         m_dHallMemory = m_dDensity = m_dTau = nullptr;
+        m_dClarHist = nullptr;
+        m_dClarCut = nullptr;
         m_dOrbitA = m_dOrbitB = nullptr;
         m_hHallMemory = m_hHallUp = nullptr;
         m_dWindA = m_dWindB = nullptr;
@@ -690,6 +697,8 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
            ok( cudaMalloc( &m.m_dHallHist, sizeof( unsigned long long ) * HallBins ), "cudaMalloc hall", error ) &&
            ok( cudaMalloc( &m.m_dHallMemory, sizeof( float ) * HallBins ), "cudaMalloc hall", error ) &&
            ok( cudaMalloc( &m.m_dDensity, sizeof( float ) * HallBins ), "cudaMalloc density", error ) &&
+           ok( cudaMalloc( &m.m_dClarHist, sizeof( unsigned long long ) * HallBins ), "cudaMalloc clarity", error ) &&
+           ok( cudaMalloc( &m.m_dClarCut, sizeof( float ) * HallBins ), "cudaMalloc clarity", error ) &&
            ok( cudaMalloc( &m.m_dTau, sizeof( float ) * partialsTotal ), "cudaMalloc clocks", error ) &&
            ok( cudaMalloc( &m.m_dOrbitA, sizeof( float4 ) * partialsTotal ), "cudaMalloc orbit", error ) &&
            ok( cudaMalloc( &m.m_dOrbitB, sizeof( float4 ) * partialsTotal ), "cudaMalloc orbit", error ) &&
@@ -828,6 +837,9 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
         ok( cudaMemsetAsync( m.m_dHallHist, 0, sizeof( unsigned long long ) * HallBins, m.m_stream ), "cudaMemsetAsync",
             error ) &&
         ok( cudaMemsetAsync( m.m_dDensity, 0, sizeof( float ) * HallBins, m.m_stream ), "cudaMemsetAsync", error ) &&
+        ok( cudaMemsetAsync( m.m_dClarHist, 0, sizeof( unsigned long long ) * HallBins, m.m_stream ), "cudaMemsetAsync",
+            error ) &&
+        ok( cudaMemsetAsync( m.m_dClarCut, 0, sizeof( float ) * HallBins, m.m_stream ), "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dTau, 0, sizeof( float ) * partialsTotal, m.m_stream ), "cudaMemsetAsync", error ) &&
         ok( cudaMemsetAsync( m.m_dOrbitA, 0, sizeof( float4 ) * partialsTotal, m.m_stream ), "cudaMemsetAsync",
             error ) &&
@@ -1112,9 +1124,10 @@ bool CloudEngine::open( const CloudConfig &config, std::string *error )
                                           m.m_dSyncX, m.m_dSyncOrder, partialsTotal, m.m_dFlockA, m.m_dFlockB,
                                           m.m_dCascadeA, m.m_dCascadeB, m.m_dFilterTable, m.m_dHallHist, m.m_dDensity,
                                           m.m_dTau, m.m_dOrbitA, m.m_dOrbitB, m.m_dDreamState, m.m_dSwarmView,
-                                          m.m_dPhysTrail, m.m_dPhysDeposit, m.m_dHalo );
+                                          m.m_dPhysTrail, m.m_dPhysDeposit, m.m_dHalo, m.m_dClarHist, m.m_dClarCut );
             hallKernel<<<1, HallBins, 0, m.m_stream>>>( hdr, m.m_dHallHist, m.m_dHallMemory, m.m_dDensity,
                                                         m.m_dDreamAcc );
+            clarityKernel<<<1, HallBins, 0, m.m_stream>>>( hdr, m.m_dClarHist, m.m_dClarCut );
             dreamSimKernel<<<DreamMemories / DreamThreads, DreamThreads, 0, m.m_stream>>>(
                 hdr, m.m_dDreamAcc, m.m_dDreamMem, m.m_dDreamState, m.m_dDreamSims, m.m_dMeta );
             dreamRecallKernel<<<1, DreamBands, 0, m.m_stream>>>( hdr, m.m_dDreamAcc, m.m_dDreamMem, m.m_dDreamState,
@@ -1609,6 +1622,11 @@ SpectralComb &CloudEngine::comb()
     return m_impl->m_comb;
 }
 
+Clarity &CloudEngine::clarity()
+{
+    return m_impl->m_clarity;
+}
+
 void CloudEngine::reservoirOut( float *out ) const
 {
     for ( int k = 0; k < ReservoirOutputs; ++k ) out[k] = m_impl->m_hLifeStats[5 + k];
@@ -1671,6 +1689,7 @@ void CloudEngine::launch()
     hdr->m_reservoir = m.m_reservoir;
     hdr->m_melt = m.m_melt;
     hdr->m_comb = m.m_comb;
+    hdr->m_clarity = m.m_clarity;
     hdr->m_turb = m.m_turb;
     hdr->m_chimes = m.m_chimes;
     hdr->m_chimes.m_pitchCount = std::clamp( m.m_chimes.m_pitchCount, 0, ChimePitches );

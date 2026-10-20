@@ -47,6 +47,51 @@ __global__ void __launch_bounds__( HallBins )
     if ( mh.m_memoryCoef > 0.0f && total > 1.0e-9f ) memory[b] += ( here - memory[b] ) * mh.m_memoryCoef;
 }
 
+/**
+ * @brief Clarity (20.10.2026, Cloud.h), one CUDA block, a band a thread: the partials' power gathered this block
+ *        (fixed point, cleared here); per band its critical band (Zwicker's bandwidth, half either side), the whole of
+ *        it and its strongest band; a crowded critical band -- its whole more than 2 dB over its strongest band -- cuts
+ *        its weaker bands, the further under the strongest the more, and the cut follows (30 ms) and lets go (300 ms).
+ * @param[in]     hdr   the header
+ * @param[in,out] hist  per band the power gathered this block (fixed point, 1e-12)
+ * @param[in,out] cut   per band the cut in dB the partials read the block after
+ */
+__global__ void __launch_bounds__( HallBins )
+    clarityKernel( const BlockHeader *hdr, unsigned long long *hist, float *cut )
+{
+    const Clarity   &c = hdr->m_clarity;
+    __shared__ float pw[HallBins];
+    const int        b = static_cast<int>( threadIdx.x );
+    const float      own = static_cast<float>( hist[b] ) * 1.0e-12f;
+    hist[b] = 0ULL;
+    pw[b] = own;
+    __syncthreads();
+    constexpr float BandsPerOctave = static_cast<float>( HallBins ) / 9.96578428f;
+    float           aim = 0.0f;
+    if ( c.m_amount > 0.0f && own > 0.0f )
+    {
+        const float f = 20.0f * exp2f( ( static_cast<float>( b ) + 0.5f ) / BandsPerOctave );
+        const float k = f * 0.001f;
+        const float bw = 25.0f + 75.0f * powf( 1.0f + 1.4f * k * k, 0.69f );   // Zwicker and Terhardt, 1980
+        const int   down = static_cast<int>( log2f( f / fmaxf( f - 0.5f * bw, 0.5f * f ) ) * BandsPerOctave );
+        const int   up = static_cast<int>( log2f( ( f + 0.5f * bw ) / f ) * BandsPerOctave );
+        float       whole = 0.0f, top = 0.0f;
+        for ( int q = max( b - down, 0 ); q <= min( b + up, HallBins - 1 ); ++q )
+        {
+            whole += pw[q];
+            top = fmaxf( top, pw[q] );
+        }
+        const float crowd = 10.0f * log10f( whole / top );   // dB the critical band holds over its strongest band
+        const float under = 10.0f * log10f( top / own );     // dB this band lies under the strongest
+        const float floor = fminf( fmaxf( ( f - 120.0f ) / 130.0f, 0.0f ), 1.0f );
+        const float crowded = fminf( fmaxf( crowd - 2.0f, 0.0f ), 10.0f ), weaker = fminf( under / 6.0f, 1.0f );
+        aim = fminf( c.m_amount * floor * 1.2f * crowded * weaker, 12.0f );
+    }
+    float now = cut[b];
+    now += ( aim - now ) * ( aim > now ? c.m_attack : c.m_release );
+    cut[b] = now < 1.0e-3f ? 0.0f : now;
+}
+
 namespace
 {
 

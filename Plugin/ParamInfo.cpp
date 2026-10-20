@@ -136,6 +136,8 @@ const Info InfoTable[] = {
     { "throat_sub", "Kargyraa: the ventricular folds close every other cycle, an octave below." },
     { "throat_vowel", "The vowel: u, o, a, e, i." },
     { "throat_voices", "How many throats: the root, its fifth, its octave, the fifth above." },
+    { "clarity", "Thins every crowded critical band by its weaker partials before they sound: the strongest stands "
+                 "clear, nothing smears, nothing waits." },
     { "brain_consonance", "How consonant the conductor's choices are: 0 anything goes, 1 strictly sweet." },
     { "brain_wander", "How far the conductor's register wanders." },
     { "auto_lead", "How far, in semitones, a voice may move when it is exchanged." },

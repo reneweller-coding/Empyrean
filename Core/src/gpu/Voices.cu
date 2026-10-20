@@ -919,6 +919,8 @@ __device__ float physStep( const Physarum &P, const float *trail, const float4 *
  * @param[in]     physTrail    the physarum's trail, both buffers (physTrailKernel wrote this block's)
  * @param[in,out] physDeposit  per trail cell what the physarum's agents leave this block
  * @param[in]     haloState    the halo's lattices (haloKernel), HaloCarriers x HaloComponents
+ * @param[in,out] clarHist     per band the power gathered this block, for Clarity (clarityKernel)
+ * @param[in]     clarCut      per band Clarity's cut in dB, the block before (clarityKernel)
  */
 __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, int pcap, const EnvShape *shapes,
                               const float *land, uint4 *run, float4 *amp, float4 *gains, const float *ring,
@@ -927,7 +929,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                               const float *qa, const float *qb, const float *filterTable, unsigned long long *hallHist,
                               const float *density, float *tau, float4 *orbitA, float4 *orbitB, const float *dreamState,
                               const float4 *swarmView, const float *physTrail, unsigned int *physDeposit,
-                              const float2 *haloState )
+                              const float2 *haloState, unsigned long long *clarHist, const float *clarCut )
 {
     const int gid = blockIdx.x * blockDim.x + threadIdx.x;
     const int v = gid / pcap;
@@ -1525,6 +1527,14 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
         // few loudest bands.
         if ( hdr->m_modal.m_listen && target > 0.0f && cv.m_kind == VoiceKindE::NOTE )
             atomicAdd( hallHist + hallBin( f ), static_cast<unsigned long long>( target * 1.0e12f ) );
+        // Clarity (20.10.2026): this partial's power in its band as it would sound, and the band's cut from the block
+        // before (clarityKernel) on it.
+        if ( hdr->m_clarity.m_amount > 0.0f && target > 0.0f && cv.m_kind == VoiceKindE::NOTE )
+        {
+            const int band = hallBin( f );
+            atomicAdd( clarHist + band, static_cast<unsigned long long>( target * target * 1.0e12f ) );
+            target *= exp2f( -clarCut[band] * 0.16609640f );   // dB to gain: 2^(-dB / 6.0206)
+        }
     }
     const std::uint32_t incTarget = static_cast<std::uint32_t>( fminf( f / fs, 0.49f ) * 4294967296.0f );
 

@@ -4991,6 +4991,15 @@ void Engine::renderBlock()
             1.0f / std::sqrt( std::max( ( 1.0f - 0.5f * d ) * ( 1.0f - 0.5f * d ) + 0.125f * d * d, 1.0e-6f ) );
     }
 
+    // Clarity (20.10.2026, Cloud.h): the crowded critical bands thinned by their weaker partials; the cut's steps per
+    // block.
+    {
+        Clarity &C = m_cloud.clarity();
+        C.m_amount = cur( ParamIdE::CLARITY );
+        C.m_attack = 1.0f - std::exp( -dtf / 0.03f );
+        C.m_release = 1.0f - std::exp( -dtf / 0.3f );
+    }
+
     // The reservoir: stepped only while a row reads it; fed with what the instrument hears and
     // plays (the sources as the last block left them), each standardised against its last half
     // minute -- the reservoir hears how the music departs from its recent self.

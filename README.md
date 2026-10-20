@@ -98,12 +98,15 @@ with pictures by [KaleidoscopeEnhanced](https://github.com/reneweller-coding/Kal
   standalone puts the process into Windows' REALTIME GPU priority class: without it another program's graphics could
   hold the card for 20 ms.
 - **On the CPU**, what works on the sum: Noctuary's echoes, near room, diffusion, far reverb and unmask, the bass
-  made mono, mid/side, the soft clip -- and the conductor, the modulation, the tuning.
+  made mono, mid/side, the soft clip, a true-peak limiter at -1 dBTP -- and the conductor, the modulation, the tuning.
 
 ## The sound
 
 - **The spectrum** (Noctuary's formula, per partial): Tilt, Brightness, Odd / Even, Inharmonic (a stiff string's
   stretch), Presence, Pad Low Cut. The voice is normalised after the whole shape: colour changes the sound, not the level.
+- **Clarity**, unmasking where a mixer cannot reach: every partial's amplitude is known before it sounds, so the GPU
+  reads each critical band's crowding from the partials themselves and thins a crowded band by its weaker partials --
+  the strongest stands clear, a sparse spectrum is left alone; no transform, no latency, no smearing.
 - **The cloud:** its width in cents and how it widens to the top, every partial's drift and shimmer, its place in the
   stereo field; **Air**, a band of flickering partials heard as noise.
 - **Motion:** Random, Wave, Pendulum, Breathe, Glissando, Aurora -- the partials' envelopes set all at once; Aurora

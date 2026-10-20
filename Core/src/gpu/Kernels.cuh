@@ -24,7 +24,7 @@ __global__ void updateKernel( const BlockHeader *hdr, const CloudVoice *voices, 
                               const float *qa, const float *qb, const float *filterTable, unsigned long long *hallHist,
                               const float *density, float *tau, float4 *orbitA, float4 *orbitB, const float *dreamState,
                               const float4 *swarmView, const float *physTrail, unsigned int *physDeposit,
-                              const float2 *haloState );
+                              const float2 *haloState, unsigned long long *clarHist, const float *clarCut );
 __global__ void renderKernel( const BlockHeader *hdr, const CloudVoice *voices, int pcap, const uint4 *run,
                               const float4 *gains, float *scratch, int maxN );
 __global__ void reduceKernel( const BlockHeader *hdr, const float *scratch, int chunks, int perVoice, int maxN,
@@ -37,6 +37,7 @@ __global__ void absorbKernel( const BlockHeader *hdr );
 // Hall.cu
 __global__ void hallKernel( const BlockHeader *hdr, unsigned long long *hist, float *memory, float *density,
                             float *dreamAcc );
+__global__ void clarityKernel( const BlockHeader *hdr, unsigned long long *hist, float *cut );
 __global__ void modalKernel( const BlockHeader *hdr, const float *in, float2 *state, float *scratch, int maxN,
                              const float *land, const float *memory );
 __global__ void modalReduceKernel( const BlockHeader *hdr, const float *scratch, int maxN, float *out );

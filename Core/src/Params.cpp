@@ -519,6 +519,7 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::THROAT_SUB, "throat_sub", "Kargyraa", "Throat", 0.f, 1.f, 0.5f, 1.f, "" ),
     F( ParamIdE::THROAT_VOWEL, "throat_vowel", "Vowel", "Throat", 0.f, 1.f, 0.2f, 1.f, "" ),
     I( ParamIdE::THROAT_VOICES, "throat_voices", "Throats", "Throat", 1.f, 4.f, 2.f ),
+    F( ParamIdE::CLARITY, "clarity", "Clarity", "Space", 0.f, 1.f, 0.f, 1.f, "" ),   // 20.10.2026 (Cloud.h)
 } };
 
 }   // namespace

@@ -491,6 +491,30 @@ struct SpectralComb
 static_assert( sizeof( SpectralComb ) % 16 == 0, "SpectralComb rides in the block header" );
 
 /**
+ * @brief Clarity (20.10.2026): every crowded critical band thinned by its weaker partials, before they sound.
+ *
+ * A mixing engineer unmasks a dense pad with a dynamic equaliser or a resonance suppressor: an analysis of what has
+ * sounded, a cut on what sounds next, and the analysis cannot tell one partial from the next. Here every partial's
+ * amplitude is known before it is rendered. The update kernel gathers the partials' power on the hall's bands
+ * (HallBins over the ten octaves, 11.7 cents each); the clarity kernel reads, for every band, its critical band
+ * (Zwicker's bandwidth, half either side): the whole of it, and the strongest band in it. A critical band that holds
+ * much more than its strongest band -- crowded, many partials of near the same strength -- is the mud of a dense
+ * chord, its partials masking each other; there the weaker bands are cut, the further under the strongest the more
+ * (up to 6 dB under: fully), by up to 1.2 dB per dB of crowding over 2 dB, at most 12 dB, times Amount. A clear band
+ * (one partial, a single cloud) and a sparse spectrum are left alone. The cut follows in 30 ms, lets go in 300 ms,
+ * and applies one block later, to every partial in the band: no transform, no latency, no smearing -- the partials
+ * keep their phases and their exact frequencies. Nothing under 120 Hz moves (full from 250 Hz): the floor stays.
+ */
+struct Clarity
+{
+    float m_amount = 0.0f;    ///< 0 .. 1 (0: off)
+    float m_attack = 0.0f;    ///< the cut's step towards a deeper aim, per block (30 ms)
+    float m_release = 0.0f;   ///< and towards a shallower one (300 ms)
+    float m_pad = 0.0f;       ///< keeps the struct 16 bytes
+};
+static_assert( sizeof( Clarity ) % 16 == 0, "Clarity rides in the block header" );
+
+/**
  * @brief Turbulence: the energy cascade of a struck gong or tam-tam, along every voice's harmonics.
  *
  * In a plate or a shell the modes are not alone: struck hard they hand their energy on to modes
@@ -1302,6 +1326,9 @@ public:
 
     /** @brief The host's copy of the spectral comb, edited between wait() and the next launch(). @return the settings */
     SpectralComb &comb();
+    /** @brief The host's copy of Clarity's settings (20.10.2026), edited between wait() and the next launch().
+     *  @return the settings */
+    Clarity &clarity();
     /** @brief The energy cascade's settings for the next block (the voices carry their drives). @return them */
     Turbulence &turbulence();
     /** @brief The chime field's settings for the next block (Phase 27). @return them */
