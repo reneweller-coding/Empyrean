@@ -29,6 +29,7 @@
 #include "additiv/ClusterBrain.h"
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
+#include "additiv/Limiter.h"
 #include "additiv/Focus.h"
 #include "additiv/Landscape.h"
 #include "additiv/Modulation.h"
@@ -130,7 +131,7 @@ public:
     bool realtime() const { return m_realtime; }
 
     /** @brief How many samples everything is delayed by (the host compensates). @return samples */
-    int latencySamples() const { return m_latency; }
+    int latencySamples() const { return m_latency + m_limiter.latency(); }
 
     /** @brief The layout prepare() was given. @return the config */
     const EngineConfig &config() const { return m_cfg; }
@@ -965,6 +966,7 @@ private:
     EarlyRoom          m_early;                 ///< the near plane's early reflections
     Reverb             m_nearRev;               ///< the near plane's small reverb
     MidSide            m_midSide;               ///< bass mono and width
+    TruePeakLimiter    m_limiter;               ///< the output's true-peak limiter, -1 dBTP (after the soft clip)
     std::vector<float> m_nearL;                 ///< one GPU block's near plane, left (then the whole mix)
     std::vector<float> m_nearR;                 ///< its near plane, right (then the whole mix)
     std::vector<float> m_farL;                  ///< its far plane, left (then the far reverb)

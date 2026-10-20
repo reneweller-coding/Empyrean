@@ -65,6 +65,7 @@ add_library(AdditivCore STATIC
     Core/src/Params.cpp
     Core/src/Tuning.cpp
     Core/src/Effects.cpp
+    Core/src/Limiter.cpp
     Core/src/Modulation.cpp
     Core/src/Presets.cpp
     Core/src/Morph.cpp

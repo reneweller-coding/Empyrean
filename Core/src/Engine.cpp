@@ -331,6 +331,9 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_early.prepare( m_cfg.m_sampleRate );
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
+    m_limiter.prepare( m_cfg.m_sampleRate, 1.5f );   // its latency is part of latencySamples()
+    m_limiter.set( -1.0f, 120.0f );
+    m_limiter.reset();
     for ( std::vector<float> *b : { &m_nearL,    &m_nearR,    &m_farL,   &m_farR,   &m_dryL,  &m_dryR,  &m_wetL,
                                     &m_wetR,     &m_modalL,   &m_modalR, &m_specL,  &m_specR, &m_meltL, &m_meltR,
                                     &m_phantomL, &m_phantomR, &m_bloomL, &m_bloomR, &m_roomL, &m_roomR } )
@@ -5345,10 +5348,17 @@ void Engine::renderBlock()
     }
     followFloor( m_nearL.data(), m_nearR.data(), G );   // Floor (Phase 32): how much of the mix is the floor
     for ( int s = 0; s < G; ++s )
+    {   // the master, the soft clip that rounds the sample peaks, then the true-peak limiter for what lies between them
+        const size_t k = static_cast<size_t>( s );
+        m_nearL[k] = softClip( m_nearL[k] * m_blk.m_master );
+        m_nearR[k] = softClip( m_nearR[k] * m_blk.m_master );
+    }
+    m_limiter.process( m_nearL.data(), m_nearR.data(), G );
+    for ( int s = 0; s < G; ++s )
     {
         const size_t at = static_cast<size_t>( ( pos + s ) & m_ringMask ) * 2;
-        m_ring[at] = softClip( m_nearL[static_cast<size_t>( s )] * m_blk.m_master );
-        m_ring[at + 1] = softClip( m_nearR[static_cast<size_t>( s )] * m_blk.m_master );
+        m_ring[at] = m_nearL[static_cast<size_t>( s )];
+        m_ring[at + 1] = m_nearR[static_cast<size_t>( s )];
     }
     m_renderPos.store( pos + G, std::memory_order_release );
     LARGE_INTEGER qpcEnd, qpcFreq;
