@@ -13,6 +13,7 @@
 #include "additiv/Cloud.h"
 #include "additiv/ClusterBrain.h"
 #include "additiv/Landscape.h"
+#include "additiv/Scene.h"
 #include "additiv/Shapes.h"
 
 #include <algorithm>
@@ -522,6 +523,13 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::CLARITY, "clarity", "Clarity", "Space", 0.f, 1.f, 0.f, 1.f, "" ),   // 20.10.2026 (Cloud.h)
     F( ParamIdE::FOCUS, "focus", "Focus", "Space", 0.f, 1.f, 0.f, 1.f, "" ),         // 20.10.2026 (Cloud.h)
     F( ParamIdE::IMAGE, "image", "Image", "Space", 0.f, 1.f, 0.f, 1.f, "" ),         // 20.10.2026 (Image.h)
+    F( ParamIdE::LOOP_MIX, "loop_mix", "Loop", "Loop", 0.f, 1.f, 0.f, 1.f, "" ),     // 20.10.2026 (LongLoop)
+    F( ParamIdE::LOOP_TIME, "loop_time", "Loop Time", "Loop", 4.f, 16.f, 12.f, 1.f, "s" ),
+    F( ParamIdE::LOOP_FEEDBACK, "loop_feedback", "Loop Feedback", "Loop", 0.f, 0.98f, 0.9f, 1.f, "" ),
+    F( ParamIdE::LOOP_TONE, "loop_tone", "Loop Tone", "Loop", 300.f, 12000.f, 3500.f, 0.3f, "Hz" ),
+    F( ParamIdE::LOOP_DRIVE, "loop_drive", "Loop Drive", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
+    F( ParamIdE::LOOP_TO_FAR, "loop_to_far", "Loop To Far", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
+    C( ParamIdE::SCENE, "scene", "Scene", "Space", SceneNames, NumScenes, 0 ),   // 20.10.2026 (Scene.h)
 } };
 
 }   // namespace

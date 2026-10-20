@@ -967,6 +967,9 @@ private:
     EarlyRoom          m_early;                 ///< the near plane's early reflections
     Reverb             m_nearRev;               ///< the near plane's small reverb
     MidSide            m_midSide;               ///< bass mono and width
+    LongLoop           m_loop;                  ///< the long loop (loop_*, 20.10.2026)
+    float              m_prevLoopMix = 0.0f;    ///< the loop's mix the last block (ramped across this one)
+    float              m_prevLoopToFar = 0.0f;  ///< and its send into the far plane
     ImageMatch         m_image;                 ///< the width per band (image, Image.h)
     TruePeakLimiter    m_limiter;               ///< the output's true-peak limiter, -1 dBTP (after the soft clip)
     std::vector<float> m_nearL;                 ///< one GPU block's near plane, left (then the whole mix)

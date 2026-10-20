@@ -25,6 +25,7 @@
 #include "additiv/PresetMap.h"
 #include "additiv/Route.h"
 #include "additiv/Presets.h"
+#include "additiv/Scene.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -398,11 +399,20 @@ int main( int argc, char **argv )
         std::printf( "route %s: %d waypoints\n", routeName.c_str(), route.count() );
     }
     for ( const std::string &s : sets )
+    {
         if ( !applySet( e, s ) )
         {
             std::fprintf( stderr, "empy_render: cannot apply --set %s\n", s.c_str() );
             return 1;
         }
+        if ( s.rfind( "scene=", 0 ) == 0 )
+        {   // a scene sets its knobs here, so a later --set wins (Scene.h)
+            int                 count = 0;
+            const SceneSetting *k = sceneSettings( static_cast<int>( e.param( ParamIdE::SCENE ) ), count );
+            for ( int i = 0; i < count; ++i )
+                if ( const ParamDesc *t = findParam( k[i].m_key ) ) e.setParam( t->m_id, k[i].m_value );
+        }
+    }
     if ( !modRows.empty() ) e.setModText( modRows );   // replaces the preset's matrix
     if ( !brain ) e.setParam( ParamIdE::BRAIN_ON, 0.0f );
     EngineConfig c;

@@ -328,6 +328,7 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_unmask.prepare( m_cfg.m_sampleRate );
     m_delay.prepare( m_cfg.m_sampleRate );
     m_delay2.prepare( m_cfg.m_sampleRate );
+    m_loop.prepare( m_cfg.m_sampleRate );
     m_early.prepare( m_cfg.m_sampleRate );
     m_nearRev.prepare( m_cfg.m_sampleRate );
     m_midSide.prepare( m_cfg.m_sampleRate );
@@ -5285,6 +5286,26 @@ void Engine::renderBlock()
         }
         m_prevDelay2Mix = m2;
         m_prevDelay2ToFar = t2;
+    }
+    {   // The long loop (20.10.2026): the dry voices into many seconds of delay, onto the near plane and into the far.
+        const float ml = cur( ParamIdE::LOOP_MIX ), tl = cur( ParamIdE::LOOP_TO_FAR );
+        if ( ml > 0.0f || m_prevLoopMix > 0.0f )   // Mix 0: off, To Far too (it is a share of the loop's output)
+        {
+            m_loop.set( cur( ParamIdE::LOOP_TIME ), cur( ParamIdE::LOOP_FEEDBACK ), cur( ParamIdE::LOOP_TONE ),
+                        cur( ParamIdE::LOOP_DRIVE ) );
+            m_loop.process( m_dryL.data(), m_dryR.data(), m_wetL.data(), m_wetR.data(), G );
+            for ( int s = 0; s < G; ++s )
+            {
+                const size_t k = static_cast<size_t>( s );
+                const float  m = ramp( m_prevLoopMix, ml, s ), tf = ramp( m_prevLoopToFar, tl * ml, s );
+                m_nearL[k] += m_wetL[k] * m;
+                m_nearR[k] += m_wetR[k] * m;
+                m_farL[k] += m_wetL[k] * tf;
+                m_farR[k] += m_wetR[k] * tf;
+            }
+        }
+        m_prevLoopMix = ml;
+        m_prevLoopToFar = tl * ml;
     }
     {   // the spectral echo, from the GPU: onto the near plane and partly into the far
         const float m3 = cur( ParamIdE::SPEC_MIX ), t3 = cur( ParamIdE::SPEC_TO_FAR ) * m3;

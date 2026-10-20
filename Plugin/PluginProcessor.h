@@ -706,6 +706,10 @@ private:
      * @pre called on the message thread
      */
     void timerCallback() override;
+    /** @brief Scene (20.10.2026, Scene.h): a newly chosen scene sets its knobs; not after a preset or a state load. */
+    void sceneTick();
+    int    m_scene = 0;               ///< the scene the knobs were last set to (or loaded with)
+    double m_sceneQuietUntil = 0.0;   ///< until this time (ms) a scene's change is a load's, not a choice
     /** @brief The hands' moves in the family's grammar, on the macros every preset shares. */
     void pollHeadset();
     /** @brief The journey's pump: the seconds since the last tick, and the preset a step glides into. */

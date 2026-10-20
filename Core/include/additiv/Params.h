@@ -417,6 +417,14 @@ enum class ParamIdE : int
     CLARITY,   ///< 0 .. 1: every crowded critical band thinned by its weaker partials, before they sound (Cloud.h)
     FOCUS,     ///< 0 .. 1: every partial's place drawn towards its voice's (Cloud.h)
     IMAGE,     ///< 0 .. 1: the width per band toward Ultimae's and Robert Rich's masters (Image.h)
+    // 20.10.2026: the long loop (Effects.h, LongLoop): Robert Rich's sleep-concert loops
+    LOOP_MIX,        ///< 0 .. 1: the loop onto the near plane (0: off)
+    LOOP_TIME,       ///< s: the loop's length, 4 .. 16
+    LOOP_FEEDBACK,   ///< 0 .. 0.98: how much comes round again
+    LOOP_TONE,       ///< Hz: the low pass in the loop -- each round darker
+    LOOP_DRIVE,      ///< 0 .. 1: the saturation in the loop -- each round softer
+    LOOP_TO_FAR,     ///< 0 .. 1: of the loop's output (times Mix), what goes on into the far plane
+    SCENE,           ///< SceneNames (Scene.h): the space set as a place, once when chosen
     COUNT      ///< number of parameters
 };
 

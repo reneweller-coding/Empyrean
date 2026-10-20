@@ -140,6 +140,17 @@ const Info InfoTable[] = {
                  "clear, nothing smears, nothing waits." },
     { "focus", "Draws every partial towards its voice's place: 0 a wash across the field, 1 voices one can point at, "
                "their width left to the rooms." },
+    { "scene", "Sets the space as a place, once when chosen: Forest a short dark scattering room, Canyon echoes off "
+               "walls 85 and 140 m away, Desert nearly dry, Sky an endless soft reverb, Ocean a long dark one. The knobs "
+               "then stand there and turn from there." },
+    { "loop_mix", "Robert Rich's sleep-concert loops: the voices circle on a delay of many seconds, a little darker and "
+                  "softer each round, under what is played now. 0 switches it off." },
+    { "loop_time", "How long a round lasts, 4 to 16 seconds; the right side is a 23rd longer, so the rounds drift apart. "
+                   "A new time glides in like a tape's speed." },
+    { "loop_feedback", "How much comes round again: at 0.9 a round loses about a decibel, the loop lasts minutes." },
+    { "loop_tone", "The low pass inside the loop: lower and every round grows darker sooner." },
+    { "loop_drive", "A gentle saturation inside the loop: every round a little softer, as a tape loop wears." },
+    { "loop_to_far", "How much of the loop (as loud as Loop sets it) goes on into the far plane, to dissolve there." },
     { "image", "Brings the width of five bands into the range of Ultimae's and Robert Rich's masters, and keeps every "
                "side under its mid, so nothing cancels in mono. Off in the binaural mode." },
     { "brain_consonance", "How consonant the conductor's choices are: 0 anything goes, 1 strictly sweet." },

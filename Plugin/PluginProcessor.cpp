@@ -6,6 +6,7 @@
  * @par Compile Flags:
  *   @arg @c ADDITIV_VERSION - the project's version (the top CMakeLists.txt), written into the saved state
  */
+#include "additiv/Scene.h"
 #include "PluginProcessor.h"
 
 #include "PluginEditor.h"
@@ -126,6 +127,19 @@ void AdditivProcessor::timerCallback()
     pollHeadset();
     journeyTick();
     mapTick();
+    sceneTick();
+}
+
+void AdditivProcessor::sceneTick()
+{
+    const int scene = static_cast<int>( std::lround( value( static_cast<int>( ParamIdE::SCENE ) ) ) );
+    if ( scene == m_scene ) return;
+    m_scene = scene;
+    if ( juce::Time::getMillisecondCounterHiRes() < m_sceneQuietUntil ) return;   // a preset or a state brought it
+    int                          count = 0;
+    const additiv::SceneSetting *s = additiv::sceneSettings( scene, count );
+    for ( int i = 0; i < count; ++i )
+        if ( const ParamDesc *d = additiv::findParam( s[i].m_key ) ) setValue( static_cast<int>( d->m_id ), s[i].m_value );
 }
 
 void AdditivProcessor::pollHeadset()
@@ -234,6 +248,7 @@ const juce::String AdditivProcessor::getProgramName( int index )
 
 void AdditivProcessor::applyPreset( int index, double glide )
 {
+    m_sceneQuietUntil = juce::Time::getMillisecondCounterHiRes() + 1500.0;   // its scene is the preset's, not a choice
     if ( index < 0 || index >= additiv::numPresets() ) return;
     float       values[additiv::NumParams];
     std::string mod;
@@ -1547,6 +1562,7 @@ void AdditivProcessor::getStateInformation( juce::MemoryBlock &dest )
 
 void AdditivProcessor::setStateInformation( const void *data, int size )
 {
+    m_sceneQuietUntil = juce::Time::getMillisecondCounterHiRes() + 1500.0;   // its scene is the state's, not a choice
     const std::unique_ptr<juce::XmlElement> xml = getXmlFromBinary( data, size );
     if ( !xml || !xml->hasTagName( "AdditivState" ) ) return;
     // A parameter the state does not name goes to its default, never stays where it was: otherwise
