@@ -66,6 +66,7 @@ add_library(AdditivCore STATIC
     Core/src/Tuning.cpp
     Core/src/Effects.cpp
     Core/src/Scene.cpp
+    Core/src/Balance.cpp
     Core/src/Image.cpp
     Core/src/Limiter.cpp
     Core/src/Modulation.cpp

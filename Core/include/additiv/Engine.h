@@ -29,6 +29,7 @@
 #include "additiv/ClusterBrain.h"
 #include "additiv/Dsp.h"
 #include "additiv/Effects.h"
+#include "additiv/Balance.h"
 #include "additiv/Image.h"
 #include "additiv/Limiter.h"
 #include "additiv/Focus.h"
@@ -971,6 +972,7 @@ private:
     float              m_prevLoopMix = 0.0f;    ///< the loop's mix the last block (ramped across this one)
     float              m_prevLoopToFar = 0.0f;  ///< and its send into the far plane
     ImageMatch         m_image;                 ///< the width per band (image, Image.h)
+    BalanceMatch       m_balance;               ///< the tonal balance (balance, Balance.h)
     TruePeakLimiter    m_limiter;               ///< the output's true-peak limiter, -1 dBTP (after the soft clip)
     std::vector<float> m_nearL;                 ///< one GPU block's near plane, left (then the whole mix)
     std::vector<float> m_nearR;                 ///< its near plane, right (then the whole mix)

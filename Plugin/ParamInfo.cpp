@@ -140,6 +140,9 @@ const Info InfoTable[] = {
                  "clear, nothing smears, nothing waits." },
     { "focus", "Draws every partial towards its voice's place: 0 a wash across the field, 1 voices one can point at, "
                "their width left to the rooms." },
+    { "balance", "Brings the tonal balance of six bands into the range of Ultimae's and Robert Rich's masters: a band "
+                 "louder than theirs is lowered, a quieter one raised -- at most 4 dB, slowly, and only where there is "
+                 "something to raise (the Floor gives the bass where there is none)." },
     { "scene", "Sets the space as a place, once when chosen: Forest a short dark scattering room, Canyon echoes off "
                "walls 85 and 140 m away, Desert nearly dry, Sky an endless soft reverb, Ocean a long dark one. The knobs "
                "then stand there and turn from there." },

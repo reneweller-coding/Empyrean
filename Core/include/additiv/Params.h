@@ -425,6 +425,7 @@ enum class ParamIdE : int
     LOOP_DRIVE,      ///< 0 .. 1: the saturation in the loop -- each round softer
     LOOP_TO_FAR,     ///< 0 .. 1: of the loop's output (times Mix), what goes on into the far plane
     SCENE,           ///< SceneNames (Scene.h): the space set as a place, once when chosen
+    BALANCE,         ///< 0 .. 1: the tonal balance in six bands toward Ultimae's and Robert Rich's masters (Balance.h)
     COUNT      ///< number of parameters
 };
 

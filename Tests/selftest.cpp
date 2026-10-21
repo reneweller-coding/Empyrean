@@ -144,7 +144,7 @@ void noEffects( Engine &e )
     for ( ParamIdE id :
           { ParamIdE::FAR_LEVEL, ParamIdE::EARLY_LEVEL, ParamIdE::NEAR_MIX, ParamIdE::DELAY_MIX, ParamIdE::DELAY_TO_FAR,
             ParamIdE::DELAY2_MIX, ParamIdE::DELAY2_TO_FAR, ParamIdE::MODAL_LEVEL, ParamIdE::FAR_UNMASK,
-            ParamIdE::IMAGE } )
+            ParamIdE::IMAGE, ParamIdE::BALANCE, ParamIdE::FOCUS } )
         e.setParam( id, 0.0f );
 }
 

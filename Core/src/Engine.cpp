@@ -338,6 +338,12 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     static const float ImageHi[ImageMatch::Bands] = { -2.8f, -1.3f, -0.9f, -1.2f, -0.8f };
     m_image.prepare( m_cfg.m_sampleRate );
     m_image.setRanges( ImageLo, ImageHi );
+    // The tonal balance's range (21.10.2026): each band's share of the whole in dB, the first and third quartile of
+    // 308 Ultimae and 228 Robert Rich recordings (Family/tools/mix_audit.py, their third-octave curves folded).
+    static const float BalanceLo[BalanceMatch::Bands] = { -33.6f, -8.4f, -7.9f, -10.9f, -17.8f, -31.2f };
+    static const float BalanceHi[BalanceMatch::Bands] = { -18.8f, -2.1f, -4.4f, -4.1f, -11.5f, -19.9f };
+    m_balance.prepare( m_cfg.m_sampleRate );
+    m_balance.setRanges( BalanceLo, BalanceHi );
     m_limiter.prepare( m_cfg.m_sampleRate, 1.5f );   // its latency is part of latencySamples()
     m_limiter.set( -1.0f, 120.0f );
     m_limiter.reset();
@@ -5386,6 +5392,9 @@ void Engine::renderBlock()
         m_nearL[static_cast<size_t>( s )] += m_phantomL[static_cast<size_t>( s )];
         m_nearR[static_cast<size_t>( s )] += m_phantomR[static_cast<size_t>( s )];
     }
+    // The tonal balance (21.10.2026, Balance.h): the same on both ears, so the binaural mode keeps it too.
+    m_balance.set( cur( ParamIdE::BALANCE ) );
+    m_balance.process( m_nearL.data(), m_nearR.data(), G );
     followFloor( m_nearL.data(), m_nearR.data(), G );   // Floor (Phase 32): how much of the mix is the floor
     for ( int s = 0; s < G; ++s )
     {   // the master, the soft clip that rounds the sample peaks, then the true-peak limiter for what lies between them

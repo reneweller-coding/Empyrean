@@ -475,7 +475,7 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::PEDAL, "pedal", "Pedal", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::PRESSURE, "pressure", "Pressure", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::PRESSURE_RATE, "pressure_rate", "Pressure Rate", "Floor", 0.03f, 0.5f, 0.12f, 0.5f, "Hz" ),
-    F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
+    F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.12f, 1.f, "" ),   // 21.10.2026: a quiet sub
     F( ParamIdE::FLOOR_FIFTH, "floor_fifth", "Fifth", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::FLOOR_BREATH, "floor_breath", "Breath", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::STAR, "star", "Star", "Star", 0.f, 1.f, 0.f, 1.f, "" ),
@@ -521,8 +521,8 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::THROAT_VOWEL, "throat_vowel", "Vowel", "Throat", 0.f, 1.f, 0.2f, 1.f, "" ),
     I( ParamIdE::THROAT_VOICES, "throat_voices", "Throats", "Throat", 1.f, 4.f, 2.f ),
     F( ParamIdE::CLARITY, "clarity", "Clarity", "Space", 0.f, 1.f, 0.f, 1.f, "" ),   // 20.10.2026 (Cloud.h)
-    F( ParamIdE::FOCUS, "focus", "Focus", "Space", 0.f, 1.f, 0.f, 1.f, "" ),         // 20.10.2026 (Cloud.h)
-    F( ParamIdE::IMAGE, "image", "Image", "Space", 0.f, 1.f, 0.f, 1.f, "" ),         // 20.10.2026 (Image.h)
+    F( ParamIdE::FOCUS, "focus", "Focus", "Space", 0.f, 1.f, 0.5f, 1.f, "" ),       // 20.10.2026 (Cloud.h)
+    F( ParamIdE::IMAGE, "image", "Image", "Space", 0.f, 1.f, 1.f, 1.f, "" ),         // 20.10.2026 (Image.h)
     F( ParamIdE::LOOP_MIX, "loop_mix", "Loop", "Loop", 0.f, 1.f, 0.f, 1.f, "" ),     // 20.10.2026 (LongLoop)
     F( ParamIdE::LOOP_TIME, "loop_time", "Loop Time", "Loop", 4.f, 16.f, 12.f, 1.f, "s" ),
     F( ParamIdE::LOOP_FEEDBACK, "loop_feedback", "Loop Feedback", "Loop", 0.f, 0.98f, 0.9f, 1.f, "" ),
@@ -530,6 +530,7 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::LOOP_DRIVE, "loop_drive", "Loop Drive", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
     F( ParamIdE::LOOP_TO_FAR, "loop_to_far", "Loop To Far", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
     C( ParamIdE::SCENE, "scene", "Scene", "Space", SceneNames, NumScenes, 0 ),   // 20.10.2026 (Scene.h)
+    F( ParamIdE::BALANCE, "balance", "Balance", "Space", 0.f, 1.f, 1.f, 1.f, "" ),   // 21.10.2026 (Balance.h)
 } };
 
 }   // namespace

@@ -514,7 +514,7 @@ int main( int argc, char **argv )
             std::fprintf(
                 stderr,
                 "additiv_presets [--from N] [--to M] [--step K] [--names FILE] [--seconds S] [--out FILE] [--describe FILE] [--sensitivity FILE] "
-                "[--register FILE [--set \"key=value;...\"]] [--evaluate FILE] [--jobs N] [--played] [--own-gain]\n" );
+                "[--register FILE] [--set \"key=value;...\"] [--evaluate FILE] [--jobs N] [--played] [--own-gain]\n" );
             return 1;
         }
     }
@@ -600,22 +600,20 @@ int main( int argc, char **argv )
     {
         for ( int i = from; i <= to; i += step ) which.push_back( i );
     }
-    if ( !registerFile.empty() )
+    // --set "key=value;key=value": knobs set after every preset's own (the register mode's and, 21.10.2026, the
+    // levels': what a new default would change)
+    std::vector<std::pair<ParamIdE, float>> overrides;
+    for ( size_t at = 0; at < setText.size(); )
     {
-        std::vector<std::pair<ParamIdE, float>> overrides;
-        size_t                                  at = 0;
-        while ( at < setText.size() )
-        {   // "key=value;key=value"
-            const size_t      end = std::min( setText.find( ';', at ), setText.size() );
-            const std::string item = setText.substr( at, end - at );
-            const size_t      eq = item.find( '=' );
-            if ( eq != std::string::npos )
-                if ( const ParamDesc *d = findParam( item.substr( 0, eq ).c_str() ) )
-                    overrides.emplace_back( d->m_id, static_cast<float>( std::atof( item.c_str() + eq + 1 ) ) );
-            at = end + 1;
-        }
-        return registerMode( which, seconds, registerFile, overrides );
+        const size_t      end = std::min( setText.find( ';', at ), setText.size() );
+        const std::string item = setText.substr( at, end - at );
+        const size_t      eq = item.find( '=' );
+        if ( eq != std::string::npos )
+            if ( const ParamDesc *d = findParam( item.substr( 0, eq ).c_str() ) )
+                overrides.emplace_back( d->m_id, static_cast<float>( std::atof( item.c_str() + eq + 1 ) ) );
+        at = end + 1;
     }
+    if ( !registerFile.empty() ) return registerMode( which, seconds, registerFile, overrides );
     if ( !sensitivityFile.empty() ) return sensitivity( which, seconds, sensitivityFile );
     if ( checkNudges ) return nudgeCheck( which, seconds );
     const auto                                       t0 = std::chrono::steady_clock::now();
@@ -640,7 +638,7 @@ int main( int argc, char **argv )
             std::string  error;
             Description  desc;
             const double db =
-                measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc, {}, played, ownGain );
+                measure( i, seconds, &error, describeFile.empty() ? nullptr : &desc, overrides, played, ownGain );
             const std::lock_guard<std::mutex> hold( lock );
             if ( std::isnan( db ) )
             {
