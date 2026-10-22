@@ -90,6 +90,27 @@ public:
     void set( float amount );
 
     /**
+     * @brief How fast it listens and moves (21.10.2026). The defaults (8 s, half a dB a second, 8 dB, 10 dB a minute)
+     *        suit an instrument played live; a composed piece wants its balance learnt on its loudest part and held
+     *        through the breakdowns -- no equaliser chasing the arrangement (30 s, 0.1 dB a second, 3 dB, 1 dB a
+     *        minute: in Parhelion's energy test the drop stood 3.9 LU over the breakdown, with the defaults 2.1).
+     * @param[in] averageSeconds     the averages' time
+     * @param[in] glideDbPerSecond   how fast a trim moves
+     * @param[in] gateDb             blocks within this of the loudest count
+     * @param[in] fallDbPerMinute    how fast the loudest is forgotten
+     */
+    void setTiming( float averageSeconds, float glideDbPerSecond, float gateDb, float fallDbPerMinute );
+
+    /**
+     * @brief Whether the trims keep the whole's power where it was (22.10.2026). The shares do not change when every
+     *        band moves alike, so without this the trims may all drift up or down together -- in Parhelion by about
+     *        3 dB, which its Leveler then took back before the master, and every stem stood 3 to 4 LU lower against
+     *        the mix. Off by default: Noctuary's and Empyrean's banks are levelled with it off.
+     * @param[in] neutral  true: a common offset after every round of the aims holds the whole's power
+     */
+    void setNeutral( bool neutral ) { m_neutral = neutral; }
+
+    /**
      * @brief Processes @p n samples in place.
      * @param[in,out] L  the left channel
      * @param[in,out] R  the right channel
@@ -133,7 +154,13 @@ private:
     int                       m_blockLength = 4800;   ///< samples a block (100 ms)
     float                     m_avgCoef = 0.0f;       ///< the averages' step per gated block (about 8 s)
     float                     m_glide = 0.05f;        ///< the trims' step per block, dB (half a dB a second)
+    float                     m_avgSeconds = 8.0f;    ///< the averages' time (setTiming)
+    float                     m_glidePerSecond = 0.5f;   ///< the trims' speed, dB a second
+    float                     m_gateDb = 8.0f;        ///< blocks within this of the loudest count
+    float                     m_fallPerMinute = 10.0f;   ///< how fast the loudest is forgotten, dB a minute
+    double                    m_fall = 1.0;           ///< the loudest's factor per block (falling)
     bool                      m_heard = false;        ///< a gated block has been averaged
+    bool                      m_neutral = false;      ///< the trims keep the whole's power (setNeutral)
     ToneEq                    m_eq;                   ///< the shelves and bells
     ToneEq::State             m_state;                ///< their memory
 };
