@@ -339,9 +339,13 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_image.prepare( m_cfg.m_sampleRate );
     m_image.setRanges( ImageLo, ImageHi );
     // The tonal balance's range (21.10.2026): each band's share of the whole in dB, the first and third quartile of
-    // 308 Ultimae and 228 Robert Rich recordings (Family/tools/mix_audit.py, their third-octave curves folded).
-    static const float BalanceLo[BalanceMatch::Bands] = { -33.6f, -8.4f, -7.9f, -10.9f, -17.8f, -31.2f };
-    static const float BalanceHi[BalanceMatch::Bands] = { -18.8f, -2.1f, -4.4f, -4.1f, -11.5f, -19.9f };
+    // 308 Ultimae and 228 Robert Rich recordings (Family/tools/mix_audit.py --balance-ranges ultimae+robertrich).
+    // Corrected 11.11.2026: the first table (-33.6 .. -18.8, -8.4 .. -2.1, -7.9 .. -4.4, -10.9 .. -4.1,
+    // -17.8 .. -11.5, -31.2 .. -19.9) was worked out with the recordings' third-octave curve read as if it began at
+    // 40 Hz; it begins at 24.8 Hz, so every band stood two thirds of an octave too low -- a sub aimed 15 to 20 dB
+    // under the recordings', presence and air 2 to 5 dB over them.
+    static const float BalanceLo[BalanceMatch::Bands] = { -14.0f, -7.6f, -9.0f, -13.1f, -22.0f, -36.8f };
+    static const float BalanceHi[BalanceMatch::Bands] = { -5.3f, -3.2f, -3.6f, -6.4f, -15.3f, -22.5f };
     m_balance.prepare( m_cfg.m_sampleRate );
     m_balance.setRanges( BalanceLo, BalanceHi );
     m_limiter.prepare( m_cfg.m_sampleRate, 1.5f );   // its latency is part of latencySamples()
