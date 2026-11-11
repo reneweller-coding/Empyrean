@@ -322,6 +322,14 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     refreshLandscape();
     m_brain.reset( m_rng.fork(), 48 + m_rootPc );
     m_brain2.reset( m_side.fork(), 36 + m_rootPc );   // its own stream: switching it on never moves the first
+    // The figures (11.11.2026): their own dice, seeded from the seed and from nothing else's stream.
+    m_figRng.seed( static_cast<std::uint64_t>( m_cfg.m_seed ) * 0x9E3779B97F4A7C15ull + 0xF16A5E5ull );
+    for ( Figure &f : m_figs ) f = Figure{};
+    for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};
+    m_figActive = 0;
+    m_figMatch = 1.0f;
+    m_figPlayed.store( 0, std::memory_order_relaxed );
+    for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
     m_stepWas = param( ParamIdE::AUTO_STEP ) >= 0.5f;
     m_far.prepare( m_cfg.m_sampleRate );
     m_diffuser.prepare( m_cfg.m_sampleRate );
@@ -351,10 +359,14 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_limiter.prepare( m_cfg.m_sampleRate, 1.5f );   // its latency is part of latencySamples()
     m_limiter.set( -1.0f, 120.0f );
     m_limiter.reset();
-    for ( std::vector<float> *b : { &m_nearL,    &m_nearR,    &m_farL,   &m_farR,   &m_dryL,  &m_dryR,  &m_wetL,
-                                    &m_wetR,     &m_modalL,   &m_modalR, &m_specL,  &m_specR, &m_meltL, &m_meltR,
-                                    &m_phantomL, &m_phantomR, &m_bloomL, &m_bloomR, &m_roomL, &m_roomR } )
+    for ( std::vector<float> *b :
+          { &m_nearL,  &m_nearR,  &m_farL,  &m_farR,  &m_dryL,    &m_dryR,   &m_wetL,     &m_wetR,
+            &m_modalL, &m_modalR, &m_specL, &m_specR, &m_meltL,   &m_meltR,  &m_phantomL, &m_phantomR,
+            &m_bloomL, &m_bloomR, &m_roomL, &m_roomR, &m_farLowL, &m_farLowR } )
         b->assign( static_cast<size_t>( G ), 0.0f );
+    m_farLp[0].reset();
+    m_farLp[1].reset();
+    m_farLowOn = false;
     m_ghosts.assign( static_cast<size_t>( std::max( 0, m_cfg.m_ghosts ) ), Ghost{} );
     m_ghostRng = Rng( m_cfg.m_seed ^ 0x47686F7374ull );
     m_windRng = Rng( m_cfg.m_seed ^ 0x57696E64ull );
@@ -1147,6 +1159,17 @@ void Engine::readParams()
     m_blk.m_brain2 = g( ParamIdE::BRAIN2_ON ) >= 0.5f;
     m_blk.m_brain2Interval = static_cast<int>( std::lround( g( ParamIdE::BRAIN2_INTERVAL ) ) );
     m_blk.m_brain2Depth = g( ParamIdE::BRAIN2_DEPTH );
+    m_blk.m_figures = std::clamp( static_cast<int>( std::lround( g( ParamIdE::FIGURES ) ) ), 0, MaxFigures );
+    m_blk.m_figEvery = std::max( g( ParamIdE::FIGURE_EVERY ), 1.0f );
+    m_blk.m_figNotes = std::clamp( static_cast<int>( std::lround( g( ParamIdE::FIGURE_NOTES ) ) ), 1, FigureNotes );
+    m_blk.m_figPace = std::max( g( ParamIdE::FIGURE_PACE ), 0.05f );
+    m_blk.m_figChange = std::clamp( g( ParamIdE::FIGURE_CHANGE ), 0.0f, 1.0f );
+    m_blk.m_figRegister = static_cast<int>( std::lround( g( ParamIdE::FIGURE_REGISTER ) ) );
+    m_blk.m_figLevel = std::clamp( g( ParamIdE::FIGURE_LEVEL ), 0.0f, 1.0f );
+    m_blk.m_figAttack = std::max( g( ParamIdE::FIGURE_ATTACK ), 0.001f );
+    m_blk.m_figRelease = std::max( g( ParamIdE::FIGURE_RELEASE ), 0.05f );
+    m_blk.m_figDepth = std::clamp( g( ParamIdE::FIGURE_DEPTH ), 0.0f, 1.0f );
+    m_blk.m_figPure = std::clamp( g( ParamIdE::FIGURE_PURE ), 0.0f, 1.0f );
     m_blk.m_overblow = g( ParamIdE::OVERBLOW );
     m_blk.m_overblowTime = g( ParamIdE::OVERBLOW_TIME );
     m_blk.m_seasons = g( ParamIdE::SEASONS );
@@ -1557,7 +1580,10 @@ float Engine::brainDistance()
 void Engine::beginOn( int i, int note, float velocity, float distance, int source, int onset, int channel )
 {
     Voice &v = m_voices[static_cast<size_t>( i )];
-    m_lastVelocity = velocity;
+    // A figure's note (11.11.2026) draws from the figures' dice alone and leaves the note sources as they are: the
+    // conductor's piece is the same with the figures or without.
+    const bool figure = source == FigureSource;
+    if ( !figure ) m_lastVelocity = velocity;
     v.m_note = note;
     v.m_source = source;
     v.m_channel = source == 0 ? channel : -1;
@@ -1571,15 +1597,16 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     v.m_place = std::clamp( distance, 0.0f, 1.0f );
     v.m_distance = v.m_place;
     v.m_prevDistance = v.m_place;
-    v.m_breath.init( m_side );
-    v.m_cutoffDrift.init( m_side );
+    v.m_breath.init( figure ? m_figRng : m_side );
+    v.m_cutoffDrift.init( figure ? m_figRng : m_side );
     v.m_env.kill();
-    // Premonition (Phase 27): a conductor's note is heard coming -- its swell first, its envelope after.
-    v.m_pre = source != 0 && m_blk.m_premonition > 0.0f ? std::max( m_blk.m_premonitionTime, 0.5f ) : 0.0f;
+    // Premonition (Phase 27): a conductor's note is heard coming -- its swell first, its envelope after. (A figure's
+    // note is a line: it begins when it begins.)
+    v.m_pre = source != 0 && !figure && m_blk.m_premonition > 0.0f ? std::max( m_blk.m_premonitionTime, 0.5f ) : 0.0f;
     v.m_preTotal = v.m_pre;
     v.m_suck = 0.0f;
     if ( v.m_pre <= 0.0f ) v.m_env.noteOn();
-    v.m_seed = static_cast<std::uint32_t>( m_rng.next() ) | 1u;
+    v.m_seed = static_cast<std::uint32_t>( ( figure ? m_figRng : m_rng ).next() ) | 1u;
     v.m_restart = true;
     v.m_onset = onset;
     v.m_released = false;
@@ -1587,14 +1614,14 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     v.m_tailArmed = false;
     v.m_tuneCents = 0.0f;
     v.m_lastGain = 0.0f;
-    m_randomNote = m_noteRng.bipolar();
+    if ( !figure ) m_randomNote = m_noteRng.bipolar();
     v.m_age = 0.0;
     v.m_stealing = false;
     v.m_stealBlocks = 0;
     // Phase 26: the harmonics' lives begin at rest; the subharmonics' clouds are kept for the note if it
     // starts while they are wanted (the partials are shared out once, so they never jump).
     v.m_share = { 1.0f, 0.0f, 0.0f, 0.0f };
-    v.m_blowWander.init( m_blowRng );
+    v.m_blowWander.init( figure ? m_figRng : m_blowRng );
     v.m_pileLive = false;
     v.m_pileDepth = 0.0f;
     v.m_glow.fill( 0.0f );
@@ -1679,13 +1706,16 @@ void Engine::purge()
     }
     for ( Ghost &g : m_ghosts ) g.m_on = false;
     m_foundationNote = m_floorSubNote = m_floorFifthNote = -1;
+    for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};   // the figures begin anew when the instrument wakes
+    for ( Figure &f : m_figs ) f.m_count = 0;
+    m_figActive = 0;
     // Notes not yet due belong to what was silenced -- unless one was played after the panic and wakes the instrument.
     if ( !m_resumeLater ) m_pending.clear();
     // The conductors: no note of theirs sounds any more; their roots and their dice stay (reset() would begin the
     // piece again), so switched off (while the panic holds) they only forget what they held.
     {
-        auto none = []( const BrainEvent & ) {};
-        auto freqOf = [this]( int note ) { return frequencyOf( note ); };
+        auto        none = []( const BrainEvent & ) {};
+        auto        freqOf = [this]( int note ) { return frequencyOf( note ); };
         BrainParams off = m_bp, off2 = m_bp2;
         off.m_on = off2.m_on = false;
         m_brain.update( 0.0, off, -1, freqOf, none );
@@ -1700,6 +1730,8 @@ void Engine::purge()
     m_far.clear();
     m_diffuser.reset();
     m_unmask.reset();
+    m_farLp[0].reset();
+    m_farLp[1].reset();
     std::fill( m_sofarRing.begin(), m_sofarRing.end(), 0.0f );
     // The card: what rings on by itself, and the subsystems that are asked through their own flags.
     m_cloud.hush();
@@ -1708,6 +1740,238 @@ void Engine::purge()
     m_cloud.room().m_clear = 1;
     m_cloud.harp().m_clear = 1;
     m_cloud.halo().m_clear = ( 1 << HaloCarriers ) - 1;
+}
+
+// ---- the figures (11.11.2026)
+
+float Engine::figureFit( int note, const int *chord, int n )
+{
+    for ( int k = 0; k < n; ++k )
+        if ( ( ( note - chord[k] ) % 12 + 12 ) % 12 == 0 ) return 3.0f;
+    float w = 1.0f;
+    for ( int k = 0; k < n; ++k )
+    {
+        const int ic = ( ( note - chord[k] ) % 12 + 12 ) % 12;
+        if ( ic == 1 || ic == 6 || ic == 11 ) return 0.0f;
+        if ( ic == 2 || ic == 10 ) w = 0.5f;
+    }
+    return w;
+}
+
+int Engine::drawFigureNote( int around, int avoid, bool chordTone, int centre, const int *chord, int n )
+{
+    // by the size of the step, 0 .. 7 semitones: seconds and thirds, a fourth less, the tritone hardly, a fifth
+    static const float Step[8] = { 0.6f, 1.0f, 1.0f, 0.8f, 0.8f, 0.5f, 0.15f, 0.35f };
+    float              weight[15];
+    float              total = 0.0f;
+    for ( int d = -7; d <= 7; ++d )
+    {
+        const int c = around + d;
+        float     w = 0.0f;
+        if ( c != avoid && std::abs( c - centre ) <= 9 && c >= 24 && c <= 108 )
+        {
+            const float fit = figureFit( c, chord, n );
+            w = ( chordTone ? ( fit >= 3.0f ? 1.0f : 0.0f ) : fit ) * Step[std::abs( d )];
+        }
+        weight[d + 7] = w;
+        total += w;
+    }
+    if ( total <= 0.0f )
+    {   // nothing fits there: the chord tone nearest to it, in whatever octave
+        int best = around, bestDist = 999;
+        for ( int k = 0; k < n; ++k )
+        {
+            const int c =
+                chord[k] + 12 * static_cast<int>( std::lround( static_cast<float>( around - chord[k] ) / 12.0f ) );
+            const int dist = std::abs( c - around ) + ( c == avoid ? 12 : 0 );
+            if ( dist < bestDist )
+            {
+                bestDist = dist;
+                best = c;
+            }
+        }
+        return std::clamp( best, 24, 108 );
+    }
+    float u = m_figRng.uniform() * total;
+    for ( int d = -7; d <= 7; ++d )
+    {
+        u -= weight[d + 7];
+        if ( u < 0.0f ) return around + d;
+    }
+    return around;
+}
+
+int Engine::figureCentre( int i ) const
+{
+    static const int Offset[MaxFigures] = { 0, 7, -5, 12 };
+    const int        lo = std::min( m_bp.m_low, m_bp.m_high ), hi = std::max( m_bp.m_low, m_bp.m_high );
+    return std::clamp( std::min( ( lo + hi ) / 2 + 7 + Offset[std::clamp( i, 0, MaxFigures - 1 )], 79 ) +
+                           m_blk.m_figRegister,
+                       33, 99 );
+}
+
+void Engine::composeFigure( int i, const int *chord, int n )
+{
+    Figure   &f = m_figs[static_cast<size_t>( i )];
+    const int centre = figureCentre( i );
+    const int most = std::clamp( m_blk.m_figNotes, 1, FigureNotes );
+    f.m_most = most;
+    f.m_centre = centre;
+    // The first figure is the long one; the others draw their length.
+    f.m_count =
+        i == 0 ? most : 1 + std::min( most - 1, static_cast<int>( m_figRng.uniform() * static_cast<float>( most ) ) );
+    int   prev = -1;
+    float at = 0.0f;
+    for ( int k = 0; k < f.m_count; ++k )
+    {
+        const size_t s = static_cast<size_t>( k );
+        const bool   edge = k == 0 || k == f.m_count - 1;   // it begins and ends on a chord tone
+        prev = drawFigureNote( prev < 0 ? centre : prev, prev, edge, centre, chord, n );
+        f.m_note[s] = prev;
+        // an arch: the middle of a figure is its strongest
+        f.m_vel[s] = ( 0.55f + 0.35f * std::sin( 3.14159265f * ( static_cast<float>( k ) + 0.5f ) /
+                                                 static_cast<float>( f.m_count ) ) ) *
+                     ( 0.88f + 0.12f * m_figRng.uniform() );
+        f.m_at[s] = at;
+        // a pace to the next, now and then two (a held note), never quite even
+        at += ( m_figRng.uniform() < 0.25f ? 2.0f : 1.0f ) * ( 1.0f + 0.1f * m_figRng.bipolar() );
+    }
+    f.m_clock = 0.0;
+    f.m_next = 0;
+}
+
+void Engine::stepFigures( double dt )
+{
+    // What has sounded its length is let go (its release rings on).
+    for ( FigureHeld &h : m_figHeld )
+        if ( h.m_note >= 0 && ( h.m_left -= static_cast<float>( dt ) ) <= 0.0f )
+        {
+            stopNote( h.m_note, FigureSource );
+            h.m_note = -1;
+        }
+    const int want = m_bp.m_on ? m_blk.m_figures : 0;   // the conductor's: they rest when it does
+    if ( want <= 0 )
+    {
+        if ( m_figActive > 0 )
+        {   // switched off: what sounds is let go, and they are composed anew the next time
+            for ( FigureHeld &h : m_figHeld )
+                if ( h.m_note >= 0 )
+                {
+                    stopNote( h.m_note, FigureSource );
+                    h.m_note = -1;
+                }
+            for ( Figure &f : m_figs ) f.m_count = 0;
+            m_figActive = 0;
+        }
+        return;
+    }
+    // The chord they play to: the conductor's notes as they sound. They enter once there is one.
+    int       chord[ClusterBrain::Slots];
+    float     vels[ClusterBrain::Slots];
+    const int n = m_brain.soundingNotes( chord, vels );
+    if ( n < 2 && m_figActive == 0 ) return;
+    m_figActive = want;
+    // The loops' lengths against the first's: in no simple ratio (the fourth root of two, three less the golden
+    // ratio, the golden ratio), so the figures never meet the same way twice.
+    static const double Ratio[MaxFigures] = { 1.0, 1.1892071, 1.3819660, 1.6180340 };
+    const double        every = m_blk.m_figEvery, pace = m_blk.m_figPace;
+    for ( int i = 0; i < MaxFigures; ++i )
+    {
+        Figure &f = m_figs[static_cast<size_t>( i )];
+        if ( i >= want )
+        {
+            f.m_count = 0;
+            continue;
+        }
+        if ( f.m_count == 0 )
+        {
+            if ( n < 2 ) continue;
+            composeFigure( i, chord, n );
+            // they enter one after the other, the first soon
+            f.m_wait = every * ( 0.1 + 0.37 * i + 0.15 * static_cast<double>( m_figRng.uniform() ) );
+        }
+        else if ( ( f.m_most != m_blk.m_figNotes || std::abs( figureCentre( i ) - f.m_centre ) > 4 ) && n >= 2 )
+        {
+            // the Notes knob moved, or the register (another preset, the Register knob): composed anew, where its
+            // loop stands
+            const double clock = f.m_clock;
+            composeFigure( i, chord, n );
+            f.m_clock = clock;
+            while ( f.m_next < f.m_count &&
+                    static_cast<double>( f.m_at[static_cast<size_t>( f.m_next )] ) * pace < clock )
+                ++f.m_next;   // what would have sounded already is not played late
+        }
+        if ( f.m_wait > 0.0 )
+        {
+            f.m_wait -= dt;
+            continue;
+        }
+        f.m_clock += dt;
+        while ( f.m_next < f.m_count &&
+                f.m_clock >= static_cast<double>( f.m_at[static_cast<size_t>( f.m_next )] ) * pace )
+        {
+            const size_t k = static_cast<size_t>( f.m_next++ );
+            int          note = f.m_note[k];
+            if ( n > 0 && figureFit( note, chord, n ) <= 0.0f )
+            {   // the harmony has moved under it: to the nearest note that fits (a chord tone first), and it stays
+                int best = note;
+                for ( int pass = 0; pass < 2 && best == note; ++pass )
+                    for ( int d : { -1, 1, -2, 2 } )
+                        if ( figureFit( note + d, chord, n ) >= ( pass == 0 ? 3.0f : 0.5f ) )
+                        {
+                            best = note + d;
+                            break;
+                        }
+                f.m_note[k] = note = best;
+            }
+            // A figure never takes a sounding voice: a note that finds none free or fading is left out.
+            bool room = false;
+            for ( const Voice &v : m_voices )
+                if ( !v.m_stealing && ( v.m_note < 0 || v.m_released ) )
+                {
+                    room = true;
+                    break;
+                }
+            if ( !room ) continue;
+            startNote( note, f.m_vel[k],
+                       std::clamp( m_blk.m_figDepth * ( 0.85f + 0.15f * m_figRng.uniform() ), 0.0f, 1.0f ),
+                       FigureSource, 0 );
+            // held for most of a pace (its attack at the least), then let go
+            FigureHeld *slot = &m_figHeld[0];
+            for ( FigureHeld &h : m_figHeld )
+            {
+                if ( h.m_note < 0 )
+                {
+                    slot = &h;
+                    break;
+                }
+                if ( h.m_left < slot->m_left ) slot = &h;
+            }
+            if ( slot->m_note >= 0 ) stopNote( slot->m_note, FigureSource );
+            slot->m_note = note;
+            slot->m_left = std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ) + m_blk.m_figAttack;
+            const int played = m_figPlayed.load( std::memory_order_relaxed );
+            m_figLog[static_cast<size_t>( played & 15 )].store( note, std::memory_order_relaxed );
+            m_figPlayed.store( played + 1, std::memory_order_relaxed );
+        }
+        // The loop: as long as the knob says times the figure's own factor -- and as the figure itself at the least.
+        const double period = std::max(
+            every * Ratio[i], ( static_cast<double>( f.m_at[static_cast<size_t>( f.m_count - 1 )] ) + 1.5 ) * pace );
+        if ( f.m_clock >= period )
+        {
+            f.m_clock -= period;
+            f.m_next = 0;
+            if ( n >= 2 && m_figRng.uniform() < m_blk.m_figChange )
+            {   // it comes round changed: one note drawn anew, between its neighbours
+                const int k =
+                    std::min( f.m_count - 1, static_cast<int>( m_figRng.uniform() * static_cast<float>( f.m_count ) ) );
+                const size_t s = static_cast<size_t>( k );
+                const int    centre = figureCentre( i );
+                const int    around = k > 0 ? f.m_note[s - 1] : f.m_count > 1 ? f.m_note[1] : centre;
+                f.m_note[s] = drawFigureNote( around, f.m_note[s], k == 0 || k == f.m_count - 1, centre, chord, n );
+            }
+        }
+    }
 }
 
 void Engine::stopNote( int note, int source, int channel )
@@ -4280,6 +4544,7 @@ void Engine::renderBlock()
                          else
                              stopNote( e.m_note, 2 );
                      } );
+    stepFigures( dt );   // the figures (11.11.2026), to the chord as it stands now
     m_brainRoot.store( m_brain.root(), std::memory_order_relaxed );
     {   // the conductor's countdown and the foundation, for the panel
         const double next = m_brain.untilNext();
@@ -4404,7 +4669,10 @@ void Engine::renderBlock()
             cv.m_active = 0;
             continue;
         }
-        v.m_env.setTimes( m_blk.m_attack, m_blk.m_decay, m_blk.m_sustain, m_blk.m_release );
+        if ( v.m_source == FigureSource )   // a figure's note: a line with its own envelope, not the pad's
+            v.m_env.setTimes( m_blk.m_figAttack, 1.5f, 0.55f, m_blk.m_figRelease );
+        else
+            v.m_env.setTimes( m_blk.m_attack, m_blk.m_decay, m_blk.m_sustain, m_blk.m_release );
         // Premonition: before the note its swell -- rising as a reverb does backwards, a quarter of the way an e-fold
         // -- the cloud wide and far; at its start the swell is drawn into the note over 0.15 s.
         float preWide = 0.0f;
@@ -4523,6 +4791,8 @@ void Engine::renderBlock()
         float level =
             VoiceLevel * ( v.m_source == FoundationSource
                                ? ( 0.6f + 0.4f * m_foundation ) * m_foundationMatch * floorVoiceLevel( v.m_note )
+                           : v.m_source == FigureSource
+                               ? 1.25f * m_blk.m_figLevel * ( 0.3f + 0.7f * v.m_velocity ) * m_figMatch
                            : v.m_source != 0 ? 0.6f + 0.4f * v.m_velocity
                                              : 0.4f + 0.6f * v.m_velocity );
         cv.m_hz = static_cast<float>( v.m_hz * doppler * std::exp2( static_cast<double>( mpeBend ) / 12.0 ) );
@@ -4531,6 +4801,10 @@ void Engine::renderBlock()
         // MPE's Brightness: the tilt flattened (or steepened) by up to 0.6 and the window opened by up
         // to a half -- the window alone moves little under a falling spectrum.
         cv.m_tilt = std::max( 0.0f, m_blk.m_tilt - 0.6f * expr( MpeTargetE::BRIGHTNESS ) );
+        // A figure's note is rounder than the chord's (Figure Pure): its spectrum falls faster by up to 0.8 of the
+        // tilt -- a line needs its fundamental, not the pad's highs (a struck line in a bell preset raised the presence
+        // by 5.6 dB before this).
+        if ( v.m_source == FigureSource ) cv.m_tilt += 0.8f * m_blk.m_figPure;
         cv.m_brightness = std::clamp( m_blk.m_brightness + 0.5f * expr( MpeTargetE::BRIGHTNESS ), 0.0f, 1.0f );
         cv.m_oddEven = m_blk.m_oddEven;
         cv.m_inharmonic = m_blk.m_inharmonicB;
@@ -4596,6 +4870,7 @@ void Engine::renderBlock()
         cv.m_airWidth = m_blk.m_airWidth;
         cv.m_airJitter = m_blk.m_airJitter;
         cv.m_width = m_blk.m_width * std::exp2( 1.5f * expr( MpeTargetE::WIDTH ) );
+        if ( v.m_source == FigureSource ) cv.m_width *= 1.0f - 0.9f * m_blk.m_figPure;   // a clear line
         cv.m_widthSlope = m_blk.m_widthSlope;
         cv.m_drift = m_blk.m_drift;
         cv.m_driftRate = m_blk.m_driftRate;
@@ -4657,8 +4932,9 @@ void Engine::renderBlock()
         v.m_onset = 0;
         v.m_age += dt;
         ++sounding;
-        ++by[v.m_source == FoundationSource ? 1
-                                            : std::clamp( v.m_source, 0, 2 )];   // the foundation is the conductor's
+        ++by[v.m_source == FoundationSource || v.m_source == FigureSource
+                 ? 1
+                 : std::clamp( v.m_source, 0, 2 )];   // the foundation and the figures are the conductor's
     }
     m_sounding.store( sounding, std::memory_order_relaxed );
     {   // the chord's mean envelope, followed over a few seconds (the foundation's own sustain divided out)
@@ -4666,6 +4942,12 @@ void Engine::renderBlock()
         // sustain: half a voice under a lone note, a little over one voice under five.
         const float target = chordVoices > 0 ? 0.5f * std::sqrt( chordGain ) / std::max( m_blk.m_sustain, 0.2f ) : 0.0f;
         m_foundationMatch += ( std::min( target, 1.5f ) - m_foundationMatch ) * ( 1.0f - std::exp( -dtf / 4.0f ) );
+        // The figures stand against the whole chord (11.11.2026): a note of theirs is as loud as the chord's voices
+        // together times Figure Level -- under a full sustained chord a fixed level left the lines 9 dB under the pad,
+        // over struck notes long faded it made them the loudest thing by far. Not under half a voice: a line over a
+        // chord still arriving is heard.
+        const float chord = chordVoices > 0 ? std::sqrt( chordGain ) : 0.0f;
+        m_figMatch += ( std::clamp( chord, 0.5f, 3.0f ) - m_figMatch ) * ( 1.0f - std::exp( -dtf / 4.0f ) );
     }
     if ( srcW > 1.0e-6f ) m_srcDistance = srcD / srcW;
     if ( m_prevSounding == 0 && sounding > 0 )
@@ -4723,8 +5005,8 @@ void Engine::renderBlock()
         m_viewGain[static_cast<size_t>( i )].store( on ? cv.m_gain : 0.0f, std::memory_order_relaxed );
         m_viewDistance[static_cast<size_t>( i )].store( v.m_distance, std::memory_order_relaxed );
         m_viewTime[static_cast<size_t>( i )].store( cv.m_time, std::memory_order_relaxed );
-        m_viewSource[static_cast<size_t>( i )].store( v.m_source == FoundationSource ? 1 : v.m_source,
-                                                      std::memory_order_relaxed );
+        m_viewSource[static_cast<size_t>( i )].store(
+            v.m_source == FoundationSource || v.m_source == FigureSource ? 1 : v.m_source, std::memory_order_relaxed );
         m_viewNote[static_cast<size_t>( i )].store( on ? v.m_note : -1, std::memory_order_relaxed );
         m_viewPress[static_cast<size_t>( i )].store( v.m_press, std::memory_order_relaxed );
         m_viewSlide[static_cast<size_t>( i )].store( v.m_slide, std::memory_order_relaxed );
@@ -5460,6 +5742,35 @@ void Engine::renderBlock()
 
     // 7. The far plane is heard only through the far reverb: the swell of the diffusion first, the
     //    hall stepping aside for the near plane band by band after (Unmask).
+    //    But not its lows (Far Low Cut, 11.11.2026): a hall of half a minute makes mud of the bass and the low mids,
+    //    and a far voice's fundamental loses nothing by standing dry. Under the knob the plane is taken out by a low
+    //    pass of 12 dB an octave and heard as it is; the hall gets the plane less that, so the two sum to the plane
+    //    exactly. At 20 Hz the split is off and the plane goes into the hall whole, as it always did.
+    {
+        const float fc = cur( ParamIdE::FAR_LOWCUT );
+        if ( fc > 21.0f )
+        {
+            m_farLp[0].setQ( fc, 0.7071f, static_cast<float>( m_cfg.m_sampleRate ) );
+            m_farLp[1].copyCoefficients( m_farLp[0] );
+            for ( int s = 0; s < G; ++s )
+            {
+                const size_t k = static_cast<size_t>( s );
+                m_farLowL[k] = m_farLp[0].lp( m_farL[k] );
+                m_farLowR[k] = m_farLp[1].lp( m_farR[k] );
+                m_farL[k] -= m_farLowL[k];
+                m_farR[k] -= m_farLowR[k];
+            }
+            m_farLowOn = true;
+        }
+        else if ( m_farLowOn )
+        {
+            std::fill( m_farLowL.begin(), m_farLowL.end(), 0.0f );
+            std::fill( m_farLowR.begin(), m_farLowR.end(), 0.0f );
+            m_farLp[0].reset();
+            m_farLp[1].reset();
+            m_farLowOn = false;
+        }
+    }
     m_diffuser.set( cur( ParamIdE::FAR_DIFFUSE ) );
     m_diffuser.process( m_farL.data(), m_farR.data(), G );
     m_far.setMode( std::clamp( static_cast<int>( std::lround( cur( ParamIdE::FAR_MODE ) ) ), 0, NumFarModes - 1 ) );
@@ -5477,8 +5788,8 @@ void Engine::renderBlock()
         {
             const size_t k = static_cast<size_t>( s );
             const float  m = ramp( m_prevModalLevel, ml, s );
-            m_nearL[k] += m_farL[k] + m_modalL[k] * m + m_bloomL[k] + m_roomL[k];
-            m_nearR[k] += m_farR[k] + m_modalR[k] * m + m_bloomR[k] + m_roomR[k];
+            m_nearL[k] += m_farL[k] + m_modalL[k] * m + m_bloomL[k] + m_roomL[k] + m_farLowL[k];
+            m_nearR[k] += m_farR[k] + m_modalR[k] * m + m_bloomR[k] + m_roomR[k] + m_farLowR[k];
         }
         m_prevModalLevel = ml;
     }

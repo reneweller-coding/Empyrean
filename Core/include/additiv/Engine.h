@@ -523,6 +523,20 @@ public:
         return source >= 0 && source < 3 ? m_soundingBy[source].load( std::memory_order_relaxed ) : 0;
     }
 
+    /** @brief Notes the figures have played since prepare (11.11.2026). Any thread. @return the count */
+    int figureNotes() const { return m_figPlayed.load( std::memory_order_relaxed ); }
+    /**
+     * @brief One of the figures' last sixteen notes.
+     * @param[in] back  0 the last, 1 the one before it ...
+     * @return MIDI, -1 when there was none
+     */
+    int figureNote( int back ) const
+    {
+        const int n = m_figPlayed.load( std::memory_order_relaxed );
+        return back >= 0 && back < 16 && back < n
+                   ? m_figLog[static_cast<size_t>( ( n - 1 - back ) & 15 )].load( std::memory_order_relaxed )
+                   : -1;
+    }
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return m_brainRoot.load( std::memory_order_relaxed ); }
     /** @brief Seconds until the conductor's next decision, for the panel. Any thread. @return seconds */
@@ -842,6 +856,92 @@ private:
     int              m_userLandSeen = 0;       ///< the version on the GPU
     float            m_landRms = 1.0f;         ///< its RMS, for the level of voices that read it
     bool             m_stepWas = false;        ///< the Step switch's last value (it fires on the rising edge)
+    /**
+     * @name Figures (11.11.2026)
+     * What a conductor that exchanges one voice every half minute leaves out: something that happens. After Eno's
+     * Music for Airports -- a few short motifs, each on a loop of its own length, the lengths in no simple ratio, so
+     * that every figure is known again when it comes round and the constellation of them never repeats. A figure is
+     * one to six notes drawn to the conductor's chord as it stands: it begins and ends on a chord tone, moves by
+     * step oftener than by leap, and takes no note a semitone, a tritone or a major seventh from a chord tone. When
+     * the harmony has moved under it, a note that no longer fits goes to its nearest neighbour that does, and stays
+     * there; and now and then (Figure Change) a note is drawn anew when the figure has come round. The notes are
+     * voices like the others, with an envelope of their own (Figure Attack and Release), a narrower cloud and a
+     * rounder spectrum (Figure Pure) and their own place (Figure Depth): a clear line in front of the chord. They never take a sounding
+     * voice (a note that finds none free or fading is left out), and their dice are their own, so the conductor
+     * plays the same piece with them or without.
+     * @{ */
+    static constexpr int FigureSource = 5;   ///< a voice's source for a figure's note (shown as the conductor's)
+    static constexpr int MaxFigures = 4;     ///< figures at most
+    static constexpr int FigureNotes = 6;    ///< notes a figure has at most
+    /** @brief One figure: its notes, where in its loop each begins (in paces), and where the loop stands. */
+    struct Figure
+    {
+        int                            m_count = 0;     ///< its notes; 0: not composed yet
+        int                            m_most = 0;      ///< the Notes knob it was composed for
+        int                            m_centre = 60;   ///< the centre it was composed round, MIDI
+        std::array<int, FigureNotes>   m_note{};        ///< their pitches, MIDI
+        std::array<float, FigureNotes> m_vel{};         ///< their strengths, 0 .. 1
+        std::array<float, FigureNotes> m_at{};          ///< where each begins, in paces from the loop's start
+        double                         m_clock = 0.0;   ///< where the loop stands, s
+        double                         m_wait = 0.0;    ///< s before the figure first enters
+        int                            m_next = 0;      ///< the note of this round that comes next
+    };
+    /** @brief A figure's note that sounds: let go when its time is over. */
+    struct FigureHeld
+    {
+        int   m_note = -1;     ///< MIDI, -1 free
+        float m_left = 0.0f;   ///< s until it is let go
+    };
+    std::array<Figure, MaxFigures> m_figs;            ///< the figures
+    std::array<FigureHeld, 12>     m_figHeld;         ///< their notes sounding
+    int                            m_figActive = 0;   ///< how many play (0: none composed)
+    float m_figMatch = 1.0f;   ///< the chord's voices' envelopes together (their power's root), followed over seconds
+    Rng   m_figRng;            ///< their dice (their own stream)
+    std::atomic<int>                 m_figPlayed{ 0 };   ///< notes they have played since prepare (figureNotes())
+    std::array<std::atomic<int>, 16> m_figLog;           ///< the last of them, a ring (figureNote())
+    /**
+     * @brief The figures' block: lets go what has sounded, composes what is new, plays what is due.
+     * @param[in] dt  the block's length, s
+     */
+    void stepFigures( double dt );
+    /**
+     * @brief A figure's centre as the knobs stand: the first in the upper half of the conductor's register, the others
+     *        a fifth above it, a fourth below and an octave above -- none over G5 by itself (a conductor that reaches
+     *        high would put the lines into the presence band); Figure Register moves them from there.
+     * @param[in] i  which figure
+     * @return MIDI
+     */
+    int figureCentre( int i ) const;
+    /**
+     * @brief Composes a figure to the chord.
+     * @param[in] i      which figure
+     * @param[in] chord  the conductor's notes as they sound
+     * @param[in] n      how many
+     */
+    void composeFigure( int i, const int *chord, int n );
+    /**
+     * @brief How well a note fits a chord.
+     * @param[in] note   MIDI
+     * @param[in] chord  the chord's notes
+     * @param[in] n      how many
+     * @return 3 a chord tone (in any octave); 1 a third, a fourth, a fifth or a sixth to every chord tone; 0.5 with
+     *         a whole tone or a minor seventh among them; 0 a semitone, a tritone or a major seventh from one
+     */
+    static float figureFit( int note, const int *chord, int n );
+    /**
+     * @brief Draws a figure's note: within a fifth of the one before and a sixth of the figure's centre, by what
+     *        fits the chord, a step likelier than a leap.
+     * @param[in] around     the note before it (the centre for the first)
+     * @param[in] avoid      a note it must not be (the one before; -1 none)
+     * @param[in] chordTone  only a chord tone will do (a figure's first and last)
+     * @param[in] centre     the figure's centre, MIDI
+     * @param[in] chord      the chord's notes
+     * @param[in] n          how many
+     * @return MIDI
+     */
+    int drawFigureNote( int around, int avoid, bool chordTone, int centre, const int *chord, int n );
+    /** @} */
+
     // The foundation (Foundation): one voice on the conductor's root in the octave from C2 up (from
     // Lowest when the register begins lower), held while the root stands; the chord is drawn from a
     // fifth above it.
@@ -1008,6 +1108,10 @@ private:
     std::vector<float> m_nearR;                 ///< its near plane, right (then the whole mix)
     std::vector<float> m_farL;                  ///< its far plane, left (then the far reverb)
     std::vector<float> m_farR;                  ///< its far plane, right
+    std::vector<float> m_farLowL;            ///< the far plane under Far Low Cut, left: heard dry, not through the hall
+    std::vector<float> m_farLowR;            ///< and right
+    Svf                m_farLp[2];           ///< the low pass that takes it out (left, right)
+    bool               m_farLowOn = false;   ///< Far Low Cut is over 20 Hz
     std::vector<float> m_dryL;         ///< the near plane before the echoes, left: the early reflections' input
     std::vector<float> m_dryR;         ///< and right
     std::vector<float> m_wetL;         ///< an echo's output, left
@@ -1532,6 +1636,17 @@ private:
         bool  m_brain2 = false;           ///< the second conductor plays
         int   m_brain2Interval = -12;     ///< semitones
         float m_brain2Depth = 0.9f;       ///< its plane
+        int   m_figures = 0;              ///< the figures: how many
+        float m_figEvery = 22.0f;         ///< the first's loop, s
+        int   m_figNotes = 3;             ///< the first's notes
+        float m_figPace = 1.2f;           ///< s from note to note
+        float m_figChange = 0.25f;        ///< how often a note is renewed, 0 .. 1
+        int   m_figRegister = 0;          ///< semitones against the conductor's register
+        float m_figLevel = 0.7f;          ///< 0 .. 1
+        float m_figAttack = 0.08f;        ///< s
+        float m_figRelease = 5.0f;        ///< s
+        float m_figDepth = 0.2f;          ///< 0 at the ear .. 1 far
+        float m_figPure = 0.7f;           ///< 0 .. 1
         float m_overblow = 0.0f;          ///< Overblow, 0 .. 1
         float m_overblowTime = 0.6f;      ///< s
         float m_seasons = 0.0f;           ///< Seasons, 0 .. 1
@@ -1570,9 +1685,9 @@ private:
     std::atomic<bool>  m_panicAsked{ false };      ///< panic() was asked for
     std::atomic<bool>  m_resumeAsked{ false };     ///< resume() was asked for (or a note played into the silence)
     std::atomic<bool>  m_haltView{ false };        ///< a panic holds (set at once by panic(), for the panel and noteOn)
-    int                m_halt = 0;                 ///< the renderer's: 0 playing, 1 the block that fades out, 2 held silent
-    bool               m_resumeLater = false;      ///< a resume came while the fade's block ran: wake after the purge
-    float              m_haltGain = 1.0f;          ///< the output's gain at the end of the last block (0 while held)
+    int                m_halt = 0;   ///< the renderer's: 0 playing, 1 the block that fades out, 2 held silent
+    bool               m_resumeLater = false;   ///< a resume came while the fade's block ran: wake after the purge
+    float              m_haltGain = 1.0f;       ///< the output's gain at the end of the last block (0 while held)
     /** @brief What a panic empties, between two blocks (the renderer's thread). */
     void purge();
     std::atomic<int>   m_sounding{ 0 };            ///< voices sounding, for status

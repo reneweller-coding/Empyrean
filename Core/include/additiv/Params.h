@@ -426,7 +426,19 @@ enum class ParamIdE : int
     LOOP_TO_FAR,     ///< 0 .. 1: of the loop's output (times Mix), what goes on into the far plane
     SCENE,           ///< SceneNames (Scene.h): the space set as a place, once when chosen
     BALANCE,         ///< 0 .. 1: the tonal balance in six bands toward Ultimae's and Robert Rich's masters (Balance.h)
-    COUNT      ///< number of parameters
+    FIGURES,        ///< 0 .. 4: the figures (11.11.2026, Engine.h) -- motifs that come round on loops of unequal length
+    FIGURE_EVERY,   ///< s: the first figure's loop; the others' are longer by irrational factors
+    FIGURE_NOTES,   ///< 1 .. 6: the notes of the first figure (the others draw up to as many)
+    FIGURE_PACE,    ///< s: from one note of a figure to the next
+    FIGURE_CHANGE,     ///< 0 .. 1: how often a figure renews one of its notes when it has come round
+    FIGURE_REGISTER,   ///< semitones: the figures' register against the conductor's
+    FIGURE_LEVEL,      ///< 0 .. 1: how loud their notes are
+    FIGURE_ATTACK,     ///< s: their notes' attack
+    FIGURE_RELEASE,    ///< s: and release
+    FIGURE_DEPTH,      ///< 0 .. 1: where they stand, 0 at the ear
+    FIGURE_PURE,       ///< 0 .. 1: how much narrower their clouds and rounder their spectra are than the chord's
+    FAR_LOWCUT,        ///< Hz: under it the far plane stays out of the hall and is heard dry (11.11.2026); 20: off
+    COUNT              ///< number of parameters
 };
 
 constexpr int NumParams = static_cast<int>( ParamIdE::COUNT );   ///< rows of the table

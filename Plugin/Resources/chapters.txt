@@ -204,6 +204,14 @@ Brain 2 is a second conductor in the background: its root follows the first one'
 
 The quantum walk moves the conductor's root on the Tonnetz -- the pitch classes joined by fifths and by major and minor thirds -- not by dice but as a wave: twelve amplitudes that spread along the joins and interfere. Every Look Every seconds it is looked at, and the root moves to the pitch class where it is found, drawn by how much of the wave is there; the wave is then partly collapsed onto it and walks on, so it remembers where it might have gone. Spread: how far it spreads between two looks -- a little, and the root moves to a neighbour on the Tonnetz; much, and the interference decides, so that some roots come up again and again and others hardly ever.
 
+== The figures | Figures | ==
+
+A conductor that exchanges one voice every half minute leaves something out: that anything happens. Figures put a line in front of the chord: up to four short motifs, each on a loop of its own length -- the first as long as Figure Loop says, the others longer by factors in no simple ratio, so every figure is known again when it comes round and the constellation of them never repeats (the way of Brian Eno's Music for Airports).
+
+A figure has one to Figure Notes notes, a Figure Pace apart; it is drawn to the chord as it stands (it begins and ends on a chord tone and takes nothing that grates against one), follows the harmony when that moves, and with Figure Change one of its notes is drawn anew now and then. Figure Register moves them up or down against the conductor's register.
+
+Their Voice: the notes have their own envelope (Figure Attack and Release -- short for a plucked line, long for a sung one), a narrower cloud and a rounder spectrum than the chord's (Figure Pure), their own place (Figure Depth, 0 at the ear) and level -- Figure Level against the chord as it sounds: a line over a full chord is louder than one over a single note. They are the conductor's: they rest when it does, they never take a sounding voice, and it plays the same piece with them or without. Figures at 0 switches them off.
+
 == Space | Space | ==
 Every note stands on a plane between the ear (0) and the far background (1): the conductor puts some notes near and most deep (Depth), played notes stand at Keys Depth. A far note is quieter, darker and heard only through the far reverb. Breath lets every voice's plane wander; Doppler raises a voice that comes closer. Presence lifts the 2-5 kHz band on the near plane; Pad Low Cut leaves the bottom free.
 

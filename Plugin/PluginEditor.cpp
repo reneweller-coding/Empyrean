@@ -234,7 +234,7 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
     m_prevPreset.setTooltip( "The preset before" );
     m_nextPreset.setTooltip( "The preset after" );
     m_presetName.setTooltip(
-        "The preset playing: click to browse the bank (96 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)" );
+        "The preset playing: click to browse the bank (256 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)" );
     m_prevPreset.onClick = [this]
     { loadPreset( ( std::max( m_proc.currentPreset(), 0 ) + additiv::numPresets() - 1 ) % additiv::numPresets() ); };
     m_nextPreset.onClick = [this] { loadPreset( ( m_proc.currentPreset() + 1 ) % additiv::numPresets() ); };
@@ -524,6 +524,15 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
               IdsT{ ParamIdE::MPE_ON } },
             { "Quantum Walk", F::ENVELOPE, IdsT{ ParamIdE::QUANTUM, ParamIdE::QUANTUM_TIME, ParamIdE::QUANTUM_SPREAD },
               IdsT{ ParamIdE::QUANTUM } } } );
+    // The figures (11.11.2026): the loops, and the voice their notes have. A page of their own -- on the conductor's
+    // they made a fourth row, and the picture gave way for every page.
+    page( "Figures", { { "Figures", F::MOTION,
+                         IdsT{ ParamIdE::FIGURES, ParamIdE::FIGURE_EVERY, ParamIdE::FIGURE_NOTES, ParamIdE::FIGURE_PACE,
+                               ParamIdE::FIGURE_CHANGE, ParamIdE::FIGURE_REGISTER },
+                         IdsT{ ParamIdE::FIGURES } },
+                       { "Their Voice", F::ENVELOPE,
+                         IdsT{ ParamIdE::FIGURE_LEVEL, ParamIdE::FIGURE_ATTACK, ParamIdE::FIGURE_RELEASE,
+                               ParamIdE::FIGURE_DEPTH, ParamIdE::FIGURE_PURE } } } );
     {
         auto *s = new SpacePage( m_proc, m_actions, &m_live );
         m_describe.push_back( [s] { return s->describe(); } );
@@ -611,7 +620,7 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
             { "Sound",
               { at( "Cloud & Filter" ), at( "Motion" ), at( "Harmonics" ), at( "Dreams" ), at( "Weather" ),
                 at( "Night" ), at( "Cosmos" ) } },
-            { "Harmony", { at( "Tuning" ), at( "Conductor" ) } },
+            { "Harmony", { at( "Tuning" ), at( "Conductor" ), at( "Figures" ) } },
             { "Space", { at( "Space" ), at( "Effects" ), at( "Rooms" ), at( "Hall" ) } },
             { "Modulation", { at( "Modulation" ) } },
             { "Explore", { at( "Journey" ), at( "Map" ) } }

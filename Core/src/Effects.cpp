@@ -748,6 +748,10 @@ void Reverb::prepare( double sampleRate )
     m_outDelayCur = 0.0f;
     m_hcL = m_hcR = 0.0f;
     m_lcL1 = m_lcR1 = m_lcL2 = m_lcR2 = 0.0f;
+    // The send's high pass too (11.11.2026, from Noctuary, where the state it kept through a prepare rang the
+    // emptied network's low modes; here the Send Low Cut is never on, and the two copies stay the same).
+    m_sendHpL.reset();
+    m_sendHpR.reset();
     setSpace( m_asym, 20000.0f );
     set( m_size, m_decay, m_damp, 40.0f, false, m_mix );
 }

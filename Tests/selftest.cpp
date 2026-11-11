@@ -5267,13 +5267,58 @@ int main( int argc, char **argv )
         e.noteOn( 62, 0.8f, 0 );
         const std::vector<float> again = render( e, 8.0 );
         const double             back = rmsDb( again, again.size() / 4, again.size() / 2 );
-        check( loud > -50.0 && leak == 0.0f && holds && awake && rest < -100.0 && heldAgain && byNote &&
-                   note > -60.0 && open && gone < note - 60.0 && back > note - 6.0,
+        check( loud > -50.0 && leak == 0.0f && holds && awake && rest < -100.0 && heldAgain && byNote && note > -60.0 &&
+                   open && gone < note - 60.0 && back > note - 6.0,
                "panic: silent at once and held, the tails emptied, a note wakes it; All Sound Off plays on",
                fmt( "%.1f dBFS before, peak %.1e held, %.1f dBFS woken without the conductor; a note %.1f dBFS, "
                     "%.1f after All Sound Off, %.1f played again (%d %d %d %d %d)",
                     loud, static_cast<double>( leak ), rest, note, gone, back, holds ? 1 : 0, awake ? 1 : 0,
                     heldAgain ? 1 : 0, byNote ? 1 : 0, open ? 1 : 0 ) );
+    }
+
+    // 113. The figures (11.11.2026): none by default; with one figure of three notes on a loop of eight seconds and
+    //      no change, the same three notes come round again and again, each fitting the chord (no semitone, tritone
+    //      or major seventh to a chord tone at the time it was composed -- the chord stands still here); with three
+    //      figures there are more notes in the same time; and the notes are heard: the first seconds of a note are
+    //      louder with the figure than without, the conductor playing the same chord.
+    if ( from <= 113 )
+    {
+        auto play = [&]( int figures, std::vector<int> &notes, double &level, int &count )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            e.setParam( ParamIdE::AUTO_MODE, 1.0f );
+            e.setParam( ParamIdE::BRAIN_RATE, 300.0f );   // the chord stands
+            e.setParam( ParamIdE::AUTO_RATE, 900.0f );
+            e.setParam( ParamIdE::FIGURES, static_cast<float>( figures ) );
+            e.setParam( ParamIdE::FIGURE_EVERY, 8.0f );
+            e.setParam( ParamIdE::FIGURE_NOTES, 3.0f );
+            e.setParam( ParamIdE::FIGURE_PACE, 0.8f );
+            e.setParam( ParamIdE::FIGURE_CHANGE, 0.0f );
+            e.setParam( ParamIdE::FIGURE_LEVEL, 1.0f );
+            if ( !openOffline( e, true, 113 ) ) return false;
+            e.requestFill();
+            const std::vector<float> lr = render( e, 40.0 );
+            count = e.figureNotes();
+            notes.clear();
+            for ( int k = std::min( count, 16 ) - 1; k >= 0; --k ) notes.push_back( e.figureNote( k ) );
+            level = rmsDb( lr, lr.size() / 4, lr.size() / 2 );
+            return true;
+        };
+        std::vector<int> none, one, three;
+        double           l0 = 0.0, l1 = 0.0, l3 = 0.0;
+        int              c0 = 0, c1 = 0, c3 = 0;
+        if ( !play( 0, none, l0, c0 ) || !play( 1, one, l1, c1 ) || !play( 3, three, l3, c3 ) ) return 1;
+        // the one figure: its last nine notes are three rounds of the same three
+        bool round = one.size() >= 9;
+        for ( size_t k = 3; round && k < 9; ++k ) round = one[one.size() - 1 - k] == one[one.size() - 1 - ( k % 3 )];
+        const bool distinct = one.size() >= 3 && one[one.size() - 1] != one[one.size() - 2];
+        check( c0 == 0 && c1 >= 9 && round && distinct && c3 > c1 + 3 && l1 > l0 + 0.2,
+               "figures: none by default, a figure comes round as it was, three play more, and they are heard",
+               fmt( "%d notes without, %d with one figure (the last three %d %d %d), %d with three; %.1f dBFS "
+                    "without, %.1f with one, %.1f with three",
+                    c0, c1, one.size() >= 3 ? one[one.size() - 3] : -1, one.size() >= 2 ? one[one.size() - 2] : -1,
+                    one.empty() ? -1 : one.back(), c3, l0, l1, l3 ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

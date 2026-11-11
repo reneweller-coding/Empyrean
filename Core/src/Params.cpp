@@ -475,7 +475,8 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::PEDAL, "pedal", "Pedal", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::PRESSURE, "pressure", "Pressure", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::PRESSURE_RATE, "pressure_rate", "Pressure Rate", "Floor", 0.03f, 0.5f, 0.12f, 0.5f, "Hz" ),
-    F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.12f, 1.f, "" ),   // 21.10.2026: a quiet sub
+    F( ParamIdE::FLOOR_SUB, "floor_sub", "Sub Octave", "Floor", 0.f, 1.f, 0.5f, 1.f,
+       "" ),   // 11.11.2026 (0.12 before: Balance.h)
     F( ParamIdE::FLOOR_FIFTH, "floor_fifth", "Fifth", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::FLOOR_BREATH, "floor_breath", "Breath", "Floor", 0.f, 1.f, 0.f, 1.f, "" ),
     F( ParamIdE::STAR, "star", "Star", "Star", 0.f, 1.f, 0.f, 1.f, "" ),
@@ -521,7 +522,7 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::THROAT_VOWEL, "throat_vowel", "Vowel", "Throat", 0.f, 1.f, 0.2f, 1.f, "" ),
     I( ParamIdE::THROAT_VOICES, "throat_voices", "Throats", "Throat", 1.f, 4.f, 2.f ),
     F( ParamIdE::CLARITY, "clarity", "Clarity", "Space", 0.f, 1.f, 0.f, 1.f, "" ),   // 20.10.2026 (Cloud.h)
-    F( ParamIdE::FOCUS, "focus", "Focus", "Space", 0.f, 1.f, 0.5f, 1.f, "" ),       // 20.10.2026 (Cloud.h)
+    F( ParamIdE::FOCUS, "focus", "Focus", "Space", 0.f, 1.f, 0.5f, 1.f, "" ),        // 20.10.2026 (Cloud.h)
     F( ParamIdE::IMAGE, "image", "Image", "Space", 0.f, 1.f, 1.f, 1.f, "" ),         // 20.10.2026 (Image.h)
     F( ParamIdE::LOOP_MIX, "loop_mix", "Loop", "Loop", 0.f, 1.f, 0.f, 1.f, "" ),     // 20.10.2026 (LongLoop)
     F( ParamIdE::LOOP_TIME, "loop_time", "Loop Time", "Loop", 4.f, 16.f, 12.f, 1.f, "s" ),
@@ -529,8 +530,22 @@ const std::array<ParamDesc, NumParams> Table = { {
     F( ParamIdE::LOOP_TONE, "loop_tone", "Loop Tone", "Loop", 300.f, 12000.f, 3500.f, 0.3f, "Hz" ),
     F( ParamIdE::LOOP_DRIVE, "loop_drive", "Loop Drive", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
     F( ParamIdE::LOOP_TO_FAR, "loop_to_far", "Loop To Far", "Loop", 0.f, 1.f, 0.3f, 1.f, "" ),
-    C( ParamIdE::SCENE, "scene", "Scene", "Space", SceneNames, NumScenes, 0 ),   // 20.10.2026 (Scene.h)
+    C( ParamIdE::SCENE, "scene", "Scene", "Space", SceneNames, NumScenes, 0 ),       // 20.10.2026 (Scene.h)
     F( ParamIdE::BALANCE, "balance", "Balance", "Space", 0.f, 1.f, 1.f, 1.f, "" ),   // 21.10.2026 (Balance.h)
+    // The figures (11.11.2026, Engine.h): motifs on loops of unequal length
+    I( ParamIdE::FIGURES, "figures", "Figures", "Figures", 0.f, 4.f, 0.f ),
+    F( ParamIdE::FIGURE_EVERY, "figure_every", "Figure Loop", "Figures", 6.f, 120.f, 22.f, 0.5f, "s" ),
+    I( ParamIdE::FIGURE_NOTES, "figure_notes", "Figure Notes", "Figures", 1.f, 6.f, 3.f ),
+    F( ParamIdE::FIGURE_PACE, "figure_pace", "Figure Pace", "Figures", 0.15f, 6.f, 1.2f, 0.5f, "s" ),
+    F( ParamIdE::FIGURE_CHANGE, "figure_change", "Figure Change", "Figures", 0.f, 1.f, 0.25f, 1.f, "" ),
+    I( ParamIdE::FIGURE_REGISTER, "figure_register", "Figure Register", "Figures", -24.f, 24.f, 0.f, "st" ),
+    F( ParamIdE::FIGURE_LEVEL, "figure_level", "Figure Level", "Figures", 0.f, 1.f, 0.7f, 1.f, "" ),
+    F( ParamIdE::FIGURE_ATTACK, "figure_attack", "Figure Attack", "Figures", 0.005f, 5.f, 0.08f, 0.4f, "s" ),
+    F( ParamIdE::FIGURE_RELEASE, "figure_release", "Figure Release", "Figures", 0.2f, 30.f, 5.f, 0.5f, "s" ),
+    F( ParamIdE::FIGURE_DEPTH, "figure_depth", "Figure Depth", "Figures", 0.f, 1.f, 0.2f, 1.f, "" ),
+    F( ParamIdE::FIGURE_PURE, "figure_pure", "Figure Pure", "Figures", 0.f, 1.f, 0.7f, 1.f, "" ),
+    // 11.11.2026: the far plane's lows stay out of the hall
+    F( ParamIdE::FAR_LOWCUT, "far_lowcut", "Far Low Cut", "Space", 20.f, 500.f, 160.f, 0.5f, "Hz" ),
 } };
 
 }   // namespace

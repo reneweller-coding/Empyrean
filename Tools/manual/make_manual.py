@@ -41,6 +41,7 @@ TABS = {
     "Cosmos": ["Star", "Black Hole", "Merger", "Scintillation", "Spectral Lines", "Wreck"],
     "Tuning": ["Tuning"],
         "Conductor": ["Conductor", "Floor", "MPE", "Quantum Walk"],
+    "Figures": ["Figures"],
     "Space": ["Space", "Master", "Binaural"],
     "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Bloom"],
     "Rooms": ["Wave Room", "Halo", "Time Mirror", "Headset", "Deep Channel"],
