@@ -122,10 +122,11 @@ public:
                     float gateSeconds = 0.0f );
 
     /**
-     * @brief The sub band's lower edge (22.10.2026). The references' third octaves begin at 40 Hz (35.6 Hz its lower
-     *        edge): what lies under it is not in their curves, and a kick's fundamental and its sub under 35 Hz read
-     *        as a sub 15 dB over theirs. 0, the default, counts everything under 56 Hz (Noctuary's and Empyrean's
-     *        banks are levelled so); the generators set 35.6.
+     * @brief The sub band's lower edge (22.10.2026). The references' third octaves begin at 24.8 Hz (22.1 Hz its
+     *        lower edge): what lies under it is not in their curves. 0, the default, counts everything under 56 Hz
+     *        (Noctuary's and Empyrean's banks are levelled so); the generators set 22.1. (Until 11.11.2026 they set
+     *        35.6: the curves had been read as if they began at 40 Hz, and against the ranges of that reading a
+     *        kick's sub stood 15 dB over the references'.)
      * @param[in] hz  the edge (0: none)
      */
     void setLowEdge( float hz );
@@ -213,13 +214,14 @@ private:
 
 /**
  * @brief The floor (21.10.2026): the Foundation's two voices set so that the music stands where Ultimae's does -- the
- *        bass band (56-141 Hz) at a share of the whole, and a quiet sub under it.
+ *        bass band (56-141 Hz) at a share of the whole, and the sub under it at its own.
  *
  * Measured as played, Noctuary's built-ins kept a median 95 % of their power under 150 Hz, most of it under 56 Hz
  * (the Foundation an octave or two under the music, about 20 dB over it), and a quarter of them under 8 % -- no floor
- * at all; Ultimae's masters keep their floor between 56 and 141 Hz (-2.4 dB of the whole) and the sub 26 dB under the
- * whole. So the Foundation as it is (the first voice) is joined by a second on its pitch class in the bass (56 .. 112
- * Hz: octaves above a deep Foundation, below a high one); and both are set by what the rest of the music holds.
+ * at all; Ultimae's masters keep their floor between 56 and 141 Hz (-3.8 dB of the whole) and a sub not far under it
+ * (-6.8 dB; read as -2.4 and -26 dB until 11.11.2026, see BalanceMatch above). So the Foundation as it is (the first
+ * voice) is joined by a second on its pitch class in the bass (56 .. 112 Hz: octaves above a deep Foundation, below a
+ * high one); and both are set by what the rest of the music holds.
  *
  * Feed-forward: what is measured is the rest (everything but the floor) and each voice's own power per band at a level
  * of one; the levels that bring the whole's two shares to their aims follow in closed form -- two equations, two
