@@ -529,6 +529,37 @@ bringen in einer Wolke nichts, mitschwingende Resonanz ist der modale Hall schon
 - **13e Presets:** 1024 Visions in 16 Gruppen; 899 der 3072 bekamen Phase 13 (nach allem anderen gezogen).
   `additiv_presets --names` misst nur die geänderten und neuen (1923).
 
+## Phase 37: Panik, Figuren, ein klarerer Raum (gebaut, 11.11.2026)
+
+Wünsche des Nutzers: „klingt noch sehr oft eher nach Rauschen als nach echter gestalteter Musik“, „weiträumiger und
+klarer, im Moment manchmal ziemlich vermatscht“, ein Panik-Knopf, aufgeräumterer Code (die Samplerate an einer Stelle).
+
+- **Messung zuerst.** 128 Presets gespielt gemessen (je 160 s, die ersten 40 s weggelassen) gegen 322 Aufnahmen
+  (Ultimae, Robert Rich, Steve Roach, Brian Eno, Space Ambient): Rauschhaftigkeit je Band (Unvorhersagbarkeit nach
+  dem psychoakustischen Modell 2), Kontrast, Chroma-Entropie, Harmoniewechsel und Einsätze je Minute, Lautheitsspanne,
+  Bild, Bandanteile. Befund: die Bank ist nicht rauschhafter als die Aufnahmen, aber sie steht -- 1,5 Einsätze je
+  Minute gegen 25, 5 Harmoniewechsel gegen 18 -- und sie war in Präsenz und Höhen 3 bis 4 dB heller, im Sub 18 dB
+  leerer.
+- **37a Panik:** `Engine::panic()` / `resume()` / `halted()`, `allSoundOff()` als Ereignis (MIDI CC 120), `purge()`,
+  `CloudEngine::hush()`, `clear()` für Echo, Hall und Raum; Knopf, Shift+Esc, Suche; Selbsttest 112.
+- **37b Die Balance-Tabelle berichtigt:** die Tabelle vom 21.10. war mit einer um zwei Terzen verschobenen Terzkurve
+  gerechnet (Beginn 24,8 Hz, gelesen als 40 Hz; betrifft alle Generatoren der Familie). Neu aus
+  `Family/tools/mix_audit.py --balance-ranges ultimae+robertrich`.
+- **37c Sub und Far Low Cut:** Sub Octave ab Werk 0,5; `far_lowcut` (160 Hz): die Tiefen der fernen Ebene gehen
+  nicht mehr in die Halle, sondern werden trocken gehört (Tiefpass 12 dB/Oktave, die Halle bekommt die Ebene ohne
+  ihn: die Summe ist genau die Ebene).
+- **37d Figuren:** `figures`, `figure_*` (elf Regler, eigene Seite „Figures“ neben Conductor),
+  `Engine::stepFigures` -- bis zu vier Motive auf Schleifen ungleicher Länge (Faktoren 1, 1,189, 1,382, 1,618), zum
+  Akkord des Dirigenten gezogen, eigene Hüllkurve, eigener Ort, schmalere Wolke und runderes Spektrum, der Pegel am
+  Akkord (wie das Fundament), eigene Würfel (der Dirigent spielt mit und ohne sie dasselbe Stück: die Differenz zweier
+  Renderings ist bis zum ersten Einsatz null und danach die Figuren allein -- so sind sie eingepegelt);
+  Selbsttest 113. Die Bank: `figure_rule` in `make_presets.py` -- 8430 von 16384 Presets (51 %), gesungen in der
+  Schlafmusik und über Drones, angeschlagen bei Glas und Glocken. Die Bank neu beschrieben (Find, Karte).
+- **37e Aufräumen:** `Rate.h` mit `DefaultSampleRate`; jede Stufe, die Werkzeuge und der Selbsttest lesen sie dort.
+
+Offen: die Bank ist mit dem alten Klang gepegelt (die Hörproben liegen 0,3 bis 2,8 dB über vorher) -- die
+Neumessung der Pegel über Nacht (`work/presets/remeasure_1111.py all`, zehn Stunden GPU), wenn der Klang so bleibt.
+
 ## Phase 36: Reisen zum Mitnehmen, die Bank neu eingepegelt (gebaut, 16.10.2026, 0.26.0)
 
 Wünsche des Nutzers: eine Journey auswählen und daraus eine WAV oder MP3 machen, so schnell wie möglich (OGG und FLAC

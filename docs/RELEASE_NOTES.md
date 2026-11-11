@@ -1,5 +1,28 @@
 # Release notes
 
+## Next (built 11.11.2026, not released yet)
+
+- **Panic.** A button beside Step (Shift+Esc, and in the search): everything is silent at once -- every voice, echo,
+  loop, room and hall, a frozen one too -- and stays silent; a journey or a route stops. Play, a key played or a preset
+  chosen wakes the instrument, and the conductor's chord arrives anew. MIDI's All Sound Off (controller 120) empties
+  as deep but does not hold, because hosts send it when the transport stops.
+- **Figures.** Something that happens in front of the chord: up to four short motifs, each on a loop of its own
+  length, the lengths in no simple ratio -- so a figure is known again when it comes round, and the constellation of
+  them never repeats (the way of Brian Eno's Music for Airports). They are drawn to the conductor's chord, follow the
+  harmony when it moves, and have their own envelope, place and a narrower, rounder cloud: a clear line against the
+  pad. Half of the bank's presets have them now (the Figures page, beside the Conductor's); 0 switches them off.
+  Measured as played against 322 recordings (Ultimae, Robert Rich, Steve Roach, Brian Eno and others), the bank had
+  one and a half onsets a minute where the recordings have twenty-five.
+- **The tonal balance, corrected.** The Balance's table of 21.10.2026 had been worked out with the recordings'
+  third-octave curve read as if it began at 40 Hz (it begins at 24.8 Hz): the sub was aimed 15 to 20 dB under the
+  recordings', presence and air 2 to 5 dB over them. With the table as the recordings measure, presence and air come
+  down to the recordings' median -- less of what was heard as hiss -- and the floor is allowed its sub.
+- **A floor with a sub.** Sub Octave stands at 0.5 by default (0.12 before): under 56 Hz the bank now holds a median
+  of -14 dB of the whole (-27 before; the recordings: -14 to -5).
+- **Far Low Cut** (Space page, 160 Hz by default): under it the far plane stays out of the hall and is heard as it
+  is -- a hall of half a minute made mud of the bass and the low mids. 20 Hz: as it was.
+- **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
+
 ## 1.0.0 (17.10.2026)
 
 The first public release: an additive synthesizer that does on a graphics card what no processor could -- and then

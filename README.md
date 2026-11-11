@@ -132,7 +132,9 @@ with pictures by [KaleidoscopeEnhanced](https://github.com/reneweller-coding/Kal
 - **Binaural** (headphones): every partial of the near plane at a point of its own round the head -- head shadow,
   pinna and the time round the head, worked out per partial; the whole cloud can orbit the listener.
 - **Self-Tune:** voices whose harmonics nearly meet pull together; an equal-tempered chord settles to just intervals.
-- **The conductor:** Free or Chords (Autoplay), Step, and Brain 2, a second conductor deep in the background.
+- **The conductor:** Free or Chords (Autoplay), Step, Brain 2 -- a second conductor deep in the background -- and
+  Figures: short motifs on loops of unequal length, a clear line in front of the chord. Panic silences everything at
+  once.
 - **Living systems:** a Lenia or Turing field grows on the GPU and the partials follow it; partials fall into step
   (Kuramoto sync); clouds fly as flocks; every note sends a ripple along the spectrum; the Melt holds the spectrum and
   lets it flow into the space between the notes.
