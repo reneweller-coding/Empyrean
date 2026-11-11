@@ -72,6 +72,9 @@ std::string fmt( const char *fmt, ... )
     return buf;
 }
 
+constexpr double Rate = additiv::DefaultSampleRate;   ///< the rate every test runs at, Hz
+constexpr int    Second = static_cast<int>( Rate );   ///< a second's frames at it
+
 /**
  * @brief An offline engine at 48 kHz with 256-sample host blocks.
  * @param[in,out] e      the engine
@@ -103,7 +106,7 @@ bool openOffline( Engine &e, bool brain, std::uint64_t seed = 0x5EEDu )
 std::vector<float> render( Engine &e, double seconds )
 {
     const int          n = 256;
-    const int          blocks = static_cast<int>( seconds * 48000.0 / n );
+    const int          blocks = static_cast<int>( seconds * Rate / n );
     std::vector<float> lr;
     lr.reserve( static_cast<size_t>( blocks ) * n * 2 );
     std::vector<float> L( n ), R( n );
@@ -170,7 +173,7 @@ void quietEffects( Engine &e )
  */
 double toneDb( const std::vector<float> &lr, size_t from, size_t to, double hz )
 {
-    const double w = 2.0 * 3.14159265358979 * hz / 48000.0, c = 2.0 * std::cos( w );
+    const double w = 2.0 * 3.14159265358979 * hz / Rate, c = 2.0 * std::cos( w );
     double       s1 = 0.0, s2 = 0.0;
     const size_t len = to - from;
     for ( size_t i = 0; i < len; ++i )
@@ -196,7 +199,7 @@ double toneDb( const std::vector<float> &lr, size_t from, size_t to, double hz )
  */
 std::complex<double> toneAt( const std::vector<float> &lr, size_t from, size_t to, double hz, int channel )
 {
-    const double         w = 2.0 * 3.14159265358979 * hz / 48000.0;
+    const double         w = 2.0 * 3.14159265358979 * hz / Rate;
     std::complex<double> acc( 0.0, 0.0 );
     const size_t         len = to - from;
     for ( size_t i = 0; i < len; ++i )
@@ -334,7 +337,7 @@ int main( int argc, char **argv )
         const std::vector<float> lr = render( e, 60.0 );
         const bool               finite =
             std::all_of( lr.begin(), lr.end(), []( float x ) { return std::isfinite( x ) && std::fabs( x ) <= 1.0f; } );
-        const double db = rmsDb( lr, 40 * 48000, 60 * 48000 );
+        const double db = rmsDb( lr, 40 * Second, 60 * Second );
         check( finite && e.soundingVoices() >= 5 && db > -45.0 && db < -6.0,
                "autoplay: the cluster fills, the level is sane",
                fmt( "%d voices, %.1f dBFS RMS over 40-60 s, root %d", e.soundingVoices(), db, e.brainRoot() ) );
@@ -388,7 +391,7 @@ int main( int argc, char **argv )
         LARGE_INTEGER      f, t;
         QueryPerformanceFrequency( &f );
         QueryPerformanceCounter( &t );
-        const double    period = 256.0 / 48000.0;
+        const double    period = 256.0 / Rate;
         const long long start = t.QuadPart;
         double          peak = 0.0;
         for ( int b = 0; b < static_cast<int>( 6.0 / period ); ++b )
@@ -446,9 +449,9 @@ int main( int argc, char **argv )
         e.noteOn( 67, 0.8f, 0 );
         const std::vector<float> lr = render( e, 2.0 );
         const bool finite = std::all_of( lr.begin(), lr.end(), []( float x ) { return std::isfinite( x ); } );
-        check( built && s.m_count >= 2 && finite && rmsDb( lr, 48000, 96000 ) > -60.0,
+        check( built && s.m_count >= 2 && finite && rmsDb( lr, Second, 96000 ) > -60.0,
                "timbre scale: from the stretched spectrum",
-               fmt( "%d degrees per period, plays at %.1f dBFS", s.m_count, rmsDb( lr, 48000, 96000 ) ) );
+               fmt( "%d degrees per period, plays at %.1f dBFS", s.m_count, rmsDb( lr, Second, 96000 ) ) );
     }
 
     // 12. The landscape's make-up: the same chord in Aurora sits within 4 dB of the bare cloud;
@@ -468,7 +471,7 @@ int main( int argc, char **argv )
             e.setParam( ParamIdE::ATTACK, 0.5f );
             for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
             const std::vector<float> lr = render( e, 20.0 );
-            return rmsDb( lr, 5 * 48000, 20 * 48000 );
+            return rmsDb( lr, 5 * Second, 20 * Second );
         };
         const double bare = chordDb( 0.0f, 0.0f );
         const double aurora = chordDb( 6.0f, 0.0f );
@@ -501,7 +504,7 @@ int main( int argc, char **argv )
         const std::vector<float> lr = render( e, 40.0 );
         const bool               finite =
             std::all_of( lr.begin(), lr.end(), []( float x ) { return std::isfinite( x ) && std::fabs( x ) <= 1.0f; } );
-        const double db = rmsDb( lr, 20 * 48000, 40 * 48000 );
+        const double db = rmsDb( lr, 20 * Second, 40 * Second );
         check( finite && db > -50.0 && db < -6.0, "everything moving at once: finite and sane",
                fmt( "%.1f dBFS RMS over 20-40 s", db ) );
     }
@@ -743,7 +746,7 @@ int main( int argc, char **argv )
         e.noteOff( 62, 0 );
         e.setParam( ParamIdE::MODAL_FREEZE, 1.0f );
         const std::vector<float> lr = render( e, 4.0 );
-        const double             a = rmsDb( lr, 24000, 48000 ), b = rmsDb( lr, 168000, 192000 );
+        const double             a = rmsDb( lr, 24000, Second ), b = rmsDb( lr, 168000, 192000 );
         check( std::fabs( a - b ) < 1.5 && a > -80.0, "modal hall: frozen, it holds",
                fmt( "%.1f dBFS after 0.5 s, %.1f dBFS after 3.5 s", a, b ) );
     }
@@ -796,7 +799,7 @@ int main( int argc, char **argv )
         const std::vector<float> lr = render( e, 30.0 );
         const bool               finite =
             std::all_of( lr.begin(), lr.end(), []( float x ) { return std::isfinite( x ) && std::fabs( x ) <= 1.0f; } );
-        const double db = rmsDb( lr, 10 * 48000, 30 * 48000 );
+        const double db = rmsDb( lr, 10 * Second, 30 * Second );
         check( finite && db > -45.0 && db < -6.0, "effects: everything at once is finite and sane",
                fmt( "%.1f dBFS RMS over 10-30 s, GPU %.3f ms/block", db, e.lastGpuMs() ) );
     }
@@ -932,7 +935,7 @@ int main( int argc, char **argv )
             for ( int note : { 50, 57, 62, 66 } ) e.noteOff( note, 0 );
             const std::vector<float> lr = render( e, 12.0 );
             early[k] = rmsDb( lr, 0, 24000 );
-            late[k] = rmsDb( lr, 9 * 48000, 11 * 48000 );
+            late[k] = rmsDb( lr, 9 * Second, 11 * Second );
         }
         check( early[1] - early[0] < 3.0 && late[1] - late[0] > 10.0,
                "memory: the ghosts bloom after the chord and linger",
@@ -1020,7 +1023,7 @@ int main( int argc, char **argv )
             if ( !openOffline( e, false, 83 ) ) return 1;
             for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
             const std::vector<float> lr = render( e, 8.0 );
-            level[k] = rmsDb( lr, 4 * 48000, 8 * 48000 );
+            level[k] = rmsDb( lr, 4 * Second, 8 * Second );
         }
         check( std::fabs( level[1] - level[0] ) < 3.0, "modal hall: painted, it keeps its level",
                fmt( "%.1f dBFS plain, %.1f painted", level[0], level[1] ) );
@@ -1199,7 +1202,7 @@ int main( int argc, char **argv )
             std::vector<float>       a3, a6, b3, b6;
             const std::vector<float> a = play( a3, a6 ), b = play( b3, b6 );
             if ( a.empty() ) return 1;
-            const double level = rmsDb( a, 3 * 48000, 6 * 48000 );
+            const double level = rmsDb( a, 3 * Second, 6 * Second );
             if ( mode == 0 )
             {
                 level0 = level;
@@ -1241,13 +1244,13 @@ int main( int argc, char **argv )
             const int                windows = 60;
             for ( int w = 0; w < windows; ++w )
             {
-                const size_t a = static_cast<size_t>( 6 * 48000 + w * 4800 );
+                const size_t a = static_cast<size_t>( 6 * Second + w * 4800 );
                 const double db = toneDb( lr, a, a + 4800, f8 );
                 s += db;
                 s2 += db * db;
             }
             sd[k] = std::sqrt( std::max( 0.0, s2 / windows - ( s / windows ) * ( s / windows ) ) );
-            level[k] = rmsDb( lr, 6 * 48000, 12 * 48000 );
+            level[k] = rmsDb( lr, 6 * Second, 12 * Second );
         }
         check( sd[1] > sd[0] + 2.0 && std::fabs( level[1] - level[0] ) < 1.5,
                "sync: coupled, a harmonic's members pulse as one",
@@ -1351,7 +1354,7 @@ int main( int argc, char **argv )
             }
             moved[k] = hi - lo;
             spread[k] = sd;
-            level[k] = rmsDb( lr, 2 * 48000, 12 * 48000 );
+            level[k] = rmsDb( lr, 2 * Second, 12 * Second );
         }
         check(
             moved[1] > 5.0 && moved[1] > moved[0] + 4.0 && spread[1] > 0.5 * spread[0] &&
@@ -1396,13 +1399,13 @@ int main( int argc, char **argv )
             const int windows = 24;
             for ( int w = 0; w < windows; ++w )
             {
-                const size_t a = static_cast<size_t>( 1 * 48000 + w * 12000 );
+                const size_t a = static_cast<size_t>( 1 * Second + w * 12000 );
                 const double db = toneDb( lr, a, a + 12000, f4 );
                 s += db;
                 s2 += db * db;
             }
             sd[k] = std::sqrt( std::max( 0.0, s2 / windows - ( s / windows ) * ( s / windows ) ) );
-            level[k] = rmsDb( lr, 4 * 48000, 8 * 48000 );
+            level[k] = rmsDb( lr, 4 * Second, 8 * Second );
         }
         check(
             sd[1] > sd[0] + 1.5 && std::fabs( level[1] - level[0] ) < 1.5,
@@ -1482,11 +1485,11 @@ int main( int argc, char **argv )
             lr.insert( lr.end(), rest.begin(), rest.end() );
             if ( k == 0 )
             {
-                dry = rmsDb( lr, 2 * 48000, 3 * 48000 );
-                silent = rmsDb( lr, 3 * 48000 + 9600, 4 * 48000 );
+                dry = rmsDb( lr, 2 * Second, 3 * Second );
+                silent = rmsDb( lr, 3 * Second + 9600, 4 * Second );
                 continue;
             }
-            const size_t a = 3 * 48000 + 9600, b = 4 * 48000;   // 0.2 .. 1 s after the release
+            const size_t a = 3 * Second + 9600, b = 4 * Second;   // 0.2 .. 1 s after the release
             tail[k - 1] = rmsDb( lr, a, b );
             // Between the 3rd and 4th harmonics against on them.
             between[k - 1] =
@@ -1709,7 +1712,7 @@ int main( int argc, char **argv )
             const std::vector<float> lr = render( e, 2.0 );
             const double             f0 = soundingHz( e );
             stretched[k] =
-                toneDb( lr, 48000, 96000, f0 * std::pow( 4.0, 1.05 ) ) - toneDb( lr, 48000, 96000, 4.0 * f0 );
+                toneDb( lr, Second, 96000, f0 * std::pow( 4.0, 1.05 ) ) - toneDb( lr, Second, 96000, 4.0 * f0 );
         }
         for ( int k = 0; k < 2; ++k )
         {
@@ -1724,7 +1727,7 @@ int main( int argc, char **argv )
             e.noteOn( 48, 0.8f, 0 );
             const std::vector<float> lr = render( e, 2.0 );
             const double             f0 = soundingHz( e );
-            shifted[k] = toneDb( lr, 48000, 96000, f0 + 50.0 ) - toneDb( lr, 48000, 96000, f0 );
+            shifted[k] = toneDb( lr, Second, 96000, f0 + 50.0 ) - toneDb( lr, Second, 96000, f0 );
         }
         check(
             stretched[1] > 10.0 && stretched[0] < -10.0 && shifted[1] > 10.0 && shifted[0] < -10.0,
@@ -1755,7 +1758,7 @@ int main( int argc, char **argv )
             e.noteOn( 48, 0.8f, 0 );
             const std::vector<float> lr = render( e, 2.0 );
             const double             f0 = soundingHz( e );
-            level[k] = rmsDb( lr, 48000, 96000 );   // standing: for the message
+            level[k] = rmsDb( lr, Second, 96000 );   // standing: for the message
             if ( k == 1 )
             {
                 // Against the same note without the comb: how far apart the harmonics are cut.
@@ -1770,7 +1773,7 @@ int main( int argc, char **argv )
                 double                   lo = 1e9, hi = -1e9;
                 for ( int h = 2; h <= 9; ++h )
                 {
-                    const double d = toneDb( lr, 48000, 96000, h * f0 ) - toneDb( ref, 48000, 96000, h * f0 );
+                    const double d = toneDb( lr, Second, 96000, h * f0 ) - toneDb( ref, Second, 96000, h * f0 );
                     lo = std::min( lo, d );
                     hi = std::max( hi, d );
                 }
@@ -1793,13 +1796,13 @@ int main( int argc, char **argv )
             e.noteOn( 48, 0.8f, 0 );
             const std::vector<float> lr = render( e, 9.0 );
             ( k == 0 ? plain : swept ) =
-                rmsDb( lr, 48000, 9 * 48000 );   // two whole sweeps (a notch an octave, a quarter notch a second)
+                rmsDb( lr, Second, 9 * Second );   // two whole sweeps (a notch an octave, a quarter notch a second)
             if ( k == 0 ) continue;
             const double f4 = 4.0 * soundingHz( e );
             double       lo = 1e9, hi = -1e9;
             for ( int w = 0; w < 40; ++w )
             {
-                const size_t a = static_cast<size_t>( 48000 + w * 9600 );
+                const size_t a = static_cast<size_t>( Second + w * 9600 );
                 const double db = toneDb( lr, a, a + 4800, f4 );
                 lo = std::min( lo, db );
                 hi = std::max( hi, db );
@@ -1880,7 +1883,7 @@ int main( int argc, char **argv )
             std::vector<float>       a3, a6, b3, b6;
             const std::vector<float> a = play( a3, a6 ), b = play( b3, b6 );
             if ( a.empty() ) return 1;
-            const double level = rmsDb( a, 3 * 48000, 6 * 48000 );
+            const double level = rmsDb( a, 3 * Second, 6 * Second );
             if ( mode == 0 )
             {
                 level0 = level;
@@ -2944,8 +2947,8 @@ int main( int argc, char **argv )
         std::string error;
         if ( !e.prepare( c, &error ) ) return false;
         for ( int note : { 50, 57, 62, 66 } ) e.noteOn( note, 0.8f, 0 );
-        const int          blocks = static_cast<int>( 14.0 * 48000.0 / 512 ),
-                           keepFrom = blocks - static_cast<int>( 8.0 * 48000.0 / 512 );
+        const int          blocks = static_cast<int>( 14.0 * Rate / 512 ),
+                           keepFrom = blocks - static_cast<int>( 8.0 * Rate / 512 );
         std::vector<float> L( 512 ), R( 512 ), keptL, keptR;
         double             sq = 0.0, loudest = 0.0;
         int                inWindow = 0;
@@ -2961,13 +2964,13 @@ int main( int argc, char **argv )
                 sq += 0.5 * ( static_cast<double>( L[static_cast<size_t>( i )] ) * L[static_cast<size_t>( i )] +
                               static_cast<double>( R[static_cast<size_t>( i )] ) * R[static_cast<size_t>( i )] );
             if ( ++inWindow == 93 )
-            {   // 48000 / 512: about a second
+            {   // Second / 512: about a second
                 loudest = std::max( loudest, sq / ( 93.0 * 512.0 ) );
                 sq = 0.0;
                 inWindow = 0;
             }
         }
-        d = describe( keptL, keptR, 48000.0 );
+        d = describe( keptL, keptR, Rate );
         db = 10.0 * std::log10( std::max( loudest, 1e-20 ) );
         return true;
     };
@@ -3836,9 +3839,9 @@ int main( int argc, char **argv )
             render( e, 10.0 );
             const std::vector<float> lr = render( e, 90.0 );
             double                   lo = 1.0e9, hi = -1.0e9;
-            for ( size_t s = 0; s + 48000 <= lr.size() / 2; s += 48000 )
+            for ( size_t s = 0; s + Second <= lr.size() / 2; s += Second )
             {
-                const double d = rmsDb( lr, s, s + 48000 );
+                const double d = rmsDb( lr, s, s + Second );
                 lo = std::min( lo, d );
                 hi = std::max( hi, d );
             }
@@ -4015,7 +4018,7 @@ int main( int argc, char **argv )
             tailSoft = rmsDb( s, 24000, 72000 );
             // its band: a one-pole split at 2.5 kHz, the power below against all of it
             double       lp = 0.0;
-            const double k = 1.0 - std::exp( -6.283185307179586 * 2500.0 / 48000.0 );
+            const double k = 1.0 - std::exp( -6.283185307179586 * 2500.0 / Rate );
             for ( size_t i = 0; i < r.size() / 2; ++i )
             {
                 const double x = 0.5 * ( r[2 * i] + r[2 * i + 1] );
@@ -4191,7 +4194,7 @@ int main( int argc, char **argv )
             const std::vector<float> lr = render( e, 4.0 );
             // its energy below 400 Hz (a one-pole split), and its balance between the ears
             double       lowE = 0.0, allE = 0.0, l2 = 0.0, r2 = 0.0, y = 0.0;
-            const double a = 1.0 - std::exp( -2.0 * 3.14159265358979 * 400.0 / 48000.0 );
+            const double a = 1.0 - std::exp( -2.0 * 3.14159265358979 * 400.0 / Rate );
             for ( size_t i = 0; i + 1 < lr.size(); i += 2 )
             {
                 const double x = 0.5 * ( lr[i] + lr[i + 1] );
@@ -4252,7 +4255,7 @@ int main( int argc, char **argv )
                 if ( ( few[2 * i] + few[2 * i + 1] >= 0.0f ) !=
                      ( few[2 * ( i - 1 )] + few[2 * ( i - 1 ) + 1] >= 0.0f ) )
                     ++crossings;
-            return static_cast<double>( crossings ) / ( static_cast<double>( to - from ) / 48000.0 );
+            return static_cast<double>( crossings ) / ( static_cast<double>( to - from ) / Rate );
         };
         int    falls = 0, chirpsSeen = 0;
         size_t quietSince = 0;
@@ -4264,7 +4267,7 @@ int main( int argc, char **argv )
                 ++quietSince;
                 continue;
             }
-            if ( quietSince >= 20 && f + 48000 / 4 < few.size() / 2 )
+            if ( quietSince >= 20 && f + Second / 4 < few.size() / 2 )
             {   // an onset after a fifth of a second of quiet
                 ++chirpsSeen;
                 if ( zcr( f, f + 1920 ) > zcr( f + 4800, f + 6720 ) ) ++falls;
@@ -4429,7 +4432,7 @@ int main( int argc, char **argv )
             render( e, 1.0 );
             const std::vector<float> lr = render( e, 2.0 );
             double                   hiE = 0.0, allE = 0.0, y = 0.0;
-            const double             a = 1.0 - std::exp( -2.0 * 3.14159265358979 * 2000.0 / 48000.0 );
+            const double             a = 1.0 - std::exp( -2.0 * 3.14159265358979 * 2000.0 / Rate );
             for ( size_t i = 0; i + 1 < lr.size(); i += 2 )
             {   // the share of the energy above 2 kHz
                 const double x = 0.5 * ( lr[i] + lr[i + 1] );
@@ -4612,9 +4615,10 @@ int main( int argc, char **argv )
             for ( int note : { 48, 55, 64 } ) e.noteOff( note, 0 );
             const std::vector<float> b = render( e, 3.7 );   // to 4 s: the second window
             early =
-                rmsDb( b, static_cast<size_t>( 1.8 * 48000 ), static_cast<size_t>( 2.5 * 48000 ) );      // 2.1 .. 2.8 s
-            late = rmsDb( b, static_cast<size_t>( 2.9 * 48000 ), static_cast<size_t>( 3.6 * 48000 ) );   // 3.2 .. 3.9 s
-            chord = rmsDb( a, static_cast<size_t>( 0.1 * 48000 ), static_cast<size_t>( 0.3 * 48000 ) );
+                rmsDb( b, static_cast<size_t>( 1.8 * Second ), static_cast<size_t>( 2.5 * Second ) );   // 2.1 .. 2.8 s
+            late =
+                rmsDb( b, static_cast<size_t>( 2.9 * Second ), static_cast<size_t>( 3.6 * Second ) );   // 3.2 .. 3.9 s
+            chord = rmsDb( a, static_cast<size_t>( 0.1 * Second ), static_cast<size_t>( 0.3 * Second ) );
             return !a.empty();
         };
         double     chord = 0.0, early = 0.0, late = 0.0, chord0 = 0.0, early0 = 0.0, late0 = 0.0;
@@ -4634,7 +4638,7 @@ int main( int argc, char **argv )
         // power under fc, a second-order low pass (RBJ, Q 0.707) over interleaved stereo, per window of w frames
         auto lowWindows = []( const std::vector<float> &lr, double fc, size_t w )
         {
-            const double        w0 = 2.0 * 3.14159265358979 * fc / 48000.0, alpha = std::sin( w0 ) / ( 2.0 * 0.7071 ),
+            const double        w0 = 2.0 * 3.14159265358979 * fc / Rate, alpha = std::sin( w0 ) / ( 2.0 * 0.7071 ),
                                 cw = std::cos( w0 );
             const double        a0 = 1.0 + alpha, b0 = ( 1.0 - cw ) / 2.0 / a0, b1 = ( 1.0 - cw ) / a0, b2 = b0,
                                 a1 = -2.0 * cw / a0, a2 = ( 1.0 - alpha ) / a0;
@@ -4718,7 +4722,7 @@ int main( int argc, char **argv )
                 if ( ( ( e.brainRoot() % 12 ) + 12 ) % 12 != 2 ) ++moved;
             }
             const std::vector<double> low = lowWindows( all, 150.0, 12000 );   // quarter seconds
-            const std::vector<double> deep = lowWindows( all, 55.0, 48000 );
+            const std::vector<double> deep = lowWindows( all, 55.0, Second );
             f.share = mean( low ) / std::max( power( all ), 1e-20 );
             f.deep = 10.0 * std::log10( std::max( mean( deep ) / std::max( power( all ), 1e-20 ), 1e-12 ) );
             // the floor's envelope (quarter seconds): its autocorrelation at Pressure's period (4 s at 0.25 Hz) less
@@ -4842,14 +4846,14 @@ int main( int argc, char **argv )
             peak = -200.0;
             for ( size_t s = 0; s + 4800 <= a.size() / 2; s += 2400 )
                 peak = std::max( peak, toneDb( a, s, s + 4800, 70.0 ) );
-            before = toneDb( a, 2 * 48000, 2 * 48000 + 4800, 70.0 );
+            before = toneDb( a, 2 * Second, 2 * Second + 4800, 70.0 );
             if ( merger > 0.0f )
                 for ( float x : a )
                     loudest = std::max( loudest,
                                         20.0 * std::log10( std::max( static_cast<double>( std::abs( x ) ), 1e-12 ) ) );
             // the width: side over mid in tenths of a second, 4 .. 12 s, its spread
             std::vector<double> r;
-            for ( size_t s = 4 * 48000; s + 4800 <= 12 * 48000; s += 4800 )
+            for ( size_t s = 4 * Second; s + 4800 <= 12 * Second; s += 4800 )
             {
                 double m = 0.0, d = 0.0;
                 for ( size_t i = s; i < s + 4800; ++i )
@@ -4900,7 +4904,7 @@ int main( int argc, char **argv )
             double w = 0.0, sum = 0.0;
             for ( double oct = 0.0; oct <= 7.0; oct += 1.0 / 6.0 )
             {
-                const double p = std::pow( 10.0, 0.1 * toneDb( a, 3 * 48000, 5 * 48000, 60.0 * std::exp2( oct ) ) );
+                const double p = std::pow( 10.0, 0.1 * toneDb( a, 3 * Second, 5 * Second, 60.0 * std::exp2( oct ) ) );
                 w += p;
                 sum += p * oct;
             }
@@ -5058,9 +5062,9 @@ int main( int argc, char **argv )
         const std::vector<float> b = render( e, 12.0 );
         // tenths of a second after the note has died (0.5 s on)
         double loud = -200.0, at = 0.0, early = -200.0, last = 0.0;
-        for ( size_t s = static_cast<size_t>( 0.3 * 48000 ); s + 4800 <= b.size() / 2; s += 4800 )
+        for ( size_t s = static_cast<size_t>( 0.3 * Second ); s + 4800 <= b.size() / 2; s += 4800 )
         {
-            const double db = rmsDb( b, s, s + 4800 ), t = static_cast<double>( s ) / 48000.0 + 0.2;
+            const double db = rmsDb( b, s, s + 4800 ), t = static_cast<double>( s ) / Rate + 0.2;
             if ( db > loud )
             {
                 loud = db;

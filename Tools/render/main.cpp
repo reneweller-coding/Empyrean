@@ -416,7 +416,7 @@ int main( int argc, char **argv )
     if ( !modRows.empty() ) e.setModText( modRows );   // replaces the preset's matrix
     if ( !brain ) e.setParam( ParamIdE::BRAIN_ON, 0.0f );
     EngineConfig c;
-    c.m_sampleRate = 48000.0;
+    c.m_sampleRate = DefaultSampleRate;
     c.m_maxHostBlock = 512;
     c.m_realtimeGpuClass = false;
     c.m_seed = seed;

@@ -33,6 +33,7 @@
 #include <string>
 #include <vector>
 
+#include "additiv/Rate.h"
 #include "additiv/Spectrum.h"
 
 namespace additiv
@@ -1257,7 +1258,7 @@ static_assert( sizeof( SpectralField ) % 16 == 0, "SpectralField rides in the bl
 /** @brief How an engine is laid out; fixed between open() and close(). */
 struct CloudConfig
 {
-    double m_sampleRate = 48000.0;       ///< Hz
+    double m_sampleRate = DefaultSampleRate;   ///< Hz
     int    m_blockSize = 128;            ///< samples per launch(), a power of two, 32 .. 4096
     int    m_voices = 16;                ///< voices the GPU tables hold
     int    m_partialsPerVoice = 20000;   ///< the most partials one voice can render

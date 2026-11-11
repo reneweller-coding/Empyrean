@@ -53,7 +53,7 @@ using namespace additiv;
 namespace
 {
 
-constexpr double SampleRate = 48000.0;   ///< every probe runs at 48 kHz
+constexpr double SampleRate = additiv::DefaultSampleRate;   ///< every probe runs at it
 
 /** @brief The command line; every subcommand reads what it needs. */
 struct Options

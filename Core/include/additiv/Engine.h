@@ -54,7 +54,7 @@ namespace additiv
 /** @brief How an engine is laid out; fixed between prepare() and release(). */
 struct EngineConfig
 {
-    double        m_sampleRate = 48000.0;       ///< the host's rate; the GPU renders at it
+    double        m_sampleRate = DefaultSampleRate;   ///< the host's rate; the GPU renders at it
     int           m_maxHostBlock = 1024;        ///< the largest block process() is asked for
     int           m_gpuBlock = 128;             ///< samples per GPU block, a power of two
     int           m_voices = 16;                ///< voices

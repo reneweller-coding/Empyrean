@@ -29,7 +29,7 @@
 namespace
 {
 
-constexpr double SampleRate = 48000.0;   ///< the files' rate
+constexpr double SampleRate = additiv::DefaultSampleRate;   ///< the files' rate
 constexpr int    Block = 4096;           ///< samples a call of the engine at most (the kit's block)
 /** @brief Samples a GPU block when not exact: four of the instrument's. Every partial is set once a block and ramped
  *         across it, so the block is the rate of every modulation; a launch and a wait every 128 samples is

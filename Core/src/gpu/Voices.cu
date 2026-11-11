@@ -359,6 +359,7 @@ __device__ void earGains( const Binaural &B, float place, float u, float f, floa
     sincosf( el, &se, &ce );
     // The pinna, the same at both ears here: five reflections whose times follow azimuth and
     // elevation (samples at 44.1 kHz), normalised by its mean power (1 + sum of rho^2 = 2.625).
+    const float PinnaRate = 44100.0f;   // the rate Brown and Duda's delays are counted at -- the model's, not ours
     const float rho[5] = { 0.5f, -1.0f, 0.5f, -0.25f, 0.25f };
     const float A[5] = { 1.0f, 5.0f, 5.0f, 5.0f, 5.0f };
     const float Bn[5] = { 2.0f, 4.0f, 7.0f, 11.0f, 13.0f };
@@ -369,7 +370,7 @@ __device__ void earGains( const Binaural &B, float place, float u, float f, floa
     {
         const float tk = A[k] * half * sinf( D[k] * ( 1.5707963f - el ) ) + Bn[k];
         float       s, c;
-        sincosf( -6.2831853f * f * tk * ( 1.0f / 44100.0f ), &s, &c );
+        sincosf( -6.2831853f * f * tk * ( 1.0f / PinnaRate ), &s, &c );
         pr += rho[k] * c;
         pim += rho[k] * s;
     }

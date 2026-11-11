@@ -588,7 +588,7 @@ bool landscapeFromAudio( const std::filesystem::path &path, float rangeDb, float
                          Landscape &out, std::string *error )
 {
     std::vector<float> mono;
-    double             rate = 48000.0;
+    double             rate = DefaultSampleRate;
     if ( !loadMono( path, mono, rate, error ) ) return false;
     constexpr int N = 4096;
     if ( mono.size() < static_cast<size_t>( N ) ) mono.resize( N, 0.0f );

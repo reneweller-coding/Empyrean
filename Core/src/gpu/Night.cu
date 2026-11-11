@@ -356,7 +356,7 @@ __global__ void __launch_bounds__( 256 ) thunderRenderKernel( const BlockHeader 
         const float  re = sqrtf( dx * dx + dy * dy + dz * dz );
         const float  shade = fmaxf( 0.6f + 0.4f * side * ( u.x * right.x + u.y * right.y ), 0.2f );
         const int    at = T.m_origin + static_cast<int>( re / SoundSpeed * fs + 0.5f );
-        const int    count = min( static_cast<int>( len ) + 1, 48000 );
+        const int    count = min( static_cast<int>( len ) + 1, static_cast<int>( fs ) );   // a second at the most
         int         *mine = ring + static_cast<size_t>( e ) * ThunderRing;
         for ( int j = static_cast<int>( threadIdx.x ); j < count; j += 256 )
         {

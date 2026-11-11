@@ -7,6 +7,7 @@
  */
 #pragma once
 
+#include "additiv/Rate.h"
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -121,7 +122,7 @@ public:
 
 private:
     TruePeakInterpolator m_interp;             ///< the true-peak interpolator
-    double               m_sr = 48000.0;       ///< the sample rate, Hz
+    double               m_sr = DefaultSampleRate;   ///< the sample rate, Hz
     int                  m_window = 72;        ///< the lookahead window, samples
     float                m_ceiling = 0.891f;   ///< the ceiling, linear
     double               m_release = 0.999;    ///< the gain's per-sample recovery factor
