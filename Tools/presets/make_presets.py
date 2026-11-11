@@ -4642,6 +4642,70 @@ def floor_rule(r):
         r.set("floor", f(r.u(0.35, 0.65), 2))
 
 
+#: The groups that are sleep music (the Sleep Concert and the sixteen after Night Gardens): a figure there is sung.
+FIGURE_SLEEP = {"Sleep Concert", "Lullabies", "Slow Breath", "Deep Sleep", "Dream Drift", "Moonlight", "Night Rain",
+                "Ocean Sleep", "Cradle", "Starfield", "Hypnagogia", "Twilight Choirs", "Warm Drones", "Snowfall",
+                "Forest Night", "Slow Tides", "Afterglow"}
+#: The drones and the floors: sung too, and seldom.
+FIGURE_DRONE = {"Dark Drones", "Deep Space", "Organ Points", "Pressure Drones", "Sub Abysses", "Fifth Pillars",
+                "Breathing Floors", "Cathedral Depths", "Abyssal Plains", "Black Monoliths", "Iron Pedals",
+                "Tectonic Hum", "Cavern Drones", "Undertow", "Low Chapels", "Night Pressure", "Floors & Storms",
+                "Cosmic Floors", "Quiet Universe", "Monk Drones", "Kargyraa Halls", "Giant Throats", "Event Horizons"}
+#: What is struck or plucked: a figure there is a line of bells.
+FIGURE_STRUCK = {"Glass", "Bells", "Keys", "Pendulums", "Shimmer", "Raindrops", "Star Streams", "Prisms", "Gong Blooms",
+                 "Bronze Swells", "Shimmer Cascades", "Glass Forests", "Bamboo Groves", "Stone Gardens", "Tam-Tam Halls",
+                 "Aeolian Harps", "Harp Gardens", "Deep Bells", "Balmer Bells", "Twinkling Stars", "Rainfall Grains",
+                 "Thermal Snaps", "Perforated Plates"}
+#: The weather and the night's animals: they have their own events, a figure joins them less often.
+FIGURE_NATURE = {"Night Gardens", "Rain on Water", "Tin Roofs", "Forest Rain", "Rustling Woods", "Pine Winds", "Seashores",
+                 "Pebble Beaches", "Storm Coasts", "Thunder Sheets", "Firefly Swarms", "Weather Gardens", "Distant Storms",
+                 "Summer Storms", "Rolling Thunder", "Singing Lakes", "Frozen Nights", "Thin Ice", "Night Weather",
+                 "Cricket Meadows", "Katydid Treetops", "Frog Ponds", "Summer Nights", "Warm Evenings", "Cool Nights",
+                 "Answering Choirs", "Tuned Choruses", "Storm Choruses", "Lake Nights", "Night Concerts", "Nocturnes",
+                 "Storm Gardens", "Living Storms", "Night Ecology"}
+
+
+def figure_rule(r, group):
+    """The figures (11.11.2026): measured as played against 322 recordings (Ultimae, Robert Rich, Steve Roach, Eno),
+    the bank had a median of one and a half onsets a minute where the recordings have twenty-five, and a harmony that
+    moved a quarter as often -- a standing sound, which is heard as noise however it is built. So in a little more
+    than half of the presets whose conductor plays, figures come round in front of the chord: lines of two to five
+    notes where the sound is a line's (short where it is struck), single sung notes -- each on its own loop, the
+    voices of Music for Airports 2/1 -- in the sleep music and over the drones. Drawn after everything: what a preset
+    had stays as it was."""
+    if int(num(r, "brain_on", 1)) < 1 or "figures" in r.p:
+        return
+    sung = group in FIGURE_SLEEP or group in FIGURE_DRONE
+    struck = group in FIGURE_STRUCK
+    chance = 0.3 if group in FIGURE_SLEEP else 0.4 if sung else 0.35 if group in FIGURE_NATURE else 0.7 if struck else 0.6
+    if r.rng.random() >= chance:
+        return
+    if sung:
+        r.set("figures", r.pick(1, 2, 2, 3))
+        r.set("figure_notes", r.pick(1, 1, 2))
+        r.set("figure_every", f(r.lg(24, 60), 1))
+        r.set("figure_pace", f(r.lg(2.5, 6.0), 2))
+        r.set("figure_attack", f(r.lg(1.2, 4.0), 2))
+        r.set("figure_release", f(r.lg(7, 16), 1))
+        r.set("figure_level", f(r.u(0.3, 0.5), 2))
+        r.set("figure_depth", f(r.u(0.25, 0.5), 2))
+        r.set("figure_pure", f(r.u(0.4, 0.75), 2))
+        r.set("figure_change", f(r.u(0.05, 0.2), 2))
+    else:
+        r.set("figures", r.pick(1, 2, 2, 3, 3, 4))
+        r.set("figure_notes", r.pick(2, 3, 3, 4, 4, 5))
+        r.set("figure_every", f(r.lg(14, 38), 1))
+        r.set("figure_pace", f(r.lg(0.5, 2.4), 2))
+        r.set("figure_attack", f(r.lg(0.008, 0.05) if struck else r.lg(0.04, 0.6), 3))
+        r.set("figure_release", f(r.lg(3.5, 9) if struck else r.lg(3, 9), 1))
+        r.set("figure_level", f(r.u(0.45, 0.8), 2))
+        r.set("figure_depth", f(r.u(0.08, 0.35), 2))
+        r.set("figure_pure", f(r.u(0.55, 0.9), 2))
+        r.set("figure_change", f(r.u(0.15, 0.4), 2))
+    if r.rng.random() < 0.3:
+        r.set("figure_register", r.pick(-12, -7, -5, 5, 7, 12))
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
@@ -4668,6 +4732,7 @@ def build():
             if g < 96:   # and phase 26 after it, so what a preset had stays as it was
                 p26_effects(r, GROUPS[g])
             floor_rule(r)   # and the floor under every preset (Phase 32), after everything
+            figure_rule(r, group)   # and the figures in front of the chord (11.11.2026), after that
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]
@@ -4682,7 +4747,7 @@ def build():
 def main():
     bank = build()
     lines = ["// Generated by Tools/presets/make_presets.py -- do not edit; edit the script and run it again.",
-                                       "/// The factory presets: 192 groups of 64 (Presets.h).",
+             f"/// The factory presets: {len(GROUPS)} groups of 64 (Presets.h).",
              "const Preset Presets[] = {"]
     for name, g, params, mod in bank:
         lines.append(f'    {{ "{name}", {g}, "{params}", "{mod}" }},')
