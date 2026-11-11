@@ -5211,6 +5211,67 @@ int main( int argc, char **argv )
                     early, late, peak, early0, late0 ) );
     }
 
+    // 112. The panic (11.11.2026): with the conductor playing into the halls, the echoes, the modal hall and a wave
+    //      room, a panic makes the output digital silence within two blocks and keeps it so; woken with the conductor
+    //      off nothing rings on (the tails were emptied, not only gated); a played note wakes it by itself; and All
+    //      Sound Off silences as deep but plays on.
+    if ( from <= 112 )
+    {
+        auto    held = std::make_unique<Engine>();
+        Engine &e = *held;
+        e.setParam( ParamIdE::MODAL_LEVEL, 0.8f );
+        e.setParam( ParamIdE::DELAY_MIX, 0.6f );
+        e.setParam( ParamIdE::WAVE_ROOM, 1.0f );
+        e.setParam( ParamIdE::ROOM_ABSORB, 0.1f );
+        e.setParam( ParamIdE::BLOOM, 0.6f );
+        if ( !openOffline( e, true, 112 ) ) return 1;
+        auto peakOf = []( const std::vector<float> &lr, size_t fromFrame )
+        {
+            float p = 0.0f;
+            for ( size_t i = fromFrame * 2; i < lr.size(); ++i ) p = std::max( p, std::fabs( lr[i] ) );
+            return p;
+        };
+        e.requestFill();
+        const std::vector<float> before = render( e, 12.0 );
+        const double             loud = rmsDb( before, before.size() / 4, before.size() / 2 );
+        // the panic: silence from the third block on (the block it came in fades, a host block of slack), and held
+        e.panic();
+        const std::vector<float> after = render( e, 3.0 );
+        const float              leak = peakOf( after, 768 );
+        const bool               holds = e.halted() && e.soundingVoices() == 0;
+        // woken with the conductors off: nothing may ring on
+        e.setParam( ParamIdE::BRAIN_ON, 0.0f );
+        e.resume();
+        const std::vector<float> woken = render( e, 2.0 );
+        const double             rest = rmsDb( woken, 0, woken.size() / 2 );
+        const bool               awake = !e.halted();
+        // a panic again, then a played note: it wakes the instrument and sounds
+        e.panic();
+        (void)render( e, 0.5 );
+        const bool heldAgain = e.halted();
+        e.noteOn( 62, 0.8f, 0 );
+        const std::vector<float> played = render( e, 8.0 );
+        const double             note = rmsDb( played, played.size() / 4, played.size() / 2 );
+        const bool               byNote = !e.halted() && e.soundingFrom( 0 ) == 1;
+        // All Sound Off: the note and the tails gone at once, nothing held, the next note sounds. (It is an event
+        // on the timeline as a note is, so it takes effect the engine's latency after the call: a tenth of a
+        // second is left out.)
+        e.allSoundOff( 0 );
+        const std::vector<float> hushed = render( e, 0.5 );
+        const double             gone = rmsDb( hushed, 4800, hushed.size() / 2 );
+        const bool               open = !e.halted() && e.soundingVoices() == 0;
+        e.noteOn( 62, 0.8f, 0 );
+        const std::vector<float> again = render( e, 8.0 );
+        const double             back = rmsDb( again, again.size() / 4, again.size() / 2 );
+        check( loud > -50.0 && leak == 0.0f && holds && awake && rest < -100.0 && heldAgain && byNote &&
+                   note > -60.0 && open && gone < note - 60.0 && back > note - 6.0,
+               "panic: silent at once and held, the tails emptied, a note wakes it; All Sound Off plays on",
+               fmt( "%.1f dBFS before, peak %.1e held, %.1f dBFS woken without the conductor; a note %.1f dBFS, "
+                    "%.1f after All Sound Off, %.1f played again (%d %d %d %d %d)",
+                    loud, static_cast<double>( leak ), rest, note, gone, back, holds ? 1 : 0, awake ? 1 : 0,
+                    heldAgain ? 1 : 0, byNote ? 1 : 0, open ? 1 : 0 ) );
+    }
+
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }

@@ -480,6 +480,11 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_qTail.store( 0 );
     m_pending.clear();
     m_pending.reserve( QueueSize );
+    // A panic that holds stays through a new prepare (everything is empty then anyway).
+    m_halt = m_haltView.load( std::memory_order_relaxed ) ? 2 : 0;
+    m_haltGain = m_halt == 0 ? 1.0f : 0.0f;
+    m_resumeLater = false;
+    m_panicAsked.store( false, std::memory_order_relaxed );
 
     // The timeline runs two host blocks plus the lookahead ahead of what the callback has taken,
     // rounded up to whole GPU blocks; the ring holds that and room to spare. Two, because a driver
@@ -590,6 +595,7 @@ void Engine::noteOn( int note, float velocity, int offset, int channel )
 {
     const std::uint32_t head = m_qHead.load( std::memory_order_relaxed );
     if ( !m_prepared || head - m_qTail.load( std::memory_order_acquire ) >= QueueSize ) return;
+    if ( m_haltView.load( std::memory_order_relaxed ) ) m_resumeAsked.store( true, std::memory_order_release );
     m_queue[head & ( QueueSize - 1 )] = { 0, note, std::clamp( velocity, 0.0f, 1.0f ), stampFor( offset ),
                                           std::clamp( channel, -1, 15 ) };
     m_qHead.store( head + 1, std::memory_order_release );
@@ -608,6 +614,14 @@ void Engine::allNotesOff()
     const std::uint32_t head = m_qHead.load( std::memory_order_relaxed );
     if ( !m_prepared || head - m_qTail.load( std::memory_order_acquire ) >= QueueSize ) return;
     m_queue[head & ( QueueSize - 1 )] = { 2, 0, 0.0f, stampFor( 0 ) };
+    m_qHead.store( head + 1, std::memory_order_release );
+}
+
+void Engine::allSoundOff( int offset )
+{
+    const std::uint32_t head = m_qHead.load( std::memory_order_relaxed );
+    if ( !m_prepared || head - m_qTail.load( std::memory_order_acquire ) >= QueueSize ) return;
+    m_queue[head & ( QueueSize - 1 )] = { 3, 0, 0.0f, stampFor( offset ) };
     m_qHead.store( head + 1, std::memory_order_release );
 }
 
@@ -1641,6 +1655,55 @@ void Engine::startNote( int note, float velocity, float distance, int source, in
     v.m_next = { 0, note, velocity, 0, channel };
     v.m_nextSource = source;
     v.m_nextDistance = distance;
+}
+
+void Engine::purge()
+{
+    // The voices: gone, whoever played them, and what waited for a stolen one; the card's voices follow in the voice
+    // loop (a free voice is inactive). The foundation's notes are forgotten, so that it begins again when it wakes.
+    for ( Voice &v : m_voices )
+    {
+        v.m_env.kill();
+        v.m_note = -1;
+        v.m_released = false;
+        v.m_stealing = false;
+        v.m_stealBlocks = 0;
+        v.m_tailBlocks = 0;
+        v.m_next.m_type = -1;
+        v.m_pre = 0.0f;
+        v.m_lastGain = 0.0f;
+    }
+    for ( Ghost &g : m_ghosts ) g.m_on = false;
+    m_foundationNote = m_floorSubNote = m_floorFifthNote = -1;
+    // Notes not yet due belong to what was silenced -- unless one was played after the panic and wakes the instrument.
+    if ( !m_resumeLater ) m_pending.clear();
+    // The conductors: no note of theirs sounds any more; their roots and their dice stay (reset() would begin the
+    // piece again), so switched off (while the panic holds) they only forget what they held.
+    {
+        auto none = []( const BrainEvent & ) {};
+        auto freqOf = [this]( int note ) { return frequencyOf( note ); };
+        BrainParams off = m_bp, off2 = m_bp2;
+        off.m_on = off2.m_on = false;
+        m_brain.update( 0.0, off, -1, freqOf, none );
+        m_brain2.update( 0.0, off2, -1, freqOf, none );
+    }
+    // What works on the sum: the echoes, the loop, the rooms, the far hall and what steps aside for it.
+    m_delay.clear();
+    m_delay2.clear();
+    m_loop.clear();
+    m_early.clear();
+    m_nearRev.clear();
+    m_far.clear();
+    m_diffuser.reset();
+    m_unmask.reset();
+    std::fill( m_sofarRing.begin(), m_sofarRing.end(), 0.0f );
+    // The card: what rings on by itself, and the subsystems that are asked through their own flags.
+    m_cloud.hush();
+    m_cloud.spectralEcho().m_clear = 1;
+    m_cloud.melt().m_clear = 1;
+    m_cloud.room().m_clear = 1;
+    m_cloud.harp().m_clear = 1;
+    m_cloud.halo().m_clear = ( 1 << HaloCarriers ) - 1;
 }
 
 void Engine::stopNote( int note, int source, int channel )
@@ -4102,6 +4165,38 @@ void Engine::renderBlock()
         }
     }
 
+    // 0. The panic (11.11.2026): the block it arrives in fades out; the next begins emptied and silent, and so every
+    //    block after it until a resume -- which a note played into the silence asks for by itself.
+    {
+        const bool panic = m_panicAsked.exchange( false, std::memory_order_acquire );
+        const bool resume = m_resumeAsked.exchange( false, std::memory_order_acquire );
+        const int  was = m_halt;
+        if ( panic )
+        {   // (again while it holds: what was about to wake it is cancelled)
+            if ( was == 0 ) m_halt = 1;
+            m_resumeLater = false;
+        }
+        else if ( resume && was != 0 )
+            m_resumeLater = true;
+        if ( was == 1 )
+        {   // the fade's block is out: now everything is emptied
+            purge();
+            m_halt = 2;
+        }
+        if ( m_halt == 2 && m_resumeLater )
+        {   // awake: the chord at once, as after a preset
+            m_halt = 0;
+            m_resumeLater = false;
+            m_haltView.store( false, std::memory_order_relaxed );
+            m_fillAsked.store( true, std::memory_order_relaxed );
+        }
+        if ( m_halt == 2 )
+        {   // held: the conductors rest (their voices are gone; switched off they start nothing), and so the foundation
+            m_bp.m_on = false;
+            m_bp2.m_on = false;
+        }
+    }
+
     // 1. The played notes that are due, in the order they came, each on its own sample.
     drainEvents();
     for ( size_t i = 0; i < m_pending.size(); )
@@ -4119,9 +4214,18 @@ void Engine::renderBlock()
             startNote( e.m_note, e.m_velocity, m_blk.m_keysDepth, 0, onset, e.m_channel );
         else if ( e.m_type == 1 )
             stopNote( e.m_note, 0, e.m_channel );
-        else
+        else if ( e.m_type == 2 )
+        {
             for ( const Voice &v : m_voices )
                 if ( v.m_note >= 0 && v.m_source == 0 && !v.m_released ) stopNote( v.m_note, 0 );
+        }
+        else if ( m_halt == 0 )
+        {   // All Sound Off: this block fades, the next begins emptied and plays on. What came after it waits for
+            // that block (2.7 ms late), so that a note sent with it is not emptied too.
+            m_halt = 1;
+            m_resumeLater = true;
+            break;
+        }
     }
 
     // 2. The conductors. Step fires on the rising edge of its switch, or from autoplayStep().
@@ -5403,6 +5507,19 @@ void Engine::renderBlock()
         m_nearR[k] = softClip( m_nearR[k] * m_blk.m_master );
     }
     m_limiter.process( m_nearL.data(), m_nearR.data(), G );
+    {   // The panic's gate, after everything: down within the block it came in, shut while it holds, open again
+        // over four blocks (about 10 ms) when the instrument wakes.
+        const float to = m_halt == 0 ? std::min( 1.0f, m_haltGain + 0.25f ) : 0.0f;
+        if ( m_haltGain != 1.0f || to != 1.0f )
+            for ( int s = 0; s < G; ++s )
+            {
+                const size_t k = static_cast<size_t>( s );
+                const float  g = ramp( m_haltGain, to, s );
+                m_nearL[k] *= g;
+                m_nearR[k] *= g;
+            }
+        m_haltGain = to;
+    }
     for ( int s = 0; s < G; ++s )
     {
         const size_t at = static_cast<size_t>( ( pos + s ) & m_ringMask ) * 2;

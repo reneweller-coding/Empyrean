@@ -220,6 +220,11 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
     addAndMakeVisible( m_play );
     m_play.onClick = [this]
     {
+        if ( m_proc.halted() )
+        {   // after a panic Play wakes the instrument; the conductor plays on when it was on
+            m_proc.resume();
+            if ( m_proc.value( static_cast<int>( ParamIdE::BRAIN_ON ) ) >= 0.5f ) return;
+        }
         m_history.begin( "Autoplay", values(), matrixText(), true );
         m_proc.setValue( static_cast<int>( ParamIdE::BRAIN_ON ),
                          m_proc.value( static_cast<int>( ParamIdE::BRAIN_ON ) ) >= 0.5f ? 0.0f : 1.0f );
@@ -237,6 +242,11 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
     addAndMakeVisible( m_step );
     m_step.setTooltip( "Autoplay: exchange one voice of the chord now" );
     m_step.onClick = [this] { m_proc.engine().autoplayStep(); };
+    addAndMakeVisible( m_panic );
+    m_panic.setTooltip(
+        "Panic: everything silent at once -- every voice, echo and hall -- and it stays silent; a journey or a route stops. Play, a key played or a preset chosen wakes it. (Shift+Esc; MIDI All Sound Off silences too, without holding)" );
+    m_panic.setColour( juce::TextButton::buttonOnColourId, juce::Colour( 0xffa8483c ) );
+    m_panic.onClick = [this] { m_proc.panic(); };
     bindChoice( m_mode, ParamIdE::AUTO_MODE );
     bindChoice( m_scale, ParamIdE::SCALE );
     bindChoice( m_root, ParamIdE::ROOT_NOTE );
@@ -788,9 +798,13 @@ void AdditivEditor::flushMatrix()
 void AdditivEditor::timerCallback()
 {
     additiv::Engine &e = m_proc.engine();
-    const bool       on = m_proc.value( static_cast<int>( ParamIdE::BRAIN_ON ) ) >= 0.5f;
+    const bool       halted = m_proc.halted();
+    const bool       on = !halted && m_proc.value( static_cast<int>( ParamIdE::BRAIN_ON ) ) >= 0.5f;
     m_play.show( on ? frame::IconButton::IconE::STOP : frame::IconButton::IconE::PLAY,
-                 on ? "Autoplay: stop the conductor" : "Autoplay: start the conductor" );
+                 halted ? "Play again: a panic holds everything silent"
+                 : on   ? "Autoplay: stop the conductor"
+                        : "Autoplay: start the conductor" );
+    m_panic.setToggleState( halted, juce::dontSendNotification );
     const int    cp = m_proc.currentPreset();
     juce::String name = cp >= 0 ? juce::String( additiv::PresetGroupNames[additiv::preset( cp ).m_group] ) + ": " +
                                       additiv::preset( cp ).m_name
@@ -812,6 +826,10 @@ void AdditivEditor::timerCallback()
         const juce::String why = m_proc.engineError();
         s << "The GPU engine is not running: " << ( why.isEmpty() ? juce::String( "the audio is off" ) : why )
           << "  (an NVIDIA card, GeForce RTX 20 or newer, with a current driver)";
+    }
+    else if ( halted )
+    {
+        s << "Silent (Panic): Play, a key or a preset wakes it";
     }
     else
     {
@@ -1208,7 +1226,7 @@ void AdditivEditor::resized()
     h.m_choices = { { &m_prevPreset, 28 }, { &m_presetName, 250 }, { &m_nextPreset, 28 }, { &m_compare, 32 },
                     { &m_mode, 92 },       { &m_scale, 150 },      { &m_root, 58 },       { &m_motion, 104 } };
     m_landscape.setVisible( false );   // on the Motion page; the header has room for the bank
-    h.m_actions = { { &m_step, 64 } };
+    h.m_actions = { { &m_step, 64 }, { &m_panic, 64 } };
     h.m_play = &m_play;
     h.m_status = &m_status;
     h.m_tools = { &m_undo, &m_redo, nullptr, &m_searchButton, &m_canvasButton, &m_nightButton,
@@ -1391,6 +1409,11 @@ bool AdditivEditor::keyPressed( const juce::KeyPress &key )
          key == juce::KeyPress( 'K', juce::ModifierKeys::ctrlModifier, 0 ) )
     {
         openPalette();
+        return true;
+    }
+    if ( key == juce::KeyPress( juce::KeyPress::escapeKey, juce::ModifierKeys::shiftModifier, 0 ) )
+    {   // the panic (in a host too: no host takes Shift+Esc)
+        m_proc.panic();
         return true;
     }
     frame::Keys k;
@@ -1606,6 +1629,7 @@ std::vector<CommandPalette::Command> AdditivEditor::paletteCommands()
     action( "Canvas", "the picture alone, the whole window", [this] { setCanvas( !m_canvas ); } );
     action( "Play / Stop", "the conductor", [this] { m_play.triggerClick(); } );
     action( "Step", "exchange one voice of the chord now", [this] { m_proc.engine().autoplayStep(); } );
+    action( "Panic", "everything silent at once, and it stays silent (Shift+Esc)", [this] { m_proc.panic(); } );
     action( "Save", "your own preset (Ctrl+S)", [this] { quickSave(); } );
     action( "Save as ...", "your own preset under a new name", [this] { saveAs(); } );
     action( "Back to the preset", "every knob where the preset had it",
@@ -1705,7 +1729,8 @@ void AdditivEditor::showHelp( bool on )
             const int                                          i = m_tabs.getCurrentTabIndex();
             if ( i >= 0 && i < static_cast<int>( m_describe.size() ) )
                 t.emplace_back( "This tab: " + m_tabs.getTabNames()[i], m_describe[static_cast<size_t>( i )]() );
-            t.emplace_back( "Keys", frame::keysText() );
+            t.emplace_back( "Keys", "Shift+Esc\tpanic: everything silent at once (Play, a key or a preset wakes it)\n" +
+                                        frame::keysText() );
             t.emplace_back(
                 "Headset (Meta Quest)",
                 frame::headsetGrammar( "Step", "Brain 2 in or out" ) +

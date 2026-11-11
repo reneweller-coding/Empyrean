@@ -185,6 +185,8 @@ public:
      *                    nothing
      */
     void setDuck( float amount ) { m_duck = clampv( amount, 0.0f, 1.0f ); }
+    /** @brief Empties the lines and the filters' and the duck's memory; the times and settings stay (a panic). */
+    void clear();
     /**
      * @brief Writes the wet signal only; the caller mixes it.
      * @param[in]  inL   left input, n samples
@@ -367,6 +369,9 @@ public:
      * @param[in] hz  the -3 dB point in Hz; 20 or less switches it off
      */
     void setSendLowcut( float hz );
+    /** @brief Empties the network, the diffusers, the pre-delays and every filter's memory; the settings, the line
+     *         lengths as they glide and the turning matrix stay (a panic: the tail gone at once, a frozen one too). */
+    void clear();
     /**
      * @brief Runs a block in place, mixing the tail against the dry signal.
      * @param[in,out] L  left channel, n samples
@@ -924,6 +929,16 @@ public:
      * @param[in] level  0 .. 1, glided across the block inside process(); 0 lets the room fall silent and then skip
      */
     void setLevel( float level ) { m_level = clampv( level, 0.0f, 1.0f ); }
+    /** @brief Empties every ring and the walls' memory; the room and the source stay where they are (a panic). */
+    void clear()
+    {
+        std::fill( m_inL.begin(), m_inL.end(), 0.0f );
+        std::fill( m_inR.begin(), m_inR.end(), 0.0f );
+        for ( auto &p : m_press ) std::fill( p.begin(), p.end(), 0.0f );
+        for ( auto &row : m_pair )
+            for ( auto &p : row ) std::fill( p.begin(), p.end(), 0.0f );
+        for ( float &s : m_lp ) s = 0.0f;
+    }
     /**
      * @brief Whether process() has anything to do.
      * @return  true while the level asked for or the glided level is above nothing

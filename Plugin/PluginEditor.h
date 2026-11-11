@@ -209,6 +209,7 @@ private:
     frame::IconButton      m_play{ frame::IconButton::IconE::PLAY,
                                    "Autoplay: start the conductor" };   ///< Autoplay on and off
     juce::TextButton       m_step{ "Step" };                            ///< Autoplay: exchange a voice now
+    juce::TextButton       m_panic{ "Panic" };   ///< everything silent at once and held (lit while it holds)
     juce::TextButton       m_prevPreset{ "<" };                         ///< the preset before
     juce::TextButton       m_presetName;                                ///< the preset playing; a click opens the bank
     juce::TextButton       m_nextPreset{ ">" };                         ///< the preset after

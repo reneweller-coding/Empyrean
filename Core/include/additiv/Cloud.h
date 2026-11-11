@@ -1518,6 +1518,15 @@ public:
     bool takeSnapshot( const float *&dots, int &perVoice );
 
     /**
+     * @brief A panic (11.11.2026): before the next launch's block everything on the card that rings on by itself is
+     *        emptied -- the modal hall's modes, the bloom's plate and bands, the chimes, the thunder still rolling and the
+     *        time mirror's recording. What is learnt stays (the hall's memory, the dream's). The
+     *        subsystems with a clear flag of their own (the spectral echo, the melt, the wave room, the harp, the halo) are
+     *        asked by the engine through those.
+     */
+    void hush();
+
+    /**
      * @brief Sends the voices up and starts one block on the GPU; returns at once. Clears every
      *        voice's restart flag and advances the active voices' time by one block.
      */

@@ -607,6 +607,19 @@ public:
     bool startJourney( const JourneyEntry &entry );
     /** @brief Stops the journey; the preset playing stays. */
     void stopJourney() { m_journeyPlayer.stop(); }
+    /**
+     * @name Panic (11.11.2026)
+     * Everything silent at once and held (Engine::panic): the voices, the echoes, the halls; the journey and the route
+     * stop. It plays again when Play is clicked, a key is played, a preset is chosen, a journey or a route starts or
+     * a state is loaded.
+     * @{ */
+    /** @brief Silence at once, held. Any thread (off the message thread the journey and route stop at its next tick). */
+    void panic();
+    /** @brief Plays again after a panic (nothing when none holds). */
+    void resume() { m_engine.resume(); }
+    /** @brief Whether a panic holds the instrument silent. @return true then */
+    bool halted() const { return m_engine.halted(); }
+    /** @} */
     /** @brief The journey's clock: running, its step, the seconds left in it, the journey (the timeline). @return it */
     const additiv::JourneyPlayer &journeyPlayer() const { return m_journeyPlayer; }
     /**
@@ -802,6 +815,7 @@ private:
     const bool         m_muted =
         juce::SystemStats::getEnvironmentVariable( "ADDITIV_MUTE", {} ).isNotEmpty();   ///< ADDITIV_MUTE: silent output
     std::atomic<int>        m_pendingProgram{ -1 };   ///< a MIDI program change waiting for the message thread
+    std::atomic<bool>       m_stopPlayers{ false };   ///< a panic from another thread: the journey and the route stop
     int                     m_bankGroup = 0;          ///< the group bank select (CC 0) chose
     bool                    m_sustain = false;        ///< the hold pedal (CC 64) is down
     juce::MidiKeyboardState m_taps;   ///< keys the picture plays (the canvas), merged into the block's MIDI

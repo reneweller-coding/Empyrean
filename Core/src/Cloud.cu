@@ -148,6 +148,7 @@ struct CloudEngine::Impl
     float              *m_hHallMemory = nullptr;    ///< pinned host: the memory as the last snapshot brought it down
     float              *m_hHallUp = nullptr;        ///< pinned host: a memory to send up
     bool                m_hallUp = false;           ///< the next launch sends hHallUp up first
+    bool                m_hush = false;             ///< the next launch empties what rings first (hush())
     bool                m_hallDown = false;         ///< hHallMemory holds a memory
     float              *m_dMeltHist = nullptr;      ///< device: the melt's input history, two rings of MeltN
     float              *m_dMeltAcc = nullptr;       ///< device: its overlap, two rings of MeltN
@@ -1611,6 +1612,11 @@ bool CloudEngine::hallMemory( float *out ) const
     return true;
 }
 
+void CloudEngine::hush()
+{
+    if ( m_impl ) m_impl->m_hush = true;
+}
+
 void CloudEngine::setHallMemory( const float *in )
 {
     if ( !m_impl ) return;
@@ -1813,6 +1819,18 @@ void CloudEngine::launch()
         cudaMemcpyAsync( m.m_dIceStress, m.m_hIceUp, sizeof( float ) * IceN * IceN, cudaMemcpyHostToDevice,
                          m.m_stream );
         m.m_iceUp = false;
+    }
+    if ( m.m_hush )
+    {   // a panic: what rings on by itself is at rest before the block (on the stream, so in order with the graph)
+        cudaMemsetAsync( m.m_dModal, 0, sizeof( float2 ) * ModalModes, m.m_stream );
+        cudaMemsetAsync( m.m_dBloom, 0, sizeof( float2 ) * BloomModes, m.m_stream );
+        // (the bands too: their energy of the block before would drive the emptied plate once more)
+        cudaMemsetAsync( m.m_dBloomBands, 0, sizeof( float ) * ( 2 * BloomBands + 2 ), m.m_stream );
+        cudaMemsetAsync( m.m_dChimeModes, 0, sizeof( float2 ) * ChimeModesTotal, m.m_stream );
+        cudaMemsetAsync( m.m_dThunderSeg, 0, sizeof( float4 ) * 2 * ThunderSegments, m.m_stream );
+        cudaMemsetAsync( m.m_dThunderRing, 0, sizeof( int ) * 2 * static_cast<size_t>( ThunderRing ), m.m_stream );
+        cudaMemsetAsync( m.m_dMirror, 0, sizeof( float ) * MirrorFloats, m.m_stream );
+        m.m_hush = false;
     }
     if ( m.m_hallUp )
     {   // a memory loaded (or a new hall): up before the block

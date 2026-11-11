@@ -120,11 +120,32 @@ void AdditivProcessor::placeFromTimeZone()
     m_engine.setLocation( lat, lon );
 }
 
+void AdditivProcessor::panic()
+{
+    // The journey and the route are the message thread's: stopped here when this is it, else at the timer's next
+    // tick (33 ms) -- before either could choose a preset, which would wake the instrument.
+    if ( juce::MessageManager::existsAndIsCurrentThread() )
+    {
+        m_journeyPlayer.stop();
+        m_route.stop();
+    }
+    else
+    {
+        m_stopPlayers.store( true, std::memory_order_release );
+    }
+    m_engine.panic();
+}
+
 void AdditivProcessor::timerCallback()
 {
     m_jam.setRole(
         frame::Settings::of( App ).jamRole() );   // the family jam (Jam.h): Off, Lead or Follow, from the settings
     pollHeadset();
+    if ( m_stopPlayers.exchange( false, std::memory_order_acquire ) )
+    {   // a panic that came from another thread
+        m_journeyPlayer.stop();
+        m_route.stop();
+    }
     journeyTick();
     mapTick();
     sceneTick();
@@ -250,6 +271,7 @@ void AdditivProcessor::applyPreset( int index, double glide )
 {
     m_sceneQuietUntil = juce::Time::getMillisecondCounterHiRes() + 1500.0;   // its scene is the preset's, not a choice
     if ( index < 0 || index >= additiv::numPresets() ) return;
+    m_engine.resume();   // after a panic: a preset chosen is to be heard
     float       values[additiv::NumParams];
     std::string mod;
     additiv::presetValues( index, values, &mod );
@@ -370,6 +392,7 @@ void AdditivProcessor::applyUserPreset( int i, double glide )
 {
     if ( i < 0 || i >= static_cast<int>( m_userPresets.size() ) ) return;
     const UserPreset &u = m_userPresets[static_cast<size_t>( i )];
+    m_engine.resume();   // after a panic: a preset chosen is to be heard
     const double g = glide >= 0.0 ? glide : static_cast<double>( value( static_cast<int>( ParamIdE::PRESET_GLIDE ) ) );
     if ( g > 0.0 ) m_engine.beginMorph( g );
     for ( int k = 0; k < additiv::NumParams; ++k )
@@ -483,6 +506,7 @@ void AdditivProcessor::previewValues( const std::vector<float> &v, const std::st
         m_browseFromMod = m_engine.modText();
         m_browsing = true;
     }
+    m_engine.resume();   // after a panic: a preset listened to is to be heard
     m_engine.beginMorph( 0.4 );
     for ( int k = 0; k < additiv::NumParams; ++k )
         if ( !additiv::keptByPresets( static_cast<ParamIdE>( k ) ) ) setValue( k, v[static_cast<size_t>( k )] );
@@ -1067,6 +1091,7 @@ bool AdditivProcessor::loadRoute( const RouteEntry &entry )
 bool AdditivProcessor::startRoute()
 {
     if ( m_route.count() == 0 ) return false;
+    m_engine.resume();   // after a panic
     m_journeyPlayer.stop();
     setValue( static_cast<int>( ParamIdE::MORPH_ACTIVE ), 0.0f );
     setValue( static_cast<int>( ParamIdE::MAP_ACTIVE ), 1.0f );
@@ -1169,6 +1194,7 @@ bool AdditivProcessor::startJourney( const JourneyEntry &entry )
     if ( !known ) return false;
     if ( j.m_name.empty() ) j.m_name = entry.m_name.toStdString();
     m_journey = j;
+    m_engine.resume();   // after a panic
     // The A/B morph holds the sound between its slots, the map plays the blend at its cursor: a
     // journey that loads presets under either would seem to do nothing (Noctuary's lesson), so both let go.
     setValue( static_cast<int>( ParamIdE::MORPH_ACTIVE ), 0.0f );
@@ -1313,7 +1339,12 @@ void AdditivProcessor::processBlock( juce::AudioBuffer<float> &buffer, juce::Mid
             else
                 m_engine.noteOff( m.getNoteNumber(), pos, member ? ch : -1 );
         }
-        else if ( m.isAllNotesOff() || m.isAllSoundOff() )
+        else if ( m.isAllSoundOff() )
+        {   // CC 120: everything silent at once, the conductor's notes and the halls too; it plays on (not held)
+            m_held.reset();
+            m_engine.allSoundOff( pos );
+        }
+        else if ( m.isAllNotesOff() )
         {
             m_held.reset();
             m_engine.allNotesOff();
@@ -1565,6 +1596,7 @@ void AdditivProcessor::setStateInformation( const void *data, int size )
     m_sceneQuietUntil = juce::Time::getMillisecondCounterHiRes() + 1500.0;   // its scene is the state's, not a choice
     const std::unique_ptr<juce::XmlElement> xml = getXmlFromBinary( data, size );
     if ( !xml || !xml->hasTagName( "AdditivState" ) ) return;
+    m_engine.resume();   // after a panic: a state loaded is to be heard
     // A parameter the state does not name goes to its default, never stays where it was: otherwise
     // a state would sound different depending on what was loaded before it (the family's lesson).
     for ( const ParamDesc &d : additiv::paramTable() )

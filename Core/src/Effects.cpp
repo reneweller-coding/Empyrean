@@ -314,6 +314,14 @@ void StereoDelay::prepare( double sampleRate )
     m_tLcur = m_tRcur = 0.0f;
 }
 
+void StereoDelay::clear()
+{
+    std::fill( m_bufL.begin(), m_bufL.end(), 0.0f );
+    std::fill( m_bufR.begin(), m_bufR.end(), 0.0f );
+    m_lpL = m_lpR = m_loL = m_loR = m_hiL = m_hiR = 0.0f;
+    m_duckEnv = m_duckFast = 0.0f;
+}
+
 void StereoDelay::set( float timeL, float timeR, float feedback, float cross, float damping, float absorb )
 {
     const float maxT = static_cast<float>( m_mask - 64 );
@@ -670,6 +678,23 @@ void Patina::process( float *L, float *R, int n )
 }
 
 // ---------------------------------------------------------------- Reverb
+
+void Reverb::clear()
+{
+    for ( auto &l : m_line ) std::fill( l.begin(), l.end(), 0.0f );
+    for ( auto &a : m_ap ) std::fill( a.begin(), a.end(), 0.0f );
+    for ( auto &a : m_apR ) std::fill( a.begin(), a.end(), 0.0f );
+    for ( auto &s : m_sc ) std::fill( s.begin(), s.end(), 0.0f );
+    std::fill( m_pre.begin(), m_pre.end(), 0.0f );
+    std::fill( m_preR.begin(), m_preR.end(), 0.0f );
+    std::fill( m_outR.begin(), m_outR.end(), 0.0f );
+    m_dcInX[0] = m_dcInX[1] = m_dcInY[0] = m_dcInY[1] = 0.0f;
+    for ( float &s : m_lp ) s = 0.0f;
+    m_hcL = m_hcR = 0.0f;
+    m_lcL1 = m_lcR1 = m_lcL2 = m_lcR2 = 0.0f;
+    m_sendHpL.reset();
+    m_sendHpR.reset();
+}
 
 void Reverb::prepare( double sampleRate )
 {

@@ -216,6 +216,36 @@ public:
     void allNotesOff();
 
     /**
+     * @brief Everything that sounds is silent at once, and nothing is held (MIDI's All Sound Off, 11.11.2026): the
+     *        voices of whoever played them, the echoes and the halls are emptied as by a panic, then the instrument
+     *        plays on -- the conductor's chord arrives anew, and a note that comes after it sounds. It does not latch,
+     *        because hosts may send it whenever the transport stops; panic() is the silence that stays. Audio thread.
+     * @param[in] offset  sample offset inside the coming block
+     * @pre called on the audio thread
+     */
+    void allSoundOff( int offset = 0 );
+
+    /**
+     * @name Panic (11.11.2026)
+     * Everything silent at once, and kept silent: the output fades within a block (2.7 ms), then every voice -- played,
+     * the conductors', the foundation's, the memory's ghosts -- is gone, the echoes, the loop, the rooms, the far and
+     * the modal hall and what else rings on the card are emptied (a frozen hall too), and the conductors rest. The
+     * instrument stays so until resume(), or until a note is played (noteOn wakes it): then the conductor's chord
+     * arrives as after a preset. What is learnt -- the hall's memory, the dream's -- and every knob stay as they are.
+     * @{ */
+    /** @brief Silence at once, held. Any thread. */
+    void panic()
+    {
+        m_haltView.store( true, std::memory_order_relaxed );
+        m_panicAsked.store( true, std::memory_order_release );
+    }
+    /** @brief Plays again after a panic (nothing when none holds). Any thread. */
+    void resume() { m_resumeAsked.store( true, std::memory_order_release ); }
+    /** @brief Whether a panic holds the instrument silent. Any thread. @return true from panic() until it plays again */
+    bool halted() const { return m_haltView.load( std::memory_order_relaxed ); }
+    /** @} */
+
+    /**
      * @brief Sets one row of the modulation matrix. Any thread (a row is one atomic word).
      * @param[in] i    0 .. ModRows-1
      * @param[in] row  the row
@@ -659,7 +689,7 @@ private:
     /** @brief A note event on its way from the audio thread to the renderer. */
     struct Event
     {
-        int          m_type = 0;          ///< 0 note on, 1 note off, 2 all played notes off
+        int          m_type = 0;          ///< 0 note on, 1 note off, 2 all played notes off, 3 all sound off
         int          m_note = 0;          ///< MIDI note
         float        m_velocity = 0.0f;   ///< 0 .. 1 (note on)
         std::int64_t m_stamp = 0;         ///< the timeline sample it takes effect at
@@ -1537,6 +1567,14 @@ private:
     std::atomic<bool>  m_running{ false };         ///< the worker runs
     std::atomic<bool>  m_stepAsked{ false };       ///< autoplayStep() was asked for
     std::atomic<bool>  m_fillAsked{ false };       ///< requestFill() was asked for
+    std::atomic<bool>  m_panicAsked{ false };      ///< panic() was asked for
+    std::atomic<bool>  m_resumeAsked{ false };     ///< resume() was asked for (or a note played into the silence)
+    std::atomic<bool>  m_haltView{ false };        ///< a panic holds (set at once by panic(), for the panel and noteOn)
+    int                m_halt = 0;                 ///< the renderer's: 0 playing, 1 the block that fades out, 2 held silent
+    bool               m_resumeLater = false;      ///< a resume came while the fade's block ran: wake after the purge
+    float              m_haltGain = 1.0f;          ///< the output's gain at the end of the last block (0 while held)
+    /** @brief What a panic empties, between two blocks (the renderer's thread). */
+    void purge();
     std::atomic<int>   m_sounding{ 0 };            ///< voices sounding, for status
     std::atomic<int>   m_soundingBy[3] = {};       ///< voices sounding per source, for status
     std::atomic<int>   m_brainRoot{ 0 };           ///< the conductor's root, for status
