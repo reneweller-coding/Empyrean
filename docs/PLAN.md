@@ -557,8 +557,12 @@ klarer, im Moment manchmal ziemlich vermatscht“, ein Panik-Knopf, aufgeräumte
   Schlafmusik und über Drones, angeschlagen bei Glas und Glocken. Die Bank neu beschrieben (Find, Karte).
 - **37e Aufräumen:** `Rate.h` mit `DefaultSampleRate`; jede Stufe, die Werkzeuge und der Selbsttest lesen sie dort.
 
-Offen: die Bank ist mit dem alten Klang gepegelt (die Hörproben liegen 0,3 bis 2,8 dB über vorher) -- die
-Neumessung der Pegel über Nacht (`work/presets/remeasure_1111.py all`, zehn Stunden GPU), wenn der Klang so bleibt.
+- **37f Neu eingepegelt (12.11.2026):** die Bank war mit dem alten Klang gepegelt (die Hörproben lagen 0,3 bis 2,8 dB
+  über vorher). `work/presets/remeasure_1111.py all` hat alle 16384 Presets gespielt gemessen (45 s, Dirigent an, die
+  lautesten drei Sekunden), die lauten mit eigenem Pegel nachgemessen und auf -16,8 LUFS gestellt, dann Karte und
+  Suche neu beschrieben: 15657 Pegel bewegt, im Median -0,8 dB, 1384 um mehr als 3 dB (meist Presets mit Figuren).
+  Mit 8 statt 16 Engines gleich schnell (die GPU ist die Grenze, gut 90 %), die Messprozesse auf der Karte mit der
+  Klasse „unter normal“; knapp elf Stunden. Stichprobe mit `empy_render --fill`: -18,3 .. -15,8 LUFS.
 
 ## Phase 36: Reisen zum Mitnehmen, die Bank neu eingepegelt (gebaut, 16.10.2026, 0.26.0)
 

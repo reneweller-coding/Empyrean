@@ -21,6 +21,11 @@
   of -14 dB of the whole (-27 before; the recordings: -14 to -5).
 - **Far Low Cut** (Space page, 160 Hz by default): under it the far plane stays out of the hall and is heard as it
   is -- a hall of half a minute made mud of the bass and the low mids. 20 Hz: as it was.
+- **The bank levelled again** (12.11.2026). With the figures, the sub and the corrected balance, the presets played
+  louder than their gains had been set for -- 0.7 dB at the median, more where a figure's note is the loudest moment.
+  All 16384 were measured again as the panel plays them (the conductor on, the loudest three seconds) and levelled to
+  -16.8 LUFS as before: 15657 gains moved, by -0.8 dB at the median and by more than 3 dB in 1384 presets (most of them
+  with figures). The map and the search were measured anew with them.
 - **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
 
 ## 1.0.0 (17.10.2026)
