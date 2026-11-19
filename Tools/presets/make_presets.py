@@ -4706,9 +4706,56 @@ def figure_rule(r, group):
         r.set("figure_register", r.pick(-12, -7, -5, 5, 7, 12))
 
 
+#: The long loop (19.11.2026): where Robert Rich's sleep-concert loops belong -- the sleep music itself, ...
+LOOP_SLEEP = FIGURE_SLEEP
+#: ... the memories, dreams and phantoms, where a sound that comes round again is the point, ...
+LOOP_MEMORY = {"Ghosts & Memory", "Memory Palaces", "Night Memories", "Dreaming Rooms", "Inner Voices", "Phantom Choirs",
+               "Phantom Gardens", "Lucid Dreams", "Elsewhere", "Premonitions", "Time Mirrors", "Lingering Waves",
+               "Choirs", "Endless Ritardando", "Night Arcs", "Nocturnes", "Lake Nights", "Inside the Cloud"}
+#: ... and the drones and the halls, more seldom.
+LOOP_DRONE = FIGURE_DRONE | {"Resonant Halls", "Cathedral Years", "Eroded Halls", "Growing Halls", "Halo Chapels",
+                             "Chapel Air"}
+
+
+#: Per preset, the share of the loop's drawn Mix it keeps (work/presets/loop_trim.json, remeasure_loop.py): where the
+#: loop measured more than 3 dB over the preset without it -- a feedback near 0.9 sums a held sound over many rounds --
+#: its Mix comes down, so the loop plays with the sound and does not take it over.
+LOOP_TRIM = ROOT / "work" / "presets" / "loop_trim.json"
+
+
+def loop_rule(r, group, name=None, trim=None):
+    """The long loop (LongLoop, loop_*; in the engine since 20.10.2026, in no preset until now): Rich's sleep concerts
+    circle what is played on a tape loop of many seconds, each round darker and softer. In the sleep music a little
+    more than half of the presets get it, in the memories and dreams somewhat less than half, in the drones and halls
+    a third; nowhere else -- not what is struck, not the weather, not the bright or the quick. Not where the conductor
+    hurries (a chord a round would pile up) and not where an echo or the melt already smears the sound. Drawn after
+    everything: what a preset had stays as it was."""
+    if "loop_mix" in r.p:
+        return
+    chance = 0.55 if group in LOOP_SLEEP else 0.45 if group in LOOP_MEMORY else 0.3 if group in LOOP_DRONE else 0.0
+    if chance <= 0.0 or r.rng.random() >= chance:
+        return
+    chords = int(num(r, "auto_mode", 1)) == 1
+    if chords and num(r, "auto_rate", 120) < 45:
+        return
+    if not chords and num(r, "brain_rate", 25) < 12:
+        return
+    if num(r, "delay_mix", 0) > 0.35 or num(r, "melt_mix", 0) > 0.45:
+        return
+    sleep = group in LOOP_SLEEP
+    mix = r.u(0.2, 0.42) if sleep else r.u(0.15, 0.34)
+    r.set("loop_mix", f(mix * (trim or {}).get(name, 1.0), 2))
+    r.set("loop_time", f(r.lg(8, 15.5), 1))
+    r.set("loop_feedback", f(r.u(0.84, 0.93) if sleep else r.u(0.8, 0.9), 2))
+    r.set("loop_tone", f(r.lg(1500, 4200), 0))
+    r.set("loop_drive", f(r.u(0.15, 0.45), 2))
+    r.set("loop_to_far", f(r.u(0.2, 0.5), 2))
+
+
 def build():
     """The bank: per group 64 presets, each a name, its parameters and its matrix."""
     levels = json.loads(LEVELS.read_text()) if LEVELS.exists() else {}
+    loop_trim = json.loads(LOOP_TRIM.read_text()) if LOOP_TRIM.exists() else {}
     bank = []
     for g, (group, recipe) in enumerate(zip(GROUPS, RECIPES)):
         adjectives, nouns = NAMES[group]
@@ -4733,6 +4780,7 @@ def build():
                 p26_effects(r, GROUPS[g])
             floor_rule(r)   # and the floor under every preset (Phase 32), after everything
             figure_rule(r, group)   # and the figures in front of the chord (11.11.2026), after that
+            loop_rule(r, group, names[i], loop_trim)   # and the long loop where it belongs (19.11.2026), last
             r.p.pop("_sleep", None)   # the sleep modulations' bookkeeping, not a parameter
             assert len(r.rows) <= 16, (group, i, r.rows)
             name = names[i]

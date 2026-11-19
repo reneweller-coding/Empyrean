@@ -569,7 +569,9 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                          IdsT{ ParamIdE::BLOOM, ParamIdE::BLOOM_SIZE, ParamIdE::BLOOM_DECAY, ParamIdE::BLOOM_DRIVE,
                                ParamIdE::BLOOM_GLIDE },
                          IdsT{ ParamIdE::BLOOM } } } );
-    // Phase 29: the wave room and the topological halo.
+    // Phase 29: the wave room and the topological halo. The loop (Robert Rich's long loops, 20.10.2026; shown since
+    // 19.11.2026) stands here beside the time mirror, the other sound sent round again: on the Effects page it made a
+    // fourth row, and that page scrolled at 1280 x 860.
     page( "Rooms",
           { { "Wave Room", F::SPACE,
               IdsT{ ParamIdE::WAVE_ROOM, ParamIdE::ROOM_SIZE, ParamIdE::ROOM_ABSORB, ParamIdE::ROOM_WALK },
@@ -579,6 +581,10 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
                     ParamIdE::HALO_TURN },
               IdsT{ ParamIdE::HALO } },
             { "Time Mirror", F::SPACE, IdsT{ ParamIdE::MIRROR, ParamIdE::MIRROR_TIME }, IdsT{ ParamIdE::MIRROR } },
+            { "Loop", F::SPACE,
+              IdsT{ ParamIdE::LOOP_MIX, ParamIdE::LOOP_TIME, ParamIdE::LOOP_FEEDBACK, ParamIdE::LOOP_TONE,
+                    ParamIdE::LOOP_DRIVE, ParamIdE::LOOP_TO_FAR },
+              IdsT{ ParamIdE::LOOP_MIX } },
             { "Headset", F::FILTER, IdsT{ ParamIdE::VR_HANDS, ParamIdE::HEAD_TRACKING }, IdsT{ ParamIdE::VR_HANDS } },
             { "Deep Channel", F::SPACE, IdsT{ ParamIdE::SOFAR, ParamIdE::SOFAR_RANGE, ParamIdE::SOFAR_DEPTH },
               IdsT{ ParamIdE::SOFAR } } } );

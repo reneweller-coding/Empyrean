@@ -43,10 +43,10 @@ TABS = {
     "Conductor": ["Conductor", "Floor", "MPE", "Quantum Walk"],
     "Figures": ["Figures"],
     "Space": ["Space", "Master", "Binaural"],
-    # Loop (Robert Rich's long loops, 20.10.2026) is on no page of the GUI -- host automation and empy_render --set
-    # reach it; it is a delay like the echoes, sending to the far plane as they do, so its table stands with theirs.
-    "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Bloom", "Loop"],
-    "Rooms": ["Wave Room", "Halo", "Time Mirror", "Headset", "Deep Channel"],
+    "Effects": ["Echo", "Room", "Spectral Echo", "Melt", "Bloom"],
+    # Loop (Robert Rich's long loops, 20.10.2026) is on the Rooms page beside the time mirror since 19.11.2026: on the
+    # Effects page it made a fourth row, and that page scrolled at 1280 x 860.
+    "Rooms": ["Wave Room", "Halo", "Time Mirror", "Loop", "Headset", "Deep Channel"],
     "Hall": ["Modal", "Hall"],
     "Modulation": ["Modulation"],
     "Journey": ["Morph"],

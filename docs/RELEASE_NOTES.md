@@ -26,6 +26,14 @@
   All 16384 were measured again as the panel plays them (the conductor on, the loudest three seconds) and levelled to
   -16.8 LUFS as before: 15657 gains moved, by -0.8 dB at the median and by more than 3 dB in 1384 presets (most of them
   with figures). The map and the search were measured anew with them.
+- **The long loop on the panel and in the bank** (19.11.2026). Robert Rich's sleep-concert loop (Loop: a stereo
+  tape of 4 to 16 seconds, the right side a 23rd longer, each round darker and softer; in the engine since 20.10.2026)
+  was on no page and in no preset. It stands on the Rooms page now, beside the time mirror (on the Effects page it
+  made a fourth row), and the help describes it. 1349 presets have it: a little more than half of the sleep music,
+  somewhat less than half of the memories, dreams and phantoms, a third of the drones and halls; not what is struck,
+  not the weather, not where the conductor hurries or an echo or the melt already smears the sound. They were measured
+  again as played and levelled (median -0.1 dB; the loop itself adds 0.04 dB at the median to the loudest moment,
+  1.9 dB at the most), and described again for Find and the map.
 - **Figures that keep to the chord, in every tuning and with both conductors** (19.11.2026). A figure judged its notes
   by their keys against the first conductor only. In a just scale whose keys snap, a key is not the interval its
   number says (in 7-limit on D the G is played as an F#), and the second conductor, which chooses its own notes on
