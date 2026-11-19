@@ -4676,7 +4676,7 @@ int main( int argc, char **argv )
         };
         struct Floor
         {
-            double share = 0.0, deep = 0.0, swing = 0.0, tonic = 0.0, moved = 0.0;
+            double share = 0.0, deep = 0.0, swing = 0.0, tonic = 0.0, moved = 0.0, voices = 0.0;
         };
         auto play = [&]( float foundation, float floor, float harp, float pedal, float pressure, float sub, Floor &f )
         {
@@ -4715,6 +4715,7 @@ int main( int argc, char **argv )
             {   // forty seconds, a look at the foundation and the root each second
                 const std::vector<float> a = render( e, 1.0 );
                 all.insert( all.end(), a.begin(), a.end() );
+                f.voices += e.soundingFrom( 1 ) / 40.0;   // the conductor's voices, on average
                 const int fn = e.foundationNow();
                 if ( fn < 0 ) continue;
                 ++looks;
@@ -4767,8 +4768,13 @@ int main( int argc, char **argv )
                "floor: Pressure makes the floor beat at its rate",
                fmt( "the floor's envelope alike after 4 s less after 2 s: %.2f with Pressure, %.2f without", beat.swing,
                     kept.swing ) );
-        check( ran && sub.deep > kept.deep + 6.0, "floor: Sub Octave puts power an octave under the foundation",
-               fmt( "under 55 Hz against the whole: %.1f dB with it, %.1f dB without", sub.deep, kept.deep ) );
+        // 4 dB over the floor without it (6 until 19.11.2026): the sub itself stands where it stood (-9.7 dB of the whole,
+        // -9.2 since), but the conductor that hears its own notes voices this test's quick chords wider, and more of
+        // them reaches under 55 Hz without the sub (-17.2 dB before, -13.6 since). Five probes of real presets (Noctuary's
+        // conductor, the same code) moved by 1.2 dB at most in any band, most by nothing.
+        check( ran && sub.deep > kept.deep + 4.0, "floor: Sub Octave puts power an octave under the foundation",
+               fmt( "under 55 Hz against the whole: %.1f dB with it, %.1f dB without (the conductor's voices %.1f)",
+                    sub.deep, kept.deep, kept.voices ) );
     }
 
     // 100. Star (Phase 33): a sun's modes stand where asteroseismology puts them -- the radial ones at
@@ -5386,6 +5392,36 @@ int main( int argc, char **argv )
         const double share = 100.0 * rubbing / std::max( both, 1 );
         check( share < 5.0, "conductors: the two hear each other and seldom rub",
                fmt( "%.1f %% of %d seconds with a semitone, a major seventh or a tritone across them", share, both ) );
+    }
+
+    // 116. A conductor hears its own notes (19.11.2026): Free mode weighed a candidate against the root alone, so a
+    //      conductor set strictly consonant could still put a note a semitone beside one of its own. Consonance at
+    //      0.95, three notes, three seeds of ten minutes: the share of the time with a minor second or a minor ninth
+    //      among its own notes is small. Before: 9.6 %; now none.
+    if ( from <= 116 )
+    {
+        int rubbing = 0, chords = 0;
+        for ( std::uint64_t seed : { 1161u, 1162u, 1163u } )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            e.setParam( ParamIdE::AUTO_MODE, 0.0f );   // Free
+            e.setParam( ParamIdE::BRAIN_RATE, 12.0f );
+            e.setParam( ParamIdE::BRAIN_DENSITY, 3.0f );
+            e.setParam( ParamIdE::BRAIN_CONSONANCE, 0.95f );
+            if ( !openOffline( e, true, seed ) ) return 1;
+            e.requestFill();
+            for ( int s = 0; s < 600; ++s )
+            {
+                (void)render( e, 1.0 );
+                if ( s < 30 ) continue;
+                ++chords;
+                if ( e.conductorRubbingItself() > 0 ) ++rubbing;
+            }
+        }
+        const double share = 100.0 * rubbing / std::max( chords, 1 );
+        check( share < 3.0, "conductor: a minor second among its own notes is rare when it is set consonant",
+               fmt( "%.1f %% of %d seconds with a minor second or ninth among the conductor's notes", share, chords ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

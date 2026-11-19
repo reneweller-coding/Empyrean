@@ -550,6 +550,12 @@ public:
      * @return the count (0 when the second conductor is off)
      */
     int conductorsRubbing() const;
+    /**
+     * @brief How many pairs of the first conductor's own sounding notes stand a minor second or a minor ninth apart, as
+     *        the tuning sounds them (19.11.2026). For the selftest, offline.
+     * @return the count
+     */
+    int conductorRubbingItself() const;
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return m_brainRoot.load( std::memory_order_relaxed ); }
     /** @brief Seconds until the conductor's next decision, for the panel. Any thread. @return seconds */

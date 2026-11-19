@@ -1771,6 +1771,21 @@ bool Engine::rubs( int a, int b ) const
     return ( c > 25.0 && c < 150.0 ) || c > 550.0;
 }
 
+int Engine::conductorRubbingItself() const
+{
+    int       one[ClusterBrain::Slots];
+    float     vels[ClusterBrain::Slots];
+    const int n = m_brain.soundingNotes( one, vels );
+    int       count = 0;
+    for ( int i = 0; i < n; ++i )
+        for ( int k = i + 1; k < n; ++k )
+        {
+            const double d = std::fabs( 1200.0 * std::log2( frequencyOf( one[i] ) / frequencyOf( one[k] ) ) );
+            if ( ( d > 25.0 && d < 150.0 ) || ( d > 1225.0 && d < 1350.0 ) ) ++count;
+        }
+    return count;
+}
+
 int Engine::conductorsRubbing() const
 {
     if ( !m_blk.m_brain2 ) return 0;

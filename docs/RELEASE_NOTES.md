@@ -39,6 +39,12 @@
   octaves) from one of the other's. With the second on the fifth and both in Free mode, such a pair stood across them
   46 % of the time and now does not. A preset without the second conductor (13286 of the bank's 16384)
   plays exactly as before.
+- **A conductor hears its own notes** (19.11.2026, as in Noctuary). Free mode weighed a candidate against the root
+  alone; a conductor whose Consonance is at least a half now takes no note a minor second or a minor ninth from one of
+  the voices that stay (in Free mode, in Chords mode, against the deja vu ring and for a changeover's pivot tone); a
+  major seventh and a tritone stay colours. A step of a minor second from the voice that leaves stays allowed, but the
+  old voice goes within two seconds instead of the whole Overlap. Three notes at Consonance 0.95: a minor second or
+  ninth among them 9.6 % of the time before, none now.
 - **Journeys with stays of their own** (19.11.2026). Every step of a journey was held for six to twelve minutes, of a
   night ten to eighteen, of a whole night twelve to twenty. Now each preset stays as long as it carries by itself:
   the third that moves least (its motion, life, ripple, the conductor's pace, the figures) 1:30-3:00, the third that
