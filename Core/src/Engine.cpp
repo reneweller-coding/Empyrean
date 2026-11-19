@@ -1771,6 +1771,21 @@ bool Engine::rubs( int a, int b ) const
     return ( c > 25.0 && c < 150.0 ) || c > 550.0;
 }
 
+int Engine::conductorsRubbing() const
+{
+    if ( !m_blk.m_brain2 ) return 0;
+    int       one[ClusterBrain::Slots], two[ClusterBrain::Slots];
+    float     vels[ClusterBrain::Slots];
+    const int n1 = m_brain.soundingNotes( one, vels ), n2 = m_brain2.soundingNotes( two, vels );
+    int       count = 0;
+    for ( int i = 0; i < n1; ++i )
+        for ( int k = 0; k < n2; ++k )
+            if ( rubs( one[i], two[k] ) &&
+                 std::fabs( 1200.0 * std::log2( frequencyOf( one[i] ) / frequencyOf( two[k] ) ) ) < 2400.0 )
+                ++count;
+    return count;
+}
+
 float Engine::figureFit( int note, const int *chord, int n ) const
 {
     // In cents of what the tuning plays (19.11.2026), not in keys: where a just scale's keys snap, a key is not the
@@ -4555,6 +4570,8 @@ void Engine::renderBlock()
     m_bp.m_light = m_lightOn ? m_light : nullptr;
     m_bp2.m_light = m_bp.m_light;
     auto freqOf = [this]( int note ) { return frequencyOf( note ); };
+    // the two conductors hear each other (19.11.2026, as in Noctuary): each weighs its choices against the other's notes
+    m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf );
     m_brain.update( dt, m_bp, -1, freqOf,
                     [this]( const BrainEvent &e )
                     {
@@ -4581,6 +4598,7 @@ void Engine::renderBlock()
     stepPedal( static_cast<float>( dt ) );
     updateFoundation();
     m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
+    m_brain2.listenTo( &m_brain, freqOf );
     m_brain2.update( dt, m_bp2, -1, freqOf,
                      [this]( const BrainEvent &e )
                      {

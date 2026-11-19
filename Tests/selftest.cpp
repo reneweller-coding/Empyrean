@@ -5355,6 +5355,39 @@ int main( int argc, char **argv )
                     notes, clashes ) );
     }
 
+    // 115. The two conductors hear each other (19.11.2026): the second on the fifth, both in Free mode with chords
+    //      of their own, three seeds of ten minutes. The share of the time a note of one stands a semitone, a major
+    //      seventh or a tritone from a note of the other (within two octaves) is small. Before, they shared the root
+    //      and nothing else: 46 % of the time; now none.
+    if ( from <= 115 )
+    {
+        int rubbing = 0, both = 0;
+        for ( std::uint64_t seed : { 1151u, 1152u, 1153u } )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            e.setParam( ParamIdE::AUTO_MODE, 0.0f );   // Free
+            e.setParam( ParamIdE::BRAIN_RATE, 20.0f );
+            e.setParam( ParamIdE::BRAIN_DENSITY, 3.0f );
+            e.setParam( ParamIdE::BRAIN2_ON, 1.0f );
+            e.setParam( ParamIdE::BRAIN2_INTERVAL, 7.0f );
+            e.setParam( ParamIdE::BRAIN2_DENSITY, 2.0f );
+            e.setParam( ParamIdE::BRAIN2_RATE, 15.0f );
+            if ( !openOffline( e, true, seed ) ) return 1;
+            e.requestFill();
+            for ( int s = 0; s < 600; ++s )
+            {
+                (void)render( e, 1.0 );
+                if ( s < 30 ) continue;   // the chords fill first
+                ++both;
+                if ( e.conductorsRubbing() > 0 ) ++rubbing;
+            }
+        }
+        const double share = 100.0 * rubbing / std::max( both, 1 );
+        check( share < 5.0, "conductors: the two hear each other and seldom rub",
+               fmt( "%.1f %% of %d seconds with a semitone, a major seventh or a tritone across them", share, both ) );
+    }
+
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }

@@ -33,6 +33,11 @@
   a semitone, a major seventh or a tritone from a note that sounded. They are judged in cents of what the tuning plays
   now, against both conductors: none of 302. In 12-TET without the second conductor they play as before, but for a
   note the harmony has moved under that now finds a fitting neighbour three keys off.
+- **The two conductors hear each other** (19.11.2026, as in Noctuary). They shared a root and nothing else; each now
+  weighs a candidate against the other's sounding notes as it weighs the root, to the power its Consonance asks. With
+  the second on the fifth and both in Free mode, a semitone, a major seventh or a tritone stood across them 46 % of
+  the time (within two octaves) and now does not. A preset without the second conductor (13286 of the bank's 16384)
+  plays exactly as before.
 - **Journeys with stays of their own** (19.11.2026). Every step of a journey was held for six to twelve minutes, of a
   night ten to eighteen, of a whole night twelve to twenty. Now each preset stays as long as it carries by itself:
   the third that moves least (its motion, life, ripple, the conductor's pace, the figures) 1:30-3:00, the third that

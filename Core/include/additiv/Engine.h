@@ -543,6 +543,13 @@ public:
      * @return the count
      */
     int figureClashes() const { return m_figClash.load( std::memory_order_relaxed ); }
+    /**
+     * @brief How many pairs of notes the two conductors sound now rub across them: a semitone, a major seventh or a
+     *        tritone apart as the tuning sounds them, within two octaves (19.11.2026). For the selftest, offline: it
+     *        reads the conductors, which the audio thread writes.
+     * @return the count (0 when the second conductor is off)
+     */
+    int conductorsRubbing() const;
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return m_brainRoot.load( std::memory_order_relaxed ); }
     /** @brief Seconds until the conductor's next decision, for the panel. Any thread. @return seconds */
