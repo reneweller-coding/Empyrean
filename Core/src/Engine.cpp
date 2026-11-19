@@ -329,6 +329,7 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_figActive = 0;
     m_figMatch = 1.0f;
     m_figPlayed.store( 0, std::memory_order_relaxed );
+    m_figClash.store( 0, std::memory_order_relaxed );
     for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
     m_stepWas = param( ParamIdE::AUTO_STEP ) >= 0.5f;
     m_far.prepare( m_cfg.m_sampleRate );
@@ -1744,16 +1745,44 @@ void Engine::purge()
 
 // ---- the figures (11.11.2026)
 
-float Engine::figureFit( int note, const int *chord, int n )
+int Engine::conductorsSounding( int *notes ) const
 {
+    float vels[ClusterBrain::Slots];
+    int   n = m_brain.soundingNotes( notes, vels );
+    if ( m_blk.m_brain2 )
+    {
+        int       more[ClusterBrain::Slots];
+        const int m = m_brain2.soundingNotes( more, vels );
+        for ( int k = 0; k < m && n < ClusterBrain::Slots; ++k )
+            if ( std::find( notes, notes + n, more[k] ) == notes + n ) notes[n++] = more[k];
+    }
+    return n;
+}
+
+double Engine::centsApart( int a, int b ) const
+{
+    const double c = std::fmod( std::fabs( 1200.0 * std::log2( frequencyOf( a ) / frequencyOf( b ) ) ), 1200.0 );
+    return std::min( c, 1200.0 - c );
+}
+
+bool Engine::rubs( int a, int b ) const
+{
+    const double c = centsApart( a, b );
+    return ( c > 25.0 && c < 150.0 ) || c > 550.0;
+}
+
+float Engine::figureFit( int note, const int *chord, int n ) const
+{
+    // In cents of what the tuning plays (19.11.2026), not in keys: where a just scale's keys snap, a key is not the
+    // interval its number says -- in 7-limit on D the G is played as an F#, a semitone from a G judged a fourth.
     for ( int k = 0; k < n; ++k )
-        if ( ( ( note - chord[k] ) % 12 + 12 ) % 12 == 0 ) return 3.0f;
+        if ( centsApart( note, chord[k] ) <= 25.0 ) return 3.0f;
     float w = 1.0f;
     for ( int k = 0; k < n; ++k )
     {
-        const int ic = ( ( note - chord[k] ) % 12 + 12 ) % 12;
-        if ( ic == 1 || ic == 6 || ic == 11 ) return 0.0f;
-        if ( ic == 2 || ic == 10 ) w = 0.5f;
+        const double c = centsApart( note, chord[k] );
+        if ( c < 150.0 || c > 550.0 ) return 0.0f;   // a semitone, a major seventh, a tritone
+        if ( c < 250.0 ) w = 0.5f;                   // a whole tone, a minor seventh
     }
     return w;
 }
@@ -1764,11 +1793,15 @@ int Engine::drawFigureNote( int around, int avoid, bool chordTone, int centre, c
     static const float Step[8] = { 0.6f, 1.0f, 1.0f, 0.8f, 0.8f, 0.5f, 0.15f, 0.35f };
     float              weight[15];
     float              total = 0.0f;
+    // a key the tuning plays as the note before is that note again (keys snap in a just scale)
+    const double avoidHz = avoid >= 0 ? frequencyOf( avoid ) : -1.0;
     for ( int d = -7; d <= 7; ++d )
     {
-        const int c = around + d;
-        float     w = 0.0f;
-        if ( c != avoid && std::abs( c - centre ) <= 9 && c >= 24 && c <= 108 )
+        const int  c = around + d;
+        float      w = 0.0f;
+        const bool again =
+            c == avoid || ( avoidHz > 0.0 && std::fabs( std::log2( frequencyOf( c ) / avoidHz ) ) < 0.001 );
+        if ( !again && std::abs( c - centre ) <= 9 && c >= 24 && c <= 108 )
         {
             const float fit = figureFit( c, chord, n );
             w = ( chordTone ? ( fit >= 3.0f ? 1.0f : 0.0f ) : fit ) * Step[std::abs( d )];
@@ -1865,10 +1898,10 @@ void Engine::stepFigures( double dt )
         }
         return;
     }
-    // The chord they play to: the conductor's notes as they sound. They enter once there is one.
+    // The chord they play to: the conductors' notes as they sound -- the second's too (19.11.2026; it chooses its own
+    // notes on its own root and they had rubbed against a figure unheard). They enter once there is one.
     int       chord[ClusterBrain::Slots];
-    float     vels[ClusterBrain::Slots];
-    const int n = m_brain.soundingNotes( chord, vels );
+    const int n = conductorsSounding( chord );
     if ( n < 2 && m_figActive == 0 ) return;
     m_figActive = want;
     // The loops' lengths against the first's: in no simple ratio (the fourth root of two, three less the golden
@@ -1916,7 +1949,8 @@ void Engine::stepFigures( double dt )
             {   // the harmony has moved under it: to the nearest note that fits (a chord tone first), and it stays
                 int best = note;
                 for ( int pass = 0; pass < 2 && best == note; ++pass )
-                    for ( int d : { -1, 1, -2, 2 } )
+                    for ( int d :
+                          { -1, 1, -2, 2, -3, 3 } )   // three: a key that snaps onto its neighbour's pitch is no move
                         if ( figureFit( note + d, chord, n ) >= ( pass == 0 ? 3.0f : 0.5f ) )
                         {
                             best = note + d;
@@ -1953,6 +1987,18 @@ void Engine::stepFigures( double dt )
             const int played = m_figPlayed.load( std::memory_order_relaxed );
             m_figLog[static_cast<size_t>( played & 15 )].store( note, std::memory_order_relaxed );
             m_figPlayed.store( played + 1, std::memory_order_relaxed );
+            {   // what both conductors sound against it, as the tuning sounds it: the selftest's count (a chord tone
+                // does not count -- a cluster's chord holds seconds of its own)
+                int       all[ClusterBrain::Slots];
+                const int na = conductorsSounding( all );
+                bool      tone = false, rub = false;
+                for ( int c = 0; c < na; ++c )
+                {
+                    tone = tone || centsApart( note, all[c] ) <= 25.0;
+                    rub = rub || rubs( note, all[c] );
+                }
+                if ( rub && !tone ) m_figClash.fetch_add( 1, std::memory_order_relaxed );
+            }
         }
         // The loop: as long as the knob says times the figure's own factor -- and as the figure itself at the least.
         const double period = std::max(

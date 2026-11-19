@@ -26,6 +26,18 @@
   All 16384 were measured again as the panel plays them (the conductor on, the loudest three seconds) and levelled to
   -16.8 LUFS as before: 15657 gains moved, by -0.8 dB at the median and by more than 3 dB in 1384 presets (most of them
   with figures). The map and the search were measured anew with them.
+- **Figures that keep to the chord, in every tuning and with both conductors** (19.11.2026). A figure judged its notes
+  by their keys against the first conductor only. In a just scale whose keys snap, a key is not the interval its
+  number says (in 7-limit on D the G is played as an F#), and the second conductor, which chooses its own notes on
+  its own root, was not heard at all: in 7-limit with the second conductor on the fifth, 33 of 302 figure notes began
+  a semitone, a major seventh or a tritone from a note that sounded. They are judged in cents of what the tuning plays
+  now, against both conductors: none of 302. In 12-TET without the second conductor they play as before, but for a
+  note the harmony has moved under that now finds a fitting neighbour three keys off.
+- **Journeys with stays of their own** (19.11.2026). Every step of a journey was held for six to twelve minutes, of a
+  night ten to eighteen, of a whole night twelve to twenty. Now each preset stays as long as it carries by itself:
+  the third that moves least (its motion, life, ripple, the conductor's pace, the figures) 1:30-3:00, the third that
+  moves most 6-10 minutes, the rest between, never two long or two short ones in a row; nights and whole nights 3-6,
+  6-10 and 10-15. A step lasts 4.8 minutes on average (9 before), in a night 8.2 (14), in a whole night 8.3 (16).
 - **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
 
 ## 1.0.0 (17.10.2026)

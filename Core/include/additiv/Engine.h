@@ -537,6 +537,12 @@ public:
                    ? m_figLog[static_cast<size_t>( ( n - 1 - back ) & 15 )].load( std::memory_order_relaxed )
                    : -1;
     }
+    /**
+     * @brief Of the figures' notes since prepare, those that rubbed (a semitone, a major seventh or a tritone, as the
+     *        tuning sounds them) against a note either conductor sounded when they began. Any thread.
+     * @return the count
+     */
+    int figureClashes() const { return m_figClash.load( std::memory_order_relaxed ); }
     /** @brief The conductor's root after the last rendered block. @return MIDI note */
     int brainRoot() const { return m_brainRoot.load( std::memory_order_relaxed ); }
     /** @brief Seconds until the conductor's next decision, for the panel. Any thread. @return seconds */
@@ -899,6 +905,28 @@ private:
     Rng   m_figRng;            ///< their dice (their own stream)
     std::atomic<int>                 m_figPlayed{ 0 };   ///< notes they have played since prepare (figureNotes())
     std::array<std::atomic<int>, 16> m_figLog;           ///< the last of them, a ring (figureNote())
+    std::atomic<int> m_figClash{ 0 };   ///< of them, the ones that rubbed against a conductor's note (figureClashes())
+    /**
+     * @brief The notes both conductors sound now: the first's, then the second's that are not among them (when it plays).
+     * @param[out] notes  receives them, MIDI; room for ClusterBrain::Slots
+     * @return how many
+     */
+    int conductorsSounding( int *notes ) const;
+    /**
+     * @brief How far apart two notes are as the tuning sounds them, folded into one octave.
+     * @param[in] a  MIDI
+     * @param[in] b  MIDI
+     * @return cents, 0 .. 600
+     */
+    double centsApart( int a, int b ) const;
+    /**
+     * @brief Whether two notes rub as the tuning sounds them: a semitone, a major seventh or a tritone apart, in cents
+     *        of their frequencies (frequencyOf), in any octave.
+     * @param[in] a  MIDI
+     * @param[in] b  MIDI
+     * @return true when they rub
+     */
+    bool rubs( int a, int b ) const;
     /**
      * @brief The figures' block: lets go what has sounded, composes what is new, plays what is due.
      * @param[in] dt  the block's length, s
@@ -920,14 +948,15 @@ private:
      */
     void composeFigure( int i, const int *chord, int n );
     /**
-     * @brief How well a note fits a chord.
+     * @brief How well a note fits a chord, in cents of what the tuning plays (frequencyOf), not in keys.
      * @param[in] note   MIDI
      * @param[in] chord  the chord's notes
      * @param[in] n      how many
-     * @return 3 a chord tone (in any octave); 1 a third, a fourth, a fifth or a sixth to every chord tone; 0.5 with
-     *         a whole tone or a minor seventh among them; 0 a semitone, a tritone or a major seventh from one
+     * @return 3 a chord tone (in any octave, within 25 cents); 1 a third, a fourth, a fifth or a sixth to every chord
+     *         tone; 0.5 with a whole tone or a minor seventh among them; 0 a semitone, a tritone or a major seventh
+     *         from one
      */
-    static float figureFit( int note, const int *chord, int n );
+    float figureFit( int note, const int *chord, int n ) const;
     /**
      * @brief Draws a figure's note: within a fifth of the one before and a sixth of the figure's centre, by what
      *        fits the chord, a step likelier than a leap.

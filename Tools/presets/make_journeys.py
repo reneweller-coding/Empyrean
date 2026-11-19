@@ -11,17 +11,22 @@ For every group, two journeys of twelve:
 
   <Group> - Journey   twelve presets spread across the group (farthest-point sampling from its
                       medoid, so they are its different faces), ordered as a chain of nearest
-                      neighbours, so every glide is a step to something close. Six to twelve
-                      minutes each, glides of one to two and a half minutes.
+                      neighbours, so every glide is a step to something close.
   <Group> - Night     the twelve stillest (the least motion, shimmer, ripple and sync, the darkest,
-                      the slowest attacks and the slowest conductor), chained the same way, ten to
-                      eighteen minutes each, glides of two to four: the version for falling asleep.
+                      the slowest attacks and the slowest conductor), chained the same way: the
+                      version for falling asleep.
 
 And nineteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
 currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
 topology, the night and illusions, the choruses and mirrors, the deep floors, the stars and gravity, the light and depth, the plasma and voice): twenty-four presets, the stillest few
-of every group in a family of groups, chained, twelve to twenty minutes each with glides of two and a half to five -- about six and a half
-hours before the first comes round again.
+of every group in a family of groups, chained, timed as the nights.
+
+How long a step stays is the preset's own (19.11.2026, as in Noctuary): what moves by itself -- the motion, the life,
+sync and ripple, the streams, shimmer and drift, the conductor's pace, the figures -- is held longest, what stands
+still is left soon. The third that moves least is held 1:30-3:00 (nights 3-6 minutes), the third that moves most
+6-10 (nights 10-15), the rest between, never two long or two short ones in a row; the glide grows with the stay.
+Before, every step of a journey drew from the same six to twelve minutes, of a night ten to eighteen, of a whole
+night twelve to twenty.
 
 Nothing here listens: a nearest neighbour in this space is a preset that is set alike, which is
 the promise of a gentle glide, not of a good one.
@@ -59,6 +64,15 @@ FEATURES = {
 # The stillness: what moves, brightens or hurries (lower is stiller).
 STILL = {"motion_depth": 1.0, "shimmer": 1.0, "brightness": 1.0, "ripple_depth": 1.0, "sync_depth": 0.7, "air": 0.5,
          "attack": -1.0, "auto_rate": -1.0, "tilt": -0.8, "thunder": 0.5, "risset": 0.5, "chorus": 0.3}
+
+# What moves by itself (higher moves more): how long a step is held. The conductor's pace and the figures are
+# added in self_motion().
+MOTION = {"motion_depth": 1.0, "life_depth": 1.0, "sync_depth": 0.7, "ripple_depth": 0.7, "stream_depth": 0.6,
+          "shimmer": 0.5, "drift": 0.5, "risset": 0.5, "night_arc": 0.4, "thunder": 0.3, "chorus": 0.3}
+TIMINGS = {   # short, middle, long: (dwell, glide)
+    "journey": [("1:30-3:00", "0:30-1:00"), ("3:00-6:00", "0:45-1:30"), ("6:00-10:00", "1:00-2:00")],
+    "night": [("3:00-6:00", "1:00-2:00"), ("6:00-10:00", "1:30-2:30"), ("10:00-15:00", "2:00-3:30")],
+}
 
 WHOLE_NIGHTS = [
     ("Whole Night - Sleep Concert", ["Sleep Concert", "Night Gardens", "Ghosts & Memory", "Choirs", "Strings"]),
@@ -146,6 +160,35 @@ def stillness(f):
     return sum(w * (f[k] if w > 0 else 1.0 - f[k]) * abs(w) for k, w in STILL.items())
 
 
+def self_motion(table, params, f):
+    """How much a preset moves by itself: its motions, the conductor's pace and the figures."""
+    def get(k):
+        return float(params[k]) if k in params else table[k][3]
+    m = sum(w * f[k] for k, w in MOTION.items())
+    pace = "auto_rate" if get("auto_mode") == 1 else "brain_rate"
+    m += 1.0 - norm(table, pace, get(pace))
+    m += 0.25 * get("figures")
+    return m
+
+
+def timings(names, moving, kind):
+    """(dwell, glide) for each of `names`, in their order, by how much each moves by itself."""
+    n = len(names)
+    rank = sorted(range(n), key=lambda i: moving[names[i]])
+    third = max(1, n // 3)
+    cls = [1] * n
+    for i in rank[:third]:
+        cls[i] = 0
+    for i in rank[n - third:]:
+        cls[i] = 2
+    # No two long and no two short ones in a row (the journeys are cyclic: the last meets the first).
+    for i in range(n):
+        j = (i + 1) % n
+        if j != i and cls[i] == cls[j] and cls[j] != 1:
+            cls[j] = 1
+    return [TIMINGS[kind][c] for c in cls]
+
+
 def spread(points, names, count):
     """Farthest-point sampling from the medoid: count names, the group's different faces."""
     medoid = min(names, key=lambda n: sum(distance(points[n], points[m]) for m in names))
@@ -167,34 +210,35 @@ def chain(points, names):
     return out
 
 
-def journey(title, names, dwell, glide):
+def journey(title, names, moving, kind):
     lines = ["# Empyrean journey: <preset> | <dwell m:ss or a range> | <glide m:ss or a range>",
              "# Made by Tools/presets/make_journeys.py from the presets' parameters; copy it and edit it freely.",
              f"journey {title}", "cyclic on"]
-    lines += [f"{n} | {dwell} | {glide}" for n in names]
+    lines += [f"{n} | {dwell} | {glide}" for n, (dwell, glide) in zip(names, timings(names, moving, kind))]
     return "\n".join(lines) + "\n"
 
 
 def main():
     table = param_table()
     bank = make_presets.build()
-    points, groups = {}, {}
+    points, groups, moving = {}, {}, {}
     for name, g, params, _ in bank:
         p = dict(kv.split("=", 1) for kv in params.split())
         points[name] = features(table, p)
+        moving[name] = self_motion(table, p, points[name])
         groups.setdefault(make_presets.GROUPS[g], []).append(name)
     journeys = []
     for group in make_presets.GROUPS:
         names = groups[group]
-        journeys.append((f"{group} - Journey", journey(f"{group} - Journey", chain(points, spread(points, names, 12)), "6:00-12:00", "1:00-2:30")))
+        journeys.append((f"{group} - Journey", journey(f"{group} - Journey", chain(points, spread(points, names, 12)), moving, "journey")))
         still = sorted(names, key=lambda n: stillness(points[n]))[:12]
-        journeys.append((f"{group} - Night", journey(f"{group} - Night", chain(points, still), "10:00-18:00", "2:00-4:00")))
+        journeys.append((f"{group} - Night", journey(f"{group} - Night", chain(points, still), moving, "night")))
     for title, family in WHOLE_NIGHTS:
         per = math.ceil(24 / len(family))   # the stillest few of every group in the family
         still = [n for g in family for n in sorted(groups[g], key=lambda n: stillness(points[n]))[:per]][:24]
         start = min(still, key=lambda n: stillness(points[n]))
         still.remove(start)
-        journeys.append((title, journey(title, chain(points, [start] + still), "12:00-20:00", "2:30-5:00")))
+        journeys.append((title, journey(title, chain(points, [start] + still), moving, "night")))
     lines = ["// Generated by Tools/presets/make_journeys.py -- do not edit; edit the script and run it again.",
              "/// The journeys the instrument comes with (Journey.h), each as its file would read.",
              "const char* const Journeys[] = {"]

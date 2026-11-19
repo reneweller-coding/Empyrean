@@ -5321,6 +5321,40 @@ int main( int argc, char **argv )
                     one.empty() ? -1 : one.back(), c3, l0, l1, l3 ) );
     }
 
+    // 114. The figures against both conductors, in a tuning whose keys snap (19.11.2026): JI 7-limit on D, the second
+    //      conductor on the fifth with chords of its own, four figures that change, chords that move. No figure note
+    //      begins a semitone, a major seventh or a tritone from a note either conductor sounds, unless it is one of
+    //      their notes itself (a cluster holds seconds of its own) -- measured in cents of what the tuning plays, not
+    //      in keys (in 7-limit on D a G is played as an F#). Before, the figures heard the first conductor only and
+    //      judged keys: 33 of 302.
+    if ( from <= 114 )
+    {
+        auto    held = std::make_unique<Engine>();
+        Engine &e = *held;
+        e.setParam( ParamIdE::SCALE, 3.0f );   // JI 7-limit
+        e.setParam( ParamIdE::ROOT_NOTE, 2.0f );
+        e.setParam( ParamIdE::PURITY, 1.0f );
+        e.setParam( ParamIdE::AUTO_MODE, 1.0f );
+        e.setParam( ParamIdE::AUTO_RATE, 15.0f );   // the chord moves
+        e.setParam( ParamIdE::BRAIN2_ON, 1.0f );
+        e.setParam( ParamIdE::BRAIN2_INTERVAL, 7.0f );
+        e.setParam( ParamIdE::BRAIN2_DENSITY, 3.0f );
+        e.setParam( ParamIdE::BRAIN2_RATE, 12.0f );
+        e.setParam( ParamIdE::FIGURES, 4.0f );
+        e.setParam( ParamIdE::FIGURE_EVERY, 6.0f );
+        e.setParam( ParamIdE::FIGURE_NOTES, 5.0f );
+        e.setParam( ParamIdE::FIGURE_PACE, 0.6f );
+        e.setParam( ParamIdE::FIGURE_CHANGE, 0.5f );
+        if ( !openOffline( e, true, 114 ) ) return 1;
+        e.requestFill();
+        (void)render( e, 150.0 );
+        const int notes = e.figureNotes(), clashes = e.figureClashes();
+        check( notes > 60 && clashes == 0,
+               "figures: no note rubs against either conductor, in a tuning whose keys snap",
+               fmt( "%d figure notes, %d of them a semitone, a major seventh or a tritone from a conductor's note",
+                    notes, clashes ) );
+    }
+
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }
