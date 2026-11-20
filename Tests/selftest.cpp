@@ -5690,6 +5690,79 @@ int main( int argc, char **argv )
                     sources[1], sources[2], sources[4], sources[5], audited.size() ) );
     }
 
+    // 120. A pitch is one voice (20.11.2026, plan A4, as Noctuary 5eca327 and 444c05d): in a scale whose keys snap,
+    //      the neighbouring key mostly plays a pitch 2 to 10 cents beside the one held, and the conductor took it as
+    //      a second voice -- two voices beating, the same note struck again. Nor may one conductor take the pitch the
+    //      other still sounds out of an exchange's Overlap. JI Major, JI Minor and JI 7-limit, Free and Chords, two
+    //      roots, both conductors, a quarter of an hour each, and the five presets of the music audit's golden sample
+    //      that did it most (62 of their onsets at cd1bad8), an hour each -- on the audit's clock (no card).
+    if ( wanted( 120, "A pitch is one voice (20.11.2026)" ) )
+    {
+        int ons = 0, unison = 0, doubled = 0;
+        // Twelve made for it, and the five presets of the music audit's sample that did it most (an hour each).
+        static const char *const Worst[] = { "Satellite Circuit", "Marble Cloister", "Remote Spacetime Wave",
+                                             "Hollow-Hulled Airlock", "F-Layer Sky Mirror" };
+        for ( int setup = 0; setup < 17; ++setup )
+                {
+                    auto         e = std::make_unique<Engine>();
+                    EngineConfig c;
+                    double       seconds = 900.0;
+                    if ( setup < 12 )
+                    {
+                        const int scale = 1 + setup / 4, mode = ( setup / 2 ) % 2, root = setup % 2 ? 9 : 0;
+                        e->setParam( ParamIdE::SCALE, static_cast<float>( scale ) );   // JI Major, Minor, 7-limit
+                        e->setParam( ParamIdE::ROOT_NOTE, static_cast<float>( root ) );
+                        e->setParam( ParamIdE::AUTO_MODE, static_cast<float>( mode ) );
+                        e->setParam( ParamIdE::AUTO_RATE, 10.0f );
+                        e->setParam( ParamIdE::BRAIN_RATE, 6.0f );
+                        e->setParam( ParamIdE::BRAIN_DENSITY, 6.0f );
+                        e->setParam( ParamIdE::BRAIN2_ON, 1.0f );
+                        e->setParam( ParamIdE::BRAIN2_RATE, 12.0f );
+                        e->setParam( ParamIdE::BRAIN2_INTERVAL, 0.0f );
+                        c.m_seed = static_cast<std::uint64_t>( 1200 + setup );
+                    }
+                    else
+                    {
+                        const int index = findPreset( Worst[setup - 12] );
+                        if ( index < 0 ) continue;
+                        e->loadPreset( index );
+                        seconds = 3600.0;
+                    }
+                    std::vector<std::pair<int, double>> held[3];   // per conductor: (key, Hz) sounding
+                    e->auditConductor(
+                        seconds, c, c.m_gpuBlock / c.m_sampleRate, 1,
+                        [&]( const Engine::AuditNote &n )
+                        {
+                            if ( n.m_source != 1 && n.m_source != 2 ) return;
+                            auto &own = held[n.m_source];
+                            if ( !n.m_on )
+                            {
+                                for ( size_t i = 0; i < own.size(); ++i )
+                                    if ( own[i].first == n.m_note )
+                                    {
+                                        own.erase( own.begin() + static_cast<std::ptrdiff_t>( i ) );
+                                        break;
+                                    }
+                                return;
+                            }
+                            ++ons;
+                            auto within = [&]( const std::vector<std::pair<int, double>> &v )
+                            {
+                                for ( const auto &h : v )
+                                    if ( std::fabs( 1200.0 * std::log2( n.m_hz / h.second ) ) < 25.0 ) return true;
+                                return false;
+                            };
+                            unison += within( own ) ? 1 : 0;
+                            doubled += within( held[3 - n.m_source] ) ? 1 : 0;
+                            own.emplace_back( n.m_note, n.m_hz );
+                        },
+                        {} );
+                }
+        check( ons > 600 && unison == 0 && doubled == 0, "conductors: a pitch held is never struck as a second voice",
+               fmt( "%d onsets; %d within 25 cents of a pitch the same conductor holds, %d of one the other holds", ons,
+                    unison, doubled ) );
+    }
+
     finishTest();
     if ( g_sel.m_list ) return 0;
     for ( size_t r = 0; r < g_sel.m_only.size(); ++r )

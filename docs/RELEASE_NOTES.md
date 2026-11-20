@@ -136,6 +136,16 @@
   newest on top, with the time on the instrument's clock, who it was in its colour and the key -- a conductor's
   exchange as the move, "D#2 -> A2". The engine hands them over through a ring of atomics: nothing on the audio
   thread waits or allocates.
+- **A pitch is one voice** (20.11.2026, as in Noctuary). In a scale whose keys snap, the key beside a held note
+  mostly plays a pitch two to ten cents from it, and a conductor took it as a second voice: two voices beating, the
+  same note struck again (Satellite Circuit, JI 7-limit, 19 times in an hour). A conductor now takes no pitch within 25
+  cents of one it holds, under whatever key -- in its free draw, an exchange, the deja vu ring and a changeover's
+  pivot tone; it hears the other conductor's voices still sounding out an exchange's Overlap; a voice sounding out its
+  Overlap a minor second from a new note goes within two seconds, as the replaced one already did; and a changeover
+  in Free mode and the root's presence go by the pitch class the tuning plays, not by key. Over the music audit's 200
+  presets, an hour each: 103 such onsets of 18026 before, 5 of 18013 after (all five in one preset in the Timbre scale);
+  the pace stays (90.1 changes an hour; JI 7-limit 88.4 -> 88.3, Harmonic 8-16 and
+  Subharmonic 16-8 unchanged).
 
 ## 1.0.0 (17.10.2026)
 

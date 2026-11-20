@@ -213,44 +213,44 @@
  ],
  "totals": {
   "presets": 200,
-  "ons": 18026,
-  "notes": 17135,
-  "restrike": 38,
+  "ons": 18013,
+  "notes": 17122,
+  "restrike": 39,
   "doubling": 0,
   "short": 22,
-  "self_unison": 103,
+  "self_unison": 5,
   "one_note": 0,
-  "figure_ons": 104541,
+  "figure_ons": 104658,
   "figure_repeat_in_round": 0,
-  "figure_same_as_previous": 6050,
-  "figure_rub": 80,
+  "figure_same_as_previous": 6058,
+  "figure_rub": 97,
   "figure_shorter_than_attack": 2774,
-  "own_rub": 0.0006488241155944937,
+  "own_rub": 0.0006923345589726916,
   "cross_rub": 0.0,
-  "changes_per_hour": 90.13,
+  "changes_per_hour": 90.065,
   "silence_s": 5616.745199999998,
   "mute": 0
  },
  "bands": {
   "ons": [
-   15322.1,
-   20729.9
+   15311.05,
+   20714.95
   ],
   "notes": [
-   14564.75,
-   19705.25
+   14553.7,
+   19690.3
   ],
   "changes_per_hour": [
-   76.6105,
-   103.6495
+   76.5553,
+   103.5747
   ],
   "figure_ons": [
-   88859.85,
-   120222.15
+   88959.3,
+   120356.7
   ],
   "restrike": [
    0,
-   76.0
+   78.0
   ],
   "doubling": [
    0,
@@ -262,11 +262,11 @@
   ],
   "self_unison": [
    0,
-   153
+   55
   ],
   "own_rub": [
    0,
-   0.0036
+   0.0037
   ],
   "cross_rub": [
    0,
@@ -290,11 +290,11 @@
   ],
   "figure_same_as_previous": [
    0,
-   7865.0
+   7875.4
   ],
   "figure_rub": [
    0,
-   120.0
+   145.5
   ],
   "figure_shorter_than_attack": [
    0,

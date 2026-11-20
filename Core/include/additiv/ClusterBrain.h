@@ -1204,6 +1204,32 @@ public:
         return false;
     }
     /**
+     * @brief Whether this conductor already sounds a pitch: one of its voices within 25 cents of it, under whatever
+     *        key (20.11.2026).
+     *
+     * sounding() asks by key, and the draws added a test for a second key on the very same pitch (within one cent).
+     * In a scale whose keys snap the neighbouring key mostly plays a pitch 2 to 10 cents beside the degree, not on
+     * it, and both tests let it through: a second voice ten cents from one still held, the two beating -- the same
+     * note struck again (Gate Basin, JI Minor: 295.37 Hz beside 293.67; over the music audit's 200 presets 845 of
+     * 10982 onsets). Every voice counts that the conductor started and that sounds: the slots, a Blend note about to
+     * begin, a voice due or sounding out its Overlap, and in Chords mode the one being exchanged. An octave is another
+     * pitch, and stays allowed.
+     * @param[in] fc      the candidate, Hz
+     * @param[in] freqOf  frequency of a MIDI note in the engine's current scale
+     * @return true when a voice of this conductor stands within 25 cents of it
+     * @tparam FreqFnT  callable `double(int note)`
+     */
+    template <class FreqFnT>
+    bool holdsPitch( double fc, FreqFnT &&freqOf ) const
+    {
+        auto same = [&]( int n ) { return n >= 0 && std::fabs( 1200.0 * std::log2( freqOf( n ) / fc ) ) < 25.0; };
+        for ( const auto &s : m_slots )
+            if ( same( s.m_note ) ) return true;
+        for ( const auto &l : m_leaving )
+            if ( same( l.m_note ) ) return true;
+        return same( m_extraHeard );
+    }
+    /**
      * @brief For the tests: how often the root moved, and how many of those changeovers were announced
      * by a tone belonging to both roots.
      *
@@ -1245,6 +1271,10 @@ public:
      * candidate now as the root does in Free mode, in both modes: its consonance with the candidate to the power the
      * conductor's Consonance asks, so one set for clusters still allows them. Called before update() every block;
      * nullptr (or a silent other) and the conductor draws exactly what it drew alone.
+     *
+     * Its voices sounding out an exchange's Overlap in Chords mode are heard too (20.11.2026): they had left its slots
+     * but not the air, and the other conductor took their very pitch (the pitch invariants of plan A4, over the
+     * thirteen tunings: 28 onsets on a pitch the other still sounded, all of them on such a voice).
      * @param[in] other   the other conductor, or nullptr
      * @param[in] freqOf  frequency of a MIDI note in the engine's current scale
      * @tparam FreqFnT  callable `double(int note)`
@@ -1255,8 +1285,10 @@ public:
         m_otherCount = 0;
         if ( !other ) return;
         for ( const auto &s : other->m_slots )
-            if ( s.m_note >= 0 && m_otherCount < Slots )   // one chosen and about to begin counts: it will sound
+            if ( s.m_note >= 0 && m_otherCount < 2 * Slots )   // one chosen and about to begin counts: it will sound
                 m_otherHz[m_otherCount++] = freqOf( s.m_note );
+        for ( const auto &l : other->m_leaving )
+            if ( l.m_note >= 0 && m_otherCount < 2 * Slots ) m_otherHz[m_otherCount++] = freqOf( l.m_note );
     }
 
     /**
@@ -1654,7 +1686,7 @@ public:
                     for ( int i = 0; i < span; ++i )
                     {
                         const int c = lo + ( ( from - lo + i ) % span );
-                        if ( c < 0 || c > 127 || sounding( c ) ) continue;
+                        if ( c < 0 || c > 127 || sounding( c ) || holdsPitch( freqOf( c ), freqOf ) ) continue;
                         const int  a = icOf( c, m_pivotOld, p, freqOf ), b = icOf( c, m_pivotTo, p, freqOf );
                         const bool fits =
                             tier == 0 ? ( perfectTo( a ) && perfectTo( b ) ) : ( consonantTo( a ) && consonantTo( b ) );
@@ -1687,9 +1719,18 @@ public:
             if ( m_pivotLeft <= 0.0 )
             {
                 m_pivotLeft = 0.0;
+                // In Free mode, on the old root's pitch class as the tuning plays it (20.11.2026): by key, a scale
+                // whose keys snap kept a neighbouring key on the old root's very pitch (JI Pentatonic plays 66, 67
+                // and 68 as one note), and a scale without an octave (Bohlen-Pierce, walked degree by degree) asked
+                // voices twelve keys away, on other pitches, to go instead. Chords mode is left as it was: there
+                // `remaining` counts age, and setting it to a second makes a voice the youngest rather than asking
+                // it to go -- a fault of its own, not of keys and pitches, noted for Rene (plan A4 port note).
                 if ( m_pivotOld >= 0 )
                     for ( auto &s : m_slots )
-                        if ( s.m_note >= 0 && ( ( s.m_note - m_pivotOld ) % 12 + 12 ) % 12 == 0 )
+                        if ( s.m_note >= 0 &&
+                             ( p.m_mode == BrainModeE::CHORDS
+                                   ? ( ( s.m_note - m_pivotOld ) % 12 + 12 ) % 12 == 0
+                                   : pitchClassEqual( freqOf( s.m_note ), freqOf( m_pivotOld ) ) ) )
                             s.m_remaining = std::min( s.m_remaining, 1.0 );
                 m_pivotTo = m_pivotOld = -1;
             }
@@ -1948,11 +1989,7 @@ public:
             const double fc = freqOf( c );
             if ( againstOther( fc, p ) ) continue;      // the other conductor's notes (listenTo())
             if ( rubsOwn( fc, p, freqOf ) ) continue;   // its own, a minor second or ninth
-            bool duplicate = false;                     // with snapped keys two keys can share one pitch
-            for ( auto &s : m_slots )
-                if ( s.m_note >= 0 && std::fabs( std::log2( freqOf( s.m_note ) / fc ) ) * 1200.0 < 1.0 )
-                    duplicate = true;
-            if ( duplicate ) continue;
+            if ( holdsPitch( fc, freqOf ) ) continue;   // its own pitch under another key, which snapped keys give
             const double cons = p.consonanceOf( fc, rootFreq );
             float        w = static_cast<float>( std::pow( cons, p.m_consonance * 3.0f ) );
             // the other conductor's notes, weighed as the root is (listenTo())
@@ -2256,6 +2293,7 @@ private:
                 remember( add );
                 if ( p.m_memory > 0.0f ) rememberChord( chordKey( -1, freqOf ) );   // the set that ends here
                 startIn( add, p, emit );
+                cutRubbingOverlaps( add, p, freqOf );
                 if ( p.m_memory > 0.0f ) rememberChord( chordKey( -1, freqOf ) );
             }
             // As in Free mode: a Blend fills what is added to a chord already there; the entrance
@@ -2449,6 +2487,7 @@ private:
             if ( leaving >= 0 && leaving < 128 ) m_pitchOffAt[static_cast<size_t>( leaving )] = m_now;
             m_sinceOff = 0.0;
         }
+        cutRubbingOverlaps( arriving, p, freqOf );
         m_recent[m_recentHead] = leaving;   // it has had its turn
         m_recentHead = ( m_recentHead + 1 ) % Recent;
         m_slots[moving].m_note = arriving;
@@ -2494,6 +2533,26 @@ private:
                 emit( BrainEvent{ BrainEvent::TypeE::NOTE_ON, note, s.m_vel } );
                 return;
             }
+    }
+
+    /**
+     * @brief Chords mode: every voice still sounding out its Overlap that stands a minor second or ninth from a note
+     *        just begun goes within two seconds, as the voice that note replaced does (stepRubs(); 20.11.2026).
+     *
+     * Only the voice replaced was asked. An exchange inside another's Overlap could bring a note a semitone from the
+     * voice before that, still sounding out its thirty seconds: Free mode compares every voice due with the newest note
+     * and Chords mode did not. It came out once exchanges stopped landing on the pitch they replaced (a voice beside a
+     * successor a semitone away for 5.7 s, testConductorOwnVoices).
+     * @param[in] arriving  the note just begun, MIDI
+     * @param[in] p         the knobs
+     * @param[in] freqOf    frequency of a MIDI note in the engine's current scale
+     * @tparam FreqFnT  callable `double(int note)`
+     */
+    template <class FreqFnT>
+    void cutRubbingOverlaps( int arriving, const BrainParams &p, FreqFnT &&freqOf )
+    {
+        for ( auto &l : m_leaving )
+            if ( l.m_note >= 0 && stepRubs( arriving, l.m_note, p, freqOf ) ) l.m_in = std::min( l.m_in, 2.0 );
     }
 
     /**
@@ -3080,11 +3139,7 @@ private:
             const double fc = freqOf( c );
             if ( againstOther( fc, p ) ) continue;      // the other conductor's notes (listenTo())
             if ( rubsOwn( fc, p, freqOf ) ) continue;   // its own, a minor second or ninth
-            bool duplicate = false;
-            for ( const auto &s : m_slots )
-                if ( s.m_note >= 0 && std::fabs( std::log2( freqOf( s.m_note ) / fc ) ) * 1200.0 < 1.0 )
-                    duplicate = true;
-            if ( duplicate ) continue;
+            if ( holdsPitch( fc, freqOf ) ) continue;   // its own pitch under another key, which snapped keys give
             // How it sits against the voices that stay, and against the root.
             double fit = p.consonanceOf( fc, rootFreq );
             int    n = 1;
@@ -3680,9 +3735,11 @@ private:
         if ( c < std::min( low, high ) || c > std::max( low, high ) || c < 0 || c > 127 ) return false;
         if ( resting( c, p, freqOf ) ) return false;
         if ( constellationHeard( c, p, freqOf ) ) return false;
-        bool rootSounding = false;
+        // Whether the root sounds, as the draws ask it: by the pitch class the tuning plays, not by key (20.11.2026).
+        bool         rootSounding = false;
+        const double rootFreq = freqOf( m_root );
         for ( const auto &s : m_slots )
-            if ( s.m_note >= 0 && ( ( s.m_note - m_root ) % 12 + 12 ) % 12 == 0 ) rootSounding = true;
+            if ( s.m_note >= 0 && pitchClassEqual( freqOf( s.m_note ), rootFreq ) ) rootSounding = true;
         return ruleWeight( c, std::min( low, high ), std::max( low, high ), rootSounding, p, freqOf, pivotal ) > 0.0f;
     }
 
@@ -3698,7 +3755,8 @@ private:
      * the stream when Deja Vu is up.
      * @param[in] fresh   the note the draw chose, MIDI, or -1 (returned unchanged)
      * @param[in] p       the knobs: Deja Vu and Loop
-     * @param[in] avoid   Chords: the note being replaced, which the ring may not offer back; -1 in Free mode
+     * @param[in] avoid   Chords: the note being replaced, which the ring may not offer back, nor any key the tuning
+     *                    plays within 25 cents of it; -1 in Free mode
      * @param[in] low     one end of the register, for admissible()
      * @param[in] high    the other end
      * @param[in] freqOf  frequency of a MIDI note in the engine's current scale
@@ -3717,7 +3775,8 @@ private:
             const int old = m_ring[m_ringPos];
             const bool again =   // the pitch of the note being replaced, under another key
                 avoid >= 0 && std::fabs( 1200.0 * std::log2( freqOf( old ) / freqOf( avoid ) ) ) < 25.0;
-            if ( old != avoid && !again && !sounding( old ) && admissible( old, low, high, p, freqOf ) &&
+            if ( old != avoid && !again && !sounding( old ) && !holdsPitch( freqOf( old ), freqOf ) &&
+                 admissible( old, low, high, p, freqOf ) &&
                  !againstOther( freqOf( old ), p ) && !rubsOwn( freqOf( old ), p, freqOf ) )
                 out = old;
         }
@@ -3726,7 +3785,7 @@ private:
     }
 
     Slot   m_slots[Slots];          ///< the cluster: one voice per slot, note -1 when empty
-    double m_otherHz[Slots] = {};   ///< the other conductor's notes as they sound, Hz (listenTo())
+    double m_otherHz[2 * Slots] = {};   ///< the other conductor's notes as they sound, Hz (listenTo()): slots and Overlap
     int    m_otherCount = 0;        ///< how many of them (0: it hears no other)
     mutable Rng
         m_rng;   ///< the conductor's own random stream, seeded by reset(); mutable so that chooseNote() can add its little life while const
