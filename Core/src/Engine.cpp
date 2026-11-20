@@ -2116,12 +2116,17 @@ int Engine::figureCentre( int i ) const
 
 double Engine::figurePace() const
 {
-    return static_cast<double>( m_blk.m_figPace );
+    // Twice the attack at the least (20.11.2026): a note held 0.8 pace plus its attack was let go before it had swelled
+    // in wherever the pace was shorter than 1.25 attacks (a sung line of 2.6 s under a 2.56 s attack). So a line under
+    // a long attack holds fewer notes rather than faster ones: each arrives, and is heard, before the next begins.
+    return std::max( static_cast<double>( m_blk.m_figPace ), 2.0 * static_cast<double>( m_blk.m_figAttack ) );
 }
 
 float Engine::figureHold( double pace ) const
 {
-    return std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ) + m_blk.m_figAttack;
+    // most of a pace and its attack -- its attack at the least (an attack longer than 4 s), so twice it in all
+    return std::max( std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ), m_blk.m_figAttack ) +
+           m_blk.m_figAttack;
 }
 
 double Engine::figureRing( double pace ) const
@@ -2330,13 +2335,8 @@ void Engine::stepFigures( double dt )
                     break;
                 }
             if ( !room ) continue;
-            m_auditFigure = i;   // (for the audit's lines: which figure, which of its notes)
-            m_auditStep = static_cast<int>( k );
-            startNote( note, f.m_vel[k],
-                       std::clamp( m_blk.m_figDepth * ( 0.85f + 0.15f * m_figRng.uniform() ), 0.0f, 1.0f ),
-                       FigureSource, 0 );
-            m_auditFigure = m_auditStep = -1;
-            // held for most of a pace (its attack at the least), then let go
+            // Its place among the held notes: a free one, else the one nearest its end -- but not one that has not had
+            // twice its attack yet (20.11.2026): that one is let sound, and the new note is left out.
             FigureHeld *slot = &m_figHeld[0];
             for ( FigureHeld &h : m_figHeld )
             {
@@ -2347,9 +2347,17 @@ void Engine::stepFigures( double dt )
                 }
                 if ( h.m_left < slot->m_left ) slot = &h;
             }
+            if ( slot->m_note >= 0 && slot->m_hold - slot->m_left < 2.0f * m_blk.m_figAttack ) continue;
+            m_auditFigure = i;   // (for the audit's lines: which figure, which of its notes)
+            m_auditStep = static_cast<int>( k );
+            startNote( note, f.m_vel[k],
+                       std::clamp( m_blk.m_figDepth * ( 0.85f + 0.15f * m_figRng.uniform() ), 0.0f, 1.0f ),
+                       FigureSource, 0 );
+            m_auditFigure = m_auditStep = -1;
+            // held for most of a pace (twice its attack at the least), then let go
             letFigureGo( *slot );
             slot->m_note = note;
-            slot->m_left = figureHold( pace );
+            slot->m_hold = slot->m_left = figureHold( pace );
             {   // struck again: the pitch the note before it in this round sounded (the selftest's count)
                 const double hz = frequencyOf( note );
                 if ( f.m_lastHz > 0.0 && std::fabs( 1200.0 * std::log2( hz / f.m_lastHz ) ) < 25.0 )

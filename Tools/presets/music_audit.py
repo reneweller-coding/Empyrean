@@ -106,7 +106,7 @@ SCALES = ["12-TET", "JI Major", "JI Minor", "JI 7-limit", "Pythagorean", "JI Pen
 COLUMNS = ["name", "group", "mode", "scale", "attack", "fig_attack", "brain2", "ons", "notes", "restrike",
            "doubling", "short", "self_unison", "own_rub", "cross_rub", "changes_per_hour", "silence_s", "one_note",
            "figure_ons", "figure_repeat_in_round", "figure_same_as_previous", "figure_restrike", "figure_rub",
-           "figure_shorter_than_attack", "sound_s", "both_s"]
+           "figure_shorter_than_attack", "figure_moved", "figure_left", "sound_s", "both_s"]
 FAULTS = ["restrike", "doubling", "short", "self_unison", "own_rub", "cross_rub", "silence_s",
           "figure_repeat_in_round", "figure_same_as_previous", "figure_restrike", "figure_rub",
           "figure_shorter_than_attack"]

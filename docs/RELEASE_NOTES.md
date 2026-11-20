@@ -171,6 +171,24 @@
   choice -0.08), a step between neighbours of 0.43 spreads at the most where the Whole Nights take 1.04. Empyrean
   Journeys lists three of them (6, 8 and 10 hours) to render. `additiv_night` and `Tools/presets/night_plot.py`
   print a night as a table and draw it against its curve.
+- **A figure never strikes a pitch that still sounds, and its notes arrive** (20.11.2026; Rene: "the same note
+  struck several times, often briefly -- under the long attacks that seems pointless"). The conductors were mended
+  the night before; what was left were the figures, 85 % of the bank's onsets. A figure only kept off the pitch of the
+  notes either side of it in its round: 14.9 % of the bank's figure notes began on a pitch a figure still sounded --
+  another figure's note, or one of its own round still ringing (a motif like C-E-C whose first C has not died away) --
+  and 2.1 % were let go before their own attack had swelled in, wherever Figure Pace was shorter than about one and a
+  quarter Figure Attacks (a sung line of a 2.6 s pace under a 2.6 s attack). Now no figure note begins within 25 cents
+  of a figure note that is held or was let go less than half its release before (the release falls in five time
+  constants, so half of it leaves the note 22 dB down, a tenth of its amplitude): a figure is composed so that its own
+  round does not do it, and where another figure would, the note moves for that round to the nearest free note that
+  fits the chord, or is left out where none is. And a figure's notes come at least twice its attack apart: under a long
+  attack a line holds fewer notes rather than faster ones, and every note is held for twice its attack at the least.
+  Over the whole bank (half an hour each, without the card): figure notes on a pitch still sounding 608428 -> 5, let go
+  before they had arrived 86821 -> 0, the pitch of the figure note just before 6.3 % -> 2.3 % (the rest lies further
+  back); 7.9 % of the figure notes are moved for their round, 1.0 % left out, and the figures play 1.4 % fewer notes
+  (no group more than 7 % fewer). The conductors play exactly as before. 1160 presets play their figures at a slower
+  pace than Figure Pace says (343 of them had let notes go early). The loudest moment of 40 presets with figures, as
+  played: median 0.0 dB, at most -2.4 dB -- the bank's levels stand.
 
 ## 1.0.0 (17.10.2026)
 

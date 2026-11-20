@@ -1038,6 +1038,7 @@ private:
     {
         int   m_note = -1;     ///< MIDI, -1 free
         float m_left = 0.0f;   ///< s until it is let go
+        float m_hold = 0.0f;   ///< s it is held for in all (figureHold)
     };
     /** @brief A figure's note let go (20.11.2026): its pitch is still heard until half its release has passed. */
     struct FigureGone
@@ -1135,12 +1136,14 @@ private:
     int drawFigureNote( int around, const int ( &avoid )[FigureAvoid], bool chordTone, int centre, const int *chord,
                         int n );
     /**
-     * @brief The figures' pace as they play it: Figure Pace.
+     * @brief The figures' pace as they play it: Figure Pace, twice the Figure Attack at the least (20.11.2026) -- a
+     *        note arrives before the next begins.
      * @return s from note to note
      */
     double figurePace() const;
     /**
-     * @brief How long a figure's note is held before it is let go: most of a pace, its attack at the least.
+     * @brief How long a figure's note is held before it is let go: most of a pace and its attack, twice its attack at
+     *        the least (it is let go only once it has arrived).
      * @param[in] pace  the pace (figurePace)
      * @return s
      */

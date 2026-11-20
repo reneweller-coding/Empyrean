@@ -220,14 +220,14 @@
   "short": 22,
   "self_unison": 5,
   "one_note": 0,
-  "figure_ons": 102931,
+  "figure_ons": 102926,
   "figure_repeat_in_round": 0,
-  "figure_same_as_previous": 2197,
+  "figure_same_as_previous": 2165,
   "figure_restrike": 0,
   "figure_rub": 88,
-  "figure_shorter_than_attack": 2788,
-  "figure_moved": 8343,
-  "figure_left": 896,
+  "figure_shorter_than_attack": 0,
+  "figure_moved": 8267,
+  "figure_left": 859,
   "own_rub": 0.0006923345589726916,
   "cross_rub": 0.0,
   "changes_per_hour": 90.065,
@@ -248,8 +248,8 @@
    103.5747
   ],
   "figure_ons": [
-   87491.35,
-   118370.65
+   87487.1,
+   118364.9
   ],
   "restrike": [
    0,
@@ -293,7 +293,7 @@
   ],
   "figure_same_as_previous": [
    0,
-   2856.1
+   2814.5
   ],
   "figure_restrike": [
    0,
@@ -305,7 +305,7 @@
   ],
   "figure_shorter_than_attack": [
    0,
-   3624.4
+   50
   ]
  }
 }

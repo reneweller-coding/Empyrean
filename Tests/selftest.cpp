@@ -6005,7 +6005,7 @@ int main( int argc, char **argv )
     {
         static const char *const Worst[] = { "Velvet-Hung Boudoir", "Spectral Bell", "Thin Spire", "Periodic Tide",
                                              "Outbound Horizon Light" };
-        int ons = 0, again = 0;
+        int                      ons = 0, again = 0;
         for ( int setup = 0; setup < 9; ++setup )
         {
             auto         e = std::make_unique<Engine>();
@@ -6037,39 +6037,98 @@ int main( int argc, char **argv )
                          block = c.m_gpuBlock / c.m_sampleRate;
             std::vector<std::pair<int, double>>    held;   // (key, Hz) of the figure notes held
             std::vector<std::pair<double, double>> gone;   // (when it is 22 dB down, Hz) of those let go
-            e->auditConductor(
-                seconds, c, c.m_gpuBlock / c.m_sampleRate, 1,
-                [&]( const Engine::AuditNote &n )
-                {
-                    if ( n.m_source != 5 ) return;
-                    if ( !n.m_on )
-                    {
-                        for ( size_t i = 0; i < held.size(); ++i )
-                            if ( held[i].first == n.m_note )
-                            {
-                                gone.emplace_back( n.m_seconds + ring, held[i].second );
-                                held.erase( held.begin() + static_cast<std::ptrdiff_t>( i ) );
-                                break;
-                            }
-                        return;
-                    }
-                    ++ons;
-                    std::erase_if( gone, [&]( const std::pair<double, double> &g )
-                                   { return g.first <= n.m_seconds + block; } );   // (to the block)
-                    bool same = false;
-                    for ( const auto &h : held )
-                        same = same || std::fabs( 1200.0 * std::log2( n.m_hz / h.second ) ) < 25.0;
-                    for ( const auto &g : gone )
-                        same = same || std::fabs( 1200.0 * std::log2( n.m_hz / g.second ) ) < 25.0;
-                    again += same ? 1 : 0;
-                    held.emplace_back( n.m_note, n.m_hz );
-                },
-                {} );
+            e->auditConductor( seconds, c, c.m_gpuBlock / c.m_sampleRate, 1,
+                               [&]( const Engine::AuditNote &n )
+                               {
+                                   if ( n.m_source != 5 ) return;
+                                   if ( !n.m_on )
+                                   {
+                                       for ( size_t i = 0; i < held.size(); ++i )
+                                           if ( held[i].first == n.m_note )
+                                           {
+                                               gone.emplace_back( n.m_seconds + ring, held[i].second );
+                                               held.erase( held.begin() + static_cast<std::ptrdiff_t>( i ) );
+                                               break;
+                                           }
+                                       return;
+                                   }
+                                   ++ons;
+                                   std::erase_if( gone, [&]( const std::pair<double, double> &g )
+                                                  { return g.first <= n.m_seconds + block; } );   // (to the block)
+                                   bool same = false;
+                                   for ( const auto &h : held )
+                                       same = same || std::fabs( 1200.0 * std::log2( n.m_hz / h.second ) ) < 25.0;
+                                   for ( const auto &g : gone )
+                                       same = same || std::fabs( 1200.0 * std::log2( n.m_hz / g.second ) ) < 25.0;
+                                   again += same ? 1 : 0;
+                                   held.emplace_back( n.m_note, n.m_hz );
+                               },
+                               {} );
         }
         check( ons > 5000 && again == 0, "figures: no note strikes a pitch a figure still sounds",
                fmt( "%d figure notes; %d within 25 cents of a figure note held or let go less than half its release "
                     "before",
                     ons, again ) );
+    }
+
+    // 124. A figure's note arrives (20.11.2026, plan B3): a figure note was held for 0.8 Figure Pace plus its Figure
+    //      Attack, so where the pace was shorter than 1.25 times the attack it was let go before it had swelled in --
+    //      2.1 % of the figure notes of the bank (a sung line of a 2.6 s pace under a 2.56 s attack; a struck one of
+    //      0.5 s under 0.47). Two lines set so, and the six presets of the music audit's sample with the most of them,
+    //      on the audit's clock: no figure note is let go sooner than twice its attack after it began. Before:
+    //      3087 of 3087.
+    if ( wanted( 124, "A figure's note arrives (20.11.2026)" ) )
+    {
+        static const char *const Worst[] = { "Waxing Tide",   "Folding Cascade",
+                                             "Owlish Marsh",  "Steadfast Contra Bourdon",
+                                             "Benthic Abyss", "Low-Voiced Puja" };
+        int                      notes = 0, early = 0;
+        for ( int setup = 0; setup < 8; ++setup )
+        {
+            auto         e = std::make_unique<Engine>();
+            EngineConfig c;
+            if ( setup < 2 )
+            {
+                e->setParam( ParamIdE::AUTO_MODE, 1.0f );
+                e->setParam( ParamIdE::AUTO_RATE, 30.0f );
+                e->setParam( ParamIdE::FIGURES, 3.0f );
+                e->setParam( ParamIdE::FIGURE_EVERY, setup == 0 ? 30.0f : 12.0f );
+                e->setParam( ParamIdE::FIGURE_NOTES, setup == 0 ? 2.0f : 5.0f );
+                e->setParam( ParamIdE::FIGURE_PACE, setup == 0 ? 2.5f : 0.5f );     // a sung line, a struck one,
+                e->setParam( ParamIdE::FIGURE_ATTACK, setup == 0 ? 3.5f : 0.6f );   // each under a longer attack
+                c.m_seed = static_cast<std::uint64_t>( 1240 + setup );
+            }
+            else
+            {
+                const int index = findPreset( Worst[setup - 2] );
+                if ( index < 0 ) continue;
+                e->loadPreset( index );
+            }
+            const double twice = 2.0 * static_cast<double>( e->param( ParamIdE::FIGURE_ATTACK ) );
+            std::vector<std::pair<int, double>> held;   // (key, when it began)
+            e->auditConductor( 1800.0, c, c.m_gpuBlock / c.m_sampleRate, 1,
+                               [&]( const Engine::AuditNote &n )
+                               {
+                                   if ( n.m_source != 5 ) return;
+                                   if ( n.m_on )
+                                   {
+                                       held.emplace_back( n.m_note, n.m_seconds );
+                                       return;
+                                   }
+                                   for ( size_t i = 0; i < held.size(); ++i )
+                                       if ( held[i].first == n.m_note )
+                                       {
+                                           ++notes;
+                                           early += n.m_seconds - held[i].second < twice - 1e-6 ? 1 : 0;
+                                           held.erase( held.begin() + static_cast<std::ptrdiff_t>( i ) );
+                                           break;
+                                       }
+                               },
+                               {} );
+        }
+        check(
+            notes > 800 && early == 0, "figures: every note is held for twice its attack at the least",
+            fmt( "%d figure notes let go; %d of them sooner than twice their attack after they began", notes, early ) );
     }
 
     finishTest();
