@@ -27,7 +27,7 @@
  * The night is walked step by step. At each, among the presets not yet played, the one with the lowest cost is
  * taken: its distance from the curve's target (in percentiles, the brightness weighing 0.7) plus 0.3 times its
  * distance in sound from the step before (the four measures in spreads, divided by 3, about a random pair's), less 0.1
- * for a preferred preset (a favourite), less up to 0.1 for a dawn preset in the morning, plus a die of up to 0.04 (the
+ * for a preferred preset (a favourite), less up to 0.25 for a dawn preset in the morning, plus a die of up to 0.04 (the
  * seed's: another seed, another night). A step stays as make_journeys.py's nights do -- by how much the preset moves by
  * itself: the third of the candidates that moves least 3-6 minutes, the third that moves most 10-15, the rest 6-10,
  * never two short or two long ones in a row -- and the target is read at the middle of that stay. When the night is

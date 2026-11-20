@@ -213,7 +213,9 @@ with pictures by [KaleidoscopeEnhanced](https://github.com/reneweller-coding/Kal
 - **Glide, morph and journeys:** a preset glides out of the one before -- the partials themselves travel, each sound's
   modulators with them, the filters moving into each other by transport; a morph knob between two slots; and
   journeys, presets in a row glided into each other for a whole night (531 come with it, nineteen of them whole nights),
-  each shown with its length, and rendered into WAV, FLAC, Ogg Vorbis or MP3 by Empyrean Journeys.
+  each shown with its length, and rendered into WAV, FLAC, Ogg Vorbis or MP3 by Empyrean Journeys; and a night director
+  that writes a night of so many hours with a form -- falling asleep, deep waves of about ninety minutes, a morning --
+  along a curve of measured stillness and brightness (Core/include/additiv/NightDirector.h).
 
 ## Build
 
@@ -234,8 +236,8 @@ The engine's self-test runs on the graphics card for about twenty minutes. To wo
 --list` numbers its tests, `--only 62,113-117` runs just those (numbers and ranges; one that matches no test is an
 error) and `--from N` the tests from N on; every run prints each test's wall time and the five slowest.
 
-The tables made from the bank's measures -- `Core/src/Find.inc`, `Journeys.inc`, `PresetMap.inc` with the routes and
-`Nudges.inc` -- are written by the scripts in `Tools/presets` from what every preset measures: `additiv_presets
+The tables made from the bank's measures -- `Core/src/Find.inc`, `Journeys.inc`, `PresetMap.inc` with the routes,
+`NightDirector.inc` (`make_night.py`) and `Nudges.inc` -- are written by the scripts in `Tools/presets` from what every preset measures: `additiv_presets
 --describe work/presets/descriptors.json` plays each a chord of fourteen seconds on the card and writes its brightness,
 motion, width, noise and level (some hours for the whole bank). `work/` is not in the repository, so a copy is:
 `Tools/presets/descriptors.tsv`, a preset a line. The scripts read the measurement when it is there and the copy
@@ -260,6 +262,10 @@ notes `empy_render --note-log` logs, note for note; `--presets FILE` takes many 
 conductors, doublings, notes struck again, notes shorter than their attack, figures repeating a pitch -- over a sample
 (`--sample 200`) or the whole bank (`--all`, about a quarter of an hour on sixteen cores); `--check
 Tests/golden/music_audit.json` is the ctest `music_audit` (label `slow`).
+
+A night of the night director as a table, without the card: `additiv_night --hours 8 --seed 1` (`--journey` prints
+the journey file); `Tools/presets/night_plot.py --hours 8 --png night.png` adds the stillness against the curve and a
+picture (Pillow).
 
 **Empyrean Journeys** (`EmpyreanJourneys.exe`, in the Start menu) renders journeys into files with a small window of
 its own: every journey listed with its length, one or several chosen, written as WAV or FLAC (24 bit), Ogg Vorbis or

@@ -45,7 +45,7 @@ constexpr double BrightWeight = 0.7;   ///< the brightness's distance from the c
 constexpr double SoundWeight = 0.3;    ///< the distance in sound from the step before, against the curve's
 constexpr double SoundScale = 3.0;     ///< the distance in sound divided by this (about a random pair's)
 constexpr double PreferBonus = 0.1;    ///< a preferred preset's cost lowered by this
-constexpr double DawnBonus = 0.1;      ///< a dawn preset's at the end of the morning (growing through it)
+constexpr double DawnBonus = 0.25;     ///< a dawn preset's at the end of the morning (growing through it)
 constexpr double Dice = 0.04;          ///< a die of up to this on every candidate's cost
 // The stays (make_journeys.py's nights): short, middle, long -- dwell and glide ranges in seconds.
 constexpr double DwellLo[3] = { 180.0, 360.0, 600.0 };   ///< the shortest dwell of each class

@@ -7,7 +7,7 @@ SETTLE seconds for the clouds to sound, then every tab on its own tick, the wind
 scrolls (ADDITIV_SHOT_FULL). Muted (ADDITIV_MUTE): the engine runs and is seen, nothing is heard. Besides:
 docs/screenshot.png, the first tab at the window's usual size, the picture on the project's front page. And the
 pictures a chapter asks for with a line "[name]" in chapters.txt (EXTRAS): the command palette, the preset browser,
-the modulation dock with a source dropped on a knob. A tab's name becomes a file name as slug() makes it. Last,
+the modulation dock with a source dropped on a knob, the night director with a night of eight hours. A tab's name becomes a file name as slug() makes it. Last,
 Empyrean Journeys' window (journeys-app.png), from the same build tree.
 """
 import glob
@@ -28,6 +28,7 @@ EXTRAS = {
     "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, "Focus"),
     "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, "Cloud & Filter"),
     "journey": ({"ADDITIV_SHOT_JOURNEY": "Sleep Concert - Night"}, "Journey"),
+    "night": ({"ADDITIV_SHOT_DIRECTOR": "8"}, "Journey"),
 }
 
 
