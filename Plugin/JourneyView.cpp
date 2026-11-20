@@ -7,11 +7,184 @@
 
 #include "Theme.h"
 
+#include "additiv/NightDirector.h"
 #include "additiv/Presets.h"
 
 using additiv::ParamIdE;
 
-JourneyView::JourneyView( AdditivProcessor &proc ) : m_proc( proc )
+// ========================================================================================================= the night
+
+NightPanel::NightPanel( AdditivProcessor &proc ) : m_proc( proc )
+{
+    m_length.setTooltip( "How long the night is: until a time to wake (from now), or so many hours" );
+    m_family.setTooltip(
+        "Which groups the night draws from: those the Whole Nights draw from, one Whole Night's family, "
+        "or the whole bank. The morning draws from the Dawn Choruses as well." );
+    m_family.addItem( additiv::nightFamilyName( additiv::NightFamilyAll ), 1 );
+    m_family.addSectionHeading( "A Whole Night's groups" );
+    for ( int f = 0; f < additiv::numNightFamilies(); ++f ) m_family.addItem( additiv::nightFamilyName( f ), f + 2 );
+    m_family.addSeparator();
+    m_family.addItem( additiv::nightFamilyName( additiv::NightFamilyBank ), additiv::numNightFamilies() + 2 );
+    m_family.setSelectedId( 1, juce::dontSendNotification );
+    m_favourites.setToggleState( true, juce::dontSendNotification );
+    m_favourites.setTooltip( "Your favourites (the star in the browser) are chosen a little more readily" );
+    m_dice.setTooltip( "Another night of the same kind: new dice, made at once" );
+    m_make.setTooltip(
+        "Composes the night: it becomes the journey being written (the timeline below shows it, the disk "
+        "saves it); nothing starts by itself" );
+    m_close.setTooltip( "Closes the night director" );
+    m_dice.onClick = [this] { make( true ); };
+    m_make.onClick = [this] { make( false ); };
+    m_close.onClick = [this]
+    {
+        if ( m_onClose ) m_onClose();
+    };
+    m_status.setColour( juce::Label::textColourId, additivui::skin().m_dim );
+    m_status.setFont( juce::FontOptions( 12.5f ) );
+    m_status.setText( "A night with a form: falling asleep (darker, stiller), a deep middle in waves of about ninety "
+                      "minutes, a brighter morning -- neighbours that sound alike, no preset twice.",
+                      juce::dontSendNotification );
+    m_seed = static_cast<std::uint64_t>( juce::Time::currentTimeMillis() ) | 1ull;
+    for ( juce::Component *c :
+          { static_cast<juce::Component *>( &m_length ), static_cast<juce::Component *>( &m_family ),
+            static_cast<juce::Component *>( &m_favourites ), static_cast<juce::Component *>( &m_dice ),
+            static_cast<juce::Component *>( &m_make ), static_cast<juce::Component *>( &m_close ),
+            static_cast<juce::Component *>( &m_status ) } )
+        addAndMakeVisible( c );
+    refreshLengths();
+}
+
+void NightPanel::refreshLengths()
+{
+    const int keep = m_length.getSelectedId();
+    m_length.clear( juce::dontSendNotification );
+    m_hours.clear();
+    m_until.clear();
+    const juce::Time now = juce::Time::getCurrentTime();
+    const double     nowH = now.getHours() + now.getMinutes() / 60.0;
+    int              wakeSeven = 0;
+    for ( int half = 11; half <= 18; ++half )   // 5:30 .. 9:00
+    {
+        double h = 0.5 * half - nowH;
+        if ( h <= 0.0 ) h += 24.0;
+        h = std::round( h * 12.0 ) / 12.0;   // to five minutes
+        if ( h < 1.0 || h > 14.0 ) continue;
+        const int hh = static_cast<int>( h ), mm = static_cast<int>( std::lround( ( h - hh ) * 60.0 ) );
+        m_hours.push_back( h );
+        m_until.push_back( true );
+        m_length.addItem( "Until " + juce::String( half / 2 ) + ( half % 2 ? ":30" : ":00" ) + "  (" +
+                              juce::String( hh ) + " h " + juce::String( mm ).paddedLeft( '0', 2 ) + " min from now)",
+                          static_cast<int>( m_hours.size() ) );
+        if ( half == 14 && h >= 3.0 && h <= 10.0 ) wakeSeven = static_cast<int>( m_hours.size() );
+    }
+    if ( !m_hours.empty() ) m_length.addSeparator();
+    int eight = 0;
+    for ( int h = 3; h <= 10; ++h )
+    {
+        m_hours.push_back( h );
+        m_until.push_back( false );
+        m_length.addItem( juce::String( h ) + " hours", static_cast<int>( m_hours.size() ) );
+        if ( h == 8 ) eight = static_cast<int>( m_hours.size() );
+    }
+    // What was chosen stays chosen while it is offered (an "until" moves with the clock); else until seven, else 8 h.
+    m_length.setSelectedId( keep > 0 && keep <= static_cast<int>( m_hours.size() ) ? keep
+                                                                                   : ( wakeSeven ? wakeSeven : eight ),
+                            juce::dontSendNotification );
+}
+
+void NightPanel::visibilityChanged()
+{
+    if ( isVisible() ) refreshLengths();
+}
+
+void NightPanel::forShot( double hours )
+{
+    for ( size_t i = 0; i < m_hours.size(); ++i )
+        if ( !m_until[i] && std::abs( m_hours[i] - hours ) < 0.01 )
+            m_length.setSelectedId( static_cast<int>( i ) + 1, juce::dontSendNotification );
+    m_favourites.setToggleState( false, juce::dontSendNotification );
+    m_seed = 1;
+}
+
+void NightPanel::make( bool newDice )
+{
+    if ( newDice )
+    {
+        m_seed ^= m_seed << 13;   // the next of an xorshift64 begun from the clock
+        m_seed ^= m_seed >> 7;
+        m_seed ^= m_seed << 17;
+    }
+    const int             item = std::clamp( m_length.getSelectedId(), 1, static_cast<int>( m_hours.size() ) );
+    const double          hours = m_hours[static_cast<size_t>( item - 1 )];
+    const int             id = m_family.getSelectedId();
+    additiv::NightRequest r;
+    r.m_hours = hours;
+    r.m_seed = m_seed;
+    r.m_family = id <= 1 ? additiv::NightFamilyAll
+                         : ( id - 2 < additiv::numNightFamilies() ? id - 2 : additiv::NightFamilyBank );
+    if ( m_favourites.getToggleState() )
+        for ( const juce::String &f : m_proc.favoriteNames() ) r.m_prefer.push_back( f.toStdString() );
+    // "Night 8 h (20.11.)": a name that is a file name too (no colon)
+    const int hh = static_cast<int>( hours ), mm = static_cast<int>( std::lround( ( hours - hh ) * 60.0 ) );
+    r.m_name = "Night " + std::to_string( hh ) + " h" + ( mm ? " " + std::to_string( mm ) + " min" : std::string() ) +
+               juce::Time::getCurrentTime().formatted( " (%d.%m.)" ).toStdString();
+    const additiv::NightPlan plan = additiv::composeNight( r );
+    if ( plan.m_journey.m_steps.empty() )
+    {
+        m_status.setText( "No preset to choose from in these groups.", juce::dontSendNotification );
+        return;
+    }
+    m_proc.setJourneyDraft( plan.m_journey );
+    double asleep = 0.0, morning = 0.0;
+    int    waves = 1;
+    additiv::nightPhases( hours, asleep, morning, waves );
+    int preferred = 0;
+    for ( const additiv::NightStep &st : plan.m_steps ) preferred += st.m_preferred ? 1 : 0;
+    juce::String s;
+    s << juce::String( r.m_name ) << ": " << static_cast<int>( plan.m_steps.size() ) << " presets of "
+      << plan.m_candidates;
+    if ( preferred ) s << " (" << preferred << ( preferred == 1 ? " favourite)" : " favourites)" );
+    s << " -- falling asleep " << juce::roundToInt( asleep * hours * 60.0 ) << " min, " << waves
+      << ( waves == 1 ? " wave of " : " waves of " )
+      << juce::roundToInt( ( 1.0 - asleep - morning ) * hours * 60.0 / waves ) << " min, morning "
+      << juce::roundToInt( morning * hours * 60.0 )
+      << " min.\nIt is the journey being written (the timeline below): the disk saves it, then choose it in the box "
+         "and play. Once through; at its end the last preset stays.";
+    m_status.setText( s, juce::dontSendNotification );
+}
+
+void NightPanel::resized()
+{
+    const int y = 28;
+    int       x = 14;
+    m_length.setBounds( x, y, 270, 26 );
+    x += 278;
+    m_family.setBounds( x, y, 220, 26 );
+    x += 228;
+    m_favourites.setBounds( x, y, 160, 26 );
+    x += 166;
+    m_dice.setBounds( x, y, 90, 26 );
+    x += 98;
+    m_make.setBounds( x, y, 80, 26 );
+    m_close.setBounds( getWidth() - 10 - 70, y, 70, 26 );
+    m_status.setBounds( 14, y + 30, getWidth() - 24, 36 );
+}
+
+void NightPanel::paint( juce::Graphics &g )
+{
+    const frame::Skin &skin = additivui::skin();
+    g.setColour( skin.m_group );
+    g.fillRoundedRectangle( getLocalBounds().toFloat(), skin.m_radius );
+    g.setColour( skin.family( frame::FamilyE::SPACE ) );
+    g.drawRoundedRectangle( getLocalBounds().toFloat().reduced( 0.5f ), skin.m_radius, 1.0f );
+    g.setFont( juce::FontOptions( 13.0f, juce::Font::bold ) );
+    g.drawText( "Night director: a night as a journey with a form, made from the bank", 18, 4, getWidth() - 30, 20,
+                juce::Justification::centredLeft );
+}
+
+// ========================================================================================================= the view
+
+JourneyView::JourneyView( AdditivProcessor &proc ) : m_proc( proc ), m_night( proc )
 {
     for ( int k = 0; k < 2; ++k )
     {
@@ -30,7 +203,7 @@ JourneyView::JourneyView( AdditivProcessor &proc ) : m_proc( proc )
     }
     m_journeys.setTextWhenNothingSelected( "Choose a journey" );
     m_journeys.setTooltip(
-        "The journeys: Whole Night plays about six and a half hours before it comes round again; a group's Night is its "
+        "The journeys: Whole Night plays a little over three hours before it comes round again; a group's Night is its "
         "twelve stillest presets, its Journey twelve of its different faces. Yours are the files in Documents/Empyrean/Journeys." );
     addAndMakeVisible( m_journeys );
     m_start.onClick = [this] { startChosen(); };
@@ -55,6 +228,25 @@ JourneyView::JourneyView( AdditivProcessor &proc ) : m_proc( proc )
                                  static_cast<juce::Component *>( &m_add ), static_cast<juce::Component *>( &m_save ),
                                  static_cast<juce::Component *>( &m_folder ) } )
         addAndMakeVisible( c );
+    m_nightButton.setTooltip( "The night director: a night of so many hours (or until a time to wake) with a form -- "
+                              "falling asleep, a deep middle in waves, a morning -- as the journey being written" );
+    m_nightButton.onClick = [this] { m_night.setVisible( !m_night.isVisible() ); };
+    m_night.m_onClose = [this] { m_night.setVisible( false ); };
+    addAndMakeVisible( m_nightButton );
+    addChildComponent( m_night );   // over the slots while open (added last: on top)
+    // ADDITIV_SHOT_DIRECTOR (hours): the night director open and a night of that length made, seed 1, for the
+    // manual's picture (the screenshot mode, Plugin/PluginEditor.cpp).
+    if ( const double shotHours =
+             juce::SystemStats::getEnvironmentVariable( "ADDITIV_SHOT_DIRECTOR", {} ).getDoubleValue();
+         shotHours > 0.0 )
+        juce::Timer::callAfterDelay( 2000,
+                                     [safe = juce::Component::SafePointer<JourneyView>( this ), shotHours]
+                                     {
+                                         if ( safe == nullptr ) return;
+                                         safe->m_night.setVisible( true );
+                                         safe->m_night.forShot( shotHours );
+                                         safe->m_night.make( false );
+                                     } );
     refreshJourneys();
     timerCallback();
     startTimerHz( 2 );
@@ -187,8 +379,13 @@ void JourneyView::saveDraft()
 {
     const juce::File dir = AdditivProcessor::journeyFolder();
     dir.createDirectory();
-    m_chooser = std::make_unique<juce::FileChooser>( "Save the journey", dir.getChildFile( "My Journey.journey" ),
-                                                     "*.journey" );
+    const std::string &named = m_proc.journeyDraft().m_name;   // a night is named already ("Night 8 h (20.11.)")
+    m_chooser = std::make_unique<juce::FileChooser>(
+        "Save the journey",
+        dir.getChildFile(
+            juce::File::createLegalFileName( named.empty() ? juce::String( "My Journey" ) : juce::String( named ) ) +
+            ".journey" ),
+        "*.journey" );
     m_chooser->launchAsync( juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
                             [this]( const juce::FileChooser &fc )
                             {
@@ -222,7 +419,9 @@ void JourneyView::resized()
     m_add.setBounds( 14, y2, 130, 26 );
     m_save.setBounds( 152, y2, 28, 26 );
     m_folder.setBounds( 184, y2, 28, 26 );
-    m_draft.setBounds( 220, y2, w - 230, 26 );
+    m_nightButton.setBounds( 220, y2, 90, 26 );
+    m_draft.setBounds( 318, y2, w - 328, 26 );
+    m_night.setBounds( 0, 0, w, y1 - 6 );   // over the slots and their heading
 }
 
 void JourneyView::paint( juce::Graphics &g )
@@ -250,7 +449,7 @@ juce::String JourneyView::describe() const
     s << "\nA preset chosen glides from the sound before it over Glide (0: at once). With Morph on, the sound is the blend of the two "
          "slots at A - B: every number on its way, the filter fading from one into the other, a motion or a living landscape fading "
          "out where it changes and in again. A journey holds each of its presets for a time drawn from its range and glides into the "
-         "next; the journeys that come with the instrument are made from the bank (Whole Night: about six and a half hours round). The timeline shows the journey chosen: a click on a step goes there. Below it, the one being written: drag a step's edge (how long it stays), its ramp (how long it glides in), the step itself (its place); right-click removes it; Edit a copy takes the journey above to change. A morph slot takes a snapshot of the Focus page too (Preset ..., first in the menu).\n";
+         "next; the journeys that come with the instrument are made from the bank (Whole Night: a little over three hours round). The timeline shows the journey chosen: a click on a step goes there. Below it, the one being written: drag a step's edge (how long it stays), its ramp (how long it glides in), the step itself (its place); right-click removes it; Edit a copy takes the journey above to change. A morph slot takes a snapshot of the Focus page too (Preset ..., first in the menu). Night ... opens the night director: a night of so many hours or until a time to wake, from the groups chosen, with a form -- falling asleep (darker, stiller), a deep middle in waves of about ninety minutes, a brighter morning -- made into the journey being written; save it with the disk, then choose it and play.\n";
     return s;
 }
 
@@ -315,6 +514,9 @@ juce::Rectangle<float> JourneyTimeline::band( int which ) const
 {
     auto r = getLocalBounds().toFloat().reduced( 18.0f, 0.0f ).withTrimmedTop( 28.0f ).withTrimmedBottom( 6.0f );
     if ( m_proc.journeyDraftSteps() == 0 ) return which == 0 ? r.withTrimmedBottom( 20.0f ) : juce::Rectangle<float>();
+    additiv::Journey above;
+    if ( !upper( above ) )   // nothing above (a night just made): the one being written has the whole of it
+        return which == 0 ? juce::Rectangle<float>() : r.withTrimmedTop( 22.0f ).withTrimmedBottom( 20.0f );
     const float h =
         ( r.getHeight() - 20.0f - 22.0f ) / 2.0f;   // two bands, the hours under the first, a title over the second
     return which == 0 ? r.withHeight( h ) : r.withTrimmedTop( h + 20.0f + 22.0f );
@@ -400,6 +602,20 @@ void JourneyTimeline::paint( juce::Graphics &g )
     double                        total = 0.0;
     for ( const additiv::JourneyStep &s : j.m_steps )
         total += 0.5 * ( s.m_dwellLo + s.m_dwellHi );   // the glide is part of the stay (JourneyPlayer)
+    auto hours = [&g, &skin]( juce::Rectangle<float> r, double length )   // the hours under a band
+    {
+        g.setColour( skin.m_dim );
+        g.setFont( juce::FontOptions( 11.0f ) );
+        const double every = length > 4.0 * 3600.0 ? 3600.0 : ( length > 3600.0 ? 1800.0 : 600.0 );
+        for ( double h = 0.0; length > 0.0 && h <= length; h += every )
+        {
+            const float x = r.getX() + r.getWidth() * static_cast<float>( h / length );
+            g.drawVerticalLine( juce::roundToInt( x ), r.getBottom(), r.getBottom() + 4.0f );
+            g.drawText( juce::String( additiv::Journey::timeText( h ) ),
+                        juce::Rectangle<float>( x - 30.0f, r.getBottom() + 4.0f, 60.0f, 14.0f ),
+                        juce::Justification::centred );
+        }
+    };
     g.setFont( juce::FontOptions( 13.0f, juce::Font::bold ) );
     g.setColour( running ? hue : skin.m_dim );
     if ( !any )
@@ -430,17 +646,7 @@ void JourneyTimeline::paint( juce::Graphics &g )
                                  1.0 - player.remaining() / std::max( 0.5 * ( s.m_dwellLo + s.m_dwellHi ), 1.0 ) );
         }
         drawBand( g, j, r0, running ? player.step() : -1, done, !running );
-        g.setColour( skin.m_dim );   // the hours under it
-        g.setFont( juce::FontOptions( 11.0f ) );
-        const double every = total > 4.0 * 3600.0 ? 3600.0 : ( total > 3600.0 ? 1800.0 : 600.0 );
-        for ( double h = 0.0; total > 0.0 && h <= total; h += every )
-        {
-            const float x = r0.getX() + r0.getWidth() * static_cast<float>( h / total );
-            g.drawVerticalLine( juce::roundToInt( x ), r0.getBottom(), r0.getBottom() + 4.0f );
-            g.drawText( juce::String( additiv::Journey::timeText( h ) ),
-                        juce::Rectangle<float>( x - 30.0f, r0.getBottom() + 4.0f, 60.0f, 14.0f ),
-                        juce::Justification::centred );
-        }
+        hours( r0, total );
     }
     // The one being written, to edit.
     const additiv::Journey &d = m_proc.journeyDraft();
@@ -459,6 +665,7 @@ void JourneyTimeline::paint( juce::Graphics &g )
             juce::Rectangle<float>( r1.getX(), r1.getY() - 21.0f, r1.getWidth(), 18.0f ),
             juce::Justification::centredLeft );
         drawBand( g, d, r1, -1, 0.0, false );
+        if ( !any ) hours( r1, dt );   // alone in the timeline: its hours under it
     }
 }
 

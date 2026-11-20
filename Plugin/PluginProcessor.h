@@ -375,6 +375,8 @@ public:
      * @param[in] on    marked
      */
     void setFavorite( const juce::String &name, bool on );
+    /** @brief The player's favourites (the night director prefers them). @return their names */
+    juce::StringArray favoriteNames() const;
     /** @brief The presets chosen lately, the newest first (at most 40). @return their names */
     juce::StringArray recentPresets() const;
     /** @brief The player's own settings (favourites, recent, the night mode, the tour), in their application data. @return them */

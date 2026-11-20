@@ -469,6 +469,14 @@ bool AdditivProcessor::favorite( const juce::String &name ) const
     return juce::StringArray::fromLines( self->userSettings().getValue( "favorites" ) ).contains( name );
 }
 
+juce::StringArray AdditivProcessor::favoriteNames() const
+{
+    auto             *self = const_cast<AdditivProcessor *>( this );   // the settings file is read on first use
+    juce::StringArray f = juce::StringArray::fromLines( self->userSettings().getValue( "favorites" ) );
+    f.removeEmptyStrings();
+    return f;
+}
+
 void AdditivProcessor::setFavorite( const juce::String &name, bool on )
 {
     juce::StringArray f = juce::StringArray::fromLines( userSettings().getValue( "favorites" ) );

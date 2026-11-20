@@ -10,7 +10,60 @@
 #include "ParamPage.h"
 #include "PluginProcessor.h"
 
+#include <functional>
 #include <vector>
+
+/**
+ * @brief The night director's controls (NightDirector.h, 20.11.2026): how long the night is (hours, or until a time
+ *        to wake), which groups it draws from, whether the favourites are preferred, new dice and Make. What it makes
+ *        becomes the journey being written -- the timeline shows it, the disk saves it; nothing starts by itself. Open,
+ *        it lies over the morph slots, so the page does not grow.
+ */
+class NightPanel final : public juce::Component
+{
+public:
+    /**
+     * @brief The controls for @p proc.
+     * @param[in,out] proc  the processor (its favourites, the journey being written)
+     */
+    explicit NightPanel( AdditivProcessor &proc );
+    /** @brief The two rows. */
+    void resized() override;
+    /**
+     * @brief Its ground and its heading.
+     * @param[in,out] g  the graphics context
+     */
+    void paint( juce::Graphics &g ) override;
+    /** @brief The lengths offered anew from the clock, whenever it is shown. */
+    void visibilityChanged() override;
+    /**
+     * @brief Composes a night and makes it the journey being written.
+     * @param[in] newDice  draw a new seed first
+     */
+    void make( bool newDice );
+    /**
+     * @brief Sets the controls as the screenshot mode asks (ADDITIV_SHOT_DIRECTOR): a length, no favourites, seed 1.
+     * @param[in] hours  the night's length
+     */
+    void forShot( double hours );
+    std::function<void()> m_onClose;   ///< what the close button does (the view hides the panel)
+
+private:
+    /** @brief Fills the length box: until 5:30 .. 9:00 from now (when 1 to 14 hours away), then 3 .. 10 hours. */
+    void refreshLengths();
+
+    AdditivProcessor   &m_proc;                                   ///< whose favourites and journey being written
+    juce::ComboBox      m_length;                                 ///< how long the night is
+    juce::ComboBox      m_family;                                 ///< which groups it draws from
+    juce::ToggleButton  m_favourites{ "Prefer my favourites" };   ///< the favourites' bonus
+    juce::TextButton    m_dice{ "New dice" };                     ///< another night of the same kind
+    juce::TextButton    m_make{ "Make" };                         ///< composes it
+    juce::TextButton    m_close{ "Close" };                       ///< hides the panel
+    juce::Label         m_status;                                 ///< what was made
+    std::vector<double> m_hours;                                  ///< the length box's hours (item id = index + 1)
+    std::vector<bool>   m_until;                                  ///< whether an item is a time to wake
+    std::uint64_t       m_seed = 1;                               ///< the dice
+};
 
 /** @brief The slots and the journeys (below the page's knobs). */
 class JourneyView final : public juce::Component, private juce::Timer
@@ -89,9 +142,11 @@ private:
         frame::IconButton::IconE::OPEN,
         "Opens the journeys folder (Documents/Empyrean/Journeys): journeys are plain text, one preset a line"
     };
-    juce::Label                        m_draft;      ///< how many presets the journey being written has
-    std::unique_ptr<juce::FileChooser> m_chooser;    ///< the save dialog while it is open
-    int                                m_tick = 0;   ///< timer ticks, for the slower refreshes
+    juce::Label                        m_draft;   ///< how many presets the journey being written has
+    juce::TextButton                   m_nightButton{ "Night ..." };   ///< opens the night director
+    NightPanel                         m_night;                        ///< the night director, over the slots
+    std::unique_ptr<juce::FileChooser> m_chooser;                      ///< the save dialog while it is open
+    int                                m_tick = 0;                     ///< timer ticks, for the slower refreshes
 };
 
 /**
