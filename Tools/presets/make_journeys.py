@@ -37,8 +37,10 @@ night twelve to twenty.
 
 A nearest neighbour here is a preset that sounds alike in four measures and is set alike, which is the promise of a
 gentle glide, not of a good one. What a glide does was measured (20.11.2026, plan D2,
-Tools/presets/journey_transitions.py): at its middle the scale and its root change, and every note that sounds keeps
-its key and is retuned into the new scale within seconds -- the conductors are not restarted, their chord stays.
+Tools/presets/journey_transitions.py): at its middle the scale and its root change, and every note that sounds kept
+its key and was retuned into the new scale within seconds -- the conductors are not restarted, their chord stays.
+Since 20.11.2026 a note that sounds then keeps its pitch until it ends (Engine::setHoldPitch, plan D2b), and the
+broken pairs are those measured so (journey_transitions.py --hold-pitch 1); the numbers below are of before.
 Between two presets of one scale on different roots a sixth of the register's keys move by a quarter tone or more (in
 JI 7-limit, whatever the fifths between the roots: its keys snap), between two scales half of them; a note retuned so
 stands against the notes chosen after it, and there the outgoing and the incoming chord rub (measured: a minor second

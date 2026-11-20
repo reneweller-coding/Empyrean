@@ -253,8 +253,9 @@ chord.
 card (`static`, `notes`: `additiv_brain_audit --pairs` plays the first preset, glides into the second and prints the
 notes and the tuning as it changes) the seconds of a minor second between the outgoing and the incoming chord and the
 retune of what sounds; on the card, for a sample (`render`: `empy_render --then NAME --at S --glide S`), the level's dip
-or peak and the roughness. `export-bad` writes the pairs measured as broken to `Tools/presets/journey_bad_pairs.tsv`,
-which `make_journeys.py` keeps apart, beside a cost for every glide between two tunings; `--check` is the ctest
+or peak and the roughness. `export-bad` writes the pairs measured as broken to `Tools/presets/journey_bad_pairs.tsv`
+(the notes as the instrument plays them, sounding notes kept at their pitch; `--hold-pitch 0` reads and writes the
+measurements of the instrument before 20.11.2026 instead), which `make_journeys.py` keeps apart, beside a cost for every glide between two tunings; `--check` is the ctest
 `journeys` (no two neighbours of one scale on roots a tritone apart, at most a tenth of the neighbour pairs of
 `Journeys.inc` listed as broken). A level that falls or rises in a glide is counted beyond what either preset does by
 itself: `alone` renders the two presets of every sampled pair over the limit alone, as the pair was rendered, and the

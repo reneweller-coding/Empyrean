@@ -235,7 +235,14 @@
   such a note by the pitch it really has. Over all glides of the journeys, without the card: a sounding note moves by
   a quarter tone or more in 11 of 6600 instead of 3475 (52.7 %), a semitone rubs between the leaving and the arriving
   chord for more than five seconds in 439 instead of 708 (6.7 s to 2.5 s on average) -- but in 317 glides a kept note,
-  foreign to the new scale, rubs for longer than before (the journeys are ordered anew for it, below).
+  foreign to the new scale, rubs for longer than before. So the journeys were ordered anew for it (20.11.2026, the
+  same presets in each, the same costs as in D2): every glide measured with sounding notes kept, the pairs that rub
+  for more than five seconds so -- and the three whose level still falls or rises more than 3 LU beyond both presets
+  alone -- kept apart (1075 pairs, from 4089 measured on the old instrument), measured again until no glide of the new
+  order was unmeasured. Of the 6600 glides 154 rub for more than five seconds (439 in the order before, both judged
+  with notes kept), 0.9 s on average (2.5 s); 484 of the 531 journeys play in another order, and the step between
+  neighbours by the measures is 2 % shorter. The worst glide left: Pressure-Sung Cantors into Drowned-Voice Assembly
+  (Abyssal Choirs - Night), 198 s.
   `Engine::setHoldPitch(0)` and the tools' `--hold-pitch 0` (`empy_render`, `additiv_brain_audit`,
   `journey_transitions.py`) play the instrument as it was, byte for byte; no knob or preset sets it.
 - **The family hears itself: "Hear leader"** (20.11.2026, plan E3; on since Rene decided the same evening). A
