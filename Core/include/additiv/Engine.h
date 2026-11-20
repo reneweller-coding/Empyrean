@@ -623,6 +623,18 @@ public:
      */
     int figureRepeats() const { return m_figRepeat.load( std::memory_order_relaxed ); }
     /**
+     * @brief Of the figures' notes since prepare, those that would have begun on a pitch a figure still sounded (held,
+     *        or let go less than half its release before) and were moved to the nearest free note that fits the chord,
+     *        or left out where none did (20.11.2026). Any thread.
+     * @param[out] left  receives the ones left out
+     * @return the ones moved
+     */
+    int figureMoved( int &left ) const
+    {
+        left = m_figLeft.load( std::memory_order_relaxed );
+        return m_figMoved.load( std::memory_order_relaxed );
+    }
+    /**
      * @brief How many pairs of notes the two conductors sound now rub across them: a semitone, a major seventh or a
      *        tritone apart as the tuning sounds them, within two octaves (19.11.2026). For the selftest, offline: it
      *        reads the conductors, which the audio thread writes.
@@ -996,13 +1008,17 @@ private:
      * the harmony has moved under it, a note that no longer fits goes to its nearest neighbour that does, and stays
      * there; and now and then (Figure Change) a note is drawn anew when the figure has come round. The notes are
      * voices like the others, with an envelope of their own (Figure Attack and Release), a narrower cloud and a
-     * rounder spectrum (Figure Pure) and their own place (Figure Depth): a clear line in front of the chord. They never take a sounding
+     * rounder spectrum (Figure Pure) and their own place (Figure Depth): a clear line in front of the chord. No
+     * figure note begins on a pitch a figure still sounds -- held, or let go less than half its release before
+     * (20.11.2026): it is composed elsewhere where the round itself would do it, and moved at play time to the
+     * nearest free note that fits the chord, or left out, where another figure would. They never take a sounding
      * voice (a note that finds none free or fading is left out), and their dice are their own, so the conductor
      * plays the same piece with them or without.
      * @{ */
     static constexpr int FigureSource = 5;   ///< a voice's source for a figure's note (shown as the conductor's)
     static constexpr int MaxFigures = 4;     ///< figures at most
     static constexpr int FigureNotes = 6;    ///< notes a figure has at most
+    static constexpr int FigureAvoid = FigureNotes + 2;   ///< pitches a figure's note may be told to avoid
     /** @brief One figure: its notes, where in its loop each begins (in paces), and where the loop stands. */
     struct Figure
     {
@@ -1023,8 +1039,15 @@ private:
         int   m_note = -1;     ///< MIDI, -1 free
         float m_left = 0.0f;   ///< s until it is let go
     };
+    /** @brief A figure's note let go (20.11.2026): its pitch is still heard until half its release has passed. */
+    struct FigureGone
+    {
+        int   m_note = -1;     ///< MIDI, -1 none
+        float m_left = 0.0f;   ///< s until it has fallen 22 dB (half the Figure Release it was let go with)
+    };
     std::array<Figure, MaxFigures> m_figs;            ///< the figures
     std::array<FigureHeld, 12>     m_figHeld;         ///< their notes sounding
+    std::array<FigureGone, 16>     m_figGone;         ///< their notes ringing out (figureSounds())
     int                            m_figActive = 0;   ///< how many play (0: none composed)
     float m_figMatch = 1.0f;   ///< the chord's voices' envelopes together (their power's root), followed over seconds
     Rng   m_figRng;            ///< their dice (their own stream)
@@ -1032,6 +1055,20 @@ private:
     std::array<std::atomic<int>, 16> m_figLog;           ///< the last of them, a ring (figureNote())
     std::atomic<int> m_figClash{ 0 };   ///< of them, the ones that rubbed against a conductor's note (figureClashes())
     std::atomic<int> m_figRepeat{ 0 };  ///< of them, the ones that struck the pitch before them again (figureRepeats())
+    std::atomic<int> m_figMoved{ 0 };   ///< notes moved off a pitch a figure still sounded (figureMoved())
+    std::atomic<int> m_figLeft{ 0 };    ///< notes left out because nothing near was free (figureMoved())
+    /**
+     * @brief Whether a figure sounds a pitch: a figure note held, or let go less than half its release before (it is 22
+     *        dB down then), within 25 cents as the tuning plays them now.
+     * @param[in] note  MIDI
+     * @return true when the pitch still sounds
+     */
+    bool figureSounds( int note ) const;
+    /**
+     * @brief Lets a figure's held note go and keeps its pitch as ringing (m_figGone) for half the Figure Release.
+     * @param[in,out] h  the held note; free afterwards
+     */
+    void letFigureGo( FigureHeld &h );
     /**
      * @brief The notes both conductors sound now: the first's, then the second's that are not among them (when it plays).
      * @param[out] notes  receives them, MIDI; room for ClusterBrain::Slots
@@ -1088,14 +1125,34 @@ private:
      *        fits the chord, a step likelier than a leap.
      * @param[in] around     the note before it (the centre for the first)
      * @param[in] avoid      notes whose pitch it must not sound, as the tuning plays them (the one before, a changed
-     *                       note's neighbours; -1 none)
+     *                       note's neighbours, the round's notes that would still ring; -1 none)
      * @param[in] chordTone  only a chord tone will do (a figure's first and last)
      * @param[in] centre     the figure's centre, MIDI
      * @param[in] chord      the chord's notes
      * @param[in] n          how many
      * @return MIDI; -1 when nothing but such a pitch is left
      */
-    int drawFigureNote( int around, const int ( &avoid )[3], bool chordTone, int centre, const int *chord, int n );
+    int drawFigureNote( int around, const int ( &avoid )[FigureAvoid], bool chordTone, int centre, const int *chord,
+                        int n );
+    /**
+     * @brief The figures' pace as they play it: Figure Pace.
+     * @return s from note to note
+     */
+    double figurePace() const;
+    /**
+     * @brief How long a figure's note is held before it is let go: most of a pace, its attack at the least.
+     * @param[in] pace  the pace (figurePace)
+     * @return s
+     */
+    float figureHold( double pace ) const;
+    /**
+     * @brief How long a figure's note is heard after it begins: held (figureHold), then half its release (22 dB down;
+     *        figureSounds) -- a pitch of the round that would still ring when another note of the round begins is
+     *        not composed there.
+     * @param[in] pace  the pace (figurePace)
+     * @return s
+     */
+    double figureRing( double pace ) const;
     /** @} */
 
     // The foundation (Foundation): one voice on the conductor's root in the octave from C2 up (from

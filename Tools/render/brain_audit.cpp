@@ -6,14 +6,17 @@
  *     additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H (0.5)] [--seconds S] [--set key=value]...
  *                         [--seed N] [--dt S] [--param-every K]
  *
- * Prints, per preset, a line `# preset <number> <name>`, a line `A,<attack>,<figure attack>` (seconds, as the
- * preset sets them: what Tools/presets/music_audit.py measures "too short" against), then one line per note
+ * Prints, per preset, a line `# preset <number> <name>`, a line `A,<attack>,<figure attack>,<figure release>` (seconds,
+ * as the preset sets them: what Tools/presets/music_audit.py measures "too short" and "still ringing" against), then
+ * one line per note
  *
  *     E,<seconds>,<source>,<on 1|0>,<note>,<velocity>,<Hz>,<figure>,<step>
  *
  * with the source as Engine::M_NoteTrace numbers it (1 and 2 the conductors, 4 the foundation, 5 a figure), the pitch
  * as the tuning plays it, and for a figure's onset which figure (0 .. 3) and which of its notes in the round (-1
- * otherwise), and one line per change of the conductor's root, `R,<seconds>,<root>`.
+ * otherwise), and one line per change of the conductor's root, `R,<seconds>,<root>`; last, `F,<moved>,<left out>`: the
+ * figure notes moved off a pitch a figure still sounded, and those left out where nothing near was free
+ * (Engine::figureMoved).
  *
  * No audio is rendered and the GPU is never opened: Engine::auditConductor steps the engine's own conductor code with
  * the parameters as a render reads them, seeded as a render seeds them. With the default `--dt` (one GPU block,
@@ -185,8 +188,9 @@ int main( int argc, char **argv )
                 return 2;
             }
         std::printf( "# preset %d %s\n", index, index >= 0 ? preset( index ).m_name : "(defaults)" );
-        std::printf( "A,%.4f,%.4f\n", static_cast<double>( e->param( ParamIdE::ATTACK ) ),
-                     static_cast<double>( e->param( ParamIdE::FIGURE_ATTACK ) ) );
+        std::printf( "A,%.4f,%.4f,%.4f\n", static_cast<double>( e->param( ParamIdE::ATTACK ) ),
+                     static_cast<double>( e->param( ParamIdE::FIGURE_ATTACK ) ),
+                     static_cast<double>( e->param( ParamIdE::FIGURE_RELEASE ) ) );
         e->auditConductor(
             seconds, config, dt, paramEvery,
             []( const Engine::AuditNote &n )
@@ -195,6 +199,9 @@ int main( int argc, char **argv )
                              static_cast<double>( n.m_velocity ), n.m_hz, n.m_figure, n.m_step );
             },
             []( double t, int root ) { std::printf( "R,%.4f,%d\n", t, root ); } );
+        int       left = 0;
+        const int moved = e->figureMoved( left );
+        std::printf( "F,%d,%d\n", moved, left );
     }
     std::fflush( stdout );
     return 0;

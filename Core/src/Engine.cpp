@@ -603,11 +603,14 @@ void Engine::beginPiece( double controlRate )
     m_figRng.seed( static_cast<std::uint64_t>( m_cfg.m_seed ) * 0x9E3779B97F4A7C15ull + 0xF16A5E5ull );
     for ( Figure &f : m_figs ) f = Figure{};
     for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};
+    for ( FigureGone &g : m_figGone ) g = FigureGone{};
     m_figActive = 0;
     m_figMatch = 1.0f;
     m_tickCount.store( 0, std::memory_order_relaxed );
     m_figPlayed.store( 0, std::memory_order_relaxed );
     m_figClash.store( 0, std::memory_order_relaxed );
+    m_figMoved.store( 0, std::memory_order_relaxed );
+    m_figLeft.store( 0, std::memory_order_relaxed );
     for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
     m_stepWas = param( ParamIdE::AUTO_STEP ) >= 0.5f;
 }
@@ -1939,6 +1942,7 @@ void Engine::purge()
     for ( Ghost &g : m_ghosts ) g.m_on = false;
     m_foundationNote = m_floorSubNote = m_floorFifthNote = -1;
     for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};   // the figures begin anew when the instrument wakes
+    for ( FigureGone &g : m_figGone ) g = FigureGone{};
     for ( Figure &f : m_figs ) f.m_count = 0;
     m_figActive = 0;
     // Notes not yet due belong to what was silenced -- unless one was played after the panic and wakes the instrument.
@@ -2048,7 +2052,8 @@ float Engine::figureFit( int note, const int *chord, int n ) const
     return w;
 }
 
-int Engine::drawFigureNote( int around, const int ( &avoid )[3], bool chordTone, int centre, const int *chord, int n )
+int Engine::drawFigureNote( int around, const int ( &avoid )[FigureAvoid], bool chordTone, int centre, const int *chord,
+                            int n )
 {
     // by the size of the step, 0 .. 7 semitones: seconds and thirds, a fourth less, the tritone hardly, a fifth
     static const float Step[8] = { 0.6f, 1.0f, 1.0f, 0.8f, 0.8f, 0.5f, 0.15f, 0.35f };
@@ -2109,6 +2114,21 @@ int Engine::figureCentre( int i ) const
                        33, 99 );
 }
 
+double Engine::figurePace() const
+{
+    return static_cast<double>( m_blk.m_figPace );
+}
+
+float Engine::figureHold( double pace ) const
+{
+    return std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ) + m_blk.m_figAttack;
+}
+
+double Engine::figureRing( double pace ) const
+{
+    return static_cast<double>( figureHold( pace ) ) + 0.5 * static_cast<double>( m_blk.m_figRelease );
+}
+
 void Engine::composeFigure( int i, const int *chord, int n )
 {
     Figure   &f = m_figs[static_cast<size_t>( i )];
@@ -2119,13 +2139,21 @@ void Engine::composeFigure( int i, const int *chord, int n )
     // The first figure is the long one; the others draw their length.
     f.m_count =
         i == 0 ? most : 1 + std::min( most - 1, static_cast<int>( m_figRng.uniform() * static_cast<float>( most ) ) );
-    int   prev = -1;
-    float at = 0.0f;
+    int          prev = -1;
+    float        at = 0.0f;
+    const double pace = figurePace(), ring = figureRing( pace );
     for ( int k = 0; k < f.m_count; ++k )
     {
         const size_t s = static_cast<size_t>( k );
         const bool   edge = k == 0 || k == f.m_count - 1;   // it begins and ends on a chord tone
-        const int avoid[3] = { prev, -1, -1 };
+        // Not the note before, nor a note of the round that would still ring when this one begins (20.11.2026): it
+        // would be that note struck again, not a step -- and played so, it would be moved every round.
+        int avoid[FigureAvoid];
+        std::fill( std::begin( avoid ), std::end( avoid ), -1 );
+        avoid[0] = prev;
+        for ( int j = 0, a = 1; j < k; ++j )
+            if ( static_cast<double>( at - f.m_at[static_cast<size_t>( j )] ) * pace < ring )
+                avoid[a++] = f.m_note[static_cast<size_t>( j )];
         const int note = drawFigureNote( prev < 0 ? centre : prev, avoid, edge, centre, chord, n );
         if ( note < 0 )
         {   // nowhere to go but the note before: the figure ends there
@@ -2147,26 +2175,45 @@ void Engine::composeFigure( int i, const int *chord, int n )
     f.m_next = 0;
 }
 
+bool Engine::figureSounds( int note ) const
+{
+    const double hz = frequencyOf( note );
+    auto         one = [&]( int other )
+    { return other >= 0 && std::fabs( 1200.0 * std::log2( hz / frequencyOf( other ) ) ) < 25.0; };
+    for ( const FigureHeld &h : m_figHeld )
+        if ( one( h.m_note ) ) return true;
+    for ( const FigureGone &g : m_figGone )
+        if ( one( g.m_note ) ) return true;
+    return false;
+}
+
+void Engine::letFigureGo( FigureHeld &h )
+{
+    if ( h.m_note < 0 ) return;
+    stopNote( h.m_note, FigureSource );
+    // Its pitch rings on: the release is five time constants, so half of it has the note 22 dB down -- a tenth of its
+    // amplitude. Until then the same pitch begun again is the same note struck again, not a new one (20.11.2026).
+    FigureGone *g = nullptr;   // a free place, else the one nearest its end
+    for ( FigureGone &o : m_figGone )
+        if ( g == nullptr || ( g->m_note >= 0 && ( o.m_note < 0 || o.m_left < g->m_left ) ) ) g = &o;
+    g->m_note = h.m_note;
+    g->m_left = 0.5f * m_blk.m_figRelease;
+    h.m_note = -1;
+}
+
 void Engine::stepFigures( double dt )
 {
-    // What has sounded its length is let go (its release rings on).
+    // What has rung out of hearing is forgotten; what has sounded its length is let go (its release rings on).
+    for ( FigureGone &g : m_figGone )
+        if ( g.m_note >= 0 && ( g.m_left -= static_cast<float>( dt ) ) <= 0.0f ) g.m_note = -1;
     for ( FigureHeld &h : m_figHeld )
-        if ( h.m_note >= 0 && ( h.m_left -= static_cast<float>( dt ) ) <= 0.0f )
-        {
-            stopNote( h.m_note, FigureSource );
-            h.m_note = -1;
-        }
+        if ( h.m_note >= 0 && ( h.m_left -= static_cast<float>( dt ) ) <= 0.0f ) letFigureGo( h );
     const int want = m_bp.m_on ? m_blk.m_figures : 0;   // the conductor's: they rest when it does
     if ( want <= 0 )
     {
         if ( m_figActive > 0 )
         {   // switched off: what sounds is let go, and they are composed anew the next time
-            for ( FigureHeld &h : m_figHeld )
-                if ( h.m_note >= 0 )
-                {
-                    stopNote( h.m_note, FigureSource );
-                    h.m_note = -1;
-                }
+            for ( FigureHeld &h : m_figHeld ) letFigureGo( h );
             for ( Figure &f : m_figs ) f.m_count = 0;
             m_figActive = 0;
         }
@@ -2181,7 +2228,7 @@ void Engine::stepFigures( double dt )
     // The loops' lengths against the first's: in no simple ratio (the fourth root of two, three less the golden
     // ratio, the golden ratio), so the figures never meet the same way twice.
     static const double Ratio[MaxFigures] = { 1.0, 1.1892071, 1.3819660, 1.6180340 };
-    const double        every = m_blk.m_figEvery, pace = m_blk.m_figPace;
+    const double        every = m_blk.m_figEvery, pace = figurePace();
     for ( int i = 0; i < MaxFigures; ++i )
     {
         Figure &f = m_figs[static_cast<size_t>( i )];
@@ -2242,6 +2289,34 @@ void Engine::stepFigures( double dt )
                         }
                 f.m_note[k] = note = best;
             }
+            // Never a pitch a figure still sounds (20.11.2026): held, or let go so lately that it rings on (half its
+            // release) -- another figure's note, or one of this figure's own, of this round or the one before. Struck
+            // there, it would be the same note again, not a step. It goes to the nearest note that fits the chord and is free (a chord tone
+            // first) for this time only -- the figure as composed stays -- and is left out where none is.
+            if ( figureSounds( note ) )
+            {
+                int free = -1;
+                for ( int pass = 0; pass < 2 && free < 0; ++pass )
+                    for ( int d : { -1, 1, -2, 2, -3, 3 } )
+                    {
+                        const int c = note + d;
+                        if ( figureFit( c, chord, n ) >= ( pass == 0 ? 3.0f : 0.5f ) && !twin( c ) &&
+                             !figureSounds( c ) &&
+                             !( f.m_lastHz > 0.0 &&
+                                std::fabs( 1200.0 * std::log2( frequencyOf( c ) / f.m_lastHz ) ) < 25.0 ) )
+                        {
+                            free = c;
+                            break;
+                        }
+                    }
+                if ( free < 0 )
+                {
+                    m_figLeft.fetch_add( 1, std::memory_order_relaxed );
+                    continue;
+                }
+                m_figMoved.fetch_add( 1, std::memory_order_relaxed );
+                note = free;
+            }
             // Never the pitch this round has just sounded: a note struck again under a pad's attack is no step. (Left
             // out rather than moved: the figure as composed stays, and comes round whole once the chord lets it.)
             if ( f.m_lastHz > 0.0 && std::fabs( 1200.0 * std::log2( frequencyOf( note ) / f.m_lastHz ) ) < 25.0 )
@@ -2272,9 +2347,9 @@ void Engine::stepFigures( double dt )
                 }
                 if ( h.m_left < slot->m_left ) slot = &h;
             }
-            if ( slot->m_note >= 0 ) stopNote( slot->m_note, FigureSource );
+            letFigureGo( *slot );
             slot->m_note = note;
-            slot->m_left = std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ) + m_blk.m_figAttack;
+            slot->m_left = figureHold( pace );
             {   // struck again: the pitch the note before it in this round sounded (the selftest's count)
                 const double hz = frequencyOf( note );
                 if ( f.m_lastHz > 0.0 && std::fabs( 1200.0 * std::log2( hz / f.m_lastHz ) ) < 25.0 )
@@ -2312,8 +2387,19 @@ void Engine::stepFigures( double dt )
                 const size_t s = static_cast<size_t>( k );
                 const int    centre = figureCentre( i );
                 const int    around = k > 0 ? f.m_note[s - 1] : f.m_count > 1 ? f.m_note[1] : centre;
-                // not the note it was, nor either neighbour's pitch (19.11.2026; it was only the note it was)
-                const int avoid[3] = { f.m_note[s], k > 0 ? f.m_note[s - 1] : -1, k + 1 < f.m_count ? f.m_note[s + 1] : -1 };
+                // not the note it was, nor either neighbour's pitch (19.11.2026; it was only the note it was), nor a
+                // note of the round that rings when it begins or still sounds when it rings (20.11.2026)
+                int avoid[FigureAvoid];
+                std::fill( std::begin( avoid ), std::end( avoid ), -1 );
+                avoid[0] = f.m_note[s];
+                int a = 1;
+                if ( k > 0 ) avoid[a++] = f.m_note[s - 1];
+                if ( k + 1 < f.m_count ) avoid[a++] = f.m_note[s + 1];
+                const double ring = figureRing( pace );
+                for ( int j = 0; j < f.m_count && a < FigureAvoid; ++j )
+                    if ( j != k && std::abs( j - k ) > 1 &&
+                         std::fabs( static_cast<double>( f.m_at[s] - f.m_at[static_cast<size_t>( j )] ) ) * pace < ring )
+                        avoid[a++] = f.m_note[static_cast<size_t>( j )];
                 const int note = drawFigureNote( around, avoid, k == 0 || k == f.m_count - 1, centre, chord, n );
                 if ( note >= 0 ) f.m_note[s] = note;
             }

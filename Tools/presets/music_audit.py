@@ -34,11 +34,17 @@ and of the figures (source 5):
   figure_repeat_in_round      onsets within 25 cents of the pitch of the note before them in the same round of the
                               same figure (what Engine::figureRepeats() counts)
   figure_same_as_previous     onsets within 25 cents of the pitch of the previous figure onset of any figure (the
-                              rendered survey of 20.11.2026: 121 of 1162)
-  figure_rub                  onsets a semitone, a major seventh or a tritone (in any octave, 25..150 or 550..600
+                              rendered survey of 20.11.2026: 121 of 1162) -- however long ago that was
+  figure_restrike             onsets within 25 cents of a figure note still sounding: held, or let go less than half
+                              the preset's figure_release before (it is 22 dB down then) -- the same note struck again
+                              (what Engine::figureSounds() forbids since 20.11.2026)
+  figure_rub                 onsets a semitone, a major seventh or a tritone (in any octave, 25..150 or 550..600
                               cents folded, as Engine::rubs) from a sounding conductor note, and not themselves a
                               chord tone (within 25 cents of one)
   figure_shorter_than_attack  figure notes held for less than twice the preset's figure_attack
+
+and, as the engine counts them (the audit's F line, no band): figure_moved, the figure notes moved off a pitch a
+figure still sounded to the nearest free note that fits the chord, and figure_left, those left out where none was.
 
 What the audit cannot see (see Engine::auditConductor): Follow Light over a living field (no preset of the
 bank uses Follow Light), Night Arc (the real night pushes the conductor's rate and density; the audit has no
@@ -99,10 +105,11 @@ SCALES = ["12-TET", "JI Major", "JI Minor", "JI 7-limit", "Pythagorean", "JI Pen
           "Subharmonic 16-8", "Slendro", "Bohlen-Pierce", "Otonality 1-11", "User", "Timbre"]
 COLUMNS = ["name", "group", "mode", "scale", "attack", "fig_attack", "brain2", "ons", "notes", "restrike",
            "doubling", "short", "self_unison", "own_rub", "cross_rub", "changes_per_hour", "silence_s", "one_note",
-           "figure_ons", "figure_repeat_in_round", "figure_same_as_previous", "figure_rub",
+           "figure_ons", "figure_repeat_in_round", "figure_same_as_previous", "figure_restrike", "figure_rub",
            "figure_shorter_than_attack", "sound_s", "both_s"]
 FAULTS = ["restrike", "doubling", "short", "self_unison", "own_rub", "cross_rub", "silence_s",
-          "figure_repeat_in_round", "figure_same_as_previous", "figure_rub", "figure_shorter_than_attack"]
+          "figure_repeat_in_round", "figure_same_as_previous", "figure_restrike", "figure_rub",
+          "figure_shorter_than_attack"]
 
 
 def load_bank():
@@ -115,7 +122,8 @@ def load_bank():
         bank[name] = {"group": make_presets.GROUPS[g],
                       "mode": "Chords" if int(float(p.get("auto_mode", 1))) == 1 else "Free",
                       "scale": SCALES[int(float(p.get("scale", 3)))],
-                      "brain2": 1 if float(p.get("brain2_on", 0)) >= 0.5 else 0}
+                      "brain2": 1 if float(p.get("brain2_on", 0)) >= 0.5 else 0,
+                      "fig_release": float(p.get("figure_release", 5.0))}
     return bank
 
 
@@ -153,8 +161,8 @@ def cross_rubs(a, b):
     return False
 
 
-def measure(name, facts, attack, fig_attack, lines, hours):
-    """One preset's row from its E lines."""
+def measure(name, facts, attack, fig_attack, lines, hours, fig_release=5.0, tick=0.0):
+    """One preset's row from its E lines (tick: the audit's step, s -- how exactly a ring's end can be told)."""
     end = hours * 3600.0
     held = {1: {}, 2: {}}      # conductor -> MIDI note -> (on time, cents)
     offat = {1: [], 2: []}     # conductor -> [(off time, cents)] of the last REST_S seconds
@@ -170,7 +178,8 @@ def measure(name, facts, attack, fig_attack, lines, hours):
     fig_on = {}                # note -> [on times] of figure notes sounding
     fig_last = {}              # figure -> (step, cents) of its last onset
     fig_prev = None            # cents of the last figure onset of any figure
-    f_ons = f_round = f_prev = f_rub = f_short = 0
+    f_ons = f_round = f_prev = f_rub = f_short = f_restrike = 0
+    fig_ring = []              # (until, cents) of the figure notes let go and still ringing (half the release)
 
     def advance(t):
         nonlocal both, cross, silence
@@ -216,15 +225,21 @@ def measure(name, facts, attack, fig_attack, lines, hours):
                 if fig_prev is not None and one_pitch(c, fig_prev):
                     f_prev += 1
                 fig_prev = c
+                fig_ring = [x for x in fig_ring if x[0] > t + tick]
+                if any(one_pitch(c, x[1]) for v in fig_on.values() for x in v) or any(
+                        one_pitch(c, x[1]) for x in fig_ring):
+                    f_restrike += 1
                 chord = [x[1] for x in held[1].values()] + [x[1] for x in held[2].values()]
                 tone = any(folded(c - x) <= SAME_C for x in chord)
                 rub = any(25.0 < folded(c - x) < 150.0 or folded(c - x) > 550.0 for x in chord)
                 if rub and not tone:
                     f_rub += 1
-                fig_on.setdefault(note, []).append(t)
+                fig_on.setdefault(note, []).append((t, c))
             elif fig_on.get(note):
-                if t - fig_on[note].pop(0) < 2.0 * fig_attack:
+                on_t, oc = fig_on[note].pop(0)
+                if t - on_t < 2.0 * fig_attack:
                     f_short += 1
+                fig_ring.append((t + 0.5 * fig_release, oc))
             continue
         if w not in (1, 2):
             continue
@@ -263,7 +278,7 @@ def measure(name, facts, attack, fig_attack, lines, hours):
             "cross_rub": cross / both if both > 0 else 0.0,
             "changes_per_hour": ons / hours, "silence_s": silence, "one_note": one,
             "figure_ons": f_ons, "figure_repeat_in_round": f_round, "figure_same_as_previous": f_prev,
-            "figure_rub": f_rub, "figure_shorter_than_attack": f_short,
+            "figure_restrike": f_restrike, "figure_rub": f_rub, "figure_shorter_than_attack": f_short,
             "sound_s": snd, "both_s": both, "own_s": own[1] + own[2], "cross_s": cross}
 
 
@@ -285,21 +300,30 @@ def run_chunk(exe, names, bank, hours, dt, every):
         os.remove(path)
     if r.returncode != 0:
         raise RuntimeError("additiv_brain_audit failed (%d): %s" % (r.returncode, r.stderr.strip()[:400]))
-    rows, cur, attack, fig_attack, lines = [], None, 6.0, 0.08, []
+    rows, cur, attack, fig_attack, fig_release, lines = [], None, 6.0, 0.08, 5.0, []
+    moved = {}                 # preset -> (figure notes moved off a pitch still sounding, left out): the F line
     for line in r.stdout.splitlines() + ["# preset -2 <end>"]:
         if line.startswith("# preset "):
             if cur is not None:
-                rows.append(measure(cur, bank[cur], attack, fig_attack, lines, hours))
+                rows.append(measure(cur, bank[cur], attack, fig_attack, lines, hours, fig_release, dt))
             cur, lines = line[len("# preset "):].split(" ", 1)[1], []
             if cur == "<end>":
                 break
+            fig_release = bank[cur].get("fig_release", 5.0)   # an audit binary from before 20.11.2026 does not say
+        elif line.startswith("F,") and cur is not None:
+            f = line.split(",")
+            moved[cur] = (int(f[1]), int(f[2]))
         elif line.startswith("A,"):
-            _, a, fa = line.split(",")
-            attack, fig_attack = float(a), float(fa)
+            f = line.split(",")   # A,attack,figure attack[,figure release] (the release since 20.11.2026)
+            attack, fig_attack = float(f[1]), float(f[2])
+            if len(f) > 3:
+                fig_release = float(f[3])
         else:
             lines.append(line)
     if len(rows) != len(names):
         raise RuntimeError("expected %d presets from additiv_brain_audit, got %d" % (len(names), len(rows)))
+    for r in rows:
+        r["figure_moved"], r["figure_left"] = moved.get(r["name"], (0, 0))
     return rows
 
 
@@ -327,8 +351,9 @@ def totals(rows):
     both = sum(r["both_s"] for r in rows)
     t = {"presets": len(rows)}
     for k in ("ons", "notes", "restrike", "doubling", "short", "self_unison", "one_note", "figure_ons",
-              "figure_repeat_in_round", "figure_same_as_previous", "figure_rub", "figure_shorter_than_attack"):
-        t[k] = sum(r[k] for r in rows)
+              "figure_repeat_in_round", "figure_same_as_previous", "figure_restrike", "figure_rub",
+              "figure_shorter_than_attack", "figure_moved", "figure_left"):
+        t[k] = sum(r.get(k, 0) for r in rows)
     t["own_rub"] = sum(r["own_s"] for r in rows) / snd if snd else 0.0
     t["cross_rub"] = sum(r["cross_s"] for r in rows) / both if both else 0.0
     t["changes_per_hour"] = sum(r["changes_per_hour"] for r in rows) / max(1, len(rows))
@@ -350,11 +375,11 @@ def line_of(t):
     """The totals of a group of presets on one line."""
     ons, fo = max(1, t["ons"]), max(1, t["figure_ons"])
     return ("%5d presets  %7d onsets  own_rub %.2f %%  cross_rub %.2f %%  doubling %d  restrike %d  short %d  "
-            "self_unison %d  %.1f/h  one_note %d  | figures %d: in round %d, same as previous %d (%.1f %%), rub %d, "
-            "short %d" % (t["presets"], t["ons"], 100 * t["own_rub"], 100 * t["cross_rub"], t["doubling"],
+            "self_unison %d  %.1f/h  one_note %d  | figures %d: in round %d, same as previous %d (%.1f %%), "
+            "restrike %d, rub %d, short %d" % (t["presets"], t["ons"], 100 * t["own_rub"], 100 * t["cross_rub"], t["doubling"],
                           t["restrike"], t["short"], t["self_unison"], t["changes_per_hour"], t["one_note"],
                           t["figure_ons"], t["figure_repeat_in_round"], t["figure_same_as_previous"],
-                          100.0 * t["figure_same_as_previous"] / fo, t["figure_rub"],
+                          100.0 * t["figure_same_as_previous"] / fo, t["figure_restrike"], t["figure_rub"],
                           t["figure_shorter_than_attack"])) if ons else ""
 
 
@@ -373,12 +398,15 @@ def summary(rows, worst=10):
     print("  changes    %8.1f onsets per hour, on average" % t["changes_per_hour"])
     print("  silence    %8.0f s in all, %.1f s per preset" % (t["silence_s"], t["silence_s"] / max(1, t["presets"])))
     print("  one_note   %6d conductors on a single pitch; %d presets without a note" % (t["one_note"], t["mute"]))
-    print("  figures    %6d onsets: repeat in round %d (%.2f %%), same as previous %d (%.2f %%), rub %d (%.2f %%), "
-          "shorter than twice their attack %d (%.2f %%)" % (
+    print("  figures    %6d onsets: repeat in round %d (%.2f %%), same as previous %d (%.2f %%), on a pitch still "
+          "sounding %d (%.2f %%), rub %d (%.2f %%), shorter than twice their attack %d (%.2f %%)" % (
               t["figure_ons"], t["figure_repeat_in_round"], 100.0 * t["figure_repeat_in_round"] / fo,
-              t["figure_same_as_previous"], 100.0 * t["figure_same_as_previous"] / fo, t["figure_rub"],
+              t["figure_same_as_previous"], 100.0 * t["figure_same_as_previous"] / fo, t["figure_restrike"],
+              100.0 * t["figure_restrike"] / fo, t["figure_rub"],
               100.0 * t["figure_rub"] / fo, t["figure_shorter_than_attack"],
               100.0 * t["figure_shorter_than_attack"] / fo))
+    print("             moved off a pitch still sounding %d, left out (nothing near was free) %d" % (
+        t["figure_moved"], t["figure_left"]))
     for key in ("mode", "scale"):
         print("by %s:" % key)
         for v in sorted({r[key] for r in rows}):
@@ -414,6 +442,7 @@ def bands_for(t):
             "mute": fault(t["mute"], 1, 1.0),
             "figure_repeat_in_round": fault(t["figure_repeat_in_round"], 15, 2.0),
             "figure_same_as_previous": fault(t["figure_same_as_previous"], 50, 1.3),
+            "figure_restrike": fault(t["figure_restrike"], 15, 2.0),
             "figure_rub": fault(t["figure_rub"], 30, 1.5),
             "figure_shorter_than_attack": fault(t["figure_shorter_than_attack"], 50, 1.3)}
 
@@ -483,7 +512,8 @@ def main():
                            "move 15 % either way: a change of pace is not a fault. Faults have no lower bound (fewer "
                            "is better: write the file again to tighten) and an upper one at twice the count or share "
                            "plus a small floor (restrike, doubling and figure_repeat_in_round +15, short x1.3 or "
-                           "+40, self_unison, figure_same_as_previous and figure_shorter_than_attack x1.3 or +50, "
+                           "+40, self_unison, figure_same_as_previous and figure_shorter_than_attack x1.3 or +50, figure_restrike "
+                           "x2 or +15, "
                            "figure_rub x1.5 or +30, own_rub +0.3 points, cross_rub x1.5 or +1 point, silence x1.5 "
                            "or +30 min, one_note +2, mute +1).",
                            "It bites: with ClusterBrain::againstOther switched off (20.11.2026) the check failed; "

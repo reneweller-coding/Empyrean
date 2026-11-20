@@ -5992,6 +5992,86 @@ int main( int argc, char **argv )
                     worstStep, whole, same ? "yes" : "NO", differ ? "yes" : "NO", withBonus, without, banned ) );
     }
 
+    // 123. A figure never strikes a pitch still sounding (20.11.2026, plan B3). Rene: "Beim Dirigenten kommt es oftmals
+    //      vor, dass dieselbe Note mehrfach (oft kurz) angeschlagen wird." What was left of it were the figures: 6.4 %
+    //      of their notes in the bank had the pitch of the figure note before them -- of another figure, or the same
+    //      one's next round. A figure note sounds while it is held and rings out over its Figure Release (five time
+    //      constants); half the release has it 22 dB down, a tenth of its amplitude, and until then the same pitch
+    //      again is the same note struck again. Four figures on short loops in two tunings whose keys snap, and the
+    //      five presets of the music audit's sample that struck most onto a pitch another figure held, on the audit's
+    //      clock (no card): no figure note begins within 25 cents of a figure note held, or let go less than half its
+    //      release before. Before: 6057 of 17848.
+    if ( wanted( 123, "A figure never strikes a pitch still sounding (20.11.2026)" ) )
+    {
+        static const char *const Worst[] = { "Velvet-Hung Boudoir", "Spectral Bell", "Thin Spire", "Periodic Tide",
+                                             "Outbound Horizon Light" };
+        int ons = 0, again = 0;
+        for ( int setup = 0; setup < 9; ++setup )
+        {
+            auto         e = std::make_unique<Engine>();
+            EngineConfig c;
+            double       seconds = 900.0;
+            if ( setup < 4 )
+            {
+                e->setParam( ParamIdE::SCALE, setup < 2 ? 6.0f : 3.0f );   // Harmonic 8-16, JI 7-limit
+                e->setParam( ParamIdE::ROOT_NOTE, setup % 2 ? 10.0f : 2.0f );
+                e->setParam( ParamIdE::AUTO_MODE, 1.0f );
+                e->setParam( ParamIdE::AUTO_RATE, 15.0f );   // the chord moves
+                e->setParam( ParamIdE::FIGURES, 4.0f );
+                e->setParam( ParamIdE::FIGURE_EVERY, 5.0f );   // short rounds: a loop's notes still ring when it comes
+                e->setParam( ParamIdE::FIGURE_NOTES, 5.0f );   // round again
+                e->setParam( ParamIdE::FIGURE_PACE, 0.7f );
+                e->setParam( ParamIdE::FIGURE_ATTACK, 0.2f );
+                e->setParam( ParamIdE::FIGURE_RELEASE, 6.0f );
+                e->setParam( ParamIdE::FIGURE_CHANGE, 0.4f );
+                c.m_seed = static_cast<std::uint64_t>( 1230 + setup );
+            }
+            else
+            {
+                const int index = findPreset( Worst[setup - 4] );
+                if ( index < 0 ) continue;
+                e->loadPreset( index );
+                seconds = 3600.0;
+            }
+            const double ring = 0.5 * static_cast<double>( e->param( ParamIdE::FIGURE_RELEASE ) ),
+                         block = c.m_gpuBlock / c.m_sampleRate;
+            std::vector<std::pair<int, double>>    held;   // (key, Hz) of the figure notes held
+            std::vector<std::pair<double, double>> gone;   // (when it is 22 dB down, Hz) of those let go
+            e->auditConductor(
+                seconds, c, c.m_gpuBlock / c.m_sampleRate, 1,
+                [&]( const Engine::AuditNote &n )
+                {
+                    if ( n.m_source != 5 ) return;
+                    if ( !n.m_on )
+                    {
+                        for ( size_t i = 0; i < held.size(); ++i )
+                            if ( held[i].first == n.m_note )
+                            {
+                                gone.emplace_back( n.m_seconds + ring, held[i].second );
+                                held.erase( held.begin() + static_cast<std::ptrdiff_t>( i ) );
+                                break;
+                            }
+                        return;
+                    }
+                    ++ons;
+                    std::erase_if( gone, [&]( const std::pair<double, double> &g )
+                                   { return g.first <= n.m_seconds + block; } );   // (to the block)
+                    bool same = false;
+                    for ( const auto &h : held )
+                        same = same || std::fabs( 1200.0 * std::log2( n.m_hz / h.second ) ) < 25.0;
+                    for ( const auto &g : gone )
+                        same = same || std::fabs( 1200.0 * std::log2( n.m_hz / g.second ) ) < 25.0;
+                    again += same ? 1 : 0;
+                    held.emplace_back( n.m_note, n.m_hz );
+                },
+                {} );
+        }
+        check( ons > 5000 && again == 0, "figures: no note strikes a pitch a figure still sounds",
+               fmt( "%d figure notes; %d within 25 cents of a figure note held or let go less than half its release "
+                    "before",
+                    ons, again ) );
+    }
+
     finishTest();
     if ( g_sel.m_list ) return 0;
     for ( size_t r = 0; r < g_sel.m_only.size(); ++r )

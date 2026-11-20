@@ -2,7 +2,7 @@
  "_about": [
   "Golden totals of Tools/presets/music_audit.py, checked by the ctest music_audit.",
   "Written by: python Tools/presets/music_audit.py --update (2026-11-20). The sample is 200 presets with a conductor drawn with random.Random(2011) from the sorted bank; their names are stored, so the check runs the same presets until this file is written again. Each is audited for 1 h, stepped as a render steps (one GPU block); a knob the matrix moves and the notes hear is read every 8 blocks.",
-  "Bands: the conductors and the figures are deterministic per preset, so the totals come back exactly on the same code. Activity (ons, notes, changes_per_hour, figure_ons) may move 15 % either way: a change of pace is not a fault. Faults have no lower bound (fewer is better: write the file again to tighten) and an upper one at twice the count or share plus a small floor (restrike, doubling and figure_repeat_in_round +15, short x1.3 or +40, self_unison, figure_same_as_previous and figure_shorter_than_attack x1.3 or +50, figure_rub x1.5 or +30, own_rub +0.3 points, cross_rub x1.5 or +1 point, silence x1.5 or +30 min, one_note +2, mute +1).",
+  "Bands: the conductors and the figures are deterministic per preset, so the totals come back exactly on the same code. Activity (ons, notes, changes_per_hour, figure_ons) may move 15 % either way: a change of pace is not a fault. Faults have no lower bound (fewer is better: write the file again to tighten) and an upper one at twice the count or share plus a small floor (restrike, doubling and figure_repeat_in_round +15, short x1.3 or +40, self_unison, figure_same_as_previous and figure_shorter_than_attack x1.3 or +50, figure_restrike x2 or +15, figure_rub x1.5 or +30, own_rub +0.3 points, cross_rub x1.5 or +1 point, silence x1.5 or +30 min, one_note +2, mute +1).",
   "It bites: with ClusterBrain::againstOther switched off (20.11.2026) the check failed; the numbers are in the commit that wrote this file."
  ],
  "hours": 1.0,
@@ -220,11 +220,14 @@
   "short": 22,
   "self_unison": 5,
   "one_note": 0,
-  "figure_ons": 104658,
+  "figure_ons": 102931,
   "figure_repeat_in_round": 0,
-  "figure_same_as_previous": 6058,
-  "figure_rub": 97,
-  "figure_shorter_than_attack": 2774,
+  "figure_same_as_previous": 2197,
+  "figure_restrike": 0,
+  "figure_rub": 88,
+  "figure_shorter_than_attack": 2788,
+  "figure_moved": 8343,
+  "figure_left": 896,
   "own_rub": 0.0006923345589726916,
   "cross_rub": 0.0,
   "changes_per_hour": 90.065,
@@ -245,8 +248,8 @@
    103.5747
   ],
   "figure_ons": [
-   88959.3,
-   120356.7
+   87491.35,
+   118370.65
   ],
   "restrike": [
    0,
@@ -290,15 +293,19 @@
   ],
   "figure_same_as_previous": [
    0,
-   7875.4
+   2856.1
+  ],
+  "figure_restrike": [
+   0,
+   15
   ],
   "figure_rub": [
    0,
-   145.5
+   132.0
   ],
   "figure_shorter_than_attack": [
    0,
-   3606.2
+   3624.4
   ]
  }
 }
