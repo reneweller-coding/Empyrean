@@ -377,6 +377,37 @@ public:
     void setFavorite( const juce::String &name, bool on );
     /** @brief The player's favourites (the night director prefers them). @return their names */
     juce::StringArray favoriteNames() const;
+    /**
+     * @brief Whether the player never wants a preset again (20.11.2026): the night director does not take it, the
+     *        header's arrows step over it, a journey passes over its step; the browser shows it dimmed.
+     * @param[in] name  its name
+     * @return true then
+     */
+    bool neverAgain( const juce::String &name ) const;
+    /**
+     * @brief Marks or unmarks a preset as never again, and writes the list (neverAgainFile) at once; a journey that
+     *        plays passes over it from its next step.
+     * @param[in] name  its name
+     * @param[in] on    marked
+     */
+    void setNeverAgain( const juce::String &name, bool on );
+    /** @brief The presets the player never wants again. @return their names, in the order they were marked */
+    juce::StringArray neverAgainNames() const;
+    /**
+     * @brief Where the "never again" list is kept: never_again.txt beside the player's settings (player.settings, where
+     *        the favourites are), one name a line (NameList.h). Read when first asked for, written only when changed.
+     *        ADDITIV_NEVER_AGAIN_FILE names another (the manual's screenshots, so the player's list stays as it is).
+     * @return the file
+     */
+    juce::File neverAgainFile() const;
+    /**
+     * @brief The preset @p step bank places from @p from that the player has not marked never again (the header's
+     *        arrows); @p from + @p step itself when every preset is marked.
+     * @param[in] from  the bank's index to step from (-1: before the first)
+     * @param[in] step  +1 or -1
+     * @return the bank's index
+     */
+    int stepPreset( int from, int step ) const;
     /** @brief The presets chosen lately, the newest first (at most 40). @return their names */
     juce::StringArray recentPresets() const;
     /** @brief The player's own settings (favourites, recent, the night mode, the tour), in their application data. @return them */
@@ -778,7 +809,9 @@ private:
     std::vector<UserPreset> m_userPresets;   ///< the player's presets (refreshUserPresets)
     std::vector<Snapshot>   m_snapshots;     ///< the snapshots, the oldest first
     std::unique_ptr<juce::PropertiesFile> m_userSettings;   ///< favourites, recent, night mode, the tour (userSettings)
-    std::vector<float>                    m_browseFrom;     ///< the knobs before a preset was listened to
+    mutable std::vector<std::string>      m_neverAgain;     ///< the presets never wanted again (neverAgain)
+    mutable bool                          m_neverRead = false;         ///< m_neverAgain has been read from its file
+    std::vector<float>                    m_browseFrom;                ///< the knobs before a preset was listened to
     std::string                           m_browseFromMod;             ///< and the matrix
     bool                                  m_browsing = false;          ///< a preset is being listened to
     int                                   m_variationGeneration = 0;   ///< variationGeneration()

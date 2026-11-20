@@ -189,6 +189,17 @@
   (no group more than 7 % fewer). The conductors play exactly as before. 1160 presets play their figures at a slower
   pace than Figure Pace says (343 of them had let notes go early). The loudest moment of 40 presets with figures, as
   played: median 0.0 dB, at most -2.4 dB -- the bank's levels stand.
+- **Never again** (20.11.2026). The browser had favourites; now it has their counterpart. Beside a row's star, a ring
+  with a bar through it marks a preset never again: the arrows in the header step past it, the night director never
+  takes it into a night (on the Journey page and Empyrean Journeys' three nights), and a journey passes over a step
+  that names it -- it glides from the step before into the one after, without a cut (a journey all of whose presets are
+  marked plays as written). The preset stays in the browser, dimmed, so it is still found by its name and taken when
+  chosen; the category Never again lists them all, and a second click takes one back. The list is a plain text file
+  beside the player's settings (never_again.txt next to player.settings, where the favourites are, one name a line),
+  read when first needed, written at once and whole when it changes, never when the instrument starts; a missing or
+  garbled file is an empty list or the names in it. A self-test (125) writes and reads it back, feeds it a garbled
+  one, and checks that a night of eight hours takes none of 28 names from it and that a journey of eight steps with
+  three of them marked -- once through, in circles, marked while it runs -- never plays them.
 
 ## 1.0.0 (17.10.2026)
 

@@ -14,6 +14,7 @@
 #include "additiv/Motion.h"
 #include "additiv/Find.h"
 #include "additiv/Focus.h"
+#include "additiv/NameList.h"
 #include "additiv/Presets.h"
 #include "additiv/Sun.h"
 
@@ -485,6 +486,60 @@ void AdditivProcessor::setFavorite( const juce::String &name, bool on )
     if ( on ) f.add( name );
     userSettings().setValue( "favorites", f.joinIntoString( "\n" ) );
     userSettings().saveIfNeeded();
+}
+
+juce::File AdditivProcessor::neverAgainFile() const
+{
+    // ADDITIV_NEVER_AGAIN_FILE: another list (the manual's screenshot of the browser), so the player's is not touched
+    const juce::String other = juce::SystemStats::getEnvironmentVariable( "ADDITIV_NEVER_AGAIN_FILE", {} );
+    if ( other.isNotEmpty() ) return juce::File( other );
+    auto *self = const_cast<AdditivProcessor *>( this );   // the settings file's place (it is not read for that)
+    return self->userSettings().getFile().getSiblingFile( "never_again.txt" );
+}
+
+bool AdditivProcessor::neverAgain( const juce::String &name ) const
+{
+    if ( !m_neverRead )
+    {   // read once, when first asked; nothing is written until the player changes the list
+        m_neverAgain = additiv::readNameList( neverAgainFile().getFullPathName().toStdString() );
+        m_neverRead = true;
+    }
+    return std::find( m_neverAgain.begin(), m_neverAgain.end(), name.toStdString() ) != m_neverAgain.end();
+}
+
+juce::StringArray AdditivProcessor::neverAgainNames() const
+{
+    (void)neverAgain( {} );   // read
+    juce::StringArray out;
+    for ( const std::string &n : m_neverAgain ) out.add( juce::String::fromUTF8( n.c_str() ) );
+    return out;
+}
+
+void AdditivProcessor::setNeverAgain( const juce::String &name, bool on )
+{
+    if ( name.isEmpty() || neverAgain( name ) == on ) return;
+    const std::string n = name.toStdString();
+    if ( on )
+        m_neverAgain.push_back( n );
+    else
+        m_neverAgain.erase( std::remove( m_neverAgain.begin(), m_neverAgain.end(), n ), m_neverAgain.end() );
+    if ( !additiv::writeNameList( neverAgainFile().getFullPathName().toStdString(), m_neverAgain ) )
+        juce::Logger::writeToLog( "never again: could not write " + neverAgainFile().getFullPathName() );
+    m_journeyPlayer.setSkip( m_neverAgain );   // a journey that plays passes over it from its next step
+}
+
+int AdditivProcessor::stepPreset( int from, int step ) const
+{
+    const int n = additiv::numPresets();
+    if ( n <= 0 ) return 0;
+    const int start = from < 0 && step < 0 ? 0 : from;   // before the first: forward to it, back to the last
+    int       i = start;
+    for ( int tries = 0; tries < n; ++tries )
+    {
+        i = ( ( i + step ) % n + n ) % n;
+        if ( !neverAgain( additiv::preset( i ).m_name ) ) return i;
+    }
+    return ( ( start + step ) % n + n ) % n;   // every preset marked: the arrows step as they did
 }
 
 juce::StringArray AdditivProcessor::recentPresets() const
@@ -1207,7 +1262,10 @@ bool AdditivProcessor::startJourney( const JourneyEntry &entry )
     // journey that loads presets under either would seem to do nothing (Noctuary's lesson), so both let go.
     setValue( static_cast<int>( ParamIdE::MORPH_ACTIVE ), 0.0f );
     leaveMap( false );
-    // Seeded from the clock: the same journey runs differently every night.
+    // Seeded from the clock: the same journey runs differently every night. A step the player never wants again is
+    // passed over (20.11.2026): the journey glides from the step before into the one after.
+    (void)neverAgain( {} );   // read
+    m_journeyPlayer.setSkip( m_neverAgain );
     m_journeyPlayer.start( m_journey, static_cast<std::uint64_t>( juce::Time::currentTimeMillis() ) | 1ull, 0 );
     m_journeyLastTick = 0.0;
     journeyTick();   // the first step begins now

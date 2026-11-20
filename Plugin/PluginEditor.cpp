@@ -231,13 +231,13 @@ AdditivEditor::AdditivEditor( AdditivProcessor &proc ) : juce::AudioProcessorEdi
         endStep();
     };
     for ( auto *b : { &m_prevPreset, &m_presetName, &m_nextPreset } ) addAndMakeVisible( b );
-    m_prevPreset.setTooltip( "The preset before" );
-    m_nextPreset.setTooltip( "The preset after" );
+    m_prevPreset.setTooltip( "The preset before (passing over those marked never again)" );
+    m_nextPreset.setTooltip( "The preset after (passing over those marked never again)" );
     m_presetName.setTooltip(
         "The preset playing: click to browse the bank (256 groups of 64: the sounds, the living systems, the sleep concerts, the visions, the swarms and currents, the halls and orbits)" );
-    m_prevPreset.onClick = [this]
-    { loadPreset( ( std::max( m_proc.currentPreset(), 0 ) + additiv::numPresets() - 1 ) % additiv::numPresets() ); };
-    m_nextPreset.onClick = [this] { loadPreset( ( m_proc.currentPreset() + 1 ) % additiv::numPresets() ); };
+    // Through the bank, past the presets the player never wants again (20.11.2026).
+    m_prevPreset.onClick = [this] { loadPreset( m_proc.stepPreset( m_proc.currentPreset(), -1 ) ); };
+    m_nextPreset.onClick = [this] { loadPreset( m_proc.stepPreset( m_proc.currentPreset(), 1 ) ); };
     m_presetName.onClick = [this] { m_browser.open(); };
     addAndMakeVisible( m_step );
     m_step.setTooltip( "Autoplay: exchange one voice of the chord now" );

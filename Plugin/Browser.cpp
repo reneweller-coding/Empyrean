@@ -29,7 +29,7 @@ const char *const TraitHigh[4] = { "brighter", "more moving", "wider", "airier" 
 }   // namespace
 
 /** @brief A row of the list (see PresetBrowser). */
-class PresetBrowser::Row final : public juce::Component
+class PresetBrowser::Row final : public juce::Component, public juce::TooltipClient
 {
 public:
     /**
@@ -70,7 +70,14 @@ public:
         tri.addTriangle( 10.0f, 8.0f, 10.0f, getHeight() - 8.0f, 22.0f, getHeight() * 0.5f );
         g.setColour( listening ? skin.m_accent : skin.m_dim );
         g.fillPath( tri );
-        // The star.
+        // The star, and "never again" beside it (20.11.2026): a ring with a bar through it, red when marked.
+        const bool never = m_owner.m_proc.neverAgain( e.m_name );
+        {
+            const juce::Rectangle<float> ring( 57.0f, getHeight() * 0.5f - 6.0f, 12.0f, 12.0f );
+            g.setColour( never ? additivui::colour::Bad : skin.m_faint );
+            g.drawEllipse( ring, 1.4f );
+            g.drawLine( ring.getX() + 2.5f, ring.getBottom() - 2.5f, ring.getRight() - 2.5f, ring.getY() + 2.5f, 1.4f );
+        }
         const bool fav = m_owner.m_proc.favorite( e.m_name );
         juce::Path star;
         star.addStar( { 40.0f, getHeight() * 0.5f }, 5, 3.0f, 7.0f );
@@ -79,13 +86,14 @@ public:
             g.fillPath( star );
         else
             g.strokePath( star, juce::PathStrokeType( 1.2f ) );
-        g.setColour( e.m_user >= 0 ? additivui::colour::Root : skin.m_ink );
+        // A preset marked never again is dimmed: still found, still taken when chosen.
+        g.setColour( never ? skin.m_faint : e.m_user >= 0 ? additivui::colour::Root : skin.m_ink );
         g.setFont( juce::FontOptions( 14.0f ) );
-        g.drawText( e.m_name, 56, 0, getWidth() / 2 - 56, getHeight(), juce::Justification::centredLeft );
-        g.setColour( skin.m_dim );
+        g.drawText( e.m_name, NameX, 0, getWidth() / 2 - NameX, getHeight(), juce::Justification::centredLeft );
+        g.setColour( never ? skin.m_faint : skin.m_dim );
         g.setFont( juce::FontOptions( 12.0f ) );
-        g.drawText( e.m_group + ( e.m_hands ? "   (for the hands)" : "" ), getWidth() / 2, 0, getWidth() / 2 - 150,
-                    getHeight(), juce::Justification::centredLeft );
+        g.drawText( e.m_group + ( e.m_hands ? "   (for the hands)" : "" ) + ( never ? "   (never again)" : "" ),
+                    getWidth() / 2, 0, getWidth() / 2 - 150, getHeight(), juce::Justification::centredLeft );
         // The traits as four small bars about their middles.
         if ( e.m_measured )
             for ( int k = 0; k < 4; ++k )
@@ -94,7 +102,7 @@ public:
                 const float v = juce::jlimit( -2.5f, 2.5f, e.m_traits[k] ) / 2.5f * ( getHeight() * 0.38f );
                 g.setColour( skin.m_faint );
                 g.drawHorizontalLine( static_cast<int>( mid ), x, x + 26.0f );
-                g.setColour( skin.family( frame::FamilyE::SOURCE ).withAlpha( 0.8f ) );
+                g.setColour( skin.family( frame::FamilyE::SOURCE ).withAlpha( never ? 0.3f : 0.8f ) );
                 g.fillRect( juce::Rectangle<float>( x + 8.0f, std::min( mid, mid - v ), 10.0f,
                                                     std::max( 1.0f, std::abs( v ) ) ) );
             }
@@ -123,6 +131,26 @@ public:
             repaint();
             if ( m_owner.m_categories[static_cast<size_t>( m_owner.m_category )].m_kind == 1 ) m_owner.filter();
         }
+        else if ( e.x < NameX )
+        {   // never again, or taken back
+            m_owner.m_proc.setNeverAgain( en.m_name, !m_owner.m_proc.neverAgain( en.m_name ) );
+            repaint();
+            if ( m_owner.m_categories[static_cast<size_t>( m_owner.m_category )].m_kind == 6 ) m_owner.filter();
+        }
+    }
+    /**
+     * @brief What the mark under the mouse does.
+     * @return the tip, or nothing over the name
+     */
+    juce::String getTooltip() override
+    {
+        const int x = getMouseXYRelative().x;
+        if ( x < 30 ) return "Hold to listen";
+        if ( x < 52 ) return "A favourite (the night director prefers it)";
+        if ( x < NameX )
+            return "Never again: the arrows, the night director and the journeys pass it over (click again to take it "
+                   "back)";
+        return {};
     }
     /**
      * @brief Back to the sound before the listening.
@@ -140,15 +168,16 @@ public:
      */
     void mouseDoubleClick( const juce::MouseEvent &e ) override
     {
-        if ( e.x >= 52 ) m_owner.choose( m_row );
+        if ( e.x >= NameX ) m_owner.choose( m_row );
     }
 
 private:
-    PresetBrowser &m_owner;               ///< whose
-    int            m_row = -1;            ///< the list's row
-    int            m_entry = -1;          ///< the entry shown
-    bool           m_selected = false;    ///< chosen
-    bool           m_listening = false;   ///< its play mark is held
+    static constexpr int NameX = 78;            ///< where the name begins (the marks before it)
+    PresetBrowser       &m_owner;               ///< whose
+    int                  m_row = -1;            ///< the list's row
+    int                  m_entry = -1;          ///< the entry shown
+    bool                 m_selected = false;    ///< chosen
+    bool                 m_listening = false;   ///< its play mark is held
 };
 
 /** @brief A range over a trait (see PresetBrowser): -3 .. 3 spreads, its two ends dragged, a double click opens it wide. */
@@ -261,7 +290,7 @@ public:
                 juce::Rectangle<float>( 0.0f, 0.0f, static_cast<float>( width ), static_cast<float>( height ) ),
                 skin.m_radius );
         }
-        const bool heading = c.m_kind == 4 || c.m_kind <= 3;
+        const bool heading = c.m_kind == 4 || c.m_kind <= 3 || c.m_kind == 6;
         g.setColour( heading ? skin.m_ink : skin.m_dim );
         g.setFont( juce::FontOptions( heading ? 13.0f : 12.0f, heading ? juce::Font::bold : juce::Font::plain ) );
         g.drawText( c.m_title, c.m_kind == 5 ? 18 : 6, 0, width - 20, height, juce::Justification::centredLeft );
@@ -359,6 +388,7 @@ void PresetBrowser::open()
     m_categories.clear();
     m_categories.push_back( { "All", 0, 0 } );
     m_categories.push_back( { "Favourites", 1, 0 } );
+    m_categories.push_back( { "Never again", 6, 0 } );
     m_categories.push_back( { "Recently played", 2, 0 } );
     m_categories.push_back( { "Yours", 3, 0 } );
     for ( int s = 0; s < 10; ++s )
@@ -394,6 +424,7 @@ void PresetBrowser::filter()
     {
         const Entry &e = m_all[i];
         if ( c.m_kind == 1 && !m_proc.favorite( e.m_name ) ) continue;
+        if ( c.m_kind == 6 && !m_proc.neverAgain( e.m_name ) ) continue;
         if ( c.m_kind == 2 && !recent.contains( e.m_name ) ) continue;
         if ( c.m_kind == 3 && e.m_user < 0 ) continue;
         if ( c.m_kind == 4 && ( e.m_factory < 0 || e.m_section != c.m_which ) ) continue;

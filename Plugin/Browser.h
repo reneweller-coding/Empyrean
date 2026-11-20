@@ -1,7 +1,8 @@
 /**
  * @file Browser.h
  * @brief The preset browser: every preset, the player's own and the bank's, found by name, by its
- *        section and group, by the favourites' star and the recent list, and by how it was measured to
+ *        section and group, by the favourites' star, the "never again" mark (dimmed, kept to be found and taken
+ *        back) and the recent list, and by how it was measured to
  *        sound -- darker or brighter, stiller or more moving, narrower or wider, purer or airier -- and
  *        by who plays it (the conductor, or the hands). Hold a row's play mark to listen (the sound
  *        glides there and back), double-click or Enter to take it.
@@ -63,14 +64,14 @@ private:
         bool  m_measured = false;      ///< the traits are measured
         bool  m_hands = false;         ///< made for the hands (the conductor rests)
     };
-    /** @brief One category on the left: All, Favourites, Recent, Yours, a section or a group. */
+    /** @brief One category on the left: All, Favourites, Never again, Recent, Yours, a section or a group. */
     struct Category
     {
         juce::String m_title;       ///< as listed
-        int          m_kind = 0;    ///< 0 all, 1 favourites, 2 recent, 3 yours, 4 a section, 5 a group
+        int          m_kind = 0;    ///< 0 all, 1 favourites, 2 recent, 3 yours, 4 a section, 5 a group, 6 never again
         int          m_which = 0;   ///< the section's or group's number
     };
-    /** @brief A row of the list: the play mark (held: listen), the star, the name, the group, the traits. */
+    /** @brief A row of the list: the play mark (held: listen), the star, never again, the name, the group, the traits. */
     class Row;
     /** @brief The categories' list. */
     class Categories;

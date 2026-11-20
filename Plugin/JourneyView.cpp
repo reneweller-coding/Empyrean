@@ -124,6 +124,8 @@ void NightPanel::make( bool newDice )
                          : ( id - 2 < additiv::numNightFamilies() ? id - 2 : additiv::NightFamilyBank );
     if ( m_favourites.getToggleState() )
         for ( const juce::String &f : m_proc.favoriteNames() ) r.m_prefer.push_back( f.toStdString() );
+    for ( const juce::String &f : m_proc.neverAgainNames() )   // never what the player marked never again
+        r.m_exclude.push_back( f.toStdString() );
     // "Night 8 h (20.11.)": a name that is a file name too (no colon)
     const int hh = static_cast<int>( hours ), mm = static_cast<int>( std::lround( ( hours - hh ) * 60.0 ) );
     r.m_name = "Night " + std::to_string( hh ) + " h" + ( mm ? " " + std::to_string( mm ) + " min" : std::string() ) +

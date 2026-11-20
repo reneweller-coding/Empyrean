@@ -9,6 +9,7 @@
 #include "additiv/Engine.h"
 #include "additiv/Sun.h"
 #include "additiv/Journey.h"
+#include "additiv/NameList.h"
 #include "additiv/NightDirector.h"
 #include "additiv/Describe.h"
 #include "additiv/Find.h"
@@ -6129,6 +6130,120 @@ int main( int argc, char **argv )
         check(
             notes > 800 && early == 0, "figures: every note is held for twice its attack at the least",
             fmt( "%d figure notes let go; %d of them sooner than twice their attack after they began", notes, early ) );
+    }
+
+    // 125. Never again (20.11.2026, plan C2/D3): the player's list of presets never wanted again, a plain text file
+    //      (NameList.h). It comes back as written; a missing file is an empty list, and a garbled one (a byte order
+    //      mark, CR LF, blank lines, control characters, broken UTF-8, a line too long, repeats) gives the names in it
+    //      and nothing else. The night director, given the list read back, takes none of them; a journey passes over a
+    //      step that names one -- cyclic and not, set before it starts and while it runs -- and plays every step when
+    //      every one is on the list. No card.
+    if ( wanted( 125, "Never again (20.11.2026)" ) )
+    {
+        const std::filesystem::path dir = std::filesystem::temp_directory_path() / "additiv_selftest_125";
+        std::error_code             ec;
+        std::filesystem::remove_all( dir, ec );
+        const std::string file = ( dir / "sub" / "never_again.txt" ).string();   // the folder is made when missing
+        // The first night's presets, and a name with letters beyond ASCII.
+        NightRequest first;
+        first.m_hours = 3.0;
+        const NightPlan          firstNight = composeNight( first );
+        std::vector<std::string> names;
+        for ( const NightStep &st : firstNight.m_steps ) names.push_back( preset( st.m_preset ).m_name );
+        names.push_back( "Br\xC3\xBC"
+                         "cke \xE2\x80\x93 Nacht" );
+        const bool missingEmpty = readNameList( file ).empty();
+        const bool written = writeNameList( file, names );
+        const bool back = readNameList( file ) == names;
+        bool       noTemp = !std::filesystem::exists( file + ".new" );
+        // garbled: what a hand, an editor or a broken disk could leave
+        {
+            std::ofstream g( std::filesystem::path( file ), std::ios::binary | std::ios::trunc );
+            g << "\xEF\xBB\xBF" << names[0] << "\r\n\r\n   \t\n"
+              << names[1] << "  \r\n"
+              << "bad\x01name\n"
+              << "broken \xC3\n"
+              << "overlong \xC0\xAF\n"
+              << std::string( 400, 'x' ) << "\n"
+              << names[0] << "\n"
+              << std::string( "\0\0\xFF\xFE", 4 ) << "\n";
+            for ( size_t i = 2; i < names.size(); ++i ) g << names[i] << "\n";
+        }
+        const bool garbled = readNameList( file ) == names;
+        // the director, from the list as read
+        NightRequest r;
+        r.m_hours = 8.0;
+        r.m_exclude = readNameList( file );
+        const NightPlan night = composeNight( r );
+        int             banned = 0;
+        for ( const NightStep &st : night.m_steps )
+            banned += std::find( names.begin(), names.end(), preset( st.m_preset ).m_name ) != names.end() ? 1 : 0;
+        // a journey of eight steps, three of them never again
+        Journey j;
+        j.m_name = "Test";
+        for ( int k = 0; k < 8; ++k )
+        {
+            JourneyStep st;
+            st.m_preset = preset( 100 * k ).m_name;
+            st.m_dwellLo = st.m_dwellHi = 60.0;
+            st.m_fadeLo = st.m_fadeHi = 10.0;
+            j.m_steps.push_back( st );
+        }
+        const std::vector<std::string> skip = { j.m_steps[0].m_preset, j.m_steps[3].m_preset, j.m_steps[7].m_preset };
+        auto play = [&]( bool cyclic, const std::vector<std::string> &s, int midway, std::vector<std::string> &heard )
+        {
+            Journey jj = j;
+            jj.m_cyclic = cyclic;
+            JourneyPlayer p;
+            if ( midway < 0 ) p.setSkip( s );
+            p.start( jj, 7 );
+            JourneyStep st;
+            double      fade = 0.0;
+            for ( int t = 0; t < 2000 && p.running(); ++t )
+            {
+                if ( t == midway ) p.setSkip( s );
+                if ( p.advance( t == 0 ? 0.0 : 30.0, st, fade ) ) heard.push_back( st.m_preset );
+            }
+        };
+        auto none = [&]( const std::vector<std::string> &heard, size_t from )
+        {
+            for ( size_t i = from; i < heard.size(); ++i )
+                if ( std::find( skip.begin(), skip.end(), heard[i] ) != skip.end() ) return false;
+            return true;
+        };
+        std::vector<std::string> cyclic, once, midway, all;
+        play( true, skip, -1, cyclic );
+        play( false, skip, -1, once );
+        play( true, skip, 9, midway );   // marked while it runs: from the next step on
+        std::vector<std::string> every;
+        for ( const JourneyStep &st : j.m_steps ) every.push_back( st.m_preset );
+        play( false, every, -1, all );
+        size_t marked = 0;   // the steps begun before the list was set (the advance at t = 9 begins none)
+        {
+            JourneyPlayer p;
+            Journey       jj = j;
+            p.start( jj, 7 );
+            JourneyStep st;
+            double      fade = 0.0;
+            for ( int t = 0; t < 9; ++t )
+                if ( p.advance( t == 0 ? 0.0 : 30.0, st, fade ) ) ++marked;
+        }
+        const bool journeys = cyclic.size() > 100 && none( cyclic, 0 ) && once.size() == 5 && none( once, 0 ) &&
+                              once.front() == j.m_steps[1].m_preset && none( midway, marked ) &&
+                              midway.size() > marked && all.size() == 8;
+        std::filesystem::remove_all( dir, ec );
+        check( missingEmpty && written && back && noTemp && garbled,
+               "never again: the list round-trips, garbled is harmless",
+               fmt( "missing file empty %s, written %s, read back %s (%zu names), no file left half-written %s, a "
+                    "garbled file gives the names in it %s",
+                    missingEmpty ? "yes" : "NO", written ? "yes" : "NO", back ? "yes" : "NO", names.size(),
+                    noTemp ? "yes" : "NO", garbled ? "yes" : "NO" ) );
+        check( banned == 0 && !night.m_steps.empty() && journeys,
+               "never again: the night director takes none, a journey passes over them",
+               fmt( "night of %zu presets, %d of the %zu never again; journey cyclic %zu steps, once %zu (of 8, 3 "
+                    "passed over), marked while running %zu, all marked %zu -- a passed-over step played: %s",
+                    night.m_steps.size(), banned, names.size(), cyclic.size(), once.size(), midway.size(), all.size(),
+                    journeys ? "no" : "YES" ) );
     }
 
     finishTest();

@@ -6,8 +6,8 @@ One run of the standalone in the screenshot mode (Plugin/PluginEditor.cpp, shoot
 SETTLE seconds for the clouds to sound, then every tab on its own tick, the window grown until nothing of the page
 scrolls (ADDITIV_SHOT_FULL). Muted (ADDITIV_MUTE): the engine runs and is seen, nothing is heard. Besides:
 docs/screenshot.png, the first tab at the window's usual size, the picture on the project's front page. And the
-pictures a chapter asks for with a line "[name]" in chapters.txt (EXTRAS): the command palette, the preset browser,
-the modulation dock with a source dropped on a knob, the night director with a night of eight hours. A tab's name becomes a file name as slug() makes it. Last,
+pictures a chapter asks for with a line "[name]" in chapters.txt (EXTRAS): the command palette, the preset browser
+(two presets marked never again, from a list of its own: the player's is not touched), the modulation dock with a source dropped on a knob, the night director with a night of eight hours. A tab's name becomes a file name as slug() makes it. Last,
 Empyrean Journeys' window (journeys-app.png), from the same build tree.
 """
 import glob
@@ -21,11 +21,14 @@ ROOT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
 PRODUCT = "Empyrean"
 PRESET = "Velvet Dreaming"   # Sleep Concert: the conductor, Breathe, the far reverb
 SETTLE = 8                   # seconds: the preset fills its chord at speed (Engine::requestFill), the attack rises
+# The browser's picture shows two presets marked "never again", from a list of its own (the player's stays untouched).
+NEVER = os.path.join(ROOT, "build", "never_again_shot.txt")
+NEVER_NAMES = ["Drowsy Cradle", "Slow Hours"]
 # The chapters' own pictures: name -> (what the screenshot mode is asked, the tab photographed, by its name: a new tab
 # moves the others).
 EXTRAS = {
     "palette": ({"ADDITIV_SHOT_PALETTE": "dark calm wide"}, "Focus"),
-    "browser": ({"ADDITIV_SHOT_BROWSER": "1"}, "Focus"),
+    "browser": ({"ADDITIV_SHOT_BROWSER": "1", "ADDITIV_NEVER_AGAIN_FILE": NEVER}, "Focus"),
     "dock": ({"ADDITIV_SHOT_DROP": "LFO 2>tilt", "ADDITIV_SHOT_SIZE": "1600x1000"}, "Cloud & Filter"),
     "journey": ({"ADDITIV_SHOT_JOURNEY": "Sleep Concert - Night"}, "Journey"),
     "night": ({"ADDITIV_SHOT_DIRECTOR": "8"}, "Journey"),
@@ -65,6 +68,8 @@ def main():
         sys.exit("no standalone at " + exe)
     out = os.path.join(ROOT, "docs", "screenshots")
     os.makedirs(out, exist_ok=True)
+    with open(NEVER, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(NEVER_NAMES) + "\n")
     pages = run(exe, os.path.join(out, "page"), True)
     if len(pages) < 7:
         sys.exit("the standalone took %d pictures, 7 expected" % len(pages))

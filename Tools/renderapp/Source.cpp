@@ -6,7 +6,9 @@
  *        the engine offline as fast as the card allows.
  *
  * Besides the journeys that come with the instrument, three nights of the night director (NightDirector.h): 6, 8 and
- * 10 hours with a form, from the groups the Whole Nights draw from.
+ * 10 hours with a form, from the groups the Whole Nights draw from. The presets the player marked "never again" in the
+ * instrument's browser (never_again.txt beside its settings, NameList.h) are not taken into a night, and a journey's
+ * step that names one is passed over, as the instrument does it.
  *
  * The journeys draw their dwells and glides from ranges; a seed fixes them, so the length of a rendering is known
  * before it begins (lengthOf simulates the JourneyPlayer) and the file holds exactly that. Its presets are the bank's
@@ -16,6 +18,7 @@
 #include "RenderKit.h"
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/NameList.h"
 #include "additiv/NightDirector.h"
 #include "additiv/Params.h"
 #include "additiv/Presets.h"
@@ -163,18 +166,34 @@ void place( double &latitude, double &longitude )
 }
 
 /**
+ * @brief The presets the player never wants again: the instrument's list (AdditivProcessor::neverAgainFile, beside
+ *        its settings in the application data), read each time (the player may change it while this app is open).
+ * @return their names; none when there is no list
+ */
+std::vector<std::string> neverAgain()
+{
+    return additiv::readNameList( juce::File::getSpecialLocation( juce::File::userApplicationDataDirectory )
+                                      .getChildFile( "Empyrean" )
+                                      .getChildFile( "never_again.txt" )
+                                      .getFullPathName()
+                                      .toStdString() );
+}
+
+/**
  * @brief How long a rendering of a journey lasts: its dwells as the seed draws them, for so many passes (one for a
  *        journey that does not cycle) -- exactly what the rendering then writes.
  * @param[in] journey  the journey
  * @param[in] seed     the dice (JourneyPlayer's)
  * @param[in] passes   passes of a cyclic journey (at least one)
+ * @param[in] skip     the presets passed over (neverAgain)
  * @return seconds
  */
-double lengthOf( const additiv::Journey &journey, std::uint64_t seed, int passes )
+double lengthOf( const additiv::Journey &journey, std::uint64_t seed, int passes, const std::vector<std::string> &skip )
 {
-    const int steps = static_cast<int>( journey.m_steps.size() ) * ( journey.m_cyclic ? std::max( passes, 1 ) : 1 );
     additiv::JourneyPlayer p;
+    p.setSkip( skip );
     p.start( journey, seed );
+    const int            steps = p.playedSteps() * ( journey.m_cyclic ? std::max( passes, 1 ) : 1 );
     additiv::JourneyStep st;
     double               fade = 0.0, total = 0.0;
     if ( !p.advance( 0.0, st, fade ) ) return 0.0;
@@ -199,14 +218,15 @@ public:
      */
     JourneyRendering( const additiv::Journey &journey, const renderkit::Request &r, std::uint64_t seed,
                       juce::String &why )
-        : m_journey( journey ), m_own( ownPresets() )
+        : m_journey( journey ), m_own( ownPresets() ), m_skip( neverAgain() )
     {
         m_seed = seed;
         m_passes = r.option( "passes" ) + 1;
-        m_seconds = lengthOf( journey, seed, m_passes );
+        m_seconds = lengthOf( journey, seed, m_passes, m_skip );
         m_fade = r.option( "fade", 1 ) ? 20.0 : 0.0;
         m_engine = std::make_unique<additiv::Engine>();   // on the heap: it is large
         m_engine->setRealtime( false );
+        m_player.setSkip( m_skip );
         m_player.start( journey, seed );
         additiv::JourneyStep st;
         double               glide = 0.0;
@@ -272,10 +292,11 @@ public:
      */
     void timeline( renderkit::CueSheet &sheet ) const override
     {
-        const int              per = static_cast<int>( m_journey.m_steps.size() );
         const int              passes = m_journey.m_cyclic ? std::max( m_passes, 1 ) : 1;
         additiv::JourneyPlayer p;
+        p.setSkip( m_skip );
         p.start( m_journey, m_seed );
+        const int            per = p.playedSteps();
         additiv::JourneyStep st;
         double               fade = 0.0, at = 0.0;
         if ( per == 0 || !p.advance( 0.0, st, fade ) ) return;
@@ -283,7 +304,7 @@ public:
         {
             const juce::String pass = passes > 1 ? "Pass " + juce::String( k / per + 1 ) + ", " : juce::String();
             sheet.section( at, k == 0 ? "Intro" : "Groove", k == 0 ? 0.25 : 0.4 );
-            sheet.chapter( at, pass + "Step " + juce::String( k % per + 1 ) + ": " + juce::String( st.m_preset ) );
+            sheet.chapter( at, pass + "Step " + juce::String( p.step() + 1 ) + ": " + juce::String( st.m_preset ) );
             at += p.remaining();
             if ( k + 1 < per * passes && !p.advance( p.remaining(), st, fade ) ) break;
         }
@@ -293,6 +314,7 @@ public:
 private:
     additiv::Journey                 m_journey;         ///< the journey
     std::map<std::string, OwnPreset> m_own;             ///< the player's presets
+    std::vector<std::string>         m_skip;            ///< the presets passed over (neverAgain), read once
     std::unique_ptr<additiv::Engine> m_engine;          ///< the instrument offline
     additiv::JourneyPlayer           m_player;          ///< the journey's clock
     std::uint64_t                    m_seed = 1;        ///< its dice
@@ -356,6 +378,7 @@ public:
         {
             additiv::NightRequest r;
             r.m_hours = hours;
+            r.m_exclude = neverAgain();   // what the player marked never again in the instrument
             additiv::NightPlan night = additiv::composeNight( r );
             if ( !night.m_journey.m_steps.empty() ) add( std::move( night.m_journey ), false, {} );
         }
@@ -411,7 +434,7 @@ public:
     }
     double length( const renderkit::Item &item, const renderkit::Request &r ) override
     {
-        return lengthOf( *journey( item ), renderkit::seedFor( item, r ), r.option( "passes" ) + 1 );
+        return lengthOf( *journey( item ), renderkit::seedFor( item, r ), r.option( "passes" ) + 1, neverAgain() );
     }
     juce::String describe( const renderkit::Item &item, const renderkit::Request &r ) override
     {
