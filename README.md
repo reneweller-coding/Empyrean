@@ -215,7 +215,7 @@ with pictures by [KaleidoscopeEnhanced](https://github.com/reneweller-coding/Kal
   journeys, presets in a row glided into each other for a whole night (531 come with it, nineteen of them whole nights),
   each shown with its length, and rendered into WAV, FLAC, Ogg Vorbis or MP3 by Empyrean Journeys; and a night director
   that writes a night of so many hours with a form -- falling asleep, deep waves of about ninety minutes, a morning --
-  along a curve of measured stillness and brightness (Core/include/additiv/NightDirector.h).
+  along a curve of measured movement and brightness (Core/include/additiv/NightDirector.h).
 
 ## Build
 
@@ -284,7 +284,7 @@ not what they write. The header is never edited by hand: a change to the conduct
 by copying the two files again and running the sync (then `music_audit` and `additiv_selftest --only 113-124`).
 
 A night of the night director as a table, without the card: `additiv_night --hours 8 --seed 1` (`--journey` prints
-the journey file); `Tools/presets/night_plot.py --hours 8 --png night.png` adds the stillness against the curve and a
+the journey file); `Tools/presets/night_plot.py --hours 8 --png night.png` adds the movement against the curve and a
 picture (Pillow).
 
 **Empyrean Journeys** (`EmpyreanJourneys.exe`, in the Start menu) renders journeys into files with a small window of

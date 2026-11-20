@@ -9,10 +9,10 @@
  * Prints a line `# night <hours> <seed> <family> <candidates> <scale>`, a line `# phases <asleep> <morning> <waves>`
  * (shares of the night), a header and one tab-separated line per step: its number, where it begins (seconds), how long
  * it stays (seconds, at the middle of its range), the preset, its group, its stay class (0 short, 1 middle, 2 long),
- * its stillness and brightness as percentiles of the candidates, the curve's two targets at the middle of its stay,
+ * its movement and brightness as percentiles of the candidates, the curve's two targets at the middle of its stay,
  * whether it is preferred, its distance in sound from the step before, and its measured motion and brightness (in
  * spreads of the bank). Then `# whole_nights <mean neighbour distance>`: the shipped Whole Nights' steps, measured
- * the same way, and 201 lines `# curve <x> <stillness> <brightness>`: the curve over the night (x 0 .. 1).
+ * the same way, and 201 lines `# curve <x> <movement> <brightness>`: the curve over the night (x 0 .. 1).
  * `--journey` prints the journey file instead; `--families` the families to choose from.
  * --prefer and --exclude read preset names, one a line.
  * @author Rene Weller

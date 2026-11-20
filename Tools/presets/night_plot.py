@@ -2,10 +2,10 @@
 picture of the curve against what was chosen.
 
 Runs additiv_night (no card, no sound) and prints, per step: when it begins, the preset and its group, how long it
-stays, its stillness and brightness as percentiles of the candidates and the curve's targets there, and its distance in
-sound from the step before; then the night's numbers: how closely the stillness follows the curve (Spearman), the mean
-step between neighbours against the shipped Whole Nights'. With --png it draws the two curves (stillness above,
-brightness below) and the presets chosen as a step line over the hours, the phases marked. The picture needs Pillow
+stays, its movement and brightness as percentiles of the candidates and the curve's targets there, and its distance in
+sound from the step before; then the night's numbers: how closely the movement follows the curve (Spearman), the mean
+step between neighbours against the shipped Whole Nights'. With --png it draws the two curves (movement above, up the
+more moving, so the deep of the night lies low; brightness below) and the presets chosen as a step line over the hours, the phases marked. The picture needs Pillow
 (no matplotlib: none of the venvs on this machine has it); G:\\Tools\\VRAudio\\AmbientSynth\\Tools\\TextureGen\\.venv has
 Pillow.
 
@@ -75,7 +75,7 @@ def table(head, steps, whole, start_h):
     lines = ["Night of %g h (seed %s, %s): %d presets of %d candidates; falling asleep %d min, %d waves, morning %d min" % (
         head["hours"], head["seed"], head["family"], len(steps), head["candidates"],
         round(head["asleep"] * head["hours"] * 60), head["waves"], round(head["morning"] * head["hours"] * 60)), "",
-        "%-6s %-34s %-22s %6s  %-14s %-14s %5s" % ("time", "preset", "group", "stay", "stillness/goal", "bright/goal",
+        "%-6s %-34s %-22s %6s  %-14s %-14s %5s" % ("time", "preset", "group", "stay", "movement/goal", "bright/goal",
                                                    "step"),
         "-" * 112]
     for s in steps:
@@ -86,10 +86,10 @@ def table(head, steps, whole, start_h):
     rho_b = spearman([s["bright"] for s in steps], [s["target_bright"] for s in steps])
     rho_m = spearman([s["motion_z"] for s in steps], [s["target_still"] for s in steps])
     mean = sum(s["distance"] for s in steps[1:]) / max(1, len(steps) - 1)
-    lines += ["", "stillness follows the curve: Spearman %.2f (brightness %.2f; the measured motion alone %.2f)" % (
+    lines += ["", "movement follows the curve: Spearman %.2f (brightness %.2f; the measured motion alone %.2f)" % (
         rho, rho_b, rho_m),
         "mean step between neighbours %.2f spreads (the shipped Whole Nights %.2f)" % (mean, whole or 0.0),
-        "stillness and brightness are percentiles of the candidates: 0 % the stillest / darkest, 100 % the most moving "
+        "movement and brightness are percentiles of the candidates: 0 % the stillest / darkest, 100 % the most moving "
         "/ brightest"]
     return "\n".join(lines)
 
@@ -105,11 +105,11 @@ def plot(head, steps, curve, path, start_h):
     colours = [(120, 200, 230), (190, 150, 240)]
     d.text((L, 10), "Night director: %g h, seed %s, %s -- %d presets (curve: dashed, chosen: solid)" % (
         head["hours"], head["seed"], head["family"], len(steps)), fill=ink)
-    for p, (key, name) in enumerate([("still", "stillness"), ("bright", "brightness")]):
+    for p, (key, name) in enumerate([("still", "movement"), ("bright", "brightness")]):
         top = T + p * (panel_h + 40)
         x0, x1, y0, y1 = L, W - R, top, top + panel_h
         d.rectangle([x0, y0, x1, y1], outline=dim)
-        d.text((8, y0 + panel_h // 2 - 6), name, fill=ink)
+        d.text((x0, y0 - 16), name + (" (up: more moving)" if key == "still" else " (up: brighter)"), fill=ink)
         for q in (0.0, 0.25, 0.5, 0.75, 1.0):
             y = y1 - q * (y1 - y0)
             d.line([x0, y, x1, y], fill=(40, 46, 60))

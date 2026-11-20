@@ -162,12 +162,12 @@
   groups, or the whole bank), your favourites a little preferred. It has a form -- falling asleep over the first 30
   to 45 minutes, darker and stiller; a deep middle in waves of about ninety minutes, a little lighter and then deep
   again, the later waves a little higher; a morning over the last 30 to 45 minutes, brighter and a little more
-  moving, ending in the Dawn Choruses -- drawn as a curve of measured stillness and brightness, each a share of the
+  moving, ending in the Dawn Choruses -- drawn as a curve of measured movement and brightness, each a share of the
   presets it chooses from. Each step is the preset closest to the curve that still sounds like the one before, none
   twice; each stays as in the journeys' Nights, three to fifteen minutes by how much it moves by itself. New dice
   makes another. The night becomes the journey you are writing (the timeline shows it, the disk saves it under its
   name); nothing starts by itself, and at its end the last preset stays. Over nine nights of 3, 8 and 10 hours: the
-  length within 0.05 % of what was asked, the stillness in the curve's order (Spearman 0.93 at the least; a random
+  length within 0.05 % of what was asked, the movement in the curve's order (Spearman 0.93 at the least; a random
   choice -0.08), a step between neighbours of 0.43 spreads at the most where the Whole Nights take 1.04. Empyrean
   Journeys lists three of them (6, 8 and 10 hours) to render. `additiv_night` and `Tools/presets/night_plot.py`
   print a night as a table and draw it against its curve.
