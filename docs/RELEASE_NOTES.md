@@ -227,17 +227,17 @@
   hole; the yardstick, the first 25 seconds after the chord was filled, had not seen them. Counted against both
   presets played alone (`journey_transitions.py alone`), none of the 78 glides of the sample (all rendered now) falls
   or rises more than 3 LU beyond them -- 13 did by the old count; with the rubbing, 4 broken instead of 16.
-- **Sounding notes may keep their pitch where a glide changes the tuning** (20.11.2026, plan D2b; a switch that is
-  off, for listening first). At a glide's middle the scale, its root and the key mapping change, and every note that
-  sounds slides to its key's pitch in the new tuning -- in more than half of the journeys' glides by a quarter tone or
-  more. `Engine::setHoldPitch(1)`, turned on only by the tools (`empy_render` and `additiv_brain_audit --hold-pitch
-  1`), lets a note that sounds then keep its pitch in hertz until it ends; notes struck afterwards are tuned anew. The
+- **Sounding notes keep their pitch where a glide changes the tuning** (20.11.2026, plan D2b; on since Rene heard
+  it the same evening). At a glide's middle the scale, its root and the key mapping change, and every note that
+  sounded slid to its key's pitch in the new tuning -- in more than half of the journeys' glides by a quarter tone or
+  more. Now a note that sounds then keeps its pitch in hertz until it ends; notes struck afterwards are tuned anew. The
   conductors', the foundation's and the figures' notes, not a key a player holds; the conductors and the figures judge
   such a note by the pitch it really has. Over all glides of the journeys, without the card: a sounding note moves by
   a quarter tone or more in 11 of 6600 instead of 3475 (52.7 %), a semitone rubs between the leaving and the arriving
   chord for more than five seconds in 439 instead of 708 (6.7 s to 2.5 s on average) -- but in 317 glides a kept note,
-  foreign to the new scale, rubs for longer than before. Not decided: it waits for listening. Off, nothing changes:
-  the music audit gives the same table byte for byte and five glides render the same bytes.
+  foreign to the new scale, rubs for longer than before (the journeys are ordered anew for it, below).
+  `Engine::setHoldPitch(0)` and the tools' `--hold-pitch 0` (`empy_render`, `additiv_brain_audit`,
+  `journey_transitions.py`) play the instrument as it was, byte for byte; no knob or preset sets it.
 
 ## 1.0.0 (17.10.2026)
 

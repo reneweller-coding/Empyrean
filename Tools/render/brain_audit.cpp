@@ -44,8 +44,10 @@
  * more than half a cent (looked at every tenth of a second): a glide changes the scale and the root at its middle, and
  * what sounds is retuned. `--tuning` prints, per preset asked for, `# preset ...` and one T line of its own tuning.
  *
- * `--hold-pitch 1` (plan D2b) turns Engine::setHoldPitch on: a note that sounds where a glide changes the tuning keeps
- * its pitch until it ends; each such note is printed as `H,<seconds>,<source>,<note>,<Hz kept>` when it is kept.
+ * `--hold-pitch` (plan D2b) sets Engine::setHoldPitch, 1 by default as in the instrument (since 20.11.2026): a note
+ * that sounds where a glide changes the tuning keeps its pitch until it ends; each such note is printed as
+ * `H,<seconds>,<source>,<note>,<Hz kept>` when it is kept. `--hold-pitch 0` audits the instrument as it was before,
+ * every sounding note retuned into the new tuning.
  *
  * The family jam offline (plan E3, 20.11.2026; JamSim.h, the same file as Noctuary's): `--jam-lead FILE` writes, as a
  * leader's render thread publishes them, every change of the conductor's root and of the notes both conductors sound
@@ -166,7 +168,7 @@ int main( int argc, char **argv )
     std::vector<std::string> names, sets;
     std::vector<Pair>        pairs;
     bool                     tuning = false;
-    int                      holdPitch = 0;   // --hold-pitch: Engine::setHoldPitch
+    int                      holdPitch = 1;   // --hold-pitch: Engine::setHoldPitch (the instrument's 1)
     std::string              jamLead, jamFollow;   // plan E3: the offline jam
     int                      jamHear = 0;
     frame::JamNetwork        net;

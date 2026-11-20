@@ -24,9 +24,10 @@
  * Tools/presets/journey_transitions.py. --then-only glides only some of the second preset's parameters in and keeps
  * the first's for the rest, to find which part of a glide does something (plan D2b): a comma list of sections of the
  * parameter table ("Filter", "Motion"; any case), parameter keys ("cutoff") and "mod" (the matrix); a list that
- * begins with "-" takes everything but what it names. --hold-pitch 1 turns Engine::setHoldPitch on (plan D2b): a note
- * that sounds where a glide changes the tuning keeps its pitch until it ends; --note-log then prints each such note as
- * `H,<s>,<source>,<note>,<Hz kept>`.
+ * begins with "-" takes everything but what it names. --hold-pitch sets Engine::setHoldPitch (plan D2b), 1 by default
+ * as in the instrument (since 20.11.2026): a note that sounds where a glide changes the tuning keeps its pitch until
+ * it ends; --note-log then prints each such note as `H,<s>,<source>,<note>,<Hz kept>`. --hold-pitch 0 renders as the
+ * instrument did before, every sounding note retuned into the new tuning.
  *
  * The family jam offline (plan E3, 20.11.2026; JamSim.h, as additiv_brain_audit): --jam-lead FILE writes what a
  * leader's audio thread posts before each block (the conductor's root and the notes both conductors sound, on a
@@ -330,7 +331,7 @@ int main( int argc, char **argv )
     std::string              thenName;                  // --then: a second preset glided into
     double                   thenAt = 60.0, thenGlide = 30.0;
     std::string              thenOnly;                  // --then-only: the parts of the second preset glided into
-    int                      holdPitch = 0;             // --hold-pitch: Engine::setHoldPitch
+    int                      holdPitch = 1;             // --hold-pitch: Engine::setHoldPitch (the instrument's 1)
     bool                     brain = true, fill = false, noteLog = false;
     std::string              jamLead, jamFollow;        // plan E3: the family jam offline (JamSim.h)
     int                      jamHear = 0;

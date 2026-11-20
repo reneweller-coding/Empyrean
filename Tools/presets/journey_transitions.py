@@ -27,10 +27,13 @@ Three passes, each resumable (results appended to TSVs under work/journeys/, don
            octave counted too (rub_m7_s: the interval class of a semitone under two octaves); the figures' notes
            against the outgoing chord (rub_fig_s); and the largest retune of a note that sounds at the glide's middle
            and how many such notes move by a quarter tone or more (moved50).
-           `--hold-pitch 1` (plan D2b) audits with Engine::setHoldPitch: a note that sounds when a glide changes the
-           tuning keeps its pitch in Hz until it ends (the audit prints `H,<s>,<source>,<note>,<Hz>` for each such
-           note, and its pitch is that from then on); the results go to notes_hold1<tag>.tsv. `--fresh` measures
-           every pair again into this run's own file (otherwise a pair any run measured is skipped).
+           `--hold-pitch` (plan D2b) is Engine::setHoldPitch, 1 by default as in the instrument since 20.11.2026: a
+           note that sounds when a glide changes the tuning keeps its pitch in Hz until it ends (the audit prints
+           `H,<s>,<source>,<note>,<Hz>` for each such note, and its pitch is that from then on); the results go to
+           notes_hold1<tag>.tsv. `--hold-pitch 0` measures the instrument as it was before, every sounding note
+           retuned (notes<tag>.tsv, the files of D2). The two are two instruments: notes, report and export-bad read
+           only the files of the one asked for. `--fresh` measures every pair again into this run's own file
+           (otherwise a pair any run of the same instrument measured is skipped).
   render   on the graphics card, a sample (the card is shared: chunks of at most --chunk-min minutes, the card
            taken through G:/Tools/Games/gpu_card.py and given back between chunks, all of it within --budget-min):
            `empy_render --preset A --fill --set brain_on=1 --then B --at RPRE --glide G` (about thirty seconds a
@@ -53,8 +56,11 @@ Three passes, each resumable (results appended to TSVs under work/journeys/, don
 
   report   joins them into work/journeys/transitions.tsv and prints the counts of broken transitions: a level dip or
            peak over 3 LU, or more than 5 s of semitone rubbing (the plan's acceptance, D2).
-  export-bad  every pair measured as broken, from all the runs, into Tools/presets/journey_bad_pairs.tsv, which
-           make_journeys.py keeps apart.
+  export-bad  every pair measured as broken, from all the runs of the instrument asked for (--hold-pitch), into
+           Tools/presets/journey_bad_pairs.tsv, which make_journeys.py keeps apart. A level dip or peak counts as
+           measured against both presets alone where that was measured (alone.tsv; plan D2b: the holes the old
+           yardstick found were the presets' own); the renders are the old instrument's, whose levels the switch
+           does not move (it keeps a pitch, not a level).
   --check  the ctest `journeys` (no card, no program): no neighbour pair of Core/src/Journeys.inc that
            journey_bad_pairs.tsv lists, and no two presets of one scale whose roots stand more than --max-fifths
            (5) fifths apart -- a tritone between the roots rubbed in a third of the transitions, the other root steps
@@ -419,14 +425,22 @@ def note_metrics(text):
             "moved50": sum(1 for m in moves if m >= COMPATIBLE_C)}
 
 
-def run_note_chunk(chunk, exe, dt, every, hold=0):
+def notes_files(hold):
+    """The note audits of one instrument: with Engine::setHoldPitch (hold 1, notes_hold1*.tsv) or as it was before
+    20.11.2026 (hold 0, the other notes*.tsv). A pair measured on one says nothing about the other."""
+    if hold:
+        return sorted(WORK.glob("notes_hold%d*.tsv" % hold))
+    return sorted(f for f in WORK.glob("notes*.tsv") if not f.name.startswith("notes_hold"))
+
+
+def run_note_chunk(chunk, exe, dt, every, hold=1):
     fd, tmp = tempfile.mkstemp(suffix=".txt", prefix="jt_pairs_")
     with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
         for p in chunk:
             fh.write("%s|%s|%.1f|%.1f|%.1f\n" % (p["from"], p["to"], PRE, p["glide"], PRE + p["glide"] + POST))
     try:
-        r = subprocess.run([str(exe), "--pairs", tmp, "--dt", repr(dt), "--param-every", str(every)] +
-                           (["--hold-pitch", str(hold)] if hold else []),
+        r = subprocess.run([str(exe), "--pairs", tmp, "--dt", repr(dt), "--param-every", str(every),
+                            "--hold-pitch", str(hold)],
                            capture_output=True, text=True, encoding="utf-8", errors="replace",
                            creationflags=low_priority())
     finally:
@@ -442,11 +456,10 @@ def run_note_chunk(chunk, exe, dt, every, hold=0):
 def notes_pass(ps, args):
     hold = "_hold%d" % args.hold_pitch if args.hold_pitch else ""
     path = WORK / ("notes%s%s.tsv" % (hold, args.tag_suffix))
-    if args.fresh or hold:   # this run's own file alone
+    if args.fresh:   # this run's own file alone
         done = {r["key"] for r in read_tsv(path, NOTE_COLUMNS)}
-    else:                    # any run's (the plain runs: a run with the switch measures another instrument)
-        done = {r["key"] for f in WORK.glob("notes*.tsv") if not f.name.startswith("notes_hold")
-                for r in read_tsv(f, NOTE_COLUMNS)}
+    else:            # any run's of the same instrument (with the switch or without it: two instruments)
+        done = {r["key"] for f in notes_files(args.hold_pitch) for r in read_tsv(f, NOTE_COLUMNS)}
     todo = list({p["key"]: p for p in ps if p["key"] not in done}.values())
     if args.limit:
         todo = todo[:args.limit]
@@ -844,15 +857,14 @@ def alone_pass(ps, args):
 
 
 # -------------------------------------------------------------------------------------------------------- report
-def joined(ps, tag_suffix=""):
-    """The pairs with whatever any run measured of them (the runs share keys: a pair is the same pair in any file);
-    of a render, a row measured against the extremes wins over one measured against the medians."""
+def joined(ps, tag_suffix="", hold=1):
+    """The pairs with whatever any run measured of them (the runs share keys: a pair is the same pair in any file),
+    the notes of the instrument `hold` asks for (notes_files); of a render, a row measured against the extremes wins
+    over one measured against the medians."""
     st, nt, rd = {}, {}, {}
     for f in sorted(WORK.glob("static*.tsv")):
         st.update({r["key"]: r for r in read_tsv(f, STATIC_COLUMNS)})
-    for f in sorted(WORK.glob("notes*.tsv")):
-        if f.name.startswith("notes_hold"):
-            continue   # measured with Engine::setHoldPitch: another instrument
+    for f in notes_files(hold):
         nt.update({r["key"]: r for r in read_tsv(f, NOTE_COLUMNS)})
     for f in sorted(WORK.glob("render*.tsv")):
         for r in read_tsv(f, RENDER_COLUMNS):
@@ -884,8 +896,8 @@ def broken(r):
     return lvl, rub
 
 
-def report(ps, tag_suffix=""):
-    rows = joined(ps, tag_suffix)
+def report(ps, tag_suffix="", hold=1):
+    rows = joined(ps, tag_suffix, hold)
     cols = PAIR_COLUMNS + [c for c in STATIC_COLUMNS[3:]] + NOTE_COLUMNS[1:] + RENDER_COLUMNS[1:] + ALONE_COLUMNS[1:]
     path = WORK / ("transitions%s.tsv" % tag_suffix)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
@@ -896,7 +908,8 @@ def report(ps, tag_suffix=""):
     stat = [r for r in rows if "compatible" in r]
     nts = [r for r in rows if "rub_s" in r]
     rds = [r for r in rows if "dip_lu" in r and broken(r)[0] is not None]
-    print("%d transitions -> %s" % (n, path))
+    print("%d transitions -> %s (notes %s)" % (n, path, "with sounding notes kept at their pitch (--hold-pitch 1)"
+                                               if hold else "as before 20.11.2026, retuned (--hold-pitch 0)"))
     if stat:
         inc = sum(1 for r in stat if r["compatible"] == "0")
         print("  static: %d measured; tunings incompatible (a key of the register moves >= %.0f c): %d (%.1f %%); "
@@ -920,11 +933,13 @@ def report(ps, tag_suffix=""):
     return rows
 
 
-def export_bad(path):
-    """Every pair measured as broken, in any of the runs (the shipped journeys' and the candidates'), into the list
-    make_journeys.py reads (BAD_PAIRS there): from, to, why -- unordered for make_journeys, written as measured."""
+def export_bad(path, hold=1):
+    """Every pair measured as broken, in any of the runs of the instrument `hold` asks for (the shipped journeys' and
+    the candidates'), into the list make_journeys.py reads (BAD_PAIRS there): from, to, why -- unordered for
+    make_journeys, written as measured. A level counts against both presets alone where that was measured (D2b)."""
     bad = {}
-    for f in sorted(WORK.glob("notes*.tsv")):
+    al = {r["key"]: r for r in read_tsv(WORK / "alone.tsv", ALONE_COLUMNS)}
+    for f in notes_files(hold):
         for r in read_tsv(f, NOTE_COLUMNS):
             if float(r["rub_s"]) > RUB_LIMIT:
                 a, b, _g = r["key"].split("|")
@@ -933,15 +948,17 @@ def export_bad(path):
         for r in read_tsv(f, RENDER_COLUMNS):
             if r["range_lu"] == "":
                 continue   # measured against the medians (before 20.11.2026, 9 a.m.): an upper bound, rendered again
-            if float(r["dip_lu"]) > LU_LIMIT or float(r["peak_lu"]) > LU_LIMIT:
+            dip, peak = float(r["dip_lu"]), float(r["peak_lu"])
+            if r["key"] in al:   # counted again against both presets alone (plan D2b): that verdict holds
+                dip, peak = float(al[r["key"]]["dip_alone_lu"]), float(al[r["key"]]["peak_alone_lu"])
+            if dip > LU_LIMIT or peak > LU_LIMIT:
                 a, b, _g = r["key"].split("|")
-                bad.setdefault((a, b), set()).add("level dip %.1f peak %.1f LU" % (float(r["dip_lu"]),
-                                                                                  float(r["peak_lu"])))
+                bad.setdefault((a, b), set()).add("level dip %.1f peak %.1f LU" % (dip, peak))
     lines = ["# Pairs of presets measured as broken where a journey glides from the first into the second "
              "(Tools/presets/journey_transitions.py export-bad): more than %.0f s of a minor second between the "
-             "outgoing and the incoming chord (additiv_brain_audit --pairs, every pair of the journeys), or a level "
-             "dip or peak over %.0f LU (empy_render --then, a sample). make_journeys.py keeps them apart." % (
-                 RUB_LIMIT, LU_LIMIT), "from\tto\twhy"]
+             "outgoing and the incoming chord (additiv_brain_audit --pairs --hold-pitch %d, every pair of the "
+             "journeys), or a level dip or peak over %.0f LU beyond both presets alone (empy_render --then, a "
+             "sample). make_journeys.py keeps them apart." % (RUB_LIMIT, hold, LU_LIMIT), "from\tto\twhy"]
     for (a, b), why in sorted(bad.items()):
         lines.append("%s\t%s\t%s" % (a, b, "; ".join(sorted(why))))
     pathlib.Path(path).write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
@@ -1011,8 +1028,9 @@ def main():
     ap.add_argument("--pause", type=float, default=45.0)
     ap.add_argument("--max-fifths", type=int, default=MAX_FIFTHS)
     ap.add_argument("--max-bad-share", type=float, default=MAX_BAD_SHARE)
-    ap.add_argument("--hold-pitch", type=int, default=0,
-                    help="notes: audit with Engine::setHoldPitch (1: a sounding note keeps its pitch); own TSV")
+    ap.add_argument("--hold-pitch", type=int, default=1,
+                    help="notes, report, export-bad: Engine::setHoldPitch, 1 as in the instrument (a sounding note "
+                         "keeps its pitch), 0 as before 20.11.2026; each has its own TSVs")
     ap.add_argument("--fresh", action="store_true", help="notes: skip only the pairs this run's own file has")
     args = ap.parse_args()
     args.tag_suffix = ("_" + args.tag) if args.tag else ""
@@ -1040,9 +1058,9 @@ def main():
     elif args.what == "alone":
         alone_pass(ps, args)
     elif args.what == "report":
-        report(ps, args.tag_suffix)
+        report(ps, args.tag_suffix, args.hold_pitch)
     elif args.what == "export-bad":
-        export_bad(ROOT / "Tools" / "presets" / "journey_bad_pairs.tsv")
+        export_bad(ROOT / "Tools" / "presets" / "journey_bad_pairs.tsv", args.hold_pitch)
     else:
         ap.print_help()
 

@@ -245,8 +245,10 @@ otherwise, and say which; `python Tools/presets/descriptors.py --check` compares
 `--refresh` writes the copy anew -- after every new measurement, committed with the tables made from it. (The nudges
 also need the knobs' sensitivity, `work/presets/sensitivity.jsonl`, which is not copied.)
 
-Where a journey glides from one preset into the next, the scale and its root change at the glide's middle and every
-note that sounds is retuned into the new scale within seconds; the conductors go on with their chord.
+Where a journey glides from one preset into the next, the scale and its root change at the glide's middle; every note
+that sounds then keeps its pitch until it ends, and the notes struck afterwards are in the new tuning (before
+20.11.2026 they were retuned into the new scale within seconds: `--hold-pitch 0`); the conductors go on with their
+chord.
 `Tools/presets/journey_transitions.py` measures what that does to every neighbour pair of the journeys: without the
 card (`static`, `notes`: `additiv_brain_audit --pairs` plays the first preset, glides into the second and prints the
 notes and the tuning as it changes) the seconds of a minor second between the outgoing and the incoming chord and the
@@ -271,12 +273,12 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).
 `--note-log` prints every note begun and let go, with its source and pitch. `--then-only LIST` glides only some
 of the second preset's parameters in (sections of the parameter table, keys, `mod` for the matrix; a leading `-`
-takes all but those), to find which part of a glide does something. `--hold-pitch 1` (and the same option of
-`additiv_brain_audit`) turns on a switch that is off in the instrument (`Engine::setHoldPitch`): where a glide changes
-the tuning, a note that sounds keeps its pitch in hertz until it ends and only notes struck afterwards are tuned anew
-(the conductors', the foundation's and the figures'; a key the player holds is retuned as before); `--note-log` and the
-audit print each such note as `H,<s>,<source>,<note>,<Hz>`, and `journey_transitions.py notes --hold-pitch 1`
-measures the journeys with it.
+takes all but those), to find which part of a glide does something. `--hold-pitch` (and the same option of
+`additiv_brain_audit` and `journey_transitions.py`) is `Engine::setHoldPitch`, 1 by default as in the instrument
+(since 20.11.2026): where a glide changes the tuning, a note that sounds keeps its pitch in hertz until it ends and
+only notes struck afterwards are tuned anew (the conductors', the foundation's and the figures'; a key the player holds
+is retuned); `--note-log` and the audit print each such note as `H,<s>,<source>,<note>,<Hz>`. `--hold-pitch 0` plays
+the instrument as it was before, every sounding note retuned into the new tuning, byte for byte.
 
 What the conductors, the foundation and the figures play can be seen without the graphics card: `additiv_brain_audit
 --preset "Velvet Dreaming" --hours 1` runs them on their own clock (an hour in about three seconds) and prints the same

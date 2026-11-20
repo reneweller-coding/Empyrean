@@ -6337,6 +6337,62 @@ int main( int argc, char **argv )
                     ons1, rubs1, uni1, ons2, rubs2, uni2 ) );
     }
 
+    // 127. Sounding notes keep their pitch where a glide changes the tuning (plan D2b, on by default since 20.11.2026;
+    //      Engine::setHoldPitch). Deep Hours glides into Slow Hours (Harmonic 8-16 on F# into JI Major on A: a key
+    //      moved by up to a whole tone) as a journey's step does, the conductors audited without the card. On -- the
+    //      default -- notes are kept, each at the pitch its key had just before the tuning changed (within 5 cents:
+    //      Purity glides on up to the middle); off, none is kept and everything is retuned as before 20.11.2026.
+    if ( wanted( 127, "Sounding notes keep their pitch in a glide (20.11.2026, plan D2b)" ) )
+    {
+        static std::vector<std::pair<int, double>> pinned;   // M_PinTrace is a plain function: (key, Hz kept)
+        auto run = []( int mode, double &worstCents, bool &defaultOn )
+        {
+            pinned.clear();
+            auto e = std::make_unique<Engine>();
+            defaultOn = e->holdPitch() == 1;
+            if ( mode >= 0 ) e->setHoldPitch( mode );
+            e->setRealtime( false );
+            const int    from = findPreset( "Deep Hours" ), to = findPreset( "Slow Hours" );
+            EngineConfig c;
+            e->loadPreset( from );
+            e->setParam( ParamIdE::BRAIN_ON, 1.0f );
+            double  snapshot[128] = {};
+            bool    loaded = false;
+            Engine *eng = e.get();
+            Engine::M_PinTrace = []( double, int note, int, double hz ) { pinned.emplace_back( note, hz ); };
+            size_t seen = 0;
+            worstCents = 0.0;
+            e->auditConductor( 240.0, c, c.m_gpuBlock / c.m_sampleRate, 1, []( const Engine::AuditNote & ) {}, {},
+                               [&]( double t )
+                               {
+                                   // what the last step kept, against the keys' pitch as that step began
+                                   for ( ; seen < pinned.size(); ++seen )
+                                   {
+                                       const auto &[key, hz] = pinned[seen];
+                                       worstCents =
+                                           std::max( worstCents, std::fabs( 1200.0 * std::log2( hz / snapshot[key] ) ) );
+                                   }
+                                   if ( !loaded && t >= 120.0 )
+                                   {
+                                       eng->loadPreset( to, 90.0 );
+                                       eng->setParam( ParamIdE::BRAIN_ON, 1.0f );
+                                       loaded = true;
+                                   }
+                                   for ( int k = 0; k < 128; ++k ) snapshot[k] = eng->keyHz( k );
+                               } );
+            Engine::M_PinTrace = nullptr;
+            return pinned.size();
+        };
+        double     worstOn = 0.0, worstZero = 0.0;
+        bool       defaultOn = false, unused = false;
+        const auto on = run( -1, worstOn, defaultOn ), zero = run( 0, worstZero, unused );
+        check( defaultOn && on > 0 && worstOn < 5.0 && zero == 0,
+               "glide: sounding notes keep their pitch (on by default), and 0 retunes them as before",
+               fmt( "default %s; kept on: %zu notes, the farthest %.1f cents from its key's pitch before the change; "
+                    "kept with 0: %zu",
+                    defaultOn ? "on" : "OFF", on, worstOn, zero ) );
+    }
+
     finishTest();
     if ( g_sel.m_list ) return 0;
     for ( size_t r = 0; r < g_sel.m_only.size(); ++r )

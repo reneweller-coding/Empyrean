@@ -163,9 +163,9 @@ public:
     static inline void ( *M_PinTrace )( double seconds, int note, int source, double hz ) = nullptr;
 
     /**
-     * @brief Sounding notes keep their pitch where a glide changes the tuning (plan D2b, 20.11.2026). Off by default,
-     *        and nothing in the instrument turns it on: the tools do (empy_render and additiv_brain_audit
-     *        `--hold-pitch 1`), so it can be heard and measured before anyone decides.
+     * @brief Sounding notes keep their pitch where a glide changes the tuning (plan D2b, 20.11.2026). On by default
+     *        since Rene heard it (20.11.2026); no knob or preset sets it. Mode 0 is the instrument as it was before, for
+     *        the tools to compare (empy_render and additiv_brain_audit `--hold-pitch 0`).
      *
      * A glide between two presets changes the scale, its root and the key mapping at its middle, and every note that
      * sounds keeps its key and slides to that key's pitch in the new tuning (D2: in 59 % of the journeys' transitions a
@@ -177,7 +177,7 @@ public:
      * (heldHz), so listenTo, rubsOwn, resting and againstOther see the true hertz; so do the figures' checks against
      * the chord and against each other. Only while a glide runs (a journey's step, a preset taken with a glide, the A/B
      * morph switched); a tuning turned on the panel, or the map's cursor, retunes as before.
-     * @param[in] mode  0 off (the instrument as it was), 1 sounding notes keep their pitch
+     * @param[in] mode  0 off (the instrument as it was before 20.11.2026), 1 sounding notes keep their pitch (default)
      * @pre before prepare() or auditConductor(), or between blocks
      */
     void setHoldPitch( int mode ) { m_holdPitch = mode; }
@@ -2094,7 +2094,7 @@ private:
     std::atomic<float> m_viewRootHz{ 261.63f };   ///< the root's equal-tempered pitch (rootHz)
     std::array<std::atomic<float>, 128> m_viewNoteHz{};   ///< every key's pitch (noteHz)
     double m_noteHzKey[5] = { -1, -1, -1, -1, -1 };   ///< what they were worked out for: scale, root, A4, Purity, keys
-    int  m_holdPitch = 0;       ///< setHoldPitch(): 0 off, 1 sounding notes keep their pitch where a glide changes the tuning
+    int  m_holdPitch = 1;       ///< setHoldPitch(): 0 off, 1 (default) sounding notes keep their pitch in a glide
     bool m_pinsLive = false;    ///< a voice has been kept at its pitch (heldHz() looks then; never while the switch is off)
 };
 
