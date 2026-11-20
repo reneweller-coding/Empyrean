@@ -263,6 +263,13 @@ conductors, doublings, notes struck again, notes shorter than their attack, figu
 (`--sample 200`) or the whole bank (`--all`, about a quarter of an hour on sixteen cores); `--check
 Tests/golden/music_audit.json` is the ctest `music_audit` (label `slow`).
 
+The conductor, `Core/include/additiv/ClusterBrain.h`, is the family's: Noctuary, Empyrean and Zodiacal play the same
+one, generated from one canonical file whose home is Noctuary's repository. `Tools/family/ClusterBrain.h.in` and
+`Tools/family/sync_brain.py` are copies of those two files; `python Tools/family/sync_brain.py --product additiv --out
+Core/include/additiv/ClusterBrain.h` writes the header from them, and the ctest `brain_in_sync` fails when the header is
+not what they write. The header is never edited by hand: a change to the conductor is made in Noctuary and arrives here
+by copying the two files again and running the sync (then `music_audit` and `additiv_selftest --only 113-124`).
+
 A night of the night director as a table, without the card: `additiv_night --hours 8 --seed 1` (`--journey` prints
 the journey file); `Tools/presets/night_plot.py --hours 8 --png night.png` adds the stillness against the curve and a
 picture (Pillow).

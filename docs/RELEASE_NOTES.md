@@ -200,6 +200,14 @@
   garbled file is an empty list or the names in it. A self-test (125) writes and reads it back, feeds it a garbled
   one, and checks that a night of eight hours takes none of 28 names from it and that a journey of eight steps with
   three of them marked -- once through, in circles, marked while it runs -- never plays them.
+- **Inside: one conductor for the family** (20.11.2026, plan A1). The conductor lay three times, in Noctuary,
+  Empyrean and Zodiacal, and every fix of 19./20.11. was carried across by hand. Empyrean's
+  `Core/include/additiv/ClusterBrain.h` is now generated from the family's one canonical file (Noctuary's
+  `Tools/family/ClusterBrain.h.in`, copied with its `sync_brain.py` into `Tools/family/`); the ctest `brain_in_sync`
+  fails when the header is not what the sync writes, and the next change to the conductor arrives by copying the two
+  files again. What came with it changes nothing that plays: Root Every as a parameter of the conductor at Empyrean's
+  old 240 seconds (the 720 is three of it, exactly), and a reason for every note let go that only a tool reads. The
+  music audit's 200 presets, an hour each, give the same numbers and the same line for every preset, byte for byte.
 
 ## 1.0.0 (17.10.2026)
 

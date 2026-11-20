@@ -150,6 +150,10 @@ if(ADDITIV_BUILD_TOOLS)
         set_tests_properties(music_audit PROPERTIES LABELS "slow" TIMEOUT 1800)
         # The checked-in copy of the bank's measures against the measurement, where both are there (A7, 20.11.2026).
         add_test(NAME descriptors COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/descriptors.py" --check)
+        # The conductor is generated from the family's one source (plan A1, 20.11.2026): Tools/family/ClusterBrain.h.in,
+        # copied from Noctuary, its home of record. The copy in Core must be what Tools/family/sync_brain.py writes.
+        add_test(NAME brain_in_sync COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/family/sync_brain.py"
+                 --check "${CMAKE_SOURCE_DIR}/Core/include/additiv/ClusterBrain.h" --product additiv)
     endif()
 endif()
 
