@@ -254,7 +254,10 @@ retune of what sounds; on the card, for a sample (`render`: `empy_render --then 
 or peak and the roughness. `export-bad` writes the pairs measured as broken to `Tools/presets/journey_bad_pairs.tsv`,
 which `make_journeys.py` keeps apart, beside a cost for every glide between two tunings; `--check` is the ctest
 `journeys` (no two neighbours of one scale on roots a tritone apart, at most a tenth of the neighbour pairs of
-`Journeys.inc` listed as broken).
+`Journeys.inc` listed as broken). A level that falls or rises in a glide is counted beyond what either preset does by
+itself: `alone` renders the two presets of every sampled pair over the limit alone, as the pair was rendered, and the
+dip and the peak are counted again against them (the holes of 13 to 53 LU measured first were the presets' own
+silences between their notes, there without any glide); `--check` also holds that yardstick.
 `Tools/presets/journey_eval.py BEFORE AFTER` compares two journeys files by the measures (the step between
 neighbours, a journey's spread).
 
@@ -266,7 +269,9 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 ```
 
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).
-`--note-log` prints every note begun and let go, with its source and pitch.
+`--note-log` prints every note begun and let go, with its source and pitch. `--then-only LIST` glides only some
+of the second preset's parameters in (sections of the parameter table, keys, `mod` for the matrix; a leading `-`
+takes all but those), to find which part of a glide does something.
 
 What the conductors, the foundation and the figures play can be seen without the graphics card: `additiv_brain_audit
 --preset "Velvet Dreaming" --hours 1` runs them on their own clock (an hour in about three seconds) and prints the same

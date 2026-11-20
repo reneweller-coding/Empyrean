@@ -7,7 +7,7 @@
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S] [--note-log]
- *                    [--then NAME|N --at S --glide S]
+ *                    [--then NAME|N --at S --glide S [--then-only LIST]]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -20,7 +20,10 @@
  * seconds, as a preset chosen on the panel does, instead of entering one voice at a time. The WAV is written as it is rendered; beyond an hour
  * it is cut into files of an hour (render-01.wav, render-02.wav, ...). --then glides into a second preset at --at
  * seconds over --glide seconds, as a journey's step does (the conductor kept on): one transition of a journey, for
- * Tools/presets/journey_transitions.py.
+ * Tools/presets/journey_transitions.py. --then-only glides only some of the second preset's parameters in and keeps
+ * the first's for the rest, to find which part of a glide does something (plan D2b): a comma list of sections of the
+ * parameter table ("Filter", "Motion"; any case), parameter keys ("cutoff") and "mod" (the matrix); a list that
+ * begins with "-" takes everything but what it names.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
@@ -35,6 +38,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -189,6 +193,39 @@ bool applySet( Engine &e, const std::string &arg )
 }
 
 /**
+ * @brief Whether --then-only takes a parameter (or, with id < 0, the matrix) from the second preset.
+ * @param[in] list  the list as given: sections, keys and "mod", comma-separated; a leading "-" inverts it
+ * @param[in] id    the parameter's index, -1 for the matrix
+ * @return true when the parameter glides into the second preset's value
+ */
+bool thenTakes( const std::string &list, int id )
+{
+    const bool  invert = !list.empty() && list[0] == '-';
+    const auto  lower = []( std::string t )
+    {
+        for ( char &ch : t ) ch = static_cast<char>( std::tolower( static_cast<unsigned char>( ch ) ) );
+        return t;
+    };
+    const std::string body = lower( invert ? list.substr( 1 ) : list );
+    bool              named = false;
+    for ( size_t p = 0; p <= body.size(); )
+    {
+        const size_t      c = body.find( ',', p );
+        const std::string item = body.substr( p, c == std::string::npos ? std::string::npos : c - p );
+        if ( id < 0 )
+            named = named || item == "mod";
+        else
+        {
+            const ParamDesc &d = paramDesc( static_cast<ParamIdE>( id ) );
+            named = named || item == lower( d.m_section ) || item == d.m_key;
+        }
+        if ( c == std::string::npos ) break;
+        p = c + 1;
+    }
+    return named != invert;
+}
+
+/**
  * @brief A string as a JSON literal.
  * @param[in] s  the text
  * @return it quoted, with quotes and backslashes escaped
@@ -282,6 +319,7 @@ int main( int argc, char **argv )
     std::uint64_t            journeySeed = 1;
     std::string              thenName;                  // --then: a second preset glided into
     double                   thenAt = 60.0, thenGlide = 30.0;
+    std::string              thenOnly;                  // --then-only: the parts of the second preset glided into
     bool                     brain = true, fill = false, noteLog = false;
     for ( int i = 1; i < argc; ++i )
     {
@@ -319,6 +357,8 @@ int main( int argc, char **argv )
             thenAt = std::atof( argv[++i] );
         else if ( a == "--glide" && has )
             thenGlide = std::atof( argv[++i] );
+        else if ( a == "--then-only" && has )
+            thenOnly = argv[++i];
         else if ( a == "--route" && has )
             routeName = argv[++i];
         else if ( a == "--route-speed" && has )
@@ -346,7 +386,7 @@ int main( int argc, char **argv )
                 stderr,
                 "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
                 "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
-                "            [--then NAME --at S --glide S] [--fill] [--log S] [--note-log]\n"
+                "            [--then NAME --at S --glide S [--then-only LIST]] [--fill] [--log S] [--note-log]\n"
                 "empy_render --dump-params\n" );
             return 1;
         }
@@ -517,7 +557,19 @@ int main( int argc, char **argv )
         }
         if ( !thenDone && done >= static_cast<std::int64_t>( thenAt * c.m_sampleRate ) )
         {   // --then: a journey's step, alone
-            e.loadPreset( thenIndex, std::max( thenGlide, 0.5 ) );
+            if ( thenOnly.empty() )
+                e.loadPreset( thenIndex, std::max( thenGlide, 0.5 ) );
+            else
+            {   // --then-only: as loadPreset, the parameters not named kept at the first preset's
+                float       values[NumParams];
+                std::string mod;
+                presetValues( thenIndex, values, &mod );
+                e.beginMorph( std::max( thenGlide, 0.5 ) );
+                for ( int k = 0; k < NumParams; ++k )
+                    if ( !keptByPresets( static_cast<ParamIdE>( k ) ) && thenTakes( thenOnly, k ) )
+                        e.setParam( static_cast<ParamIdE>( k ), values[k] );
+                if ( thenTakes( thenOnly, -1 ) ) e.setModText( mod );
+            }
             e.setParam( ParamIdE::BRAIN_ON, 1.0f );
             thenDone = true;
             std::printf( "  %5.0f s: glide into %s, %.0f s\n", done / c.m_sampleRate, preset( thenIndex ).m_name,

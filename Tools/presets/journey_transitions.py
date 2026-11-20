@@ -35,6 +35,16 @@ Three passes, each resumable (results appended to TSVs under work/journeys/, don
            has in its steady stretch (LU), and a roughness peak (Vassilakis over the spectrum's 40 strongest peaks,
            every half second) against the larger steady roughness, as a ratio. The curves are kept
            (work/journeys/curves/), the audio is not. --card-sample takes the sample card_sample() draws.
+  alone    on the card (plan D2b, 20.11.2026): every rendered pair whose level dips or peaks over the limit has both
+           its presets rendered alone, as the pair was (`--fill`, conductor on, the same seconds), and the dip and the
+           peak counted again beyond what either preset does by itself over the same stretch (dip_alone_lu,
+           peak_alone_lu in alone.tsv; the report and export-bad take those where they exist). The holes of 13 to 53 LU
+           found in D2 were the presets' own: played alone, without any glide, Travertine Atrium falls 55 LU under its
+           first 25 seconds' lowest level in the same stretch (its conductor strikes at 25 s and next at 61 s, every
+           note decaying to nothing in seconds), Seething Eddy Light 43, Answering Reply 22, Scintillant Rigel 16 --
+           as deep as with the glide, and a glide of any single knob (empy_render --then-only) gave the same hole. The
+           first 25 s after `--fill` are not the preset's whole range. Same budget rules as render; curves of the
+           presets alone in work/journeys/curves/alone_*.npz.
 
   report   joins them into work/journeys/transitions.tsv and prints the counts of broken transitions: a level dip or
            peak over 3 LU, or more than 5 s of semitone rubbing (the plan's acceptance, D2).
@@ -48,6 +58,7 @@ Three passes, each resumable (results appended to TSVs under work/journeys/, don
     python Tools/presets/journey_transitions.py static
     python Tools/presets/journey_transitions.py notes            (four processes, below normal)
     python Tools/presets/journey_transitions.py render --card-sample --budget-min 52 --chunk-min 15
+    python Tools/presets/journey_transitions.py alone --card-sample --budget-min 30 --chunk-min 15
     python Tools/presets/journey_transitions.py export-bad
     python Tools/presets/journey_transitions.py report
     python Tools/presets/journey_transitions.py --check
@@ -97,6 +108,7 @@ STATIC_COLUMNS = ["key", "from", "to", "root_from", "root_to", "fifths", "scale_
                   "retune_mean_c", "moved_share", "compatible"]
 NOTE_COLUMNS = ["key", "rub_s", "rub_m7_s", "rub_fig_s", "retune_sounding_c", "out_notes", "in_notes", "chord_mid"]
 RENDER_COLUMNS = ["key", "level_from", "level_to", "dip_lu", "peak_lu", "jump_lu", "rough_ratio", "card_s", "range_lu"]
+ALONE_COLUMNS = ["key", "dip_alone_lu", "peak_alone_lu", "alone_low_lu", "alone_high_lu"]
 # (rows without range_lu were measured against the steady stretches' medians, not their extremes: an upper bound of
 # the dip and the peak; those over the limit are rendered again)
 SCALES = ["12-TET", "JI Major", "JI Minor", "JI 7-limit", "Pythagorean", "JI Pentatonic", "Harmonic 8-16",
@@ -485,6 +497,54 @@ def render_metrics(wav, glide, curves=None):
     return metrics_of(t, st, tr, rv, glide, total)
 
 
+def alone_corrected(t, st, glide, total, alone):
+    """The dip and the peak of a transition counted beyond what either preset does by itself: the floor is the lowest
+    of the steady stretches' lowest levels (as metrics_of) and of each preset's own lowest level over the same window
+    when played alone; the ceiling likewise. `alone` is a list of (t, st) curves of the presets alone (same clock).
+    Returns (dip, peak, the alone curves' lowest and highest level in the window)."""
+    import numpy as np
+    a0, a1 = RPRE - STEADY, RPRE
+    b0, b1 = total - STEADY, total
+    sa, sb = st[(t > a0 + 3) & (t <= a1)], st[(t > b0 + 3) & (t <= b1)]
+    lo, hi = (t > RPRE), (t <= RPRE + glide + 15.0)
+    w = lo & hi
+    low = min(float(sa.min()), float(sb.min()))
+    high = max(float(sa.max()), float(sb.max()))
+    alow, ahigh = float("inf"), float("-inf")
+    for at, ast in alone:
+        aw = (at > RPRE) & (at <= RPRE + glide + 15.0)
+        if aw.any():
+            alow, ahigh = min(alow, float(ast[aw].min())), max(ahigh, float(ast[aw].max()))
+    dip = max(0.0, min(low, alow) - float(st[w].min()))
+    peak = max(0.0, float(st[w].max()) - max(high, ahigh))
+    return dip, peak, alow, ahigh
+
+
+def yardstick_check():
+    """Part of --check (plan D2b): a preset that falls silent by itself between its notes is not a hole of the glide.
+    Synthetic curves: the first preset at -20 LUFS for its steady stretch, then a 20 s silence at -80 that it has
+    alone too; the glide follows the first preset. metrics_of (the steady stretches alone, as D2 counted) calls that a
+    hole of 60 LU; counted against the presets alone it is none. And a hole the glide makes itself (-80 where both
+    presets alone stay at -20) is still found. Returns the problems, empty when the yardstick holds."""
+    import numpy as np
+    glide, total = 90.0, RPRE + 90.0 + RPOST
+    t = np.arange(3.0, total + 0.01, 0.5)
+    own = np.where((t > 60.0) & (t < 80.0), -80.0, -20.0)        # the first preset's own silence
+    flat = np.full_like(t, -20.0)
+    made = np.where((t > 60.0) & (t < 80.0), -80.0, -20.0)       # a glide that makes the same hole itself
+    problems = []
+    old = metrics_of(t, own, t, np.ones_like(t), glide, total)["dip_lu"]
+    if old < LU_LIMIT:
+        problems.append("the steady stretches alone should count the preset's own silence (%.1f LU)" % old)
+    dip, _peak, _l, _h = alone_corrected(t, own, glide, total, [(t, own), (t, flat)])
+    if dip > LU_LIMIT:
+        problems.append("a preset's own silence counted as a hole of the glide: %.1f LU" % dip)
+    dip, _peak, _l, _h = alone_corrected(t, made, glide, total, [(t, flat), (t, flat)])
+    if dip < 50.0:
+        problems.append("a hole the glide makes itself was not found: %.1f LU" % dip)
+    return problems
+
+
 def metrics_of(t, st, tr, rv, glide, total):
     """The measures from the loudness and roughness curves. A dip or a peak is counted beyond what either preset does
     by itself in its steady stretch (its own lowest and highest short-term loudness there): a preset that is struck
@@ -570,7 +630,7 @@ def render_pass(ps, args):
     sys.path.insert(0, str(GPU_CARD))
     import gpu_card
     path = WORK / ("render%s.tsv" % args.tag_suffix)
-    budget_path = WORK / "card_budget.json"
+    budget_path = WORK / ("card_budget%s.json" % args.tag_suffix)   # each tag its own budget (D2b)
     used = json.loads(budget_path.read_text())["seconds"] if budget_path.exists() else 0.0
     done = {r["key"] for f in WORK.glob("render*.tsv") for r in read_tsv(f, RENDER_COLUMNS)
             if (r["range_lu"] != "" or (float(r["dip_lu"]) <= LU_LIMIT and float(r["peak_lu"]) <= LU_LIMIT))
@@ -632,6 +692,127 @@ def render_pass(ps, args):
             time.sleep(args.pause)   # the card back for whoever waits (gpu_card polls every 20 s)
 
 
+def alone_curve_path(name, seconds):
+    return WORK / "curves" / ("alone_%s_%d.npz" % (re.sub(r"[^A-Za-z0-9]+", "_", name), int(round(seconds))))
+
+
+def render_alone(name, seconds, out_dir, n):
+    """Renders one preset alone as a transition's first preset is rendered (the caller holds the card); its short-term
+    loudness is kept, the audio is not."""
+    import numpy as np
+    from scipy.io import wavfile
+    wav = out_dir / ("alone%d.wav" % (n % 4))
+    env = dict(os.environ, ADDITIV_MUTE="1")
+    t0 = time.time()
+    r = subprocess.run([str(RENDER_EXE), "--preset", name, "--fill", "--seconds", "%.1f" % seconds, "--log", "60",
+                        "--set", "brain_on=1", "--out", str(wav)], capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", env=env, creationflags=low_priority())
+    if r.returncode != 0:
+        raise RuntimeError("empy_render failed for %s: %s" % (name, (r.stderr or r.stdout)[-300:]))
+    took = time.time() - t0
+    sr, x = wavfile.read(str(wav))
+    x = x.astype(np.float64)
+    if np.abs(x).max() > 4.0:   # as render_metrics reads it
+        x /= 2.0 ** 31
+    if np.abs(x).max() > 4.0:
+        x /= 2.0 ** 31 if np.abs(x).max() > 2.0 ** 24 else 2.0 ** 23
+    t, st = short_term(x, sr)
+    np.savez_compressed(str(alone_curve_path(name, seconds)), t=t, st=st)
+    wav.unlink()
+    return took
+
+
+def alone_rows(ps):
+    """For every rendered pair whose two presets have their alone curves: the corrected dip and peak."""
+    import numpy as np
+    rd = rendered()
+    rows = []
+    for p in {p["key"]: p for p in ps}.values():
+        r = rd.get(p["key"])
+        cur = WORK / "curves" / (re.sub(r"[^A-Za-z0-9]+", "_", p["key"]) + ".npz")
+        if r is None or not cur.exists():
+            continue
+        d = np.load(str(cur))
+        total = float(d["total"])
+        alone = []
+        for name in (p["from"], p["to"]):
+            f = alone_curve_path(name, total)
+            if not f.exists():
+                break
+            a = np.load(str(f))
+            alone.append((a["t"], a["st"]))
+        if len(alone) < 2:
+            continue
+        dip, peak, lo, hi = alone_corrected(d["t"], d["st"], float(d["glide"]), total, alone)
+        rows.append({"key": p["key"], "dip_alone_lu": dip, "peak_alone_lu": peak, "alone_low_lu": lo,
+                     "alone_high_lu": hi})
+    return rows
+
+
+def rendered():
+    """key -> the render row any run measured (of two, the one measured against the extremes)."""
+    rd = {}
+    for f in sorted(WORK.glob("render*.tsv")):
+        for r in read_tsv(f, RENDER_COLUMNS):
+            if r["key"] not in rd or r["range_lu"] != "" or rd[r["key"]]["range_lu"] == "":
+                rd[r["key"]] = r
+    return rd
+
+
+def alone_pass(ps, args):
+    """The presets of every rendered pair over the level limit, alone (see the file comment); then alone.tsv."""
+    sys.path.insert(0, str(GPU_CARD))
+    import gpu_card
+    chosen = card_sample(ps, args.sample_nights, args.sample_groups) if args.card_sample else \
+        (sample_pairs(ps, args.sample) if args.sample else ps)
+    rd = rendered()
+    want = {}
+    for p in chosen:
+        r = rd.get(p["key"])
+        if r is None or not (float(r["dip_lu"]) > LU_LIMIT or float(r["peak_lu"]) > LU_LIMIT):
+            continue
+        seconds = RPRE + p["glide"] + RPOST
+        for name in (p["from"], p["to"]):
+            if not alone_curve_path(name, seconds).exists():
+                want[(name, round(seconds, 1))] = seconds
+    todo = list(want.items())
+    budget_path = WORK / ("card_budget%s.json" % args.tag_suffix)
+    used = json.loads(budget_path.read_text())["seconds"] if budget_path.exists() else 0.0
+    print("alone: %d presets to render alone, card used %.1f of %.0f min" % (len(todo), used / 60, args.budget_min),
+          flush=True)
+    out_dir = WORK / "render_tmp"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    while todo and used < 60.0 * args.budget_min:
+        chunk_left = min(60.0 * args.chunk_min, 60.0 * args.budget_min - used)
+        if chunk_left < 40.0:
+            break   # no render fits in what is left
+        with gpu_card.hold("Empyrean D2b [journey_transitions]: Presets allein rendern"):
+            t_hold = time.time()
+            while todo and time.time() - t_hold + 30.0 < chunk_left:
+                gpu_card.wait_while_paused()
+                (name, _s), seconds = todo.pop(0)
+                try:
+                    took = render_alone(name, seconds, out_dir, count)
+                except Exception as exc:
+                    print("  failed: %s" % exc, flush=True)
+                    continue
+                count += 1
+                print("  alone: %-40s %.0f s (%.0f s)" % (name, seconds, took), flush=True)
+            used += time.time() - t_hold
+            budget_path.write_text(json.dumps({"seconds": used}))
+        print("alone: chunk done, card used %.1f of %.0f min, %d left" % (used / 60, args.budget_min, len(todo)),
+              flush=True)
+        if todo and used < 60.0 * args.budget_min:
+            time.sleep(args.pause)
+    rows = alone_rows(ps)
+    path = WORK / "alone.tsv"
+    if path.exists():
+        path.unlink()
+    append_tsv(path, ALONE_COLUMNS, rows)
+    print("alone: %d pairs with both presets alone -> %s" % (len(rows), path))
+
+
 # -------------------------------------------------------------------------------------------------------- report
 def joined(ps, tag_suffix=""):
     """The pairs with whatever any run measured of them (the runs share keys: a pair is the same pair in any file);
@@ -645,10 +826,11 @@ def joined(ps, tag_suffix=""):
         for r in read_tsv(f, RENDER_COLUMNS):
             if r["key"] not in rd or r["range_lu"] != "" or rd[r["key"]]["range_lu"] == "":
                 rd[r["key"]] = r
+    al = {r["key"]: r for r in read_tsv(WORK / "alone.tsv", ALONE_COLUMNS)}
     rows = []
     for p in ps:
         r = dict(p)
-        for d in (st.get(p["key"]), nt.get(p["key"]), rd.get(p["key"])):
+        for d in (st.get(p["key"]), nt.get(p["key"]), rd.get(p["key"]), al.get(p["key"])):
             if d:
                 r.update({k: v for k, v in d.items() if k not in ("from", "to")})
         rows.append(r)
@@ -660,6 +842,8 @@ def broken(r):
     lvl = None
     if "dip_lu" in r:
         lvl = float(r["dip_lu"]) > LU_LIMIT or float(r["peak_lu"]) > LU_LIMIT
+        if lvl and "dip_alone_lu" in r:   # counted again against the presets alone (plan D2b): that verdict holds
+            lvl = float(r["dip_alone_lu"]) > LU_LIMIT or float(r["peak_alone_lu"]) > LU_LIMIT
         if lvl and r.get("range_lu", "") == "":
             lvl = None   # an upper bound (measured against the medians) over the limit: not known
         if float(r["level_from"]) < -70.0:
@@ -670,7 +854,7 @@ def broken(r):
 
 def report(ps, tag_suffix=""):
     rows = joined(ps, tag_suffix)
-    cols = PAIR_COLUMNS + [c for c in STATIC_COLUMNS[3:]] + NOTE_COLUMNS[1:] + RENDER_COLUMNS[1:]
+    cols = PAIR_COLUMNS + [c for c in STATIC_COLUMNS[3:]] + NOTE_COLUMNS[1:] + RENDER_COLUMNS[1:] + ALONE_COLUMNS[1:]
     path = WORK / ("transitions%s.tsv" % tag_suffix)
     with open(path, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\t".join(cols) + "\n")
@@ -759,6 +943,9 @@ def check(inc, max_fifths, max_bad_share):
         if (p["from"], p["to"]) in listed:
             broken_.append((p, "measured as broken"))
     share = len(broken_) / max(1, len(ps))
+    yard = yardstick_check()
+    for why in yard:
+        print("journey_transitions --check: the level's yardstick: %s" % why)
     print("journey_transitions --check: %d neighbour pairs of %d journeys; roots more than %d fifths apart in one "
           "scale: %d (none allowed); measured as broken: %d = %.1f %% (%d pairs listed; at most %.1f %% allowed)" % (
               len(ps), len({p["journey"] for p in ps}), max_fifths, len(far), len(broken_), 100.0 * share,
@@ -766,12 +953,12 @@ def check(inc, max_fifths, max_bad_share):
     shown = far[:8] + (broken_[:8] if share > max_bad_share else [])
     for p, why in shown:
         print("  %s, step %d: %s -> %s: %s" % (p["journey"], p["index"] + 1, p["from"], p["to"], why))
-    return 1 if far or share > max_bad_share else 0
+    return 1 if far or share > max_bad_share or yard else 0
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("what", nargs="?", choices=["pairs", "static", "notes", "render", "report",
+    ap.add_argument("what", nargs="?", choices=["pairs", "static", "notes", "render", "alone", "report",
                                                       "export-bad"])
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--inc", default=str(INC))
@@ -815,6 +1002,8 @@ def main():
         notes_pass(ps, args)
     elif args.what == "render":
         render_pass(ps, args)
+    elif args.what == "alone":
+        alone_pass(ps, args)
     elif args.what == "report":
         report(ps, args.tag_suffix)
     elif args.what == "export-bad":

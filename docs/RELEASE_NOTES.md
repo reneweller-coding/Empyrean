@@ -221,7 +221,12 @@
   measures is 5 % longer (median 4.6 %), a journey's spread and its stays are unchanged. The ctest `journeys` holds it.
   On the card, a sample of 78 glides: the level fell or rose more than 3 LU beyond what either preset does by itself
   in 16 of 67 before and 8 of 52 after; the deepest holes (13 to 53 LU at the glide's middle) belong to a few presets
-  whatever their neighbour, and are not mended here.
+  whatever their neighbour. They are the presets' own (plan D2b): played alone, without any glide, Travertine Atrium
+  falls as deep over the same seconds (its conductor strikes at 25 s and next at 61 s, every note gone in seconds),
+  Seething Eddy Light, Scintillant Rigel and Answering Reply likewise, and a glide of a single knob made the same
+  hole; the yardstick, the first 25 seconds after the chord was filled, had not seen them. Counted against both
+  presets played alone (`journey_transitions.py alone`), none of the 78 glides of the sample (all rendered now) falls
+  or rises more than 3 LU beyond them -- 13 did by the old count; with the rubbing, 4 broken instead of 16.
 
 ## 1.0.0 (17.10.2026)
 
