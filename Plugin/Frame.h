@@ -588,7 +588,8 @@ public:
     void setJamRole( JamRoleE r );
     /**
      * @brief Whether a follower hears the leader's notes ("Hear leader", plan E3, 20.11.2026): its conductors weigh
-     *        their choices against the notes the leader sounds too. Off by default; no preset sets it.
+     *        their choices against the notes the leader sounds too. On by default since 20.11.2026 (a settings file
+     *        that stores it keeps its value; FAMILY_JAM_HEAR=1 or 0 overrides it for one process); no preset sets it.
      * @return true when the leader's notes are heard
      */
     bool jamHear() const;

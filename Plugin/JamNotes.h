@@ -6,7 +6,7 @@
  * Jam.h gives a follower the leader's root; which notes the leader plays, it never knew, and a follower's chord could
  * stand a semitone against the leader's. A leader now also says the notes its conductors sound, in hertz, as they
  * sound (a kept or retuned pitch as it is, not its key), and a follower whose "Hear leader" is on (Settings, Family
- * jam; off by default) gives them to its conductors as further notes of another (ClusterBrain::hearAlso).
+ * jam; on by default) gives them to its conductors as further notes of another (ClusterBrain::hearAlso).
  * @code
  *   /family/notes  ,sii f...   instance, sequence number, count, then count notes in Hz (float32)
  * @endcode

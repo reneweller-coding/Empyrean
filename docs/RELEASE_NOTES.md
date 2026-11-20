@@ -238,6 +238,13 @@
   foreign to the new scale, rubs for longer than before (the journeys are ordered anew for it, below).
   `Engine::setHoldPitch(0)` and the tools' `--hold-pitch 0` (`empy_render`, `additiv_brain_audit`,
   `journey_transitions.py`) play the instrument as it was, byte for byte; no knob or preset sets it.
+- **The family hears itself: "Hear leader"** (20.11.2026, plan E3; on since Rene decided the same evening). A
+  leader in the family jam now also says the notes its conductors sound (`/family/notes`, in hertz as they sound), and
+  a follower with Hear leader on (Settings > Family jam; a settings file that stores the choice keeps it) weighs its
+  choices against them and lets go of a held note the leader's new note stands a semitone or a tritone against.
+  Measured offline over 13 preset pairs with Noctuary, an hour each way and 5 % of the messages lost: the two
+  conductors stood a semitone apart 65 to 69 % of the time, with it 0.02 to 0.03 %. Without a leader on the network
+  nothing changes. Not yet tried with two running instruments against each other.
 
 ## 1.0.0 (17.10.2026)
 

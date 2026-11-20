@@ -141,7 +141,7 @@ void AdditivProcessor::timerCallback()
 {
     m_jam.setRole(
         frame::Settings::of( App ).jamRole() );   // the family jam (Jam.h): Off, Lead or Follow, from the settings
-    m_jam.setHear( frame::Settings::of( App ).jamHear() );   // "Hear leader" (plan E3): off by default
+    m_jam.setHear( frame::Settings::of( App ).jamHear() );   // "Hear leader" (plan E3): on by default
     pollHeadset();
     if ( m_stopPlayers.exchange( false, std::memory_order_acquire ) )
     {   // a panic that came from another thread
