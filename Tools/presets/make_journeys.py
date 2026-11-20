@@ -277,7 +277,11 @@ def standardised(values):
     return dict(zip(names, (r[0] for r in zscores([[values[n]] for n in names]))))
 
 
-def main():
+def measures():
+    """The bank as the journeys see it: (bank, groups, points, mz, moving, still_score, pstill) -- the bank as
+    make_presets builds it, group name -> its presets, every preset's point (points_of), its measured z-scores, how
+    much it moves by itself (higher moves more), its stillness (lower is stiller) and the parameters' part of that
+    stillness (z-scores). make_night.py reads the same."""
     table = param_table()
     bank = make_presets.build()
     byparams, groups, pmoving, pstill = {}, {}, {}, {}
@@ -300,6 +304,11 @@ def main():
     moving = {n: (0.5 * mz[n][1] + 0.5 * pm[n]) if n in mz else pm[n] for n in names}
     still_score = {n: (0.4 * mz[n][1] + 0.2 * mz[n][0] + 0.1 * mz[n][3] + 0.3 * ps[n]) if n in mz else ps[n]
                    for n in names}
+    return bank, groups, points, mz, moving, still_score, ps
+
+
+def main():
+    bank, groups, points, mz, moving, still_score, _ = measures()
 
     def stillness(n):
         return still_score[n]

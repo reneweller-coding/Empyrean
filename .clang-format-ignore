@@ -3,6 +3,7 @@
 Core/src/Find.inc
 Core/src/HarmonicEntropy.inc
 Core/src/Journeys.inc
+Core/src/NightDirector.inc
 Core/src/Nudges.inc
 Core/src/PresetMap.inc
 Core/src/Presets.inc

@@ -9,6 +9,7 @@
 #include "additiv/Engine.h"
 #include "additiv/Sun.h"
 #include "additiv/Journey.h"
+#include "additiv/NightDirector.h"
 #include "additiv/Describe.h"
 #include "additiv/Find.h"
 #include "additiv/Focus.h"
@@ -5818,6 +5819,177 @@ int main( int argc, char **argv )
                     "brain 2 %d, figures %d, %d figure onsets named)",
                     static_cast<int>( traced.size() ), shown, same, compared, sources[1], sources[2], sources[5],
                     figures ) );
+    }
+
+    // 122. The night director (20.11.2026, plan D3): a night of 3, 8 and 10 hours, three seeds each, from the groups
+    //      the Whole Nights draw from. It lasts what was asked (at the middle of its ranges, within 5 %), plays no
+    //      preset twice, follows its curve -- its presets' stillness in the rank order of the curve's (Spearman at
+    //      least 0.8; the same presets in a random order stay far below, which is what the yardstick is for), stiller
+    //      at the end of falling asleep than at its start, brighter in the morning than in the middle -- and glides
+    //      no further than the shipped Whole Nights (their mean step between neighbours, 10 % margin). The same request
+    //      gives the same night, another seed another; favourites come more often with the bonus than without; an
+    //      excluded preset never. A family of five groups follows its curve too (Spearman at least 0.6: 320
+    //      presets, the deep's few soon used up). No card: the director is pure.
+    if ( wanted( 122, "The night director (20.11.2026, plan D3)" ) )
+    {
+        auto spearman = []( const std::vector<double> &a, const std::vector<double> &b )
+        {
+            auto ranks = []( const std::vector<double> &v )
+            {
+                std::vector<size_t> o( v.size() );
+                for ( size_t i = 0; i < o.size(); ++i ) o[i] = i;
+                std::stable_sort( o.begin(), o.end(), [&]( size_t x, size_t y ) { return v[x] < v[y]; } );
+                std::vector<double> r( v.size() );
+                for ( size_t k = 0; k < o.size(); ++k ) r[o[k]] = static_cast<double>( k );
+                return r;
+            };
+            const std::vector<double> ra = ranks( a ), rb = ranks( b );
+            const double              m = 0.5 * ( static_cast<double>( a.size() ) - 1.0 );
+            double                    sab = 0.0, saa = 0.0, sbb = 0.0;
+            for ( size_t i = 0; i < a.size(); ++i )
+            {
+                sab += ( ra[i] - m ) * ( rb[i] - m );
+                saa += ( ra[i] - m ) * ( ra[i] - m );
+                sbb += ( rb[i] - m ) * ( rb[i] - m );
+            }
+            return saa > 0.0 && sbb > 0.0 ? sab / std::sqrt( saa * sbb ) : 0.0;
+        };
+        // The shipped Whole Nights' mean step between neighbours, in the director's measure.
+        double wholeSum = 0.0;
+        int    wholeSteps = 0;
+        for ( int i = 0; i < numBuiltinJourneys(); ++i )
+        {
+            Journey j;
+            if ( !j.parse( builtinJourneyText( i ) ) || j.m_name.rfind( "Whole Night", 0 ) != 0 ) continue;
+            for ( size_t k = 1; k < j.m_steps.size(); ++k, ++wholeSteps )
+                wholeSum += nightDistance( findPreset( j.m_steps[k - 1].m_preset.c_str() ),
+                                           findPreset( j.m_steps[k].m_preset.c_str() ) );
+        }
+        const double whole = wholeSteps ? wholeSum / wholeSteps : 0.0;
+        double       worstLength = 0.0, worstRho = 1.0, controlRho = -1.0, worstStep = 0.0, smallRho = 1.0;
+        int          repeats = 0, asleepFails = 0, morningFails = 0, nights = 0, steps = 0;
+        bool         same = true, differ = true;
+        std::uint64_t shuffle = 0x2545F4914F6CDD1Dull;
+        auto          follow = [&]( const NightPlan &p, double &rho, double &control )
+        {
+            std::vector<double> got, want;
+            for ( const NightStep &s : p.m_steps )
+            {
+                got.push_back( s.m_still );
+                want.push_back( s.m_targetStill );
+            }
+            rho = spearman( got, want );
+            for ( size_t i = got.size(); i > 1; --i )   // the same presets in a random order
+            {
+                shuffle ^= shuffle << 13;
+                shuffle ^= shuffle >> 7;
+                shuffle ^= shuffle << 17;
+                std::swap( got[i - 1], got[static_cast<size_t>( shuffle % i )] );
+            }
+            control = spearman( got, want );
+        };
+        for ( double hours : { 3.0, 8.0, 10.0 } )
+            for ( std::uint64_t seed : { 1ull, 2ull, 3ull } )
+            {
+                NightRequest r;
+                r.m_hours = hours;
+                r.m_seed = seed;
+                const NightPlan p = composeNight( r );
+                ++nights;
+                steps += static_cast<int>( p.m_steps.size() );
+                worstLength = std::max( worstLength,
+                                        std::fabs( p.m_journey.meanLength() - hours * 3600.0 ) / ( hours * 3600.0 ) );
+                std::vector<int> seen;
+                for ( const NightStep &s : p.m_steps )
+                {
+                    if ( std::find( seen.begin(), seen.end(), s.m_preset ) != seen.end() ) ++repeats;
+                    seen.push_back( s.m_preset );
+                }
+                double rho = 0.0, control = 0.0;
+                follow( p, rho, control );
+                worstRho = std::min( worstRho, rho );
+                controlRho = std::max( controlRho, control );
+                double asleep = 0.0, morning = 0.0;
+                int    waves = 1;
+                nightPhases( hours, asleep, morning, waves );
+                const double     total = hours * 3600.0;
+                const NightStep *firstAsleep = nullptr, *lastAsleep = nullptr;
+                double           brightMid = 0.0, brightMorning = 0.0, dist = 0.0;
+                int              mid = 0, morn = 0;
+                for ( size_t k = 0; k < p.m_steps.size(); ++k )
+                {
+                    const NightStep &s = p.m_steps[k];
+                    if ( s.m_at < asleep * total )
+                    {
+                        if ( !firstAsleep ) firstAsleep = &s;
+                        lastAsleep = &s;
+                    }
+                    else if ( s.m_at >= ( 1.0 - morning ) * total )
+                    {
+                        brightMorning += s.m_bright;
+                        ++morn;
+                    }
+                    else
+                    {
+                        brightMid += s.m_bright;
+                        ++mid;
+                    }
+                    if ( k ) dist += nightDistance( p.m_steps[k - 1].m_preset, s.m_preset );
+                }
+                if ( !firstAsleep || firstAsleep == lastAsleep || lastAsleep->m_still >= firstAsleep->m_still )
+                    ++asleepFails;
+                if ( !mid || !morn || brightMorning / morn <= brightMid / mid ) ++morningFails;
+                worstStep = std::max( worstStep, p.m_steps.size() > 1 ? dist / ( p.m_steps.size() - 1 ) : 1e9 );
+                same = same && composeNight( r ).m_journey.text() == p.m_journey.text();
+                r.m_seed = seed + 100;
+                differ = differ && composeNight( r ).m_journey.text() != p.m_journey.text();
+            }
+        // Favourites: every 23rd preset of the bank, with the bonus and without.
+        std::vector<std::string> favourites;
+        for ( int i = 0; i < numPresets(); i += 23 ) favourites.emplace_back( preset( i ).m_name );
+        int withBonus = 0, without = 0;
+        for ( double hours : { 3.0, 8.0, 10.0 } )
+            for ( std::uint64_t seed : { 1ull, 2ull, 3ull } )
+            {
+                NightRequest r;
+                r.m_hours = hours;
+                r.m_seed = seed;
+                for ( const NightStep &s : composeNight( r ).m_steps )
+                    without += s.m_preset % 23 == 0 ? 1 : 0;
+                r.m_prefer = favourites;
+                for ( const NightStep &s : composeNight( r ).m_steps ) withBonus += s.m_preferred ? 1 : 0;
+            }
+        // Excluded: a night without the presets of the first night.
+        NightRequest r;
+        const NightPlan first = composeNight( r );
+        for ( const NightStep &s : first.m_steps ) r.m_exclude.emplace_back( preset( s.m_preset ).m_name );
+        const NightPlan again = composeNight( r );
+        int             banned = 0;
+        for ( const NightStep &s : again.m_steps )
+            for ( const NightStep &f : first.m_steps ) banned += s.m_preset == f.m_preset ? 1 : 0;
+        // A family of five groups.
+        for ( std::uint64_t seed : { 1ull, 2ull, 3ull } )
+        {
+            NightRequest small;
+            small.m_family = 0;
+            small.m_seed = seed;
+            double rho = 0.0, control = 0.0;
+            follow( composeNight( small ), rho, control );
+            smallRho = std::min( smallRho, rho );
+        }
+        check( worstLength < 0.05 && repeats == 0, "night director: as long as asked, no preset twice",
+               fmt( "%d nights (3, 8, 10 h x 3 seeds), %d steps; length off by %.2f %% at most; %d repeated", nights,
+                    steps, 100.0 * worstLength, repeats ) );
+        check( worstRho >= 0.8 && controlRho < 0.8 && asleepFails == 0 && morningFails == 0 && smallRho >= 0.6,
+               "night director: follows its curve",
+               fmt( "stillness against the curve: Spearman %.2f at the least (the same presets shuffled: %.2f at the "
+                    "most; a family of five groups %.2f); falling asleep not stiller %d, morning not brighter %d",
+                    worstRho, controlRho, smallRho, asleepFails, morningFails ) );
+        check( worstStep <= 1.1 * whole && same && differ && withBonus > without && banned == 0 && !again.m_steps.empty(),
+               "night director: gentle glides, its dice, favourites, exclusions",
+               fmt( "mean step %.2f at the most (Whole Nights %.2f); a seed repeats %s, another differs %s; favourites "
+                    "%d with the bonus, %d without; %d excluded played",
+                    worstStep, whole, same ? "yes" : "NO", differ ? "yes" : "NO", withBonus, without, banned ) );
     }
 
     finishTest();

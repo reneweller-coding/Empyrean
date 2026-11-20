@@ -73,6 +73,7 @@ add_library(AdditivCore STATIC
     Core/src/Presets.cpp
     Core/src/Morph.cpp
     Core/src/Journeys.cpp
+    Core/src/NightDirector.cpp
     Core/src/PresetMap.cpp
     Core/src/Route.cpp
     Core/src/Describe.cpp
@@ -116,6 +117,12 @@ if(ADDITIV_BUILD_TOOLS)
     target_link_libraries(additiv_brain_audit PRIVATE AdditivCore)
     target_link_options(additiv_brain_audit PRIVATE /STACK:8388608)
     family_bin(additiv_brain_audit)
+
+    # additiv_night: the night director's night as a table, for Tools/presets/night_plot.py (no card, no sound).
+    add_executable(additiv_night Tools/render/night.cpp)
+    target_compile_options(additiv_night PRIVATE /W4 /permissive-)
+    target_link_libraries(additiv_night PRIVATE AdditivCore)
+    family_bin(additiv_night)
 
     # additiv_presets: every factory preset's level, for make_presets.py to bring the bank to one level.
     add_executable(additiv_presets Tools/presets/main.cpp)
