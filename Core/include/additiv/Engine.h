@@ -137,6 +137,12 @@ public:
 
     /** @brief The layout prepare() was given. @return the config */
     const EngineConfig &config() const { return m_cfg; }
+    /**
+     * @brief Diagnostics for the tools (empy_render --note-log): when set, every note a voice begins or lets go -- the
+     *        time on the timeline in seconds, the MIDI note, its source (0 played, 1 and 2 the conductors, 4 the
+     *        foundation, 5 a figure), whether it begins, and its pitch in hertz. Never set in the instrument.
+     */
+    static inline void ( *M_NoteTrace )( double seconds, int note, int source, bool on, double hz ) = nullptr;
 
     /** @brief The GPU, for the logs. @return its name and compute capability ("" before prepare) */
     std::string deviceName() const;
@@ -544,6 +550,12 @@ public:
      */
     int figureClashes() const { return m_figClash.load( std::memory_order_relaxed ); }
     /**
+     * @brief Of the figures' notes since prepare, those that sounded the pitch the same figure's note before them in the
+     *        round had sounded (within 25 cents, as the tuning plays them): a note struck again. Any thread.
+     * @return the count
+     */
+    int figureRepeats() const { return m_figRepeat.load( std::memory_order_relaxed ); }
+    /**
      * @brief How many pairs of notes the two conductors sound now rub across them: a semitone, a major seventh or a
      *        tritone apart as the tuning sounds them, within two octaves (19.11.2026). For the selftest, offline: it
      *        reads the conductors, which the audio thread writes.
@@ -904,6 +916,7 @@ private:
         double                         m_clock = 0.0;   ///< where the loop stands, s
         double                         m_wait = 0.0;    ///< s before the figure first enters
         int                            m_next = 0;      ///< the note of this round that comes next
+        double                         m_lastHz = -1.0; ///< the pitch this round sounded last, Hz; -1 none yet
     };
     /** @brief A figure's note that sounds: let go when its time is over. */
     struct FigureHeld
@@ -919,6 +932,7 @@ private:
     std::atomic<int>                 m_figPlayed{ 0 };   ///< notes they have played since prepare (figureNotes())
     std::array<std::atomic<int>, 16> m_figLog;           ///< the last of them, a ring (figureNote())
     std::atomic<int> m_figClash{ 0 };   ///< of them, the ones that rubbed against a conductor's note (figureClashes())
+    std::atomic<int> m_figRepeat{ 0 };  ///< of them, the ones that struck the pitch before them again (figureRepeats())
     /**
      * @brief The notes both conductors sound now: the first's, then the second's that are not among them (when it plays).
      * @param[out] notes  receives them, MIDI; room for ClusterBrain::Slots
@@ -974,14 +988,15 @@ private:
      * @brief Draws a figure's note: within a fifth of the one before and a sixth of the figure's centre, by what
      *        fits the chord, a step likelier than a leap.
      * @param[in] around     the note before it (the centre for the first)
-     * @param[in] avoid      a note it must not be (the one before; -1 none)
+     * @param[in] avoid      notes whose pitch it must not sound, as the tuning plays them (the one before, a changed
+     *                       note's neighbours; -1 none)
      * @param[in] chordTone  only a chord tone will do (a figure's first and last)
      * @param[in] centre     the figure's centre, MIDI
      * @param[in] chord      the chord's notes
      * @param[in] n          how many
-     * @return MIDI
+     * @return MIDI; -1 when nothing but such a pitch is left
      */
-    int drawFigureNote( int around, int avoid, bool chordTone, int centre, const int *chord, int n );
+    int drawFigureNote( int around, const int ( &avoid )[3], bool chordTone, int centre, const int *chord, int n );
     /** @} */
 
     // The foundation (Foundation): one voice on the conductor's root in the octave from C2 up (from

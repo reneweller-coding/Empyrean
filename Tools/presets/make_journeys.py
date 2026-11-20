@@ -2,19 +2,24 @@
 
 A journey (Core/include/additiv/Journey.h) is presets in a row, each held for a while drawn from a
 range and glided into the next; cyclic, so a night plays itself. After Noctuary's
-Tools/make_journeys.py, but from the presets' own parameters (there is no measured library here):
-every preset a point in a space of what is heard -- tilt, brightness, the cloud's width, shimmer,
-the motion, the envelope, the space, the filter, the effects, the conductor's pace -- each
-normalised in its parameter's own (skewed) domain.
+Tools/make_journeys.py, which stands on its library's measurement. Here every preset is a point in two spaces at once
+(19.11.2026; before, in the second alone):
+  what it measures -- work/presets/descriptors.json, what additiv_presets --describe hears of a chord of fourteen
+      seconds and the map and the search by example read: its brightness, its motion, its width, its noise, each as
+      z-scores over the bank -- two thirds of the distance (PARAM_SHARE);
+  how it is set -- tilt, brightness, the cloud's width, shimmer, the motion, the envelope, the space, the filter, the
+      effects, the conductor's pace, each normalised in its parameter's own (skewed) domain -- the other third: four
+      measures do not tell a tuning, a hall or an effect from another, and the parameters do.
+A preset the descriptions lack stands on its parameters alone (the run says how many).
 
 For every group, two journeys of twelve:
 
   <Group> - Journey   twelve presets spread across the group (farthest-point sampling from its
                       medoid, so they are its different faces), ordered as a chain of nearest
                       neighbours, so every glide is a step to something close.
-  <Group> - Night     the twelve stillest (the least motion, shimmer, ripple and sync, the darkest,
-                      the slowest attacks and the slowest conductor), chained the same way: the
-                      version for falling asleep.
+  <Group> - Night     the twelve stillest -- the least measured motion, the darkest, the least noise, and of the
+                      parameters the least motion, shimmer, ripple and sync, the slowest attacks and the slowest
+                      conductor -- chained the same way: the version for falling asleep.
 
 And nineteen whole nights across groups (two from the sleep concerts, one each from the visions, the swarms and
 currents, the halls and orbits, the harmonic lives, the dreams and phantoms, the weather and growth, the rooms and
@@ -23,16 +28,18 @@ of every group in a family of groups, chained, timed as the nights.
 
 How long a step stays is the preset's own (19.11.2026, as in Noctuary): what moves by itself -- the motion, the life,
 sync and ripple, the streams, shimmer and drift, the conductor's pace, the figures -- is held longest, what stands
-still is left soon. The third that moves least is held 1:30-3:00 (nights 3-6 minutes), the third that moves most
+still is left soon -- half by the measured motion, half by the parameters (a chord of fourteen seconds does not
+show a conductor that changes its notes every few minutes, or a figure). The third that moves least is held 1:30-3:00 (nights 3-6 minutes), the third that moves most
 6-10 (nights 10-15), the rest between, never two long or two short ones in a row; the glide grows with the stay.
 Before, every step of a journey drew from the same six to twelve minutes, of a night ten to eighteen, of a whole
 night twelve to twenty.
 
-Nothing here listens: a nearest neighbour in this space is a preset that is set alike, which is
-the promise of a gentle glide, not of a good one.
+A nearest neighbour here is a preset that sounds alike in four measures and is set alike, which is the promise of a
+gentle glide, not of a good one.
 
     python Tools/presets/make_journeys.py
 """
+import json
 import math
 import pathlib
 import re
@@ -40,6 +47,8 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "Core" / "src" / "Journeys.inc"
+DESCRIPTORS = ROOT / "work" / "presets" / "descriptors.json"
+PARAM_SHARE = 1.0 / 3.0   # of the distance's spread, the parameters'; the measures have the rest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import make_presets  # noqa: E402
 
@@ -152,11 +161,43 @@ def features(table, params):
     return out
 
 
+def measured(d):
+    """A description's features (work/presets/descriptors.json, as make_find.py reads it): brightness, log motion,
+    width, noise."""
+    return [d[0], math.log(max(d[1], 0.0) + 0.01), d[2], d[3]]
+
+
+def zscores(rows):
+    """Each column centred on the bank's mean and scaled by its spread."""
+    n, k = len(rows), len(rows[0])
+    mean = [sum(r[i] for r in rows) / n for i in range(k)]
+    sd = [math.sqrt(sum((r[i] - mean[i]) ** 2 for r in rows) / n) or 1.0 for i in range(k)]
+    return [[(r[i] - mean[i]) / sd[i] for i in range(k)] for r in rows]
+
+
+def points_of(names, params_points, desc):
+    """Every preset's point: the four measures (standardised) and the parameters (weighted, scaled so that they carry
+    PARAM_SHARE of the bank's spread). A preset without a description stands on its parameters alone."""
+    keys = list(FEATURES)
+    prow = [[math.sqrt(FEATURES[k]) * params_points[n][k] for k in keys] for n in names]
+    have = [n for n in names if n in desc]
+    mz = dict(zip(have, zscores([measured(desc[n]) for n in have]))) if have else {}
+    pm = [sum(r[i] for r in prow) / len(prow) for i in range(len(keys))]
+    pvar = sum(sum((r[i] - pm[i]) ** 2 for r in prow) / len(prow) for i in range(len(keys))) or 1.0
+    # the measures' variance is four (z-scores); the parameters are scaled to PARAM_SHARE of the whole
+    scale = math.sqrt(4.0 * PARAM_SHARE / (1.0 - PARAM_SHARE) / pvar)
+    out = {}
+    for n, r in zip(names, prow):
+        m = mz.get(n)
+        out[n] = (m if m is not None else [0.0] * 4) + [scale * x for x in r]
+    return out, mz
+
+
 def distance(a, b):
-    return math.sqrt(sum(FEATURES[k] * (a[k] - b[k]) ** 2 for k in FEATURES))
+    return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
 
-def stillness(f):
+def stillness_by_params(f):
     return sum(w * (f[k] if w > 0 else 1.0 - f[k]) * abs(w) for k, w in STILL.items())
 
 
@@ -200,43 +241,79 @@ def spread(points, names, count):
 
 
 def chain(points, names):
-    """The names as a chain of nearest neighbours, from the first."""
+    """The names as a chain of nearest neighbours, from the first; then untangled (2-opt): a journey is cyclic, and
+    the greedy chain's last step back to the first was its longest -- a section turned round wherever that makes the
+    whole round shorter, the first staying first."""
     left = list(names[1:])
     out = [names[0]]
     while left:
         nxt = min(left, key=lambda n: distance(points[out[-1]], points[n]))
         out.append(nxt)
         left.remove(nxt)
+    d = lambda a, b: distance(points[a], points[b])
+    better = True
+    while better and len(out) > 3:
+        better = False
+        for i in range(1, len(out) - 1):
+            for j in range(i + 1, len(out)):
+                a, b, c, e = out[i - 1], out[i], out[j], out[(j + 1) % len(out)]
+                if d(a, c) + d(b, e) < d(a, b) + d(c, e) - 1e-9:
+                    out[i:j + 1] = reversed(out[i:j + 1])
+                    better = True
     return out
 
 
 def journey(title, names, moving, kind):
     lines = ["# Empyrean journey: <preset> | <dwell m:ss or a range> | <glide m:ss or a range>",
-             "# Made by Tools/presets/make_journeys.py from the presets' parameters; copy it and edit it freely.",
+             "# Made by Tools/presets/make_journeys.py from how the presets measure and how they are set; copy it and edit it freely.",
              f"journey {title}", "cyclic on"]
     lines += [f"{n} | {dwell} | {glide}" for n, (dwell, glide) in zip(names, timings(names, moving, kind))]
     return "\n".join(lines) + "\n"
 
 
+def standardised(values):
+    """name -> value, as z-scores over the bank."""
+    names = list(values)
+    return dict(zip(names, (r[0] for r in zscores([[values[n]] for n in names]))))
+
+
 def main():
     table = param_table()
     bank = make_presets.build()
-    points, groups, moving = {}, {}, {}
+    byparams, groups, pmoving, pstill = {}, {}, {}, {}
     for name, g, params, _ in bank:
         p = dict(kv.split("=", 1) for kv in params.split())
-        points[name] = features(table, p)
-        moving[name] = self_motion(table, p, points[name])
+        byparams[name] = features(table, p)
+        pmoving[name] = self_motion(table, p, byparams[name])
+        pstill[name] = stillness_by_params(byparams[name])
         groups.setdefault(make_presets.GROUPS[g], []).append(name)
+    desc = json.loads(DESCRIPTORS.read_text(encoding="utf-8")) if DESCRIPTORS.exists() else {}
+    names = [name for name, *_ in bank]
+    missing = [n for n in names if n not in desc]
+    if missing:
+        print(f"descriptors.json lacks {len(missing)} presets (first: {missing[0]}): they stand on their parameters")
+    points, mz = points_of(names, byparams, desc)
+    # What moves by itself: the measured motion (the spectrum's change over a quarter of a second to three seconds)
+    # and the parameters' (the conductor's pace and the figures, which a chord of fourteen seconds cannot show), half
+    # and half. And the stillness: the measured motion, brightness and noise against the parameters' stillness.
+    pm, ps = standardised(pmoving), standardised(pstill)
+    moving = {n: (0.5 * mz[n][1] + 0.5 * pm[n]) if n in mz else pm[n] for n in names}
+    still_score = {n: (0.4 * mz[n][1] + 0.2 * mz[n][0] + 0.1 * mz[n][3] + 0.3 * ps[n]) if n in mz else ps[n]
+                   for n in names}
+
+    def stillness(n):
+        return still_score[n]
+
     journeys = []
     for group in make_presets.GROUPS:
         names = groups[group]
         journeys.append((f"{group} - Journey", journey(f"{group} - Journey", chain(points, spread(points, names, 12)), moving, "journey")))
-        still = sorted(names, key=lambda n: stillness(points[n]))[:12]
+        still = sorted(names, key=lambda n: stillness(n))[:12]
         journeys.append((f"{group} - Night", journey(f"{group} - Night", chain(points, still), moving, "night")))
     for title, family in WHOLE_NIGHTS:
         per = math.ceil(24 / len(family))   # the stillest few of every group in the family
-        still = [n for g in family for n in sorted(groups[g], key=lambda n: stillness(points[n]))[:per]][:24]
-        start = min(still, key=lambda n: stillness(points[n]))
+        still = [n for g in family for n in sorted(groups[g], key=lambda n: stillness(n))[:per]][:24]
+        start = min(still, key=lambda n: stillness(n))
         still.remove(start)
         journeys.append((title, journey(title, chain(points, [start] + still), moving, "night")))
     lines = ["// Generated by Tools/presets/make_journeys.py -- do not edit; edit the script and run it again.",

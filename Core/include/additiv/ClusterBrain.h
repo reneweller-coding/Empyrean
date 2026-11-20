@@ -1318,6 +1318,31 @@ public:
     }
 
     /**
+     * @brief Whether a pitch is resting after its release (Retrigger): the key's own rest, and that of every key the
+     *        tuning plays as the same pitch (20.11.2026).
+     *
+     * The rest was kept per key. In a just scale whose keys snap -- JI Pentatonic plays 66, 67 and 68 all as 392 Hz --
+     * a neighbour of the key just let go is the same note, and it was free at once: H-Beta Bell let 66 go and struck 68
+     * seven seconds later, the same 392 Hz under a bell's attack again. Within six keys either way, within 25 cents.
+     * @param[in] c       the candidate, MIDI
+     * @param[in] p       the knobs
+     * @param[in] freqOf  frequency of a MIDI note in the engine's current scale
+     * @return true when it is to rest still
+     * @tparam FreqFnT  callable `double(int note)`
+     */
+    template <class FreqFnT>
+    bool resting( int c, const BrainParams &p, FreqFnT &&freqOf ) const
+    {
+        if ( p.m_retrigger <= 0.0f || c < 0 || c > 127 ) return false;
+        const double rest = static_cast<double>( p.m_retrigger ), fc = freqOf( c );
+        for ( int k = std::max( 0, c - 6 ); k <= std::min( 127, c + 6 ); ++k )
+            if ( m_now - m_pitchOffAt[static_cast<size_t>( k )] < rest &&
+                 ( k == c || std::fabs( 1200.0 * std::log2( freqOf( k ) / fc ) ) < 25.0 ) )
+                return true;
+        return false;
+    }
+
+    /**
      * @brief Whether a candidate rubs against the other conductor: a semitone, a major seventh or a tritone from one of
      *        its notes (listenTo()), within two octaves, for a conductor whose Consonance is at least a half.
      *
@@ -1328,12 +1353,20 @@ public:
      * for twenty minutes. A veto here, in the draw of Free mode, in chooseNote() and against the deja vu ring; when it
      * empties the field Chords mode widens its allowance as it always did, and Free mode waits for its next decision.
      * A conductor set for clusters (Consonance under a half) keeps the weight only.
+     *
+     * And at any Consonance, not the pitch the other sounds now (20.11.2026, within 25 cents; an octave stays): the
+     * other plays its own voices, so the same pitch taken by both is a second voice on one note, its attack swelling
+     * over the first -- the note struck again, which says nothing under a pad's attack. Hearing each other had made it
+     * likelier, a unison being the most consonant choice there is: over 300 presets of Noctuary's library 3.8 % of the
+     * conductors' onsets doubled the other; on one root, a third.
      * @param[in] fc  the candidate, Hz
      * @param[in] p   the knobs
      * @return true when it is out
      */
     bool againstOther( double fc, const BrainParams &p ) const
     {
+        for ( int k = 0; k < m_otherCount; ++k )
+            if ( std::fabs( 1200.0 * std::log2( fc / m_otherHz[k] ) ) < 25.0 ) return true;   // the other's pitch
         if ( m_otherCount == 0 || p.m_consonance < 0.5f ) return false;
         for ( int k = 0; k < m_otherCount; ++k )
         {
@@ -1911,9 +1944,7 @@ public:
             if ( sounding( c ) ) continue;
             // A pitch that has only just been let go is not a new note, it is the same note again --
             // which is the one repetition this music notices. It rests for its seconds first.
-            if ( p.m_retrigger > 0.0f &&
-                 m_now - m_pitchOffAt[static_cast<size_t>( c )] < static_cast<double>( p.m_retrigger ) )
-                continue;
+            if ( resting( c, p, freqOf ) ) continue;
             const double fc = freqOf( c );
             if ( againstOther( fc, p ) ) continue;      // the other conductor's notes (listenTo())
             if ( rubsOwn( fc, p, freqOf ) ) continue;   // its own, a minor second or ninth
@@ -3034,12 +3065,15 @@ private:
             // and being at zero distance it always won: the chord never moved once until this
             // line existed. The self test found it, the descriptors never would have.
             if ( from >= 0 && c == from ) continue;
+            // Nor may a key the tuning plays as the same pitch (20.11.2026): in a just scale whose keys snap the
+            // neighbouring key can stand two cents from the note replaced (JI 7-limit on C#: 49 at 138.59 Hz, 50 at
+            // 138.75), and being the smallest move it won -- the old voice let go and the same note struck again,
+            // 22 of 59 exchanges in that scale.
+            if ( from >= 0 && std::fabs( 1200.0 * std::log2( freqOf( c ) / freqOf( from ) ) ) < 25.0 ) continue;
             // What Free mode asks of every candidate, asked here too: a pitch is resting after its
             // release (R7.4), a constellation was heard lately (R6.6), and the register and interval
             // rules as one weight -- a veto ends the candidate.
-            if ( p.m_retrigger > 0.0f &&
-                 m_now - m_pitchOffAt[static_cast<size_t>( c )] < static_cast<double>( p.m_retrigger ) )
-                continue;
+            if ( resting( c, p, freqOf ) ) continue;
             if ( constellationHeard( c, p, freqOf ) ) continue;
             const float rule = ruleWeight( c, low, high, rootSounding, p, freqOf );
             if ( rule <= 0.0f ) continue;
@@ -3644,9 +3678,7 @@ private:
     bool admissible( int c, int low, int high, const BrainParams &p, FreqFnT &&freqOf, bool pivotal = false ) const
     {
         if ( c < std::min( low, high ) || c > std::max( low, high ) || c < 0 || c > 127 ) return false;
-        if ( p.m_retrigger > 0.0f &&
-             m_now - m_pitchOffAt[static_cast<size_t>( c )] < static_cast<double>( p.m_retrigger ) )
-            return false;
+        if ( resting( c, p, freqOf ) ) return false;
         if ( constellationHeard( c, p, freqOf ) ) return false;
         bool rootSounding = false;
         for ( const auto &s : m_slots )
@@ -3683,7 +3715,9 @@ private:
         if ( m_ring[m_ringPos] >= 0 && m_rng.uniform() < p.m_dejavu )
         {
             const int old = m_ring[m_ringPos];
-            if ( old != avoid && !sounding( old ) && admissible( old, low, high, p, freqOf ) &&
+            const bool again =   // the pitch of the note being replaced, under another key
+                avoid >= 0 && std::fabs( 1200.0 * std::log2( freqOf( old ) / freqOf( avoid ) ) ) < 25.0;
+            if ( old != avoid && !again && !sounding( old ) && admissible( old, low, high, p, freqOf ) &&
                  !againstOther( freqOf( old ), p ) && !rubsOwn( freqOf( old ), p, freqOf ) )
                 out = old;
         }

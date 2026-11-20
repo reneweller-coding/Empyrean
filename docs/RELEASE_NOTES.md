@@ -58,6 +58,49 @@
   the third that moves least (its motion, life, ripple, the conductor's pace, the figures) 1:30-3:00, the third that
   moves most 6-10 minutes, the rest between, never two long or two short ones in a row; nights and whole nights 3-6,
   6-10 and 10-15. A step lasts 4.8 minutes on average (9 before), in a night 8.2 (14), in a whole night 8.3 (16).
+- **A figure never strikes the same pitch twice in a row** (20.11.2026). In a tuning whose keys snap, two keys can be
+  one pitch -- Harmonic 8-16 plays A#4 and B4 both as 466 Hz -- and a figure's step was judged by the key: Velvet
+  Dreaming's figure of two notes struck 466 Hz twice in every round, each for three seconds under an attack of one
+  and a half, which was heard as the conductor hitting one note again and again. A figure's note is now drawn, moved
+  to the harmony and changed by the pitch the tuning plays: never the pitch of the note before it or after it in the
+  round, and a note that would sound the pitch just sounded is left out (where nothing else is left, a figure is
+  shorter). Two figures of two notes and two of five in Harmonic 8-16, chords that move: 33 of 217 notes struck the
+  pitch before them again, now none.
+- **Journeys chosen by what the presets measure** (20.11.2026). Which twelve presets make a group's journey, in which
+  order, and which are a night's stillest, was worked out from the presets' parameters alone; the bank has been
+  measured all along (brightness, motion, width and noise, which the map and Find read). Now the measures make two
+  thirds of the distance and the parameters a third (they tell a tuning, a hall or an effect apart, which four
+  measures do not), the stillness and a stay's length are half measured, half set (the conductor's pace and the
+  figures do not show in fourteen seconds), and the round is untangled so its way back to the first is no leap. By
+  the measures: a journey's twelve stand 53 % further apart (they are more of its different faces), the steps between
+  neighbours are 7 % shorter (p90 5 %), and the nights' presets move measurably less (-0.75 standard deviations
+  against -0.32).
+- **The conductor does not strike a note it has just let go, or that is sounding** (20.11.2026; Rene: "the same
+  note struck several times, often briefly -- under these attacks that says nothing"). Four causes, measured over 30
+  presets of the bank as played (`empy_render --note-log`, five minutes each, the conductors' 263 onsets):
+  - *No rest after a release.* Noctuary's presets set a rest a pitch keeps before it may be chosen again; Empyrean
+    had no knob for it and kept none. Now nine tenths of the rate (Every in Chords, Rate in Free), thirty seconds at
+    the least -- four of its decisions where the conductor hurries -- and two minutes at the most; and the rest is
+    the pitch's, not the key's (JI Pentatonic plays three neighbouring keys as one pitch). A conductor struck a pitch
+    it had let go less than thirty seconds before in 61 of 248 onsets (24.6 %), the second in 2 of 15; now none of
+    246 and 15.
+  - *An exchange onto the same pitch.* Chords mode barred the note being replaced by its key alone. In a just scale
+    the neighbouring key can stand two to nine cents from it (JI 7-limit, the default scale), and being the smallest
+    move it won: the old voice let go and the same note began again. 22 of 59 exchanges in the new selftest 118, now
+    none of 65.
+  - *The other conductor's note.* The second conductor plays its own voices, so a pitch taken by both sounded
+    twice, the second attack swelling over the first; hearing each other had made it likelier, a unison being the
+    most consonant choice there is. Neither takes the pitch the other sounds now (an octave stays): 7 of 263 onsets
+    before, none.
+  - *The figures* (above). Of their 1162 onsets in the same presets, 218 had the pitch of the figure note before
+    them; 121 still do, each the note of another figure or of the next round -- a motif coming round is what a
+    figure is.
+- **Inside:** `empy_render --note-log` prints every note begun and let go with its source (the conductors, the
+  foundation, the figures) and its pitch; `Engine::M_NoteTrace` is the hook. Three selftests measured their own
+  yardstick moving and were made to stand: Follow Light's conductor at a rate of two seconds (the rest's cap of four
+  decisions), the figures' "comes round as it was" (the chord's last note arrives at 21 s; it passed at 40 s only
+  while that exchange was the fault of 118), and the sub octave (under 55 Hz through 36 dB an octave instead of 12:
+  a quarter of the foundation at 73 Hz had come through and moved with every chord; the threshold is 6 dB again).
 - **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
 
 ## 1.0.0 (17.10.2026)

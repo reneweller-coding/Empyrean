@@ -6,7 +6,7 @@
  *
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
- *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S]
+ *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S] [--note-log]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -277,7 +277,7 @@ int main( int argc, char **argv )
     std::string              presetName, journeyName, routeName;
     double                   routeSpeed = 1.0;
     std::uint64_t            journeySeed = 1;
-    bool                     brain = true, fill = false;
+    bool                     brain = true, fill = false, noteLog = false;
     for ( int i = 1; i < argc; ++i )
     {
         const std::string a = argv[i];
@@ -298,6 +298,8 @@ int main( int argc, char **argv )
             brain = false;
         else if ( a == "--fill" )
             fill = true;
+        else if ( a == "--note-log" )   // every note begun and let go, as N,<s>,<note>,<source>,<on>,<Hz> on stdout
+            noteLog = true;
         else if ( a == "--log" && has )
             logEvery = std::max( 0.1, std::atof( argv[++i] ) );   // seconds between the log's lines
         else if ( a == "--preset" && has )
@@ -340,6 +342,11 @@ int main( int argc, char **argv )
 
     Engine e;
     e.setRealtime( false );
+    if ( noteLog )
+    {
+        Engine::M_NoteTrace = []( double t, int note, int source, bool on, double hz )
+        { std::printf( "N,%.4f,%d,%d,%d,%.3f\n", t, note, source, on ? 1 : 0, hz ); };
+    }
     if ( !presetName.empty() )
     {
         const int index = applyPreset( e, presetName );

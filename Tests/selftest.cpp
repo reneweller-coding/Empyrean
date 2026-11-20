@@ -4636,23 +4636,28 @@ int main( int argc, char **argv )
     if ( from <= 99 )
     {
         // power under fc, a second-order low pass (RBJ, Q 0.707) over interleaved stereo, per window of w frames
-        auto lowWindows = []( const std::vector<float> &lr, double fc, size_t w )
+        auto lowWindows = []( const std::vector<float> &lr, double fc, size_t w, int passes = 1 )
         {
             const double        w0 = 2.0 * 3.14159265358979 * fc / Rate, alpha = std::sin( w0 ) / ( 2.0 * 0.7071 ),
                                 cw = std::cos( w0 );
             const double        a0 = 1.0 + alpha, b0 = ( 1.0 - cw ) / 2.0 / a0, b1 = ( 1.0 - cw ) / a0, b2 = b0,
                                 a1 = -2.0 * cw / a0, a2 = ( 1.0 - alpha ) / a0;
-            double              z[2][2] = {};
+            double              z[2][4][2] = {};   // per channel, per pass (the low pass in series: 12 dB an octave each)
             std::vector<double> out;
             double              sq = 0.0;
             for ( size_t i = 0; i < lr.size() / 2; ++i )
             {
                 for ( int c = 0; c < 2; ++c )
                 {
-                    const double x = lr[2 * i + static_cast<size_t>( c )], y = b0 * x + z[c][0];
-                    z[c][0] = b1 * x - a1 * y + z[c][1];
-                    z[c][1] = b2 * x - a2 * y;
-                    sq += y * y;
+                    double x = lr[2 * i + static_cast<size_t>( c )];
+                    for ( int k = 0; k < passes && k < 4; ++k )
+                    {
+                        const double y = b0 * x + z[c][k][0];
+                        z[c][k][0] = b1 * x - a1 * y + z[c][k][1];
+                        z[c][k][1] = b2 * x - a2 * y;
+                        x = y;
+                    }
+                    sq += x * x;
                 }
                 if ( ( i + 1 ) % w == 0 )
                 {
@@ -4723,7 +4728,7 @@ int main( int argc, char **argv )
                 if ( ( ( e.brainRoot() % 12 ) + 12 ) % 12 != 2 ) ++moved;
             }
             const std::vector<double> low = lowWindows( all, 150.0, 12000 );   // quarter seconds
-            const std::vector<double> deep = lowWindows( all, 55.0, Second );
+            const std::vector<double> deep = lowWindows( all, 55.0, Second, 3 );   // steep: see the check below
             f.share = mean( low ) / std::max( power( all ), 1e-20 );
             f.deep = 10.0 * std::log10( std::max( mean( deep ) / std::max( power( all ), 1e-20 ), 1e-12 ) );
             // the floor's envelope (quarter seconds): its autocorrelation at Pressure's period (4 s at 0.25 Hz) less
@@ -4768,11 +4773,13 @@ int main( int argc, char **argv )
                "floor: Pressure makes the floor beat at its rate",
                fmt( "the floor's envelope alike after 4 s less after 2 s: %.2f with Pressure, %.2f without", beat.swing,
                     kept.swing ) );
-        // 4 dB over the floor without it (6 until 19.11.2026): the sub itself stands where it stood (-9.7 dB of the whole,
-        // -9.2 since), but the conductor that hears its own notes voices this test's quick chords wider, and more of
-        // them reaches under 55 Hz without the sub (-17.2 dB before, -13.6 since). Five probes of real presets (Noctuary's
-        // conductor, the same code) moved by 1.2 dB at most in any band, most by nothing.
-        check( ran && sub.deep > kept.deep + 4.0, "floor: Sub Octave puts power an octave under the foundation",
+        // Under 55 Hz through a low pass of 36 dB an octave (20.11.2026; 12 until then). The foundation stands at D2,
+        // 73 Hz, and a low pass of 12 dB an octave at 55 Hz lets a quarter of its power through: "without the sub" was
+        // mostly the foundation itself, a share that moved with every chord the conductor chose (-17.2 dB of the whole,
+        // then -13.6, then -13.9), and the threshold followed it down from 6 dB to 4 and failed again at 3.7 -- the
+        // sub itself where it had always stood. Steeper, the foundation's share is out of the measure and the sub
+        // octave at 37 Hz is what is left.
+        check( ran && sub.deep > kept.deep + 6.0, "floor: Sub Octave puts power an octave under the foundation",
                fmt( "under 55 Hz against the whole: %.1f dB with it, %.1f dB without (the conductor's voices %.1f)",
                     sub.deep, kept.deep, kept.voices ) );
     }
@@ -5304,7 +5311,10 @@ int main( int argc, char **argv )
             e.setParam( ParamIdE::FIGURE_LEVEL, 1.0f );
             if ( !openOffline( e, true, 113 ) ) return false;
             e.requestFill();
-            const std::vector<float> lr = render( e, 40.0 );
+            // 48 s (40 until 20.11.2026): the chord's last note arrives at 21 s, and a figure follows the harmony --
+            // three rounds of eight seconds lie after it. (At 40 s the test passed only while that last exchange put a
+            // key of the same pitch in the place of the one it took out, which was the fault of selftest 118.)
+            const std::vector<float> lr = render( e, 48.0 );
             count = e.figureNotes();
             notes.clear();
             for ( int k = std::min( count, 16 ) - 1; k >= 0; --k ) notes.push_back( e.figureNote( k ) );
@@ -5422,6 +5432,84 @@ int main( int argc, char **argv )
         const double share = 100.0 * rubbing / std::max( chords, 1 );
         check( share < 3.0, "conductor: a minor second among its own notes is rare when it is set consonant",
                fmt( "%.1f %% of %d seconds with a minor second or ninth among the conductor's notes", share, chords ) );
+    }
+
+    // 117. A figure never strikes the same pitch twice in a row (19.11.2026). In a tuning whose keys snap -- Harmonic
+    //      8-16 plays A#4 and B4 as one pitch -- a figure's two notes could be one note struck again and again, and with
+    //      the attack of a pad that is no line at all: Velvet Dreaming played 466 Hz twice every loop. Two figures of
+    //      two notes and two of five, chords that move, figures that change: no note of a round sounds the pitch of
+    //      the note before it.
+    if ( from <= 117 )
+    {
+        int notes = 0, repeats = 0;
+        for ( int most : { 2, 5 } )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            e.setParam( ParamIdE::SCALE, 6.0f );   // Harmonic 8-16
+            e.setParam( ParamIdE::ROOT_NOTE, 10.0f );
+            e.setParam( ParamIdE::AUTO_MODE, 1.0f );
+            e.setParam( ParamIdE::AUTO_RATE, 15.0f );   // the chord moves
+            e.setParam( ParamIdE::FIGURES, 2.0f );
+            e.setParam( ParamIdE::FIGURE_EVERY, 6.0f );
+            e.setParam( ParamIdE::FIGURE_NOTES, static_cast<float>( most ) );
+            e.setParam( ParamIdE::FIGURE_PACE, 0.6f );
+            e.setParam( ParamIdE::FIGURE_CHANGE, 0.5f );
+            if ( !openOffline( e, true, static_cast<std::uint64_t>( 1170 + most ) ) ) return 1;
+            e.requestFill();
+            (void)render( e, 150.0 );
+            notes += e.figureNotes();
+            repeats += e.figureRepeats();
+        }
+        check( notes > 60 && repeats == 0, "figures: no note strikes the pitch of the note before it again",
+               fmt( "%d figure notes, %d of them the pitch of the one before", notes, repeats ) );
+    }
+
+    // 118. An exchange is a move (20.11.2026). Chords mode replaces one voice by the note that sits best within Voice
+    //      Lead of it, and the note being replaced was barred by its key alone. In a just scale whose keys snap the
+    //      neighbouring key can play the same pitch -- in JI 7-limit on C# key 50 is 138.75 Hz beside 49's 138.59,
+    //      two cents -- and being the smallest move it won: the old voice let go and the same note struck again
+    //      (Breathy Flute: three of its first three exchanges). JI 7-limit on C and on C#, the chord moving every
+    //      eight seconds: no note begins within 25 cents of the one let go at that instant.
+    if ( from <= 118 )
+    {
+        static double offAt = -1.0, offHz = 0.0;
+        static int    exchanges = 0, same = 0;
+        exchanges = same = 0;
+        Engine::M_NoteTrace = []( double t, int, int source, bool on, double hz )
+        {
+            if ( source != 1 ) return;
+            if ( !on )
+            {
+                offAt = t;
+                offHz = hz;
+                return;
+            }
+            if ( offAt >= 0.0 && t - offAt < 0.05 )
+            {
+                ++exchanges;
+                if ( std::fabs( 1200.0 * std::log2( hz / offHz ) ) < 25.0 ) ++same;
+            }
+        };
+        bool opened = true;
+        for ( int root : { 0, 1 } )
+        {
+            auto    held = std::make_unique<Engine>();
+            Engine &e = *held;
+            offAt = -1.0;
+            e.setParam( ParamIdE::SCALE, 3.0f );   // JI 7-limit
+            e.setParam( ParamIdE::ROOT_NOTE, static_cast<float>( root ) );
+            e.setParam( ParamIdE::AUTO_MODE, 1.0f );
+            e.setParam( ParamIdE::AUTO_RATE, 8.0f );
+            opened = opened && openOffline( e, true, static_cast<std::uint64_t>( 1180 + root ) );
+            if ( !opened ) break;
+            e.requestFill();
+            (void)render( e, 240.0 );
+        }
+        Engine::M_NoteTrace = nullptr;
+        if ( !opened ) return 1;
+        check( exchanges > 30 && same == 0, "conductor: an exchange in Chords mode never lands on the pitch it replaces",
+               fmt( "%d exchanges, %d of them within 25 cents of the note let go", exchanges, same ) );
     }
 
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );

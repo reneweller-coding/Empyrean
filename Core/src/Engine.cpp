@@ -1208,6 +1208,15 @@ void Engine::readParams()
     m_bp.m_rootMove = g( ParamIdE::AUTO_ROOT_MOVE );
     m_bp.m_timbre = g( ParamIdE::BRAIN_TIMBRE );
     m_bp.m_spectrum = &m_brainSpec;
+    // The rest a pitch keeps after it is let go before the conductor may take it again (20.11.2026). Noctuary's presets
+    // set it (thirty seconds is its rule; its library 33 to 111, about nine tenths of the rate); Empyrean had no knob for
+    // it and kept none, so a note let go could be struck again at the next decision -- H-Beta Bell let its G go and
+    // struck it again fifteen seconds later, under a bell's attack. Nine tenths of the rate and thirty seconds at the
+    // least, two minutes at the most -- but for a conductor that hurries no more than four of its decisions: at a
+    // rate of two seconds thirty would empty a narrow register (selftest 62, Follow Light's band of an octave, had
+    // only 53 % of its notes in the light, where it asks for 60). The second conductor by its own rate, below.
+    auto pitchRest = []( float rate ) { return std::min( std::max( 0.9f * rate, std::min( 30.0f, 4.0f * rate ) ), 120.0f ); };
+    m_bp.m_retrigger = pitchRest( m_bp.m_rateSeconds );
 
     // The second conductor: the first one's knobs, its own pace, density and register (its root
     // follows the first one's plus the interval), always in Free -- a slow background.
@@ -1216,6 +1225,7 @@ void Engine::readParams()
     m_bp2.m_mode = BrainModeE::FREE;
     m_bp2.m_density = static_cast<int>( std::lround( g( ParamIdE::BRAIN2_DENSITY ) ) );
     m_bp2.m_rateSeconds = g( ParamIdE::BRAIN2_RATE );
+    m_bp2.m_retrigger = pitchRest( m_bp2.m_rateSeconds );
     m_bp2.m_holdMin = 2.0f * m_bp.m_holdMin;
     m_bp2.m_holdMax = 2.0f * m_bp.m_holdMax;
     m_bp2.m_low = std::clamp( m_bp.m_low + m_blk.m_brain2Interval, 12, 115 );
@@ -1634,6 +1644,9 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
 
 void Engine::startNote( int note, float velocity, float distance, int source, int onset, int channel )
 {
+    if ( M_NoteTrace )
+        M_NoteTrace( static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) + onset ) / m_cfg.m_sampleRate, note,
+                     source, true, frequencyOf( note ) );
     const int count = static_cast<int>( m_voices.size() );
     for ( int i = 0; i < count; ++i )
         if ( m_voices[static_cast<size_t>( i )].m_note < 0 && !m_voices[static_cast<size_t>( i )].m_stealing )
@@ -1817,21 +1830,26 @@ float Engine::figureFit( int note, const int *chord, int n ) const
     return w;
 }
 
-int Engine::drawFigureNote( int around, int avoid, bool chordTone, int centre, const int *chord, int n )
+int Engine::drawFigureNote( int around, const int ( &avoid )[3], bool chordTone, int centre, const int *chord, int n )
 {
     // by the size of the step, 0 .. 7 semitones: seconds and thirds, a fourth less, the tritone hardly, a fifth
     static const float Step[8] = { 0.6f, 1.0f, 1.0f, 0.8f, 0.8f, 0.5f, 0.15f, 0.35f };
     float              weight[15];
     float              total = 0.0f;
-    // a key the tuning plays as the note before is that note again (keys snap in a just scale)
-    const double avoidHz = avoid >= 0 ? frequencyOf( avoid ) : -1.0;
+    // A note it must not be, by the pitch the tuning plays and not by the key (19.11.2026): keys snap in a just scale --
+    // Harmonic 8-16 plays A#4 and B4 as one 466 Hz -- and a figure's step onto the same pitch is one note struck again,
+    // which under a pad's attack is no line at all.
+    auto again = [&]( int c )
+    {
+        for ( const int a : avoid )
+            if ( a >= 0 && std::fabs( 1200.0 * std::log2( frequencyOf( c ) / frequencyOf( a ) ) ) < 25.0 ) return true;
+        return false;
+    };
     for ( int d = -7; d <= 7; ++d )
     {
-        const int  c = around + d;
-        float      w = 0.0f;
-        const bool again =
-            c == avoid || ( avoidHz > 0.0 && std::fabs( std::log2( frequencyOf( c ) / avoidHz ) ) < 0.001 );
-        if ( !again && std::abs( c - centre ) <= 9 && c >= 24 && c <= 108 )
+        const int c = around + d;
+        float     w = 0.0f;
+        if ( c >= 24 && c <= 108 && std::abs( c - centre ) <= 9 && !again( c ) )
         {
             const float fit = figureFit( c, chord, n );
             w = ( chordTone ? ( fit >= 3.0f ? 1.0f : 0.0f ) : fit ) * Step[std::abs( d )];
@@ -1840,20 +1858,20 @@ int Engine::drawFigureNote( int around, int avoid, bool chordTone, int centre, c
         total += w;
     }
     if ( total <= 0.0f )
-    {   // nothing fits there: the chord tone nearest to it, in whatever octave
-        int best = around, bestDist = 999;
+    {   // nothing fits there: the chord tone nearest to it, in whatever octave -- but not a pitch it must not be (it
+        // was, an octave of the conductor's note under the one before: Velvet Dreaming's 466 Hz twice); none: -1
+        int best = -1, bestDist = 999;
         for ( int k = 0; k < n; ++k )
-        {
-            const int c =
-                chord[k] + 12 * static_cast<int>( std::lround( static_cast<float>( around - chord[k] ) / 12.0f ) );
-            const int dist = std::abs( c - around ) + ( c == avoid ? 12 : 0 );
-            if ( dist < bestDist )
+            for ( int o = -10; o <= 10; ++o )
             {
-                bestDist = dist;
-                best = c;
+                const int c = chord[k] + 12 * o, dist = std::abs( c - around );
+                if ( c >= 24 && c <= 108 && dist < bestDist && !again( c ) )
+                {
+                    bestDist = dist;
+                    best = c;
+                }
             }
-        }
-        return std::clamp( best, 24, 108 );
+        return best;
     }
     float u = m_figRng.uniform() * total;
     for ( int d = -7; d <= 7; ++d )
@@ -1889,7 +1907,15 @@ void Engine::composeFigure( int i, const int *chord, int n )
     {
         const size_t s = static_cast<size_t>( k );
         const bool   edge = k == 0 || k == f.m_count - 1;   // it begins and ends on a chord tone
-        prev = drawFigureNote( prev < 0 ? centre : prev, prev, edge, centre, chord, n );
+        const int avoid[3] = { prev, -1, -1 };
+        const int note = drawFigureNote( prev < 0 ? centre : prev, avoid, edge, centre, chord, n );
+        if ( note < 0 )
+        {   // nowhere to go but the note before: the figure ends there
+            f.m_count = std::max( k, 1 );
+            if ( k == 0 ) f.m_note[0] = centre;
+            break;
+        }
+        prev = note;
         f.m_note[s] = prev;
         // an arch: the middle of a figure is its strongest
         f.m_vel[s] = ( 0.55f + 0.35f * std::sin( 3.14159265f * ( static_cast<float>( k ) + 0.5f ) /
@@ -1975,19 +2001,33 @@ void Engine::stepFigures( double dt )
         {
             const size_t k = static_cast<size_t>( f.m_next++ );
             int          note = f.m_note[k];
+            // the notes either side of it in the round, which it must not become (19.11.2026)
+            const int before = k > 0 ? f.m_note[k - 1] : -1,
+                      after = k + 1 < static_cast<size_t>( f.m_count ) ? f.m_note[k + 1] : -1;
+            auto      twin = [&]( int c )
+            {
+                for ( const int a : { before, after } )
+                    if ( a >= 0 && std::fabs( 1200.0 * std::log2( frequencyOf( c ) / frequencyOf( a ) ) ) < 25.0 )
+                        return true;
+                return false;
+            };
             if ( n > 0 && figureFit( note, chord, n ) <= 0.0f )
             {   // the harmony has moved under it: to the nearest note that fits (a chord tone first), and it stays
                 int best = note;
                 for ( int pass = 0; pass < 2 && best == note; ++pass )
                     for ( int d :
                           { -1, 1, -2, 2, -3, 3 } )   // three: a key that snaps onto its neighbour's pitch is no move
-                        if ( figureFit( note + d, chord, n ) >= ( pass == 0 ? 3.0f : 0.5f ) )
+                        if ( figureFit( note + d, chord, n ) >= ( pass == 0 ? 3.0f : 0.5f ) && !twin( note + d ) )
                         {
                             best = note + d;
                             break;
                         }
                 f.m_note[k] = note = best;
             }
+            // Never the pitch this round has just sounded: a note struck again under a pad's attack is no step. (Left
+            // out rather than moved: the figure as composed stays, and comes round whole once the chord lets it.)
+            if ( f.m_lastHz > 0.0 && std::fabs( 1200.0 * std::log2( frequencyOf( note ) / f.m_lastHz ) ) < 25.0 )
+                continue;
             // A figure never takes a sounding voice: a note that finds none free or fading is left out.
             bool room = false;
             for ( const Voice &v : m_voices )
@@ -2014,6 +2054,12 @@ void Engine::stepFigures( double dt )
             if ( slot->m_note >= 0 ) stopNote( slot->m_note, FigureSource );
             slot->m_note = note;
             slot->m_left = std::clamp( 0.8f * static_cast<float>( pace ), 0.2f, 4.0f ) + m_blk.m_figAttack;
+            {   // struck again: the pitch the note before it in this round sounded (the selftest's count)
+                const double hz = frequencyOf( note );
+                if ( f.m_lastHz > 0.0 && std::fabs( 1200.0 * std::log2( hz / f.m_lastHz ) ) < 25.0 )
+                    m_figRepeat.fetch_add( 1, std::memory_order_relaxed );
+                f.m_lastHz = hz;
+            }
             const int played = m_figPlayed.load( std::memory_order_relaxed );
             m_figLog[static_cast<size_t>( played & 15 )].store( note, std::memory_order_relaxed );
             m_figPlayed.store( played + 1, std::memory_order_relaxed );
@@ -2037,6 +2083,7 @@ void Engine::stepFigures( double dt )
         {
             f.m_clock -= period;
             f.m_next = 0;
+            f.m_lastHz = -1.0;
             if ( n >= 2 && m_figRng.uniform() < m_blk.m_figChange )
             {   // it comes round changed: one note drawn anew, between its neighbours
                 const int k =
@@ -2044,7 +2091,10 @@ void Engine::stepFigures( double dt )
                 const size_t s = static_cast<size_t>( k );
                 const int    centre = figureCentre( i );
                 const int    around = k > 0 ? f.m_note[s - 1] : f.m_count > 1 ? f.m_note[1] : centre;
-                f.m_note[s] = drawFigureNote( around, f.m_note[s], k == 0 || k == f.m_count - 1, centre, chord, n );
+                // not the note it was, nor either neighbour's pitch (19.11.2026; it was only the note it was)
+                const int avoid[3] = { f.m_note[s], k > 0 ? f.m_note[s - 1] : -1, k + 1 < f.m_count ? f.m_note[s + 1] : -1 };
+                const int note = drawFigureNote( around, avoid, k == 0 || k == f.m_count - 1, centre, chord, n );
+                if ( note >= 0 ) f.m_note[s] = note;
             }
         }
     }
@@ -2065,6 +2115,9 @@ void Engine::stopNote( int note, int source, int channel )
         if ( v.m_note == note && v.m_source == source && ours && !v.m_released && !v.m_stealing )
         {
             v.m_released = true;
+            if ( M_NoteTrace )
+                M_NoteTrace( static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) ) / m_cfg.m_sampleRate, note,
+                             source, false, frequencyOf( note ) );
             if ( v.m_pre > 0.0f )
             {   // let go before it sounded: its swell is drawn away
                 v.m_pre = 0.0f;
