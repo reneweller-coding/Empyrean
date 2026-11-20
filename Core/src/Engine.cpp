@@ -198,6 +198,72 @@ const std::vector<float> &warmIce()
     return sheet;
 }
 
+/**
+ * @brief Whether a parameter can change which notes the conductors, the foundation or the figures play, or when a
+ *        voice is free: what auditConductor() must read again when the matrix moves it.
+ * @param[in] id       the parameter
+ * @param[in] colours  whether the conductors listen to the timbre or the light (Brain Timbre or Follow Light on, or the
+ *                     Timbre scale): then the spectrum's and the landscape's knobs count too
+ * @return true for the conductors' and the figures' knobs, the tuning, the envelope, the premonition, the floor and
+ *         the dispersion's tail; with `colours`, also what Timbre (the spectrum) and Follow Light (the landscape, the
+ *         living field) read
+ */
+bool movesTheNotes( int id, bool colours )
+{
+    static const ParamIdE Colours[] = { ParamIdE::TILT,           ParamIdE::ODD_EVEN,  ParamIdE::BRIGHTNESS,
+                                        ParamIdE::INHARMONIC,     ParamIdE::STRETCH,   ParamIdE::HORIZON,
+                                        ParamIdE::HORIZON_HEIGHT, ParamIdE::LANDSCAPE, ParamIdE::MOTION,
+                                        ParamIdE::MOTION_DEPTH,   ParamIdE::MOTION_RATE, ParamIdE::LIFE_MODE,
+                                        ParamIdE::LIFE_DEPTH,     ParamIdE::LIFE_ZOOM };
+    for ( const ParamIdE p : Colours )
+        if ( static_cast<int>( p ) == id ) return colours;
+    static const ParamIdE Ids[] = {
+        ParamIdE::BRAIN_ON,         ParamIdE::AUTO_MODE,        ParamIdE::AUTO_RATE,       ParamIdE::AUTO_STEP,
+        ParamIdE::AUTO_LEAD,        ParamIdE::AUTO_TENSION,     ParamIdE::AUTO_ROOT_MOVE,  ParamIdE::BRAIN_DENSITY,
+        ParamIdE::BRAIN_RATE,       ParamIdE::BRAIN_HOLD_MIN,   ParamIdE::BRAIN_HOLD_MAX,  ParamIdE::BRAIN_CASCADE,
+        ParamIdE::BRAIN_LOW,        ParamIdE::BRAIN_HIGH,       ParamIdE::BRAIN_CONSONANCE, ParamIdE::BRAIN_WANDER,
+        ParamIdE::BRAIN_TIMBRE,     ParamIdE::BRAIN_LIGHT,      ParamIdE::BRAIN_FOUNDATION, ParamIdE::BRAIN2_ON,
+        ParamIdE::BRAIN2_INTERVAL,  ParamIdE::BRAIN2_DENSITY,   ParamIdE::BRAIN2_RATE,     ParamIdE::FIGURES,
+        ParamIdE::FIGURE_EVERY,     ParamIdE::FIGURE_NOTES,     ParamIdE::FIGURE_PACE,     ParamIdE::FIGURE_CHANGE,
+        ParamIdE::FIGURE_REGISTER,  ParamIdE::FIGURE_ATTACK,    ParamIdE::FIGURE_RELEASE,  ParamIdE::SCALE,
+        ParamIdE::ROOT_NOTE,        ParamIdE::KEY_MAP,          ParamIdE::PURITY,          ParamIdE::REF_PITCH,
+        ParamIdE::ATTACK,           ParamIdE::DECAY,            ParamIdE::SUSTAIN,         ParamIdE::RELEASE,
+        ParamIdE::PREMONITION,      ParamIdE::PREMONITION_TIME, ParamIdE::PEDAL,           ParamIdE::FLOOR_SUB,
+        ParamIdE::FLOOR_FIFTH,      ParamIdE::DISPERSION };
+    for ( const ParamIdE p : Ids )
+        if ( static_cast<int>( p ) == id ) return true;
+    return false;
+}
+
+/**
+ * @brief Whether a modulation source stands still in auditConductor(): a macro, the wheel, the pressure, nothing --
+ *        and what the instrument hears of itself (its loudness, centroid and flux, the reservoir), which the audit
+ *        has no card to hear and reads as silence.
+ * @param[in] s  the source
+ * @return true when it does
+ */
+bool standsStill( ModSourceE s )
+{
+    switch ( s )
+    {
+    case ModSourceE::OFF:
+    case ModSourceE::MACRO1:
+    case ModSourceE::MACRO2:
+    case ModSourceE::MACRO3:
+    case ModSourceE::MACRO4:
+    case ModSourceE::MOD_WHEEL:
+    case ModSourceE::PRESSURE:
+    case ModSourceE::LOUDNESS:
+    case ModSourceE::CENTROID:
+    case ModSourceE::FLUX:
+    case ModSourceE::RESERVOIR1:
+    case ModSourceE::RESERVOIR2:
+    case ModSourceE::RESERVOIR3:
+    case ModSourceE::RESERVOIR4: return true;
+    default: return false;
+    }
+}
+
 }   // namespace
 
 Engine::Engine()
@@ -295,43 +361,9 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     const std::vector<EnvShape> bank = factoryShapes();
     m_cloud.setShapes( bank.data(), static_cast<int>( bank.size() ) );
     factoryLandscapes();   // made now, not in the middle of a block
-    m_landChoice = -1;
     if ( m_cfg.m_realtimeGpuClass ) raiseGpuClass();
 
-    m_voices.assign( static_cast<size_t>( m_cfg.m_voices ), Voice{} );
-    m_foundationNote = -1;
-    for ( Voice &v : m_voices ) v.m_env.setSampleRate( m_cfg.m_sampleRate / G );   // stepped once per GPU block
-    m_rng.seed( m_cfg.m_seed );
-    m_eventRng.seed( m_cfg.m_seed ^ 0x5EAC0DEu );
-    m_side.seed( m_cfg.m_seed ^ 0xA5A5A5A55A5A5A5Aull );
-    m_tide.init( m_side );
-    std::fill( std::begin( m_specKey ), std::end( m_specKey ), -1.0f );
-    m_scaleChoice = -1;
-    m_mods.reset( m_cfg.m_seed ^ 0x6D6F647363ull );
-    for ( OwnUnit &o : m_own ) o.m_live = false;
-    m_soundValid = false;
-    m_morphT = 1.0f;
-    m_morphSeen = m_morphAsked.load( std::memory_order_acquire );
-    m_abWas = false;
-    m_mapWas = false;
-    m_phraseStart = false;
-    m_prevSounding = 0;
-    readParams();
-    refreshSpectrum();
-    refreshScale();
-    refreshLandscape();
-    m_brain.reset( m_rng.fork(), 48 + m_rootPc );
-    m_brain2.reset( m_side.fork(), 36 + m_rootPc );   // its own stream: switching it on never moves the first
-    // The figures (11.11.2026): their own dice, seeded from the seed and from nothing else's stream.
-    m_figRng.seed( static_cast<std::uint64_t>( m_cfg.m_seed ) * 0x9E3779B97F4A7C15ull + 0xF16A5E5ull );
-    for ( Figure &f : m_figs ) f = Figure{};
-    for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};
-    m_figActive = 0;
-    m_figMatch = 1.0f;
-    m_figPlayed.store( 0, std::memory_order_relaxed );
-    m_figClash.store( 0, std::memory_order_relaxed );
-    for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
-    m_stepWas = param( ParamIdE::AUTO_STEP ) >= 0.5f;
+    beginPiece( m_cfg.m_sampleRate / G );   // stepped once per GPU block
     m_far.prepare( m_cfg.m_sampleRate );
     m_diffuser.prepare( m_cfg.m_sampleRate );
     m_unmask.prepare( m_cfg.m_sampleRate );
@@ -469,8 +501,6 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
     m_chimeLevel = m_phantomGain = m_dreamGain = 0.0f;
     m_dreamBlocks = 0;
     m_chimeStrikes.store( 0, std::memory_order_relaxed );
-    m_noteRng = Rng( m_cfg.m_seed ^ 0x4E6F7465ull );
-    m_randomNote = 0.0f;
     m_roughness = 0.0f;
     m_roughTick = 0;
     m_prevSpecMix = m_prevSpecToFar = 0.0f;
@@ -538,6 +568,182 @@ bool Engine::prepare( const EngineConfig &config, std::string *error )
             Sleep( 1 );
     }
     return true;
+}
+
+void Engine::beginPiece( double controlRate )
+{
+    m_landChoice = -1;
+    m_voices.assign( static_cast<size_t>( m_cfg.m_voices ), Voice{} );
+    m_foundationNote = -1;
+    for ( Voice &v : m_voices ) v.m_env.setSampleRate( controlRate );
+    m_rng.seed( m_cfg.m_seed );
+    m_eventRng.seed( m_cfg.m_seed ^ 0x5EAC0DEu );
+    m_side.seed( m_cfg.m_seed ^ 0xA5A5A5A55A5A5A5Aull );
+    m_tide.init( m_side );
+    std::fill( std::begin( m_specKey ), std::end( m_specKey ), -1.0f );
+    m_scaleChoice = -1;
+    m_mods.reset( m_cfg.m_seed ^ 0x6D6F647363ull );
+    for ( OwnUnit &o : m_own ) o.m_live = false;
+    m_soundValid = false;
+    m_morphT = 1.0f;
+    m_morphSeen = m_morphAsked.load( std::memory_order_acquire );
+    m_abWas = false;
+    m_mapWas = false;
+    m_phraseStart = false;
+    m_prevSounding = 0;
+    m_noteRng = Rng( m_cfg.m_seed ^ 0x4E6F7465ull );
+    m_randomNote = 0.0f;
+    readParams();
+    refreshSpectrum();
+    refreshScale();
+    refreshLandscape();
+    m_brain.reset( m_rng.fork(), 48 + m_rootPc );
+    m_brain2.reset( m_side.fork(), 36 + m_rootPc );   // its own stream: switching it on never moves the first
+    // The figures (11.11.2026): their own dice, seeded from the seed and from nothing else's stream.
+    m_figRng.seed( static_cast<std::uint64_t>( m_cfg.m_seed ) * 0x9E3779B97F4A7C15ull + 0xF16A5E5ull );
+    for ( Figure &f : m_figs ) f = Figure{};
+    for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};
+    m_figActive = 0;
+    m_figMatch = 1.0f;
+    m_figPlayed.store( 0, std::memory_order_relaxed );
+    m_figClash.store( 0, std::memory_order_relaxed );
+    for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
+    m_stepWas = param( ParamIdE::AUTO_STEP ) >= 0.5f;
+}
+
+void Engine::auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
+                             const std::function<void( const AuditNote & )> &sink,
+                             const std::function<void( double, int )>       &rootSink )
+{
+    // Everything prepare() does that the conductors, the foundation and the figures depend on (beginPiece), and nothing
+    // of the card: the cloud is never opened, and the few places those steps reach into it look at m_audit.
+    release();
+    m_cfg = config;
+    m_audit = true;
+    m_auditSink = sink;
+    m_auditTime = 0.0;
+    m_halt = 0;
+    m_pending.clear();
+    const bool always = paramEvery <= 0;   // the reference: every step, as a render
+    paramEvery = std::max( paramEvery, 1 );
+    m_paramDt = dt * paramEvery;
+    factoryLandscapes();
+    beginPiece( 1.0 / dt );
+    m_ghosts.clear();   // the memory's ghosts are the card's: none here (stopNote captures none)
+    // Reading the parameters is most of a step's time (the modulators, the matrix). Read again only when the matrix
+    // moves one that the notes hear: otherwise every reading gives what the first gave.
+    const bool colours = base( ParamIdE::BRAIN_TIMBRE ) > 0.0f || base( ParamIdE::BRAIN_LIGHT ) > 0.0f ||
+                         static_cast<int>( std::lround( base( ParamIdE::SCALE ) ) ) == TimbreScaleIndex;
+    bool       moving = always;
+    for ( int r = 0; r < m_sound.m_rowCount; ++r )
+    {
+        const ModRow &row = m_sound.m_rows[r];
+        moving = moving || ( row.m_depth != 0.0f && movesTheNotes( row.m_target, colours ) &&
+                             !( standsStill( row.m_source ) && standsStill( row.m_via ) ) );
+    }
+    int lastRoot = m_brain.root();
+    if ( rootSink ) rootSink( 0.0, lastRoot );
+    const long long steps = static_cast<long long>( seconds / dt );
+    for ( long long s = 0; s < steps; ++s )
+    {
+        // renderBlock's order: the parameters, the spectrum, the scale, the landscape, then the conductors (section 2),
+        // then the voices' lives (what section 3 decides about a voice being free, fading or stolen).
+        if ( moving && s % paramEvery == 0 )
+            readParams();
+        else
+            readBrainParams();   // what follows the conductor's root (the floor's register) is read every step
+        refreshSpectrum();
+        refreshScale();
+        refreshLandscape();
+        stepConductors( dt );
+        auditVoices( dt );
+        if ( rootSink && m_brain.root() != lastRoot )
+        {
+            lastRoot = m_brain.root();
+            rootSink( m_auditTime, lastRoot );
+        }
+        m_auditTime += dt;
+    }
+    m_audit = false;
+    m_auditSink = nullptr;
+    m_paramDt = 0.0;
+}
+
+void Engine::auditVoices( double dt )
+{
+    // Section 3 of renderBlock, as far as it decides a voice's life: a stolen voice's fade and the note waiting on it,
+    // the premonition's countdown, the envelope (the pad's or the figure's) and the dispersion's tail after it. What
+    // the voice sounds like is not computed.
+    const float dtf = static_cast<float>( dt );
+    for ( int i = 0; i < static_cast<int>( m_voices.size() ); ++i )
+    {
+        Voice &v = m_voices[static_cast<size_t>( i )];
+        if ( v.m_stealing )
+        {
+            if ( v.m_stealBlocks > 0 )
+            {
+                --v.m_stealBlocks;
+                v.m_env.kill();
+                continue;
+            }
+            v.m_stealing = false;
+            if ( v.m_next.m_type == 0 )
+                beginOn( i, v.m_next.m_note, v.m_next.m_velocity, v.m_nextDistance, v.m_nextSource, 0,
+                         v.m_next.m_channel );
+            else
+                v.m_note = -1;
+        }
+        if ( v.m_note < 0 ) continue;
+        if ( v.m_restart )
+        {   // where it stands and what it sounds, for the matrix's Note, Distance and Beat (no breath, tide, self-tuning)
+            v.m_hz = frequencyOf( v.m_note );
+            v.m_distance = v.m_place;
+        }
+        if ( v.m_source == FigureSource )
+            v.m_env.setTimes( m_blk.m_figAttack, 1.5f, 0.55f, m_blk.m_figRelease );
+        else
+            v.m_env.setTimes( m_blk.m_attack, m_blk.m_decay, m_blk.m_sustain, m_blk.m_release );
+        if ( v.m_pre > 0.0f )
+        {
+            v.m_pre -= dtf;
+            if ( v.m_pre <= 0.0f )
+            {
+                v.m_pre = 0.0f;
+                v.m_suck = 1.0f;
+                if ( !v.m_released ) v.m_env.noteOn();
+            }
+        }
+        float gain;
+        if ( v.m_pre > 0.0f )
+            gain = 0.5f * m_blk.m_premonition * std::exp( -4.0f * v.m_pre / std::max( v.m_preTotal, 0.5f ) );
+        else
+        {
+            gain = v.m_env.process();
+            if ( v.m_suck > 0.0f )
+            {
+                gain = std::max( gain, 0.5f * m_blk.m_premonition * v.m_suck );
+                v.m_suck = std::max( 0.0f, v.m_suck - dtf / 0.15f );
+            }
+        }
+        v.m_lastGain = gain;
+        if ( !v.m_env.isActive() && v.m_pre <= 0.0f && v.m_suck <= 0.0f )
+        {
+            if ( !v.m_tailArmed )
+            {
+                v.m_tailArmed = true;
+                v.m_tailBlocks += static_cast<int>( std::ceil( std::fabs( cur( ParamIdE::DISPERSION ) ) / dt ) );
+            }
+            if ( v.m_tailBlocks > 0 )
+            {
+                --v.m_tailBlocks;
+                continue;
+            }
+            v.m_note = -1;
+            continue;
+        }
+        v.m_restart = false;
+        v.m_age += dt;
+    }
 }
 
 void Engine::release()
@@ -736,7 +942,7 @@ void Engine::loadPreset( int index, double glideSeconds )
 
 void Engine::updateSound()
 {
-    const double dt = m_cfg.m_gpuBlock / m_cfg.m_sampleRate;
+    const double dt = paramStep();
     // The slots, when the editor chose one (taken only if the lock is free: the next block tries again).
     bool      slotsChanged = false;
     const int version = m_slotVersion.load( std::memory_order_acquire );
@@ -1017,8 +1223,8 @@ void Engine::readParams()
             in.m_merger = m_mergerEnv;   // Phase 33
         }
         m_phraseStart = false;
-        m_mods.advance( static_cast<float>( m_cfg.m_gpuBlock / m_cfg.m_sampleRate ), in );
-        runOwnModulators( static_cast<float>( m_cfg.m_gpuBlock / m_cfg.m_sampleRate ) );
+        m_mods.advance( static_cast<float>( paramStep() ), in );
+        runOwnModulators( static_cast<float>( paramStep() ) );
         for ( int s = 1; s < NumModSources; ++s )
             m_sourceLive[static_cast<size_t>( s )].store( m_mods.value( static_cast<ModSourceE>( s ) ),
                                                           std::memory_order_relaxed );
@@ -1191,6 +1397,12 @@ void Engine::readParams()
     m_blk.m_premonition = g( ParamIdE::PREMONITION );
     m_blk.m_premonitionTime = g( ParamIdE::PREMONITION_TIME );
 
+    readBrainParams();
+}
+
+void Engine::readBrainParams()
+{
+    auto g = [this]( ParamIdE id ) { return cur( id ); };
     m_bp.m_on = g( ParamIdE::BRAIN_ON ) >= 0.5f;
     m_bp.m_mode = static_cast<BrainModeE>(
         std::clamp( static_cast<int>( std::lround( g( ParamIdE::AUTO_MODE ) ) ), 0, NumBrainModes - 1 ) );
@@ -1436,8 +1648,9 @@ void Engine::refreshLandscape()
     {
         if ( m_landChoice == choice && version == m_userLandSeen ) return;
         if ( !m_userLandLock.try_lock() ) return;   // the editor is handing one over: the next block
-        m_cloud.setLandscape( m_userLand.m_amps.data(), m_userLand.m_columns, m_userLand.m_rows,
-                              m_userLand.m_rowSeconds );
+        if ( !m_audit )
+            m_cloud.setLandscape( m_userLand.m_amps.data(), m_userLand.m_columns, m_userLand.m_rows,
+                                  m_userLand.m_rowSeconds );
         m_landRms = m_userLandRms;
         m_landLoop = static_cast<float>( m_userLand.m_rows ) * m_userLand.m_rowSeconds;
         m_userLandLock.unlock();
@@ -1448,7 +1661,7 @@ void Engine::refreshLandscape()
     if ( choice == m_landChoice ) return;
     const FactoryLandscapes &f = factoryLandscapes();
     const Landscape         &l = f.m_land[static_cast<size_t>( choice )];
-    m_cloud.setLandscape( l.m_amps.data(), l.m_columns, l.m_rows, l.m_rowSeconds );
+    if ( !m_audit ) m_cloud.setLandscape( l.m_amps.data(), l.m_columns, l.m_rows, l.m_rowSeconds );
     m_landRms = f.m_rms[static_cast<size_t>( choice )];
     m_landLoop = static_cast<float>( l.m_rows ) * l.m_rowSeconds;
     m_landChoice = choice;
@@ -1473,7 +1686,7 @@ void Engine::updateLight()
     const float lifeDepth = cur( ParamIdE::LIFE_DEPTH );
     if ( lifeMode != 0 && lifeDepth > 0.0f )
     {
-        if ( const float *cells = m_cloud.lifePicture() )
+        if ( const float *cells = m_audit ? nullptr : m_cloud.lifePicture() )   // (the audit has no living field)
         {   // the living field: its columns, averaged along
             float column[LifeW];
             for ( int x = 0; x < LifeW; ++x )
@@ -1639,7 +1852,7 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     v.m_glowTarget.fill( 0.0f );
     v.m_subOn = m_blk.m_subharmonics > 0.0f;
     v.m_sub.fill( 0.0f );
-    m_cloud.voice( i ).m_releaseAt = -1.0f;
+    if ( !m_audit ) m_cloud.voice( i ).m_releaseAt = -1.0f;
 }
 
 void Engine::startNote( int note, float velocity, float distance, int source, int onset, int channel )
@@ -1647,6 +1860,9 @@ void Engine::startNote( int note, float velocity, float distance, int source, in
     if ( M_NoteTrace )
         M_NoteTrace( static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) + onset ) / m_cfg.m_sampleRate, note,
                      source, true, frequencyOf( note ) );
+    if ( m_audit )
+        m_auditSink( AuditNote{ m_auditTime, source, true, note, velocity, frequencyOf( note ), m_auditFigure,
+                                m_auditStep } );
     const int count = static_cast<int>( m_voices.size() );
     for ( int i = 0; i < count; ++i )
         if ( m_voices[static_cast<size_t>( i )].m_note < 0 && !m_voices[static_cast<size_t>( i )].m_stealing )
@@ -2037,9 +2253,12 @@ void Engine::stepFigures( double dt )
                     break;
                 }
             if ( !room ) continue;
+            m_auditFigure = i;   // (for the audit's lines: which figure, which of its notes)
+            m_auditStep = static_cast<int>( k );
             startNote( note, f.m_vel[k],
                        std::clamp( m_blk.m_figDepth * ( 0.85f + 0.15f * m_figRng.uniform() ), 0.0f, 1.0f ),
                        FigureSource, 0 );
+            m_auditFigure = m_auditStep = -1;
             // held for most of a pace (its attack at the least), then let go
             FigureHeld *slot = &m_figHeld[0];
             for ( FigureHeld &h : m_figHeld )
@@ -2118,12 +2337,16 @@ void Engine::stopNote( int note, int source, int channel )
             if ( M_NoteTrace )
                 M_NoteTrace( static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) ) / m_cfg.m_sampleRate, note,
                              source, false, frequencyOf( note ) );
+            if ( m_audit )
+                m_auditSink( AuditNote{ m_auditTime, source, false, note, 0.0f, frequencyOf( note ),
+                                        -1, -1 } );
             if ( v.m_pre > 0.0f )
             {   // let go before it sounded: its swell is drawn away
                 v.m_pre = 0.0f;
                 v.m_suck = 1.0f;
             }
             v.m_env.noteOff();
+            if ( m_audit ) return;   // (the audit has no card: no motion's tail, no ghost)
             CloudVoice &cv = m_cloud.voice( static_cast<int>( i ) );
             cv.m_releaseAt = cv.m_time;   // the motion's release tails start here
             if ( cur( ParamIdE::MEMORY_LEVEL ) > 0.0f && !m_ghosts.empty() ) captureGhost( static_cast<int>( i ) );
@@ -4513,6 +4736,70 @@ void Engine::captureGhost( int i )
     g.m_env = 0.0f;
 }
 
+void Engine::stepConductors( double dt )
+{
+    const bool step = cur( ParamIdE::AUTO_STEP ) >= 0.5f;
+    if ( ( step && !m_stepWas ) | m_stepAsked.exchange( false, std::memory_order_relaxed ) ) m_brain.requestStep();
+    m_stepWas = step;
+    if ( m_fillAsked.exchange( false, std::memory_order_relaxed ) )
+    {
+        if ( m_bp.m_on ) m_brain.requestFill();
+        if ( m_blk.m_brain2 ) m_brain2.requestFill();
+    }
+    updateLight();
+    m_bp.m_light = m_lightOn ? m_light : nullptr;
+    m_bp2.m_light = m_bp.m_light;
+    auto freqOf = [this]( int note ) { return frequencyOf( note ); };
+    // the two conductors hear each other (19.11.2026, as in Noctuary): each weighs its choices against the other's notes
+    m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf );
+    m_brain.update( dt, m_bp, -1, freqOf,
+                    [this]( const BrainEvent &e )
+                    {
+                        if ( e.m_type == BrainEvent::TypeE::NOTE_ON )
+                            startNote( e.m_note, e.m_velocity, brainDistance(), 1, 0 );
+                        else
+                            stopNote( e.m_note, 1 );
+                    } );
+    // The family jam: a follower's conductor keeps its root on the leader's pitch class, the nearest
+    // note of it (Noctuary's way: its tuning stays its own).
+    if ( const int jr = m_jamRoot.load( std::memory_order_relaxed );
+         jr >= 0 && ( ( m_brain.root() % 12 ) + 12 ) % 12 != jr )
+    {
+        const int r = m_brain.root();
+        int       best = r, bestDist = 99;
+        for ( int d = -6; d <= 6; ++d )
+            if ( ( ( ( r + d ) % 12 ) + 12 ) % 12 == jr && std::abs( d ) < bestDist )
+            {
+                bestDist = std::abs( d );
+                best = r + d;
+            }
+        m_brain.setRoot( std::clamp( best, 0, 127 ) );
+    }
+    stepPedal( static_cast<float>( dt ) );
+    updateFoundation();
+    m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
+    m_brain2.listenTo( &m_brain, freqOf );
+    m_brain2.update( dt, m_bp2, -1, freqOf,
+                     [this]( const BrainEvent &e )
+                     {
+                         if ( e.m_type == BrainEvent::TypeE::NOTE_ON )
+                             startNote( e.m_note, e.m_velocity,
+                                        m_blk.m_brain2Depth * ( 0.85f + 0.15f * m_rng.uniform() ), 2, 0 );
+                         else
+                             stopNote( e.m_note, 2 );
+                     } );
+    stepFigures( dt );   // the figures (11.11.2026), to the chord as it stands now
+    m_brainRoot.store( m_brain.root(), std::memory_order_relaxed );
+    {   // the conductor's countdown and the foundation, for the panel
+        const double next = m_brain.untilNext();
+        if ( next > m_conductorWas + 0.5 )
+            m_conductorSpan.store( static_cast<float>( next ), std::memory_order_relaxed );
+        m_conductorWas = next;
+        m_conductorNext.store( static_cast<float>( next ), std::memory_order_relaxed );
+        m_foundationView.store( m_foundationNote, std::memory_order_relaxed );
+    }
+}
+
 void Engine::renderBlock()
 {
     const NoDenormals noDenormals;
@@ -4626,66 +4913,7 @@ void Engine::renderBlock()
     }
 
     // 2. The conductors. Step fires on the rising edge of its switch, or from autoplayStep().
-    const bool step = cur( ParamIdE::AUTO_STEP ) >= 0.5f;
-    if ( ( step && !m_stepWas ) | m_stepAsked.exchange( false, std::memory_order_relaxed ) ) m_brain.requestStep();
-    m_stepWas = step;
-    if ( m_fillAsked.exchange( false, std::memory_order_relaxed ) )
-    {
-        if ( m_bp.m_on ) m_brain.requestFill();
-        if ( m_blk.m_brain2 ) m_brain2.requestFill();
-    }
-    updateLight();
-    m_bp.m_light = m_lightOn ? m_light : nullptr;
-    m_bp2.m_light = m_bp.m_light;
-    auto freqOf = [this]( int note ) { return frequencyOf( note ); };
-    // the two conductors hear each other (19.11.2026, as in Noctuary): each weighs its choices against the other's notes
-    m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf );
-    m_brain.update( dt, m_bp, -1, freqOf,
-                    [this]( const BrainEvent &e )
-                    {
-                        if ( e.m_type == BrainEvent::TypeE::NOTE_ON )
-                            startNote( e.m_note, e.m_velocity, brainDistance(), 1, 0 );
-                        else
-                            stopNote( e.m_note, 1 );
-                    } );
-    // The family jam: a follower's conductor keeps its root on the leader's pitch class, the nearest
-    // note of it (Noctuary's way: its tuning stays its own).
-    if ( const int jr = m_jamRoot.load( std::memory_order_relaxed );
-         jr >= 0 && ( ( m_brain.root() % 12 ) + 12 ) % 12 != jr )
-    {
-        const int r = m_brain.root();
-        int       best = r, bestDist = 99;
-        for ( int d = -6; d <= 6; ++d )
-            if ( ( ( ( r + d ) % 12 ) + 12 ) % 12 == jr && std::abs( d ) < bestDist )
-            {
-                bestDist = std::abs( d );
-                best = r + d;
-            }
-        m_brain.setRoot( std::clamp( best, 0, 127 ) );
-    }
-    stepPedal( static_cast<float>( dt ) );
-    updateFoundation();
-    m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
-    m_brain2.listenTo( &m_brain, freqOf );
-    m_brain2.update( dt, m_bp2, -1, freqOf,
-                     [this]( const BrainEvent &e )
-                     {
-                         if ( e.m_type == BrainEvent::TypeE::NOTE_ON )
-                             startNote( e.m_note, e.m_velocity,
-                                        m_blk.m_brain2Depth * ( 0.85f + 0.15f * m_rng.uniform() ), 2, 0 );
-                         else
-                             stopNote( e.m_note, 2 );
-                     } );
-    stepFigures( dt );   // the figures (11.11.2026), to the chord as it stands now
-    m_brainRoot.store( m_brain.root(), std::memory_order_relaxed );
-    {   // the conductor's countdown and the foundation, for the panel
-        const double next = m_brain.untilNext();
-        if ( next > m_conductorWas + 0.5 )
-            m_conductorSpan.store( static_cast<float>( next ), std::memory_order_relaxed );
-        m_conductorWas = next;
-        m_conductorNext.store( static_cast<float>( next ), std::memory_order_relaxed );
-        m_foundationView.store( m_foundationNote, std::memory_order_relaxed );
-    }
+    stepConductors( dt );
 
     // 3. The voices: envelope, place, frequency, colour, filter, air, motion.
     // While the sound glides, the tuning follows slowly: a new scale is reached by the partials

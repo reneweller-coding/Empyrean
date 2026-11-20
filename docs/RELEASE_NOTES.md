@@ -105,6 +105,16 @@
 - **Inside: the self-test picks its tests** (20.11.2026). A full run takes twenty minutes on the card, and it knew
   only `--from N`. `--list` numbers the 118 tests with their titles, `--only 62,113-117` runs those alone, and every
   run prints each test's wall time and the five slowest; the last line stays `selftest passed`.
+- **Inside: the conductors without the graphics card** (20.11.2026). Any look at what the conductors played needed a
+  render on the card, 35 seconds a preset for five minutes. `Engine::auditConductor` steps the same code -- the
+  conductors, the pedal, the foundation, the figures, and of the voices only whether they are free, fading or stolen
+  -- on its own clock without opening the card, and `additiv_brain_audit` prints its notes: an hour of a preset in
+  about three seconds. Against `empy_render --note-log` over ten presets of every kind (Chords and Free, the second
+  conductor, figures, JI 7-limit, Harmonic 8-16, Subharmonic 16-8, Pentatonic, premonition, Timbre, Night Arc),
+  five minutes each: 1012 notes of 1012 the same, at the same sample. A new selftest (119) keeps them together.
+  What it cannot see: Follow Light over a living field (no preset of the bank has Follow Light), a modulation route
+  from what the instrument hears (it reads silence), and Night Arc, which in a render follows the real sun at the
+  hour it runs (the audit has no night; 415 presets have the arc, and the one among the ten agreed at 3 a.m.).
 
 ## 1.0.0 (17.10.2026)
 

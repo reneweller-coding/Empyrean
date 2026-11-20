@@ -109,6 +109,14 @@ if(ADDITIV_BUILD_TOOLS)
     target_link_options(empy_render PRIVATE /STACK:8388608)
     family_bin(empy_render)
 
+    # additiv_brain_audit: the conductors, the foundation and the figures without the card (Engine::auditConductor),
+    # for Tools/presets/music_audit.py.
+    add_executable(additiv_brain_audit Tools/render/brain_audit.cpp)
+    target_compile_options(additiv_brain_audit PRIVATE /W4 /permissive-)
+    target_link_libraries(additiv_brain_audit PRIVATE AdditivCore)
+    target_link_options(additiv_brain_audit PRIVATE /STACK:8388608)
+    family_bin(additiv_brain_audit)
+
     # additiv_presets: every factory preset's level, for make_presets.py to bring the bank to one level.
     add_executable(additiv_presets Tools/presets/main.cpp)
     target_compile_options(additiv_presets PRIVATE /W4 /permissive-)

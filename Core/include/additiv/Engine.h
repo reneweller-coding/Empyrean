@@ -42,6 +42,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -143,6 +144,49 @@ public:
      *        foundation, 5 a figure), whether it begins, and its pitch in hertz. Never set in the instrument.
      */
     static inline void ( *M_NoteTrace )( double seconds, int note, int source, bool on, double hz ) = nullptr;
+
+    /** @brief One note the conductors, the foundation or the figures begin or let go (auditConductor() reports it). */
+    struct AuditNote
+    {
+        double m_seconds = 0.0;     ///< when, on the audit's clock
+        int    m_source = 0;        ///< 1 and 2 the conductors, 4 the foundation, 5 a figure (as M_NoteTrace)
+        bool   m_on = false;        ///< it begins (false: it is let go)
+        int    m_note = -1;         ///< MIDI
+        float  m_velocity = 0.0f;   ///< its strength (0 when let go)
+        double m_hz = 0.0;          ///< its pitch as the tuning plays it
+        int    m_figure = -1;       ///< a figure's onset: which figure, 0 .. 3; -1 otherwise
+        int    m_step = -1;         ///< a figure's onset: which of its notes in the round; -1 otherwise
+    };
+    /**
+     * @brief The conductors, the foundation and the figures on their own clock, with nothing rendered and the card
+     *        never touched: an hour of notes in a fraction of a second (plan 20.11.2026, A2; Noctuary's
+     *        auditConductor).
+     *
+     * Seeds and starts the piece as prepare() does (the same beginPiece()), then steps what renderBlock() steps for
+     * the notes -- the parameters, the scale, stepConductors() (both conductors, the pedal, the foundation, the
+     * figures) and, of the voices, only their lives (auditVoices(): a stolen voice's fade, the premonition, the
+     * envelope, the dispersion's tail). With `dt` one GPU block (config's gpuBlock / sampleRate) and nothing played
+     * it should give the notes `empy_render --note-log` gives, note for note, but for what needs the card: Follow
+     * Light over a living field (Life Mode) reads no field here, the memory captures no ghosts (they play no notes),
+     * a modulation route from what the instrument hears (its loudness, centroid and flux, the reservoir) reads
+     * silence, and Night Arc has no night (a render's follows the real sun at the hour it runs). A longer
+     * `dt`, or the parameters read only every `paramEvery` steps (the modulators advanced by as much at once), is
+     * faster and no longer exact: every wait is rounded to the step, and a modulated knob moves in coarser steps.
+     * Offline only; leaves the engine unprepared.
+     * @param[in] seconds     how long
+     * @param[in] config      as for prepare(): the seed, the voices, the sample rate and the GPU block
+     * @param[in] dt          the step, s
+     * @param[in] paramEvery  read the parameters (and advance the modulators) every this many steps -- and only when
+     *                        the matrix moves a knob the notes hear (otherwise every reading gives the first one's
+     *                        values; what follows the conductor's root is read every step); 0 every step whatever
+     *                        the matrix does, as a render
+     * @param[in] sink        receives every note begun and let go
+     * @param[in] rootSink    receives (seconds, root) at the start and at every change of the conductor's root; may
+     *                        be empty
+     */
+    void auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
+                         const std::function<void( const AuditNote & )> &sink,
+                         const std::function<void( double, int )>       &rootSink );
 
     /** @brief The GPU, for the logs. @return its name and compute capability ("" before prepare) */
     std::string deviceName() const;
@@ -796,6 +840,9 @@ private:
     void stopWorker();    ///< stops and joins it
     void renderBlock();   ///< one GPU block of the timeline into the ring (renderer thread)
     void readParams();    ///< the parameters the block uses, read once per block, the modulation applied
+    /** @brief The end of readParams(): the conductors', the foundation's and the floor's settings from the values read
+     *         (they follow the conductor's root, so the audit reads them every step). */
+    void readBrainParams();
     /**
      * @brief A parameter's effective value this block (after the matrix).
      * @param[in] id  the parameter
@@ -845,6 +892,35 @@ private:
     double frequencyOf( int note ) const;
     /** @brief Rebuilds the scale when its choice, root or key mapping changed. */
     void refreshScale();
+    /**
+     * @brief Begins the piece: the voices emptied, every die seeded from the seed, the parameters read, the scale and
+     *        the landscape chosen, the conductors and the figures started. prepare() and auditConductor() share it, so
+     *        the audit starts where a render starts.
+     * @param[in] controlRate  how often the voices' envelopes are stepped, Hz (once per GPU block, or per audit step)
+     */
+    void beginPiece( double controlRate );
+    /**
+     * @brief Section 2 of renderBlock(): a step asked for, a fill asked for, Follow Light, both conductors, the family
+     *        jam's root, the pedal, the foundation, the figures, and what the panel shows of them.
+     * @param[in] dt  the block's length, s
+     */
+    void stepConductors( double dt );
+    /**
+     * @brief The audit's section 3: of every voice only its life -- a stolen voice's fade and the note waiting on it,
+     *        the premonition, the envelope, the dispersion's tail -- so that "free", "fading" and "stolen" are what a
+     *        render would find.
+     * @param[in] dt  the step, s
+     */
+    void auditVoices( double dt );
+
+    bool                                     m_audit = false;      ///< auditConductor() runs: the card is not there
+    std::function<void( const AuditNote & )> m_auditSink;          ///< where the audit's notes go
+    double                                   m_auditTime = 0.0;    ///< the audit's clock, s
+    int                                      m_auditFigure = -1;   ///< the figure whose note begins now, -1 none
+    int                                      m_auditStep = -1;     ///< which of its notes
+    double m_paramDt = 0.0;   ///< the audit's time between two readings of the parameters, s; 0 outside the audit
+    /** @brief How far the modulators and a glide advance per readParams(): a GPU block, or the audit's. @return s */
+    double paramStep() const { return m_paramDt > 0.0 ? m_paramDt : m_cfg.m_gpuBlock / m_cfg.m_sampleRate; }
 
     EngineConfig m_cfg;                ///< the layout
     bool         m_prepared = false;   ///< prepare() succeeded

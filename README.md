@@ -242,6 +242,11 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 ```
 
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).
+`--note-log` prints every note begun and let go, with its source and pitch.
+
+What the conductors, the foundation and the figures play can be seen without the graphics card: `additiv_brain_audit
+--preset "Velvet Dreaming" --hours 1` runs them on their own clock (an hour in about three seconds) and prints the same
+notes `empy_render --note-log` logs, note for note; `--presets FILE` takes many presets in one process.
 
 **Empyrean Journeys** (`EmpyreanJourneys.exe`, in the Start menu) renders journeys into files with a small window of
 its own: every journey listed with its length, one or several chosen, written as WAV or FLAC (24 bit), Ogg Vorbis or

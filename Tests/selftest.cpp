@@ -24,6 +24,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <complex>
@@ -5640,6 +5641,53 @@ int main( int argc, char **argv )
         if ( !opened ) return 1;
         check( exchanges > 30 && same == 0, "conductor: an exchange in Chords mode never lands on the pitch it replaces",
                fmt( "%d exchanges, %d of them within 25 cents of the note let go", exchanges, same ) );
+    }
+
+    // 119. The audit (20.11.2026): Engine::auditConductor plays, without the card, the notes a render plays -- both
+    //      conductors, the foundation and the figures, note for note and sample for sample. A preset with the second
+    //      conductor and figures, two minutes; what the render logs after the audit's end is left out.
+    if ( wanted( 119, "The audit plays what the render plays (20.11.2026)" ) )
+    {
+        using Note = std::array<long long, 4>;   // the sample, the source, on, the note
+        static std::vector<Note> heard;
+        heard.clear();
+        Engine::M_NoteTrace = []( double t, int note, int source, bool on, double )
+        { heard.push_back( { std::llround( t * Rate ), source, on ? 1 : 0, note } ); };
+        const int index = findPreset( "Crimson Giant" );
+        bool      opened = index >= 0;
+        if ( opened )
+        {
+            auto e = std::make_unique<Engine>();
+            e->loadPreset( index );
+            opened = openOffline( *e, true );
+            if ( opened ) (void)render( *e, 120.0 );
+        }
+        Engine::M_NoteTrace = nullptr;
+        if ( !opened ) return 1;
+        std::vector<Note> audited;
+        {
+            auto e = std::make_unique<Engine>();
+            e->loadPreset( index );
+            e->setParam( ParamIdE::BRAIN_ON, 1.0f );
+            EngineConfig c;
+            c.m_maxHostBlock = 256;
+            c.m_realtimeGpuClass = false;
+            c.m_seed = 0x5EEDu;
+            e->auditConductor(
+                120.0, c, c.m_gpuBlock / c.m_sampleRate, 0,
+                [&]( const Engine::AuditNote &n )
+                { audited.push_back( { std::llround( n.m_seconds * Rate ), n.m_source, n.m_on ? 1 : 0, n.m_note } ); },
+                {} );
+        }
+        const long long end = 119 * Second;
+        std::erase_if( heard, [end]( const Note &n ) { return n[0] >= end; } );
+        std::erase_if( audited, [end]( const Note &n ) { return n[0] >= end; } );
+        int sources[6] = {};
+        for ( const Note &n : heard ) ++sources[std::clamp<long long>( n[1], 0, 5 )];
+        check( heard.size() > 40 && heard == audited && sources[2] > 0 && sources[5] > 0,
+               "audit: the conductors and the figures without the card, note for note",
+               fmt( "render %zu notes (conductor %d, brain 2 %d, foundation %d, figures %d), audit %zu", heard.size(),
+                    sources[1], sources[2], sources[4], sources[5], audited.size() ) );
     }
 
     finishTest();
