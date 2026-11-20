@@ -155,6 +155,34 @@ public:
      *        foundation, 5 a figure), whether it begins, and its pitch in hertz. Never set in the instrument.
      */
     static inline void ( *M_NoteTrace )( double seconds, int note, int source, bool on, double hz ) = nullptr;
+    /**
+     * @brief Diagnostics for the tools (additiv_brain_audit --hold-pitch): when set, every note setHoldPitch() keeps at
+     *        its pitch as a glide changes the tuning -- the time in seconds (the audit's clock, else the timeline's),
+     *        the MIDI note, its source (as M_NoteTrace) and the pitch it keeps, in hertz. Never set in the instrument.
+     */
+    static inline void ( *M_PinTrace )( double seconds, int note, int source, double hz ) = nullptr;
+
+    /**
+     * @brief Sounding notes keep their pitch where a glide changes the tuning (plan D2b, 20.11.2026). Off by default,
+     *        and nothing in the instrument turns it on: the tools do (empy_render and additiv_brain_audit
+     *        `--hold-pitch 1`), so it can be heard and measured before anyone decides.
+     *
+     * A glide between two presets changes the scale, its root and the key mapping at its middle, and every note that
+     * sounds keeps its key and slides to that key's pitch in the new tuning (D2: in 59 % of the journeys' transitions a
+     * sounding note moves by a quarter tone or more, up to a whole tone). With mode 1 a note that sounds at that moment
+     * -- the conductors', the foundation's and the figures' -- keeps the pitch it had, in hertz, until it ends; only
+     * notes struck afterwards are tuned anew. A key the player holds (source 0) is retuned as before: a player on a
+     * keyboard expects the key to follow the tuning. The conductors judge their choices by the pitch a note really
+     * has: the key-to-pitch function they are given answers a key their own kept voice holds with the kept pitch
+     * (heldHz), so listenTo, rubsOwn, resting and againstOther see the true hertz; so do the figures' checks against
+     * the chord and against each other. Only while a glide runs (a journey's step, a preset taken with a glide, the A/B
+     * morph switched); a tuning turned on the panel, or the map's cursor, retunes as before.
+     * @param[in] mode  0 off (the instrument as it was), 1 sounding notes keep their pitch
+     * @pre before prepare() or auditConductor(), or between blocks
+     */
+    void setHoldPitch( int mode ) { m_holdPitch = mode; }
+    /** @brief What setHoldPitch() set. @return 0 off, 1 sounding notes keep their pitch */
+    int holdPitch() const { return m_holdPitch; }
 
     /** @brief One note the conductors, the foundation or the figures begin or let go (auditConductor() reports it). */
     struct AuditNote
@@ -849,6 +877,7 @@ private:
         Drifter       m_breath;                ///< the slow wander of its distance (Breath)
         Drifter       m_cutoffDrift;           ///< the slow wander of its filter's cutoff (Filter Drift)
         double        m_hz = 0.0;              ///< the frequency it is gliding at (purity and root changes glide)
+        double m_pinHz = 0.0;   ///< setHoldPitch(): the pitch it keeps since a glide changed the tuning, 0 when none
         Envelope      m_env;                   ///< the amplitude envelope, stepped once per GPU block
         std::uint32_t m_seed = 1;              ///< the note's dice on the GPU
         bool          m_restart = false;       ///< the GPU voice begins this note at the next block
@@ -938,6 +967,18 @@ private:
      * @return Hz
      */
     double frequencyOf( int note ) const;
+    /**
+     * @brief The pitch a key sounds at as one of a source's notes: the pitch a voice of that source holding the key was
+     *        kept at (setHoldPitch()), else frequencyOf(). With the switch off it is frequencyOf() itself.
+     * @param[in] note      MIDI note
+     * @param[in] source    the voice's source (as M_NoteTrace), -1 any source
+     * @param[in] released  whether a voice that was let go and still rings counts
+     * @return Hz
+     */
+    double heldHz( int note, int source, bool released ) const;
+    /** @brief setHoldPitch(): every voice that sounds now, but the player's, keeps the pitch it has (before the tuning
+     *         changes under it). */
+    void pinSounding();
     /** @brief Rebuilds the scale when its choice, root or key mapping changed. */
     void refreshScale();
     /**
@@ -1961,6 +2002,8 @@ private:
     std::atomic<float> m_viewRootHz{ 261.63f };   ///< the root's equal-tempered pitch (rootHz)
     std::array<std::atomic<float>, 128> m_viewNoteHz{};   ///< every key's pitch (noteHz)
     double m_noteHzKey[5] = { -1, -1, -1, -1, -1 };   ///< what they were worked out for: scale, root, A4, Purity, keys
+    int  m_holdPitch = 0;       ///< setHoldPitch(): 0 off, 1 sounding notes keep their pitch where a glide changes the tuning
+    bool m_pinsLive = false;    ///< a voice has been kept at its pitch (heldHz() looks then; never while the switch is off)
 };
 
 }   // namespace additiv

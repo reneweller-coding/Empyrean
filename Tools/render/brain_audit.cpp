@@ -4,7 +4,7 @@
  *        of a preset's notes in a fraction of a second (plan 20.11.2026, A2; Noctuary's ambient_brain_audit).
  *
  *     additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H (0.5)] [--seconds S] [--set key=value]...
- *                         [--seed N] [--dt S] [--param-every K] [--pairs FILE] [--tuning]
+ *                         [--seed N] [--dt S] [--param-every K] [--pairs FILE] [--tuning] [--hold-pitch N]
  *
  * Prints, per preset, a line `# preset <number> <name>`, a line `A,<attack>,<figure attack>,<figure release>` (seconds,
  * as the preset sets them: what Tools/presets/music_audit.py measures "too short" and "still ringing" against), then
@@ -42,6 +42,9 @@
  * -- every key's pitch as the tuning gives it (Engine::keyHz) -- at the start and whenever a key's pitch has moved by
  * more than half a cent (looked at every tenth of a second): a glide changes the scale and the root at its middle, and
  * what sounds is retuned. `--tuning` prints, per preset asked for, `# preset ...` and one T line of its own tuning.
+ *
+ * `--hold-pitch 1` (plan D2b) turns Engine::setHoldPitch on: a note that sounds where a glide changes the tuning keeps
+ * its pitch until it ends; each such note is printed as `H,<seconds>,<source>,<note>,<Hz kept>` when it is kept.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
@@ -152,6 +155,7 @@ int main( int argc, char **argv )
     std::vector<std::string> names, sets;
     std::vector<Pair>        pairs;
     bool                     tuning = false;
+    int                      holdPitch = 0;   // --hold-pitch: Engine::setHoldPitch
     for ( int i = 1; i < argc; ++i )
     {
         const std::string a = argv[i];
@@ -186,6 +190,8 @@ int main( int argc, char **argv )
             sets.push_back( argv[++i] );
         else if ( a == "--tuning" )
             tuning = true;
+        else if ( a == "--hold-pitch" && has )
+            holdPitch = std::atoi( argv[++i] );
         else if ( a == "--pairs" && has )
         {
             std::ifstream in( argv[++i] );
@@ -227,7 +233,7 @@ int main( int argc, char **argv )
         {
             std::fprintf( stderr, "additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H] [--seconds S] "
                                   "[--set key=value]... [--seed N] [--dt S] [--param-every K] [--pairs FILE] "
-                                  "[--tuning]\n" );
+                                  "[--tuning] [--hold-pitch N]\n" );
             return 2;
         }
     }
@@ -261,10 +267,14 @@ int main( int argc, char **argv )
                      static_cast<double>( n.m_velocity ), n.m_hz, n.m_figure, n.m_step );
     };
     auto rootLine = []( double t, int root ) { std::printf( "R,%.4f,%d\n", t, root ); };
+    if ( holdPitch > 0 )
+        Engine::M_PinTrace = []( double t, int note, int source, double hz )
+        { std::printf( "H,%.4f,%d,%d,%.3f\n", t, source, note, hz ); };
     for ( const Pair &pr : pairs )
     {   // a journey's transition: the first preset, the second glided into at m_at (as JourneyPlayer and empy_render)
         auto e = std::make_unique<Engine>();
         e->setRealtime( false );
+        e->setHoldPitch( holdPitch );
         std::printf( "# pair %s | %s\n", preset( pr.m_from ).m_name, preset( pr.m_to ).m_name );
         for ( int k = 0; k < 2; ++k )
         {
@@ -304,6 +314,7 @@ int main( int argc, char **argv )
     {
         auto e = std::make_unique<Engine>();   // a fresh one each: an Engine is large, the heap and not the stack
         e->setRealtime( false );
+        e->setHoldPitch( holdPitch );
         if ( index >= 0 ) e->loadPreset( index );
         for ( const std::string &s : sets )
             if ( !applySet( *e, s ) )

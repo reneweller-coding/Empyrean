@@ -25,7 +25,12 @@ Three passes, each resumable (results appended to TSVs under work/journeys/, don
            or an octave more: the conductor's own rub; by pitch in Hz, never by key), a note counted until it has
            fallen 20 dB after its release (0.47 of the release time); the same with the major seventh and its
            octave counted too (rub_m7_s: the interval class of a semitone under two octaves); the figures' notes
-           against the outgoing chord (rub_fig_s); and the largest retune of a note that sounds at the glide's middle.
+           against the outgoing chord (rub_fig_s); and the largest retune of a note that sounds at the glide's middle
+           and how many such notes move by a quarter tone or more (moved50).
+           `--hold-pitch 1` (plan D2b) audits with Engine::setHoldPitch: a note that sounds when a glide changes the
+           tuning keeps its pitch in Hz until it ends (the audit prints `H,<s>,<source>,<note>,<Hz>` for each such
+           note, and its pitch is that from then on); the results go to notes_hold1<tag>.tsv. `--fresh` measures
+           every pair again into this run's own file (otherwise a pair any run measured is skipped).
   render   on the graphics card, a sample (the card is shared: chunks of at most --chunk-min minutes, the card
            taken through G:/Tools/Games/gpu_card.py and given back between chunks, all of it within --budget-min):
            `empy_render --preset A --fill --set brain_on=1 --then B --at RPRE --glide G` (about thirty seconds a
@@ -106,7 +111,8 @@ LU_LIMIT, RUB_LIMIT = 3.0, 5.0  # the plan's acceptance: a level jump over 3 LU,
 PAIR_COLUMNS = ["journey", "index", "from", "to", "glide"]
 STATIC_COLUMNS = ["key", "from", "to", "root_from", "root_to", "fifths", "scale_from", "scale_to", "retune_max_c",
                   "retune_mean_c", "moved_share", "compatible"]
-NOTE_COLUMNS = ["key", "rub_s", "rub_m7_s", "rub_fig_s", "retune_sounding_c", "out_notes", "in_notes", "chord_mid"]
+NOTE_COLUMNS = ["key", "rub_s", "rub_m7_s", "rub_fig_s", "retune_sounding_c", "out_notes", "in_notes", "chord_mid",
+                "moved50"]
 RENDER_COLUMNS = ["key", "level_from", "level_to", "dip_lu", "peak_lu", "jump_lu", "rough_ratio", "card_s", "range_lu"]
 ALONE_COLUMNS = ["key", "dip_alone_lu", "peak_alone_lu", "alone_low_lu", "alone_high_lu"]
 # (rows without range_lu were measured against the steady stretches' medians, not their extremes: an upper bound of
@@ -216,8 +222,8 @@ def read_tsv(path, columns):
         f = line.split("\t")
         if len(f) == len(columns):
             rows.append(dict(zip(columns, f)))
-        elif columns is RENDER_COLUMNS and len(f) == len(columns) - 1:
-            rows.append(dict(zip(columns, f + [""])))
+        elif columns in (RENDER_COLUMNS, NOTE_COLUMNS) and len(f) == len(columns) - 1:
+            rows.append(dict(zip(columns, f + [""])))   # written before the last column was added
     return rows
 
 
@@ -328,8 +334,12 @@ def note_metrics(text):
     rel = {0: 5.0, 1: 5.0}
     tables = []                 # (t, [cents of key 0..127])
     events = []                 # (t, source, on, note)
+    pins = {}                   # (source, note) -> [(t, cents)]: --hold-pitch, a sounding note kept at its pitch
     for line in text.splitlines():
-        if line.startswith("E,"):
+        if line.startswith("H,"):
+            f = line.split(",")
+            pins.setdefault((int(f[2]), int(f[3])), []).append((float(f[1]), cents(float(f[4]))))
+        elif line.startswith("E,"):
             f = line.split(",")
             events.append((float(f[1]), int(f[2]), f[3] == "1", int(f[4])))
         elif line.startswith("T,"):
@@ -364,6 +374,18 @@ def note_metrics(text):
             else:
                 break
         return cur
+
+    def pin_of(n, t):
+        """The pitch a note was kept at, if it was by time t (its own pin: one made while it sounded -- or rang: the
+        engine keeps a voice a little longer than the 20 dB this tool counts a release to, hence the second's slack)."""
+        for tp, c in pins.get((n[0], n[1]), ()):
+            if n[2] <= tp < n[3] + 1.0 and tp <= t:
+                return c
+        return None
+
+    def pitch(n, t, tb=None):
+        c = pin_of(n, t)
+        return c if c is not None else (tb if tb is not None else table_at(t))[n[1]]
     chord = [n for n in notes if n[0] in (1, 2, 4)]
     figs = [n for n in notes if n[0] == 5]
     out_ = [n for n in chord if n[2] < at and n[3] > at]
@@ -379,8 +401,8 @@ def note_metrics(text):
                 continue
             m = 0.5 * (s + e)
             tb = table_at(m)
-            o = [tb[n[1]] for n in out_ if n[2] <= m < n[3]]
-            i = [tb[n[1]] for n in group_in if n[2] <= m < n[3]]
+            o = [pitch(n, m, tb) for n in out_ if n[2] <= m < n[3]]
+            i = [pitch(n, m, tb) for n in group_in if n[2] <= m < n[3]]
             if any(rub(x, y) for x in o for y in i):
                 total += e - s
         return total
@@ -390,18 +412,21 @@ def note_metrics(text):
         if mid - 0.05 < tt <= mid + 1.0:
             after = tb
     sounding = [n for n in chord if n[2] <= mid < n[3]]
-    retune = max((abs(after[n[1]] - before[n[1]]) for n in sounding), default=0.0)
+    moves = [abs(pitch(n, mid + 1.0, after) - pitch(n, mid - 0.05, before)) for n in sounding]
+    retune = max(moves, default=0.0)
     return {"rub_s": rub_time(in_), "rub_m7_s": rub_time(in_, rubs_m7), "rub_fig_s": rub_time(in_f), "retune_sounding_c": retune,
-            "out_notes": len(out_), "in_notes": len(in_), "chord_mid": len(sounding)}
+            "out_notes": len(out_), "in_notes": len(in_), "chord_mid": len(sounding),
+            "moved50": sum(1 for m in moves if m >= COMPATIBLE_C)}
 
 
-def run_note_chunk(chunk, exe, dt, every):
+def run_note_chunk(chunk, exe, dt, every, hold=0):
     fd, tmp = tempfile.mkstemp(suffix=".txt", prefix="jt_pairs_")
     with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
         for p in chunk:
             fh.write("%s|%s|%.1f|%.1f|%.1f\n" % (p["from"], p["to"], PRE, p["glide"], PRE + p["glide"] + POST))
     try:
-        r = subprocess.run([str(exe), "--pairs", tmp, "--dt", repr(dt), "--param-every", str(every)],
+        r = subprocess.run([str(exe), "--pairs", tmp, "--dt", repr(dt), "--param-every", str(every)] +
+                           (["--hold-pitch", str(hold)] if hold else []),
                            capture_output=True, text=True, encoding="utf-8", errors="replace",
                            creationflags=low_priority())
     finally:
@@ -415,8 +440,13 @@ def run_note_chunk(chunk, exe, dt, every):
 
 
 def notes_pass(ps, args):
-    path = WORK / ("notes%s.tsv" % args.tag_suffix)
-    done = {r["key"] for f in WORK.glob("notes*.tsv") for r in read_tsv(f, NOTE_COLUMNS)}   # any run's
+    hold = "_hold%d" % args.hold_pitch if args.hold_pitch else ""
+    path = WORK / ("notes%s%s.tsv" % (hold, args.tag_suffix))
+    if args.fresh or hold:   # this run's own file alone
+        done = {r["key"] for r in read_tsv(path, NOTE_COLUMNS)}
+    else:                    # any run's (the plain runs: a run with the switch measures another instrument)
+        done = {r["key"] for f in WORK.glob("notes*.tsv") if not f.name.startswith("notes_hold")
+                for r in read_tsv(f, NOTE_COLUMNS)}
     todo = list({p["key"]: p for p in ps if p["key"] not in done}.values())
     if args.limit:
         todo = todo[:args.limit]
@@ -424,7 +454,7 @@ def notes_pass(ps, args):
     chunks = [todo[i:i + args.chunk] for i in range(0, len(todo), args.chunk)]
     t0, n = time.time(), 0
     with cf.ThreadPoolExecutor(args.jobs) as ex:
-        futs = [ex.submit(run_note_chunk, c, AUDIT_EXE, args.dt, args.every) for c in chunks]
+        futs = [ex.submit(run_note_chunk, c, AUDIT_EXE, args.dt, args.every, args.hold_pitch) for c in chunks]
         for f in cf.as_completed(futs):
             rows = f.result()
             append_tsv(path, NOTE_COLUMNS, rows)
@@ -821,6 +851,8 @@ def joined(ps, tag_suffix=""):
     for f in sorted(WORK.glob("static*.tsv")):
         st.update({r["key"]: r for r in read_tsv(f, STATIC_COLUMNS)})
     for f in sorted(WORK.glob("notes*.tsv")):
+        if f.name.startswith("notes_hold"):
+            continue   # measured with Engine::setHoldPitch: another instrument
         nt.update({r["key"]: r for r in read_tsv(f, NOTE_COLUMNS)})
     for f in sorted(WORK.glob("render*.tsv")):
         for r in read_tsv(f, RENDER_COLUMNS):
@@ -979,6 +1011,9 @@ def main():
     ap.add_argument("--pause", type=float, default=45.0)
     ap.add_argument("--max-fifths", type=int, default=MAX_FIFTHS)
     ap.add_argument("--max-bad-share", type=float, default=MAX_BAD_SHARE)
+    ap.add_argument("--hold-pitch", type=int, default=0,
+                    help="notes: audit with Engine::setHoldPitch (1: a sounding note keeps its pitch); own TSV")
+    ap.add_argument("--fresh", action="store_true", help="notes: skip only the pairs this run's own file has")
     args = ap.parse_args()
     args.tag_suffix = ("_" + args.tag) if args.tag else ""
     if args.check:

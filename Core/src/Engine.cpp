@@ -1600,6 +1600,13 @@ void Engine::refreshSpectrum()
 void Engine::refreshScale()
 {
     const int choice = static_cast<int>( std::lround( base( ParamIdE::SCALE ) ) );
+    // setHoldPitch (plan D2b): where a glide changes the tuning, what sounds keeps the pitch it has, worked out here
+    // before the scale, its root or the key mapping change under it. Off: nothing is looked at.
+    if ( m_holdPitch > 0 && m_morphT < 1.0f &&
+         ( choice != m_scaleChoice ||
+           std::clamp( static_cast<int>( std::lround( base( ParamIdE::ROOT_NOTE ) ) ), 0, 11 ) != m_rootPc ||
+           ( std::lround( base( ParamIdE::KEY_MAP ) ) == 0 ) != m_snapKeys ) )
+        pinSounding();
     if ( choice != m_scaleChoice )
     {
         FixedScale s;
@@ -1800,6 +1807,29 @@ double Engine::frequencyOf( int note ) const
     return std::exp( std::log( et ) + ( std::log( pure ) - std::log( et ) ) * p );
 }
 
+double Engine::heldHz( int note, int source, bool released ) const
+{
+    if ( m_pinsLive )
+        for ( const Voice &v : m_voices )
+            if ( v.m_note == note && v.m_pinHz > 0.0 && ( source < 0 || v.m_source == source ) &&
+                 ( released || !v.m_released ) )
+                return v.m_pinHz;
+    return frequencyOf( note );
+}
+
+void Engine::pinSounding()
+{
+    const double t = m_audit ? m_auditTime
+                             : static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) ) / m_cfg.m_sampleRate;
+    for ( Voice &v : m_voices )
+        if ( v.m_note >= 0 && v.m_source != 0 && !( v.m_pinHz > 0.0 ) )
+        {
+            v.m_pinHz = frequencyOf( v.m_note );
+            m_pinsLive = true;
+            if ( M_PinTrace ) M_PinTrace( t, v.m_note, v.m_source, v.m_pinHz );
+        }
+}
+
 float Engine::brainDistance()
 {
     // Noctuary's spatial model: the conductor's notes are bimodal, 40 % close, 60 % deep.
@@ -1816,6 +1846,7 @@ void Engine::beginOn( int i, int note, float velocity, float distance, int sourc
     if ( !figure ) m_lastVelocity = velocity;
     v.m_note = note;
     v.m_source = source;
+    v.m_pinHz = 0.0;   // a new note is tuned as the tuning stands (setHoldPitch)
     v.m_channel = source == 0 ? channel : -1;
     v.m_bend =
         v.m_channel >= 0 ? m_chanBend[static_cast<size_t>( v.m_channel )].load( std::memory_order_relaxed ) : 0.0f;
@@ -2042,12 +2073,19 @@ float Engine::figureFit( int note, const int *chord, int n ) const
 {
     // In cents of what the tuning plays (19.11.2026), not in keys: where a just scale's keys snap, a key is not the
     // interval its number says -- in 7-limit on D the G is played as an F#, a semitone from a G judged a fourth.
+    // A chord tone at the pitch it sounds (setHoldPitch: one kept at its pitch; off, frequencyOf as centsApart).
+    auto apart = [&]( int k )
+    {
+        const double c = std::fmod(
+            std::fabs( 1200.0 * std::log2( frequencyOf( note ) / heldHz( chord[k], -1, false ) ) ), 1200.0 );
+        return std::min( c, 1200.0 - c );
+    };
     for ( int k = 0; k < n; ++k )
-        if ( centsApart( note, chord[k] ) <= 25.0 ) return 3.0f;
+        if ( apart( k ) <= 25.0 ) return 3.0f;
     float w = 1.0f;
     for ( int k = 0; k < n; ++k )
     {
-        const double c = centsApart( note, chord[k] );
+        const double c = apart( k );
         if ( c < 150.0 || c > 550.0 ) return 0.0f;   // a semitone, a major seventh, a tritone
         if ( c < 250.0 ) w = 0.5f;                   // a whole tone, a minor seventh
     }
@@ -2185,8 +2223,8 @@ void Engine::composeFigure( int i, const int *chord, int n )
 bool Engine::figureSounds( int note ) const
 {
     const double hz = frequencyOf( note );
-    auto         one = [&]( int other )
-    { return other >= 0 && std::fabs( 1200.0 * std::log2( hz / frequencyOf( other ) ) ) < 25.0; };
+    auto         one = [&]( int other )   // at the pitch it sounds (setHoldPitch), ringing out included
+    { return other >= 0 && std::fabs( 1200.0 * std::log2( hz / heldHz( other, FigureSource, true ) ) ) < 25.0; };
     for ( const FigureHeld &h : m_figHeld )
         if ( one( h.m_note ) ) return true;
     for ( const FigureGone &g : m_figGone )
@@ -2468,9 +2506,10 @@ void Engine::stopNote( int note, int source, int channel )
             v.m_released = true;
             if ( M_NoteTrace )
                 M_NoteTrace( static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) ) / m_cfg.m_sampleRate, note,
-                             source, false, frequencyOf( note ) );
+                             source, false, v.m_pinHz > 0.0 ? v.m_pinHz : frequencyOf( note ) );
             if ( m_audit )
-                m_auditSink( AuditNote{ m_auditTime, source, false, note, 0.0f, frequencyOf( note ),
+                m_auditSink( AuditNote{ m_auditTime, source, false, note, 0.0f,
+                                        v.m_pinHz > 0.0 ? v.m_pinHz : frequencyOf( note ),
                                         -1, -1 } );
             tickNote( source, false, note, 0 );
             if ( v.m_pre > 0.0f )
@@ -4882,9 +4921,12 @@ void Engine::stepConductors( double dt )
     updateLight();
     m_bp.m_light = m_lightOn ? m_light : nullptr;
     m_bp2.m_light = m_bp.m_light;
-    auto freqOf = [this]( int note ) { return frequencyOf( note ); };
+    // A key's pitch as each conductor's own notes sound (setHoldPitch: a note kept at its pitch answers with that
+    // pitch; off, both are frequencyOf).
+    auto freqOf = [this]( int note ) { return heldHz( note, 1, false ); };
+    auto freqOf2 = [this]( int note ) { return heldHz( note, 2, false ); };
     // the two conductors hear each other (19.11.2026, as in Noctuary): each weighs its choices against the other's notes
-    m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf );
+    m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf2 );
     m_brain.update( dt, m_bp, -1, freqOf,
                     [this]( const BrainEvent &e )
                     {
@@ -4912,7 +4954,7 @@ void Engine::stepConductors( double dt )
     updateFoundation();
     m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
     m_brain2.listenTo( &m_brain, freqOf );
-    m_brain2.update( dt, m_bp2, -1, freqOf,
+    m_brain2.update( dt, m_bp2, -1, freqOf2,
                      [this]( const BrainEvent &e )
                      {
                          if ( e.m_type == BrainEvent::TypeE::NOTE_ON )
@@ -5077,7 +5119,9 @@ void Engine::renderBlock()
                 const Voice &v = m_voices[static_cast<size_t>( a )];
                 lb[static_cast<size_t>( a )] =
                     v.m_note >= 0
-                        ? static_cast<float>( std::log2( frequencyOf( v.m_note ) * tideMul ) ) + v.m_tuneCents / 1200.0f
+                        ? static_cast<float>( std::log2( ( v.m_pinHz > 0.0 ? v.m_pinHz : frequencyOf( v.m_note ) ) *
+                                                         tideMul ) ) +
+                              v.m_tuneCents / 1200.0f
                         : 0.0f;
             }
             const float rate = 1.0f - std::exp( -2.0f * grav * dtf );
@@ -5242,8 +5286,8 @@ void Engine::renderBlock()
         const double doppler =
             v.m_restart ? 1.0 : 1.0 - static_cast<double>( m_blk.m_doppler * velocity / SpeedOfSound );
         v.m_prevDistance = v.m_distance;
-        const double target =
-            frequencyOf( v.m_note ) * tideMul * std::exp2( static_cast<double>( v.m_tuneCents ) / 1200.0 );
+        const double target = ( v.m_pinHz > 0.0 ? v.m_pinHz : frequencyOf( v.m_note ) ) * tideMul *
+                              std::exp2( static_cast<double>( v.m_tuneCents ) / 1200.0 );
         v.m_hz = v.m_restart ? target : v.m_hz * std::pow( target / v.m_hz, follow );
         // MPE: a played note's own bend, pressure and slide while it is held (kept as they were once it
         // is let go, so a channel used again moves only its new note), and the master's bend. Each of

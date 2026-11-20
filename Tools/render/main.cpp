@@ -7,7 +7,7 @@
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S] [--note-log]
- *                    [--then NAME|N --at S --glide S [--then-only LIST]]
+ *                    [--then NAME|N --at S --glide S [--then-only LIST]] [--hold-pitch N]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -23,7 +23,9 @@
  * Tools/presets/journey_transitions.py. --then-only glides only some of the second preset's parameters in and keeps
  * the first's for the rest, to find which part of a glide does something (plan D2b): a comma list of sections of the
  * parameter table ("Filter", "Motion"; any case), parameter keys ("cutoff") and "mod" (the matrix); a list that
- * begins with "-" takes everything but what it names.
+ * begins with "-" takes everything but what it names. --hold-pitch 1 turns Engine::setHoldPitch on (plan D2b): a note
+ * that sounds where a glide changes the tuning keeps its pitch until it ends; --note-log then prints each such note as
+ * `H,<s>,<source>,<note>,<Hz kept>`.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
@@ -320,6 +322,7 @@ int main( int argc, char **argv )
     std::string              thenName;                  // --then: a second preset glided into
     double                   thenAt = 60.0, thenGlide = 30.0;
     std::string              thenOnly;                  // --then-only: the parts of the second preset glided into
+    int                      holdPitch = 0;             // --hold-pitch: Engine::setHoldPitch
     bool                     brain = true, fill = false, noteLog = false;
     for ( int i = 1; i < argc; ++i )
     {
@@ -359,6 +362,8 @@ int main( int argc, char **argv )
             thenGlide = std::atof( argv[++i] );
         else if ( a == "--then-only" && has )
             thenOnly = argv[++i];
+        else if ( a == "--hold-pitch" && has )
+            holdPitch = std::atoi( argv[++i] );
         else if ( a == "--route" && has )
             routeName = argv[++i];
         else if ( a == "--route-speed" && has )
@@ -386,7 +391,7 @@ int main( int argc, char **argv )
                 stderr,
                 "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
                 "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
-                "            [--then NAME --at S --glide S [--then-only LIST]] [--fill] [--log S] [--note-log]\n"
+                "            [--then NAME --at S --glide S [--then-only LIST]] [--hold-pitch N] [--fill] [--log S] [--note-log]\n"
                 "empy_render --dump-params\n" );
             return 1;
         }
@@ -394,10 +399,14 @@ int main( int argc, char **argv )
 
     Engine e;
     e.setRealtime( false );
+    e.setHoldPitch( holdPitch );
     if ( noteLog )
     {
         Engine::M_NoteTrace = []( double t, int note, int source, bool on, double hz )
         { std::printf( "N,%.4f,%d,%d,%d,%.3f\n", t, note, source, on ? 1 : 0, hz ); };
+        // --hold-pitch: each note kept at its pitch where the glide changes the tuning, as H,<s>,<source>,<note>,<Hz>
+        Engine::M_PinTrace = []( double t, int note, int source, double hz )
+        { std::printf( "H,%.4f,%d,%d,%.3f\n", t, source, note, hz ); };
     }
     const int thenIndex = thenName.empty() ? -1 : findPreset( thenName.c_str() );
     if ( !thenName.empty() && thenIndex < 0 )

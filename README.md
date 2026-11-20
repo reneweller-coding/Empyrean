@@ -271,7 +271,12 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 `--set` takes any key of the parameter table; `--dump-params` writes the table as JSON (the manual is made from it).
 `--note-log` prints every note begun and let go, with its source and pitch. `--then-only LIST` glides only some
 of the second preset's parameters in (sections of the parameter table, keys, `mod` for the matrix; a leading `-`
-takes all but those), to find which part of a glide does something.
+takes all but those), to find which part of a glide does something. `--hold-pitch 1` (and the same option of
+`additiv_brain_audit`) turns on a switch that is off in the instrument (`Engine::setHoldPitch`): where a glide changes
+the tuning, a note that sounds keeps its pitch in hertz until it ends and only notes struck afterwards are tuned anew
+(the conductors', the foundation's and the figures'; a key the player holds is retuned as before); `--note-log` and the
+audit print each such note as `H,<s>,<source>,<note>,<Hz>`, and `journey_transitions.py notes --hold-pitch 1`
+measures the journeys with it.
 
 What the conductors, the foundation and the figures play can be seen without the graphics card: `additiv_brain_audit
 --preset "Velvet Dreaming" --hours 1` runs them on their own clock (an hour in about three seconds) and prints the same
