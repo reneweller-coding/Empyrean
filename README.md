@@ -247,6 +247,10 @@ empy_render --seconds 60 --no-brain --chord 50,57,62,66 --hold 40 --set motion=A
 What the conductors, the foundation and the figures play can be seen without the graphics card: `additiv_brain_audit
 --preset "Velvet Dreaming" --hours 1` runs them on their own clock (an hour in about three seconds) and prints the same
 notes `empy_render --note-log` logs, note for note; `--presets FILE` takes many presets in one process.
+`Tools/presets/music_audit.py` counts what went wrong by ear in November 2026 -- rubs within and between the
+conductors, doublings, notes struck again, notes shorter than their attack, figures repeating a pitch -- over a sample
+(`--sample 200`) or the whole bank (`--all`, about a quarter of an hour on sixteen cores); `--check
+Tests/golden/music_audit.json` is the ctest `music_audit` (label `slow`).
 
 **Empyrean Journeys** (`EmpyreanJourneys.exe`, in the Start menu) renders journeys into files with a small window of
 its own: every journey listed with its length, one or several chosen, written as WAV or FLAC (24 bit), Ogg Vorbis or

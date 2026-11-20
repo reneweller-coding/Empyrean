@@ -132,6 +132,16 @@ if(ADDITIV_BUILD_TOOLS)
     target_link_options(additiv_selftest PRIVATE /STACK:33554432)
     add_test(NAME selftest COMMAND additiv_selftest)
     add_test(NAME probe COMMAND probe selftest)
+    # The music audit (Tools/presets/music_audit.py, 20.11.2026): the conductors and the figures of 200 presets for an
+    # hour each, without the card (additiv_brain_audit), against Tests/golden/music_audit.json. Labelled slow: about
+    # five minutes on eight processes; `ctest -LE slow` leaves it out.
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+    if(Python3_Interpreter_FOUND)
+        add_test(NAME music_audit COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/music_audit.py"
+                 --check "${CMAKE_SOURCE_DIR}/Tests/golden/music_audit.json" --exe "$<TARGET_FILE:additiv_brain_audit>"
+                 --tsv "${CMAKE_BINARY_DIR}/music_audit/check.tsv")
+        set_tests_properties(music_audit PROPERTIES LABELS "slow" TIMEOUT 1800)
+    endif()
 endif()
 
 # The plugin. JUCE from ThirdParty/JUCE, else from the sibling Phosphene's checkout, else fetched (cmake/Family.cmake).

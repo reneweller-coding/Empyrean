@@ -115,6 +115,19 @@
   What it cannot see: Follow Light over a living field (no preset of the bank has Follow Light), a modulation route
   from what the instrument hears (it reads silence), and Night Arc, which in a render follows the real sun at the
   hour it runs (the audit has no night; 415 presets have the arc, and the one among the ten agreed at 3 a.m.).
+- **Inside: the music audit as a test** (20.11.2026, as Noctuary's). Every fault of the last days was found by ear
+  and measured by a script thrown away after. `Tools/presets/music_audit.py` keeps the measures, in cents of what
+  the tuning plays: rubs within a conductor and across the two, doublings, a pitch struck again within thirty
+  seconds or while it still sounds, notes shorter than their attack, activity and silence, and of the figures a pitch
+  repeated within a round or after the previous figure note, a rub against the chord, notes shorter than twice their
+  attack. The ctest `music_audit` (label `slow`, five minutes) holds 200 presets for an hour each against
+  `Tests/golden/music_audit.json`; with the conductors made deaf to each other it fails (doubling 0 -> 403 onsets,
+  cross rub 0 % -> 10.3 % of the time). The whole bank, half an hour each, takes seven minutes: no doubling, no cross
+  rub, no conductor on one note; own rub 0.01 % (19 presets over 5 %, most in the Timbre scale), conductors' onsets
+  0.67 % struck again within thirty seconds (in Free mode with a fast rate, where the rest is four decisions), 0.62 %
+  within 25 cents of a pitch the conductor still holds, 0.14 % shorter than their attack. The figures play 85 % of
+  all onsets (4.09 million of 4.83 in the bank's half hours); 6.4 % repeat the previous figure note's pitch (another
+  figure's or the next round's), 0.06 % rub, 2.1 % are shorter than twice their attack.
 
 ## 1.0.0 (17.10.2026)
 
