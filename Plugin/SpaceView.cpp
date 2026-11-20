@@ -5,6 +5,7 @@
  */
 #include "SpaceView.h"
 
+#include "CloudView.h"
 #include "Theme.h"
 
 #include <cmath>
@@ -151,7 +152,6 @@ void SpaceView::paint( juce::Graphics &g )
     }
 
     // The voices: a light at its plane and its pitch, its trail fading behind it.
-    const juce::Colour bySource[4] = { played, conductor, space, skin.m_dim.brighter( 0.4f ) };
     auto place = [&](juce::Point<float> dp) {   // (depth, across) to pixels
         const float a = (dp.y - 0.5f) * juce::MathConstants<float>::pi * 0.9f;
         const float r = planeRadius(dp.x);
@@ -161,7 +161,7 @@ void SpaceView::paint( juce::Graphics &g )
     {
         const additiv::VoiceView &v = m_views[static_cast<size_t>( i )];
         if ( v.m_hz <= 0.0f || v.m_gain <= 0.0f ) continue;
-        const juce::Colour c = bySource[juce::jlimit( 0, 3, v.m_source )];
+        const juce::Colour c = CloudView::sourceColour( v.m_source );   // the picture's colours, a figure's too
         const int          n = m_seen[static_cast<size_t>( i )];
         for ( int k = 1; k < n; ++k )
         {

@@ -108,20 +108,22 @@ void CloudView::resized()
 void CloudView::paintKeys( juce::Graphics &g, juce::Rectangle<float> keys, juce::Rectangle<float> spec )
 {
     const frame::Skin &skin = additivui::skin();
-    const juce::Colour bySource[3] = { skin.m_accent, additivui::colour::Violet,
-                                       skin.family( frame::FamilyE::SPACE ) };   // played, conductor, Brain 2
-    // Each sounding key once: its loudest voice, near and loud brightest.
+    juce::Colour       bySource[ViewSources];   // played, conductor, Brain 2, a ghost, a figure
+    for ( int s = 0; s < ViewSources; ++s ) bySource[s] = sourceColour( s );
+    // Each sounding key once: its loudest voice, near and loud brightest. (A ghost of the memory has no key.)
     float level[128] = {};
     int   source[128] = {};
     for ( const additiv::VoiceView &v : m_views )
     {
-        if ( v.m_note < 0 || v.m_note > 127 || v.m_hz <= 0.0f || v.m_gain <= 0.0f || v.m_source > 2 ) continue;
+        if ( v.m_note < 0 || v.m_note > 127 || v.m_hz <= 0.0f || v.m_gain <= 0.0f || v.m_source == 3 ||
+             v.m_source < 0 || v.m_source >= ViewSources )
+            continue;
         const float l = juce::jlimit(
             0.0f, 1.0f, std::sqrt( v.m_gain ) * ( 1.0f - 0.6f * juce::jlimit( 0.0f, 1.0f, v.m_distance ) ) );
         if ( l > level[v.m_note] )
         {
             level[v.m_note] = std::max( l, 0.05f );
-            source[v.m_note] = juce::jlimit( 0, 2, v.m_source );
+            source[v.m_note] = v.m_source;
         }
     }
     constexpr int First = 21, Last = 108;   // A0 .. C8
@@ -211,10 +213,103 @@ void CloudView::paintKeys( juce::Graphics &g, juce::Rectangle<float> keys, juce:
         if ( level[n] <= 0.0f ) continue;
         const juce::String name = juce::MidiMessage::getMidiNoteName( n, true, true, 4 );
         const float        w = juce::GlyphArrangement::getStringWidth( font, name ) + 8.0f;
-        if ( x + w > spec.getRight() ) break;
+        if ( x + w > spec.getRight() - LegendWidth ) break;   // the legend's corner stays free
         g.setColour( bySource[source[n]].withAlpha( 0.45f + 0.55f * level[n] ) );
         g.drawText( name, juce::Rectangle<float>( x, spec.getY() + 2.0f, w, 14.0f ), juce::Justification::centredLeft );
         x += w;
+    }
+}
+
+juce::Colour CloudView::sourceColour( int viewSource )
+{
+    const frame::Skin &skin = additivui::skin();
+    switch ( viewSource )
+    {
+    case 0: return skin.m_accent;                          // played
+    case 1: return additivui::colour::Violet;              // the conductor, and its foundation
+    case 2: return skin.family( frame::FamilyE::SPACE );   // Brain 2, pale blue
+    case 4: return additivui::colour::Figure;              // a figure, rose
+    default: return skin.m_dim.brighter( 0.4f );           // a ghost of the memory, pale grey
+    }
+}
+
+void CloudView::paintLegend( juce::Graphics &g, juce::Rectangle<float> spec )
+{
+    const frame::Skin &skin = additivui::skin();
+    const juce::Font   font( juce::FontOptions( 11.0f ) );
+    g.setFont( font );
+    static const std::pair<int, const char *> Items[] = {
+        { 0, "played" }, { 1, "conductor" }, { 2, "brain 2" }, { 4, "figures" } };
+    float w = 0.0f;
+    for ( const auto &[src, name] : Items ) w += 12.0f + juce::GlyphArrangement::getStringWidth( font, name ) + 10.0f;
+    float x = spec.getRight() - w - 4.0f;
+    for ( const auto &[src, name] : Items )
+    {
+        g.setColour( sourceColour( src ) );
+        g.fillEllipse( x, spec.getY() + 6.0f, 7.0f, 7.0f );
+        const float tw = juce::GlyphArrangement::getStringWidth( font, name ) + 2.0f;
+        g.setColour( skin.m_dim );
+        g.drawText( name, juce::Rectangle<float>( x + 11.0f, spec.getY() + 2.0f, tw, 14.0f ),
+                    juce::Justification::centredLeft );
+        x += 12.0f + tw + 8.0f;
+    }
+}
+
+void CloudView::paintTicker( juce::Graphics &g, juce::Rectangle<float> spec )
+{
+    const frame::Skin &skin = additivui::skin();
+    // The notes begun, newest first; a conductor's note that began where one of its own was let go at the same moment
+    // is an exchange, shown as the move.
+    struct Line
+    {
+        juce::String m_time, m_who, m_what;
+        int          m_colour;
+    };
+    std::vector<Line> lines;
+    const float       lineH = 13.0f, w = 196.0f;
+    // As many lines as the spectrum has room for under the legend, twelve at the most.
+    const int most = juce::jlimit( 1, TickerLines, static_cast<int>( ( spec.getHeight() - 20.0f - 18.0f ) / lineH ) );
+    auto      name = []( int n ) { return juce::MidiMessage::getMidiNoteName( n, true, true, 4 ); };
+    for ( int i = 0; i < m_tickerCount && static_cast<int>( lines.size() ) < most; ++i )
+    {
+        const additiv::TickerNote &e = m_ticker[static_cast<size_t>( i )];
+        if ( !e.m_on ) continue;
+        juce::String what = name( e.m_note );
+        if ( e.m_source == 1 || e.m_source == 2 )
+            for ( int k = 0; k < m_tickerCount; ++k )
+            {
+                const additiv::TickerNote &o = m_ticker[static_cast<size_t>( k )];
+                if ( !o.m_on && o.m_source == e.m_source && std::abs( o.m_seconds - e.m_seconds ) < 0.0005 )
+                {
+                    what = name( o.m_note ) + juce::String( juce::CharPointer_UTF8( " \xe2\x86\x92 " ) ) + what;
+                    break;
+                }
+            }
+        const int          s = static_cast<int>( e.m_seconds );
+        const juce::String who = e.m_source == 1   ? juce::String( "Conductor" )
+                                 : e.m_source == 2 ? juce::String( "Brain 2" )
+                                                   : "Figure " + juce::String( e.m_figure + 1 );
+        lines.push_back( { juce::String( s / 60 ) + ":" + juce::String( s % 60 ).paddedLeft( '0', 2 ), who, what,
+                           e.m_source == 1 ? 1 : e.m_source == 2 ? 2 : 4 } );
+    }
+    const auto box = juce::Rectangle<float>( spec.getRight() - w - 4.0f, spec.getY() + 20.0f, w,
+                                             lineH * static_cast<float>( most ) + 20.0f );
+    g.setColour( skin.m_group.withAlpha( 0.78f ) );
+    g.fillRoundedRectangle( box, 4.0f );
+    g.setFont( juce::FontOptions( 11.0f ) );
+    g.setColour( skin.m_dim );
+    g.drawText( lines.empty() ? "who plays: nothing yet" : "who plays", box.withHeight( 16.0f ).reduced( 6.0f, 0.0f ),
+                juce::Justification::centredLeft );
+    float y = box.getY() + 17.0f;
+    for ( const Line &l : lines )
+    {
+        const auto row = juce::Rectangle<float>( box.getX() + 6.0f, y, box.getWidth() - 12.0f, lineH );
+        g.setColour( skin.m_dim );
+        g.drawText( l.m_time, row.withWidth( 34.0f ), juce::Justification::centredLeft );
+        g.setColour( sourceColour( l.m_colour ) );
+        g.drawText( l.m_who, row.withTrimmedLeft( 36.0f ).withWidth( 68.0f ), juce::Justification::centredLeft );
+        g.drawText( l.m_what, row.withTrimmedLeft( 106.0f ), juce::Justification::centredLeft );
+        y += lineH;
     }
 }
 
@@ -280,7 +375,7 @@ float CloudView::referenceHz() const
 {
     float lowest = 0.0f;
     for ( const additiv::VoiceView &v : m_views )
-        if ( v.m_hz > 0.0f && v.m_gain > 0.0f && v.m_source <= 2 && ( lowest <= 0.0f || v.m_hz < lowest ) )
+        if ( v.m_hz > 0.0f && v.m_gain > 0.0f && v.m_source != 3 && ( lowest <= 0.0f || v.m_hz < lowest ) )
             lowest = v.m_hz;
     return lowest > 0.0f ? lowest : 130.81f;
 }
@@ -410,6 +505,7 @@ void CloudView::refresh()
 {
     for ( int i = 0; i < additiv::MaxViewVoices; ++i )
         m_views[static_cast<size_t>( i )] = m_proc.engine().voiceView( i );
+    m_tickerCount = m_proc.engine().recentNotes( m_ticker.data(), static_cast<int>( m_ticker.size() ) );
     refreshLandscape();
     if ( m_proc.engine().partialSnapshot( m_snap, m_snapPer ) )
     {
@@ -454,16 +550,13 @@ void CloudView::plotDots( int w, int h )
     // colour by whose note it is, as bright as it is loud. The canvas lets them linger longer.
     const float fade = m_canvas ? 0.9f : 0.8f;
     for ( float &x : m_glow ) x *= fade;
-    const frame::Skin &skin = additivui::skin();
-    const juce::Colour bySource[4] = {
-        skin.m_accent, additivui::colour::Violet, skin.family( frame::FamilyE::SPACE ), skin.m_dim.brighter( 0.4f )
-    };   // played, conductor, Brain 2, the memory's ghosts (pale grey)
     const int voices = m_snapPer > 0 ? static_cast<int>( m_snap.size() / 2 ) / m_snapPer : 0;
     for ( int v = 0; v < voices; ++v )
     {
-        const int src =
-            v < additiv::MaxViewVoices ? juce::jlimit( 0, 3, m_views[static_cast<size_t>( v )].m_source ) : 3;
-        const juce::Colour c = bySource[src];
+        const int src = v < additiv::MaxViewVoices
+                            ? juce::jlimit( 0, ViewSources - 1, m_views[static_cast<size_t>( v )].m_source )
+                            : 3;   // played, conductor, Brain 2, the memory's ghosts (pale grey), a figure
+        const juce::Colour c = sourceColour( src );
         const float        cr = c.getFloatRed(), cg = c.getFloatGreen(), cb = c.getFloatBlue();
         const float       *d = m_snap.data() + static_cast<size_t>( v ) * m_snapPer * 2;
         for ( int i = 0; i < m_snapPer; ++i )
@@ -794,6 +887,8 @@ void CloudView::paint( juce::Graphics &g )
     m_dotsArea = spec.toNearestInt();
     if ( m_dots.isValid() ) g.drawImage( m_dots, spec, juce::RectanglePlacement::stretchToFit );
     paintOverlay( g, spec, keys );
+    paintLegend( g, spec );
+    if ( m_page == "Conductor" || m_page == "Figures" ) paintTicker( g, spec );
     if ( m_canvas )
     {
         g.setColour( skin.m_dim.withAlpha( 0.6f ) );

@@ -91,7 +91,8 @@ struct VoiceView
     float m_gain = 0.0f;       ///< its envelope, 0 .. 1
     float m_distance = 0.0f;   ///< where it stands, 0 at the ear .. 1 far
     float m_time = 0.0f;       ///< seconds since it began (the motions' clock)
-    int   m_source = 0;        ///< 0 played, 1 the conductor, 2 the second conductor, 3 a ghost of the memory
+    int   m_source = 0;        ///< 0 played, 1 the conductor (and its foundation), 2 the second conductor, 3 a ghost
+                               ///< of the memory, 4 a figure (20.11.2026; before, the conductor's)
     int   m_note = -1;         ///< the key it sounds (MIDI), -1 for a ghost or when silent
     float m_press = 0.0f;      ///< MPE: its pressure, 0 .. 1
     float m_slide = 0.5f;      ///< MPE: its slide, 0 .. 1 (0.5 at rest)
@@ -100,6 +101,16 @@ struct VoiceView
 };
 
 constexpr int MaxViewVoices = 32;   ///< voices a picture can be given
+
+/** @brief A note a conductor or a figure began or let go, for the panel's ticker (Engine::recentNotes). */
+struct TickerNote
+{
+    double m_seconds = 0.0;   ///< when, on the instrument's clock (seconds since prepare, as `--note-log` gives it)
+    int    m_source = 0;      ///< 1 the conductor, 2 the second conductor, 5 a figure (as Engine::M_NoteTrace)
+    bool   m_on = false;      ///< it began (false: it was let go)
+    int    m_note = -1;       ///< MIDI
+    int    m_figure = -1;     ///< a figure's onset: which figure, 0 .. 3; -1 otherwise
+};
 
 /** @brief The instrument (see the file comment). */
 class Engine
@@ -572,6 +583,18 @@ public:
     {
         return source >= 0 && source < 3 ? m_soundingBy[source].load( std::memory_order_relaxed ) : 0;
     }
+    /** @brief Voices the figures sound after the last block (20.11.2026; the conductor's before). @return count */
+    int soundingFigures() const { return m_soundingBy[3].load( std::memory_order_relaxed ); }
+    /**
+     * @brief The last notes the conductors and the figures began and let go, newest first: the panel's ticker
+     *        (20.11.2026). Any thread; the render thread writes them into a ring of atomics, never locking or
+     *        allocating.
+     * @param[out] out   receives them
+     * @param[in]  most  room in `out` (at most TickerSize are kept)
+     * @return how many were written
+     */
+    int recentNotes( TickerNote *out, int most ) const;
+    static constexpr int TickerSize = 32;   ///< notes the ticker's ring keeps
 
     /** @brief Notes the figures have played since prepare (11.11.2026). Any thread. @return the count */
     int figureNotes() const { return m_figPlayed.load( std::memory_order_relaxed ); }
@@ -916,8 +939,8 @@ private:
     bool                                     m_audit = false;      ///< auditConductor() runs: the card is not there
     std::function<void( const AuditNote & )> m_auditSink;          ///< where the audit's notes go
     double                                   m_auditTime = 0.0;    ///< the audit's clock, s
-    int                                      m_auditFigure = -1;   ///< the figure whose note begins now, -1 none
-    int                                      m_auditStep = -1;     ///< which of its notes
+    int m_auditFigure = -1;   ///< the figure whose note begins now, -1 none (the audit's lines, the panel's ticker)
+    int m_auditStep = -1;     ///< which of its notes
     double m_paramDt = 0.0;   ///< the audit's time between two readings of the parameters, s; 0 outside the audit
     /** @brief How far the modulators and a glide advance per readParams(): a GPU block, or the audit's. @return s */
     double paramStep() const { return m_paramDt > 0.0 ? m_paramDt : m_cfg.m_gpuBlock / m_cfg.m_sampleRate; }
@@ -1824,7 +1847,17 @@ private:
     /** @brief What a panic empties, between two blocks (the renderer's thread). */
     void purge();
     std::atomic<int>   m_sounding{ 0 };            ///< voices sounding, for status
-    std::atomic<int>   m_soundingBy[3] = {};       ///< voices sounding per source, for status
+    std::atomic<int>   m_soundingBy[4] = {};       ///< voices sounding: played, conductor, Brain 2, figures
+    std::array<std::atomic<std::uint64_t>, TickerSize> m_tick{};   ///< the ticker's ring, packed (tickNote)
+    std::atomic<int>                                   m_tickCount{ 0 };   ///< notes written into it since prepare
+    /**
+     * @brief Writes a note into the ticker's ring (render thread; two atomic stores).
+     * @param[in] source  1, 2 or FigureSource
+     * @param[in] on      it begins
+     * @param[in] note    MIDI
+     * @param[in] onset   its sample in the block
+     */
+    void tickNote( int source, bool on, int note, int onset );
     std::atomic<int>   m_brainRoot{ 0 };           ///< the conductor's root, for status
     std::atomic<float> m_conductorNext{ 0.0f };    ///< conductorNext()
     std::atomic<float> m_conductorSpan{ 1.0f };    ///< conductorSpan()

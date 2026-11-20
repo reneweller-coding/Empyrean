@@ -38,6 +38,18 @@ public:
     ~CloudView() override;
     /** @brief Reads the voices and the parameters it draws with and repaints (the editor's timer). */
     void refresh();
+    static constexpr int   ViewSources = 5;        ///< a view's sources: played, conductor, Brain 2, ghost, figure
+    static constexpr float LegendWidth = 290.0f;   ///< the legend's room in the spectrum's top right corner, px
+    static constexpr int   TickerLines = 12;       ///< the ticker's lines at the most (fewer where the picture is low)
+    /**
+     * @brief The colour a source has in the points, on the keys, in the names, the legend and the ticker -- the same
+     *        everywhere (20.11.2026: the figures were drawn in the conductor's violet, so a fault of theirs looked
+     *        like the conductor's).
+     * @param[in] viewSource  as additiv::VoiceView::m_source: 0 played, 1 the conductor (and its foundation),
+     *                        2 Brain 2, 3 a ghost of the memory, 4 a figure
+     * @return its colour
+     */
+    static juce::Colour sourceColour( int viewSource );
     /**
      * @brief The page in front, whose overlay it draws.
      * @param[in] page  the tab's name
@@ -147,6 +159,20 @@ private:
      */
     void paintOverlay( juce::Graphics &g, juce::Rectangle<float> spec, juce::Rectangle<float> keys );
     /**
+     * @brief Which colour is whose, in the spectrum's top right corner: played, conductor, Brain 2, figures.
+     * @param[in,out] g     where
+     * @param[in]     spec  the spectrum
+     */
+    void paintLegend( juce::Graphics &g, juce::Rectangle<float> spec );
+    /**
+     * @brief Who played what (the Conductor and Figures pages): the last notes the conductors and the figures began,
+     *        newest on top, each with its time on the instrument's clock (as `empy_render --note-log` gives it), whose
+     *        it is and its key -- a conductor's exchange as "from -> to".
+     * @param[in,out] g     where
+     * @param[in]     spec  the spectrum
+     */
+    void paintTicker( juce::Graphics &g, juce::Rectangle<float> spec );
+    /**
      * @brief A handle as a ring, brighter while held or under the mouse.
      * @param[in,out] g   where
      * @param[in]     h   which
@@ -213,6 +239,8 @@ private:
     float                       m_heldResonance = 0.0f;   ///< the resonance when the filter's point was taken
     float                       m_heldY = 0.0f;           ///< and where
     int                         m_playing = -1;           ///< the key the canvas plays, -1 none
+    std::array<additiv::TickerNote, 32> m_ticker{};          ///< the last notes begun and let go, newest first
+    int                                 m_tickerCount = 0;   ///< how many of them there are
     std::vector<float>          m_ripple;                 ///< the ripple's string at the last snapshot
     std::vector<float>          m_hall;                   ///< the hall's memory as last fetched
     double                      m_hallAge = 0.0;          ///< its seconds learnt

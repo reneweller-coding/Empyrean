@@ -128,6 +128,14 @@
   within 25 cents of a pitch the conductor still holds, 0.14 % shorter than their attack. The figures play 85 % of
   all onsets (4.09 million of 4.83 in the bank's half hours); 6.4 % repeat the previous figure note's pitch (another
   figure's or the next round's), 0.06 % rub, 2.1 % are shorter than twice their attack.
+- **Who is playing?** (20.11.2026). The picture drew a figure's notes in the conductor's violet, so a fault of the
+  figures looked like the conductor's. The figures have their own colour now, a rose, in the points, on the keys,
+  in the names of the sounding notes and in the tuning's and the space's pictures; a legend in the picture's corner
+  says which colour is whose, and the header's second line counts the figures' voices apart. On the Conductor and
+  Figures pages the picture's corner lists who played what: the last notes the conductors and the figures began,
+  newest on top, with the time on the instrument's clock, who it was in its colour and the key -- a conductor's
+  exchange as the move, "D#2 -> A2". The engine hands them over through a ring of atomics: nothing on the audio
+  thread waits or allocates.
 
 ## 1.0.0 (17.10.2026)
 

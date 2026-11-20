@@ -5,6 +5,7 @@
  */
 #include "TuningView.h"
 
+#include "CloudView.h"
 #include "Theme.h"
 
 #include <algorithm>
@@ -106,8 +107,6 @@ void TuningView::paint( juce::Graphics &g )
 
     // The voices: across where they sound in the octave, up by their octave, a tail as long as Self-Tune pulls.
     const float        rootHz = std::max( e.rootHz(), 1.0f );
-    const juce::Colour bySource[4] = { skin.m_accent, additivui::colour::Violet, skin.family( frame::FamilyE::SPACE ),
-                                       skin.m_dim };
     const float        lane = ( ruler - area.getY() - 22.0f ) / 7.0f;   // seven octaves, from two below the root's
     for ( int i = 0; i < additiv::MaxViewVoices; ++i )
     {
@@ -119,7 +118,7 @@ void TuningView::paint( juce::Graphics &g )
         const float  y =
             ruler - 8.0f - lane * static_cast<float>( juce::jlimit( 0.0, 6.0, octave + 2.0 ) ) - lane * 0.5f;
         const float        x = xOf( within ), r = 3.0f + 4.0f * v.m_gain;
-        const juce::Colour col = bySource[juce::jlimit( 0, 3, v.m_source )];
+        const juce::Colour col = CloudView::sourceColour( v.m_source );   // the picture's colours, a figure's too
         if ( std::fabs( v.m_tune ) > 0.3f )
         {
             g.setColour( col.withAlpha( 0.5f ) );

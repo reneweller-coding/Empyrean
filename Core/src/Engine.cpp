@@ -605,6 +605,7 @@ void Engine::beginPiece( double controlRate )
     for ( FigureHeld &h : m_figHeld ) h = FigureHeld{};
     m_figActive = 0;
     m_figMatch = 1.0f;
+    m_tickCount.store( 0, std::memory_order_relaxed );
     m_figPlayed.store( 0, std::memory_order_relaxed );
     m_figClash.store( 0, std::memory_order_relaxed );
     for ( auto &l : m_figLog ) l.store( -1, std::memory_order_relaxed );
@@ -1863,6 +1864,7 @@ void Engine::startNote( int note, float velocity, float distance, int source, in
     if ( m_audit )
         m_auditSink( AuditNote{ m_auditTime, source, true, note, velocity, frequencyOf( note ), m_auditFigure,
                                 m_auditStep } );
+    tickNote( source, true, note, onset );
     const int count = static_cast<int>( m_voices.size() );
     for ( int i = 0; i < count; ++i )
         if ( m_voices[static_cast<size_t>( i )].m_note < 0 && !m_voices[static_cast<size_t>( i )].m_stealing )
@@ -2319,6 +2321,40 @@ void Engine::stepFigures( double dt )
     }
 }
 
+void Engine::tickNote( int source, bool on, int note, int onset )
+{
+    if ( source != 1 && source != 2 && source != FigureSource ) return;
+    // Packed: the key (7 bits), on (1), the source (3), the figure + 1 (3), the time in ms (32 bits, 49 days).
+    const double       seconds = static_cast<double>( m_renderPos.load( std::memory_order_relaxed ) + onset ) /
+                           m_cfg.m_sampleRate;
+    const std::uint64_t ms = static_cast<std::uint64_t>( std::max( 0.0, seconds * 1000.0 + 0.5 ) ) & 0xFFFFFFFFull;
+    const std::uint64_t figure =
+        source == FigureSource ? static_cast<std::uint64_t>( std::clamp( m_auditFigure, -1, 6 ) + 1 ) : 0;
+    const std::uint64_t v = static_cast<std::uint64_t>( note & 127 ) | ( on ? 128ull : 0ull ) |
+                            ( static_cast<std::uint64_t>( source & 7 ) << 8 ) | ( figure << 11 ) | ( ms << 32 );
+    const int n = m_tickCount.load( std::memory_order_relaxed );
+    m_tick[static_cast<size_t>( n & ( TickerSize - 1 ) )].store( v, std::memory_order_relaxed );
+    m_tickCount.store( n + 1, std::memory_order_release );
+}
+
+int Engine::recentNotes( TickerNote *out, int most ) const
+{
+    const int n = m_tickCount.load( std::memory_order_acquire );
+    int       k = 0;
+    for ( ; k < most && k < n && k < TickerSize; ++k )
+    {
+        const std::uint64_t v =
+            m_tick[static_cast<size_t>( ( n - 1 - k ) & ( TickerSize - 1 ) )].load( std::memory_order_relaxed );
+        TickerNote         &t = out[k];
+        t.m_note = static_cast<int>( v & 127 );
+        t.m_on = ( v & 128 ) != 0;
+        t.m_source = static_cast<int>( ( v >> 8 ) & 7 );
+        t.m_figure = static_cast<int>( ( v >> 11 ) & 7 ) - 1;
+        t.m_seconds = static_cast<double>( v >> 32 ) * 0.001;
+    }
+    return k;
+}
+
 void Engine::stopNote( int note, int source, int channel )
 {
     for ( size_t i = 0; i < m_voices.size(); ++i )
@@ -2340,6 +2376,7 @@ void Engine::stopNote( int note, int source, int channel )
             if ( m_audit )
                 m_auditSink( AuditNote{ m_auditTime, source, false, note, 0.0f, frequencyOf( note ),
                                         -1, -1 } );
+            tickNote( source, false, note, 0 );
             if ( v.m_pre > 0.0f )
             {   // let go before it sounded: its swell is drawn away
                 v.m_pre = 0.0f;
@@ -5001,7 +5038,7 @@ void Engine::renderBlock()
     int   sounding = 0;
     float chordGain = 0.0f;   // the conductor's voices' envelopes (not the foundation's), for the foundation's level
     int   chordVoices = 0;
-    int   by[3] = { 0, 0, 0 };
+    int   by[4] = { 0, 0, 0, 0 };   // played, the conductor (and its foundation), Brain 2, the figures
     float srcW = 0.0f, srcD = 0.0f;   // the near room's source: the voices' distance, weighted by loudness
     for ( int i = 0; i < static_cast<int>( m_voices.size() ); ++i )
     {
@@ -5292,9 +5329,9 @@ void Engine::renderBlock()
         v.m_onset = 0;
         v.m_age += dt;
         ++sounding;
-        ++by[v.m_source == FoundationSource || v.m_source == FigureSource
-                 ? 1
-                 : std::clamp( v.m_source, 0, 2 )];   // the foundation and the figures are the conductor's
+        ++by[v.m_source == FoundationSource ? 1
+             : v.m_source == FigureSource   ? 3
+                                            : std::clamp( v.m_source, 0, 2 )];   // the foundation is the conductor's
     }
     m_sounding.store( sounding, std::memory_order_relaxed );
     {   // the chord's mean envelope, followed over a few seconds (the foundation's own sustain divided out)
@@ -5313,7 +5350,7 @@ void Engine::renderBlock()
     if ( m_prevSounding == 0 && sounding > 0 )
         m_phraseStart = true;   // a note into silence: the envelopes' phrase begins
     m_prevSounding = sounding;
-    for ( int s = 0; s < 3; ++s ) m_soundingBy[s].store( by[s], std::memory_order_relaxed );
+    for ( int s = 0; s < 4; ++s ) m_soundingBy[s].store( by[s], std::memory_order_relaxed );
     // The memory's ghosts: each a released voice sounding on from where it was let go, rising over
     // Bloom, fading by 60 dB over Memory Time, and as it fades widening, drifting, darkening and
     // receding (Blur, Sink). New phases of its own, so it never adds to the voice it came from.
@@ -5366,7 +5403,8 @@ void Engine::renderBlock()
         m_viewDistance[static_cast<size_t>( i )].store( v.m_distance, std::memory_order_relaxed );
         m_viewTime[static_cast<size_t>( i )].store( cv.m_time, std::memory_order_relaxed );
         m_viewSource[static_cast<size_t>( i )].store(
-            v.m_source == FoundationSource || v.m_source == FigureSource ? 1 : v.m_source, std::memory_order_relaxed );
+            v.m_source == FoundationSource ? 1 : v.m_source == FigureSource ? 4 : v.m_source,
+            std::memory_order_relaxed );   // a figure in its own colour (20.11.2026; it was drawn as the conductor's)
         m_viewNote[static_cast<size_t>( i )].store( on ? v.m_note : -1, std::memory_order_relaxed );
         m_viewPress[static_cast<size_t>( i )].store( v.m_press, std::memory_order_relaxed );
         m_viewSlide[static_cast<size_t>( i )].store( v.m_slide, std::memory_order_relaxed );

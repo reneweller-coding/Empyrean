@@ -851,7 +851,8 @@ void AdditivEditor::timerCallback()
         static const char *const Names[12] = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
         const int                root = e.brainRoot();
         s << e.soundingVoices() << " voices (" << e.soundingFrom( 1 ) << " conductor, " << e.soundingFrom( 2 )
-          << " brain 2, " << e.soundingFrom( 0 ) << " played)   root " << Names[( ( root % 12 ) + 12 ) % 12]
+          << " brain 2, " << e.soundingFigures() << " figures, " << e.soundingFrom( 0 ) << " played)   root "
+          << Names[( ( root % 12 ) + 12 ) % 12]
           << ( root / 12 - 1 );
         // The machine only when it matters: a block that took more than half its time, or audio that broke.
         const double blockMs = 1000.0 * e.config().m_gpuBlock / std::max( e.config().m_sampleRate, 1.0 );

@@ -23,6 +23,7 @@ const juce::Colour Dim{ 0xff8794a8 };           ///< names, secondary text
 const juce::Colour Faint{ 0xff3c4559 };         ///< tracks, axes, the off state
 const juce::Colour Accent{ 0xff7fe0c4 };        ///< the aurora's green: the title, the tab in front
 const juce::Colour Violet{ 0xffb69cf0 };        ///< its violet edge: the conductor's notes
+const juce::Colour Figure{ 0xfff59ac2 };        ///< a rose: the figures' notes (20.11.2026; they were the conductor's)
 const juce::Colour Onset{ 0xffd7799b };         ///< a playhead, a mute
 const juce::Colour Root{ 0xffe8b56a };          ///< the conductor's root on the keys
 const juce::Colour Good{ 0xff7fd49a };          ///< a meter in range
