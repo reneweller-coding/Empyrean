@@ -158,6 +158,10 @@ if(ADDITIV_BUILD_TOOLS)
         # neighbour pairs measured as broken (Tools/presets/journey_bad_pairs.tsv). No card, no program.
         add_test(NAME journeys COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/journey_transitions.py"
                  --check)
+        # New events a minute (plan B4, 20.11.2026): on synthetic signals a re-strike in a ringing tail must not count,
+        # a new pitch and a repetition after silence must, a beating pad and a noise bed must not. No card, no program.
+        add_test(NAME event_density COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/event_density.py"
+                 --check)
     endif()
 endif()
 
