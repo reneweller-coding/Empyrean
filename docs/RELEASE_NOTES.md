@@ -102,6 +102,9 @@
   while that exchange was the fault of 118), and the sub octave (under 55 Hz through 36 dB an octave instead of 12:
   a quarter of the foundation at 73 Hz had come through and moved with every chord; the threshold is 6 dB again).
 - **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
+- **Inside: the self-test picks its tests** (20.11.2026). A full run takes twenty minutes on the card, and it knew
+  only `--from N`. `--list` numbers the 118 tests with their titles, `--only 62,113-117` runs those alone, and every
+  run prints each test's wall time and the five slowest; the last line stays `selftest passed`.
 
 ## 1.0.0 (17.10.2026)
 

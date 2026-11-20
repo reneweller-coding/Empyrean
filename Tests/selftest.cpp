@@ -238,21 +238,151 @@ double soundingHz( const Engine &e )
     return 0.0;
 }
 
+/**
+ * @brief Which tests run, and how long each took.
+ *
+ * The tests are numbered blocks in main(); each opens with `if ( wanted( n, "title" ) )`. That call
+ * closes the clock of the test before it, decides whether test n runs, and when it does, starts its
+ * clock (20.11.2026: a full run takes 17 to 20 minutes on the card, and nobody knew where they went).
+ */
+struct Selection
+{
+    int                                   m_from = 1;       ///< `--from N`: N and after
+    std::vector<std::pair<int, int>>      m_only;           ///< `--only`: inclusive ranges; empty = all
+    std::vector<bool>                     m_hit;            ///< per `--only` range: whether a test matched it
+    bool                                  m_list = false;   ///< `--list`: print the tests, run none
+    int                                   m_current = 0;    ///< the test whose clock runs, 0 = none
+    const char                           *m_title = "";     ///< its title
+    std::chrono::steady_clock::time_point m_start;          ///< when it began
+    std::vector<std::pair<double, int>>   m_times;          ///< (seconds, number) of every test that ran
+    std::vector<std::string>              m_titles;         ///< their titles, in the same order
+};
+
+Selection g_sel;   ///< the one selection of this run
+
+/**
+ * @brief Stops the running test's clock and prints its wall time.
+ */
+void finishTest()
+{
+    if ( g_sel.m_current == 0 ) return;
+    const double s = std::chrono::duration<double>( std::chrono::steady_clock::now() - g_sel.m_start ).count();
+    std::printf( "  [time] %3d  %.1f s\n", g_sel.m_current, s );
+    g_sel.m_times.emplace_back( s, g_sel.m_current );
+    g_sel.m_titles.emplace_back( g_sel.m_title );
+    g_sel.m_current = 0;
+}
+
+/**
+ * @brief Whether test n runs; starts its clock when it does (and stops the previous one).
+ * @param[in] n      the test's number
+ * @param[in] title  its title, for `--list` and the timing summary
+ * @return true when it is selected
+ */
+bool wanted( int n, const char *title )
+{
+    finishTest();
+    if ( g_sel.m_list )
+    {
+        std::printf( "%4d  %s\n", n, title );
+        return false;
+    }
+    if ( n < g_sel.m_from ) return false;
+    if ( !g_sel.m_only.empty() )
+    {
+        bool in = false;
+        for ( size_t r = 0; r < g_sel.m_only.size(); ++r )
+            if ( n >= g_sel.m_only[r].first && n <= g_sel.m_only[r].second )
+            {
+                in = true;
+                g_sel.m_hit[r] = true;
+            }
+        if ( !in ) return false;
+    }
+    std::printf( "[%d] %s\n", n, title );
+    g_sel.m_current = n;
+    g_sel.m_title = title;
+    g_sel.m_start = std::chrono::steady_clock::now();
+    return true;
+}
+
+/**
+ * @brief Reads `--only 62,113-117` into ranges.
+ * @param[in] text  numbers and ranges, comma-separated
+ * @return true when every item was a number or a range a-b with a <= b
+ */
+bool parseOnly( const char *text )
+{
+    std::string       item;
+    const std::string all = std::string( text ) + ",";
+    for ( char ch : all )
+    {
+        if ( ch != ',' )
+        {
+            item += ch;
+            continue;
+        }
+        if ( item.empty() ) continue;
+        char      *end = nullptr;
+        const long a = std::strtol( item.c_str(), &end, 10 );
+        long       b = a;
+        if ( end == item.c_str() ) return false;
+        if ( *end == '-' )
+        {
+            const char *second = end + 1;
+            b = std::strtol( second, &end, 10 );
+            if ( end == second ) return false;
+        }
+        if ( *end != '\0' || a < 1 || b < a ) return false;
+        g_sel.m_only.emplace_back( static_cast<int>( a ), static_cast<int>( b ) );
+        item.clear();
+    }
+    g_sel.m_hit.assign( g_sel.m_only.size(), false );
+    return !g_sel.m_only.empty();
+}
+
 }   // namespace
 
 /**
- * @brief Runs every check, or those from a number on.
+ * @brief Runs every check, or those the arguments pick.
+ *
+ * Arguments (none: every test, which is what ctest runs):
+ * - `--from N` runs test N and every one after it;
+ * - `--only 62,113-117` runs the tests whose numbers or ranges are listed, comma-separated; an item
+ *   that matches no test is an error (exit 2), so a typo never passes as green;
+ * - `--list` prints every test's number and title and runs nothing.
+ *
+ * Each test that runs opens with `[n] title` and closes with `[time] n s`; at the end the five
+ * slowest are listed. The last line is `selftest passed` or `selftest: N FAILED`.
+ *
  * @param[in] argc  the arguments' count
- * @param[in] argv  "--from N": only checks N and after
- * @return 0 when all passed
+ * @param[in] argv  the arguments
+ * @return 0 when all passed, 1 when a check failed, 2 for arguments it does not understand
  */
 int main( int argc, char **argv )
 {
-    int from = 1;
-    for ( int a = 1; a + 1 < argc; ++a )
-        if ( std::strcmp( argv[a], "--from" ) == 0 ) from = std::max( 1, std::atoi( argv[a + 1] ) );
+    for ( int a = 1; a < argc; ++a )
+    {
+        if ( std::strcmp( argv[a], "--from" ) == 0 && a + 1 < argc )
+            g_sel.m_from = std::max( 1, std::atoi( argv[++a] ) );
+        else if ( std::strcmp( argv[a], "--only" ) == 0 && a + 1 < argc )
+        {
+            if ( !parseOnly( argv[++a] ) )
+            {
+                std::printf( "selftest: --only takes numbers and ranges, e.g. --only 62,113-117\n" );
+                return 2;
+            }
+        }
+        else if ( std::strcmp( argv[a], "--list" ) == 0 )
+            g_sel.m_list = true;
+        else
+        {
+            std::printf( "selftest: unknown argument %s (--from N, --only 62,113-117, --list)\n", argv[a] );
+            return 2;
+        }
+    }
     // 1. The parameter table: in ParamId order, defaults inside their ranges, keys found.
-    if ( from <= 1 )
+    if ( wanted( 1, "The parameter table" ) )
     {
         bool ordered = true, inRange = true;
         for ( int i = 0; i < NumParams; ++i )
@@ -267,7 +397,7 @@ int main( int argc, char **argv )
     }
 
     // 2. The tuning (Noctuary's): the root sounds its tempered pitch, the fifth above it 3/2 of that.
-    if ( from <= 2 )
+    if ( wanted( 2, "The tuning (Noctuary's)" ) )
     {
         FixedScale   s;
         const bool   built = makeBuiltinScale( 3, s );   // JI 7-limit
@@ -280,7 +410,7 @@ int main( int argc, char **argv )
     }
 
     // 3. Without the conductor and without notes the instrument is silent to the last bit.
-    if ( from <= 3 )
+    if ( wanted( 3, "Without the conductor and without notes the instrument is silent to the last bit" ) )
     {
         Engine e;
         if ( !openOffline( e, false ) ) return 1;
@@ -290,7 +420,7 @@ int main( int argc, char **argv )
     }
 
     // 4. A played note begins on its sample: stamped offset + latency, the GPU ramp starts there.
-    if ( from <= 4 )
+    if ( wanted( 4, "A played note begins on its sample" ) )
     {
         Engine e;
         if ( !openOffline( e, false ) ) return 1;
@@ -312,7 +442,7 @@ int main( int argc, char **argv )
     }
 
     // 5. The same seed renders the same bits, conductor and all.
-    if ( from <= 5 )
+    if ( wanted( 5, "The same seed renders the same bits, conductor and all" ) )
     {
         std::vector<float> a, b;
         for ( std::vector<float> *dst : { &a, &b } )
@@ -327,7 +457,7 @@ int main( int argc, char **argv )
     }
 
     // 6. Autoplay (Chords): the cluster fills to its density and the piece sounds at a sane level.
-    if ( from <= 6 )
+    if ( wanted( 6, "Autoplay (Chords)" ) )
     {
         Engine e;
         if ( !openOffline( e, true, 7 ) ) return 1;
@@ -344,7 +474,7 @@ int main( int argc, char **argv )
     }
 
     // 7. Twenty notes on sixteen voices: the oldest are stolen (faded over a block), nothing breaks.
-    if ( from <= 7 )
+    if ( wanted( 7, "Twenty notes on sixteen voices" ) )
     {
         Engine e;
         if ( !openOffline( e, false ) ) return 1;
@@ -357,7 +487,7 @@ int main( int argc, char **argv )
     }
 
     // 8. Release: a note let go falls silent and its voice is free again.
-    if ( from <= 8 )
+    if ( wanted( 8, "Release: a note let go falls silent and its voice is free again" ) )
     {
         Engine e;
         if ( !openOffline( e, false ) ) return 1;
@@ -374,7 +504,7 @@ int main( int argc, char **argv )
 
     // 9. Real time: a paced callback of 256 samples for 6 s with notes coming and going -- the
     //    worker keeps ahead, nothing underruns, no note is late.
-    if ( from <= 9 )
+    if ( wanted( 9, "Real time" ) )
     {
         Engine e;
         e.setRealtime( true );
@@ -415,7 +545,7 @@ int main( int argc, char **argv )
     }
 
     // 10. Brain 2: the second conductor plays its own notes in the background.
-    if ( from <= 10 )
+    if ( wanted( 10, "Brain 2: the second conductor plays its own notes in the background" ) )
     {
         Engine e;
         if ( !openOffline( e, true, 11 ) ) return 1;
@@ -430,7 +560,7 @@ int main( int argc, char **argv )
     }
 
     // 11. The Timbre scale (Sethares) is made from the cloud's own spectrum.
-    if ( from <= 11 )
+    if ( wanted( 11, "The Timbre scale (Sethares) is made from the cloud's own spectrum" ) )
     {
         BrainSpectrum sp;
         sp.m_count = BrainSpectrum::Max;
@@ -456,7 +586,7 @@ int main( int argc, char **argv )
 
     // 12. The landscape's make-up: the same chord in Aurora sits within 4 dB of the bare cloud;
     //     a low pass at 60 Hz, under every fundamental, takes it far down.
-    if ( from <= 12 )
+    if ( wanted( 12, "The landscape's make-up" ) )
     {
         auto chordDb = []( float motion, float filterModel )
         {
@@ -482,7 +612,7 @@ int main( int argc, char **argv )
 
     // 13. Everything that moves at once -- breath, doppler, tide, air, presence, a resonant filter
     //     with drift and envelope, glissando -- stays finite and sane.
-    if ( from <= 13 )
+    if ( wanted( 13, "Everything that moves at once" ) )
     {
         Engine e;
         if ( !openOffline( e, true, 5 ) ) return 1;
@@ -510,7 +640,7 @@ int main( int argc, char **argv )
     }
 
     // 14. The matrix as text: written by one engine, read by another, the same rows.
-    if ( from <= 14 )
+    if ( wanted( 14, "The matrix as text" ) )
     {
         Engine a, b;
         a.setModRow( 0, { ModSourceE::LFO1, static_cast<int>( ParamIdE::CUTOFF ), 0.35f } );
@@ -528,7 +658,7 @@ int main( int argc, char **argv )
     }
 
     // 15. No source ever steps: every LFO shape, a hundred cycles at 1 Hz in millisecond steps.
-    if ( from <= 15 )
+    if ( wanted( 15, "No source ever steps" ) )
     {
         double worst = 0.0;
         for ( int shape = 0; shape < NumLfoShapes; ++shape )
@@ -557,7 +687,7 @@ int main( int argc, char **argv )
     }
 
     // 16. An LFO on the cutoff moves the level; the live value is where the cutoff plays.
-    if ( from <= 16 )
+    if ( wanted( 16, "An LFO on the cutoff moves the level; the live value is where the cutoff plays" ) )
     {
         auto swing = []( bool modulated, float *played )
         {
@@ -598,7 +728,7 @@ int main( int argc, char **argv )
 
     // 17. The factory bank: 64 groups of 64, unique names, every key known and every value in its
     //     range, every matrix row read, and bank select plus program finding each preset again.
-    if ( from <= 17 )
+    if ( wanted( 17, "The factory bank" ) )
     {
         int                      bad = 0, outOfRange = 0, rowsLost = 0, perGroup[NumPresetGroups] = {};
         std::vector<std::string> names;
@@ -643,7 +773,7 @@ int main( int argc, char **argv )
 
     // 18. The family jam, following: the conductor's root comes to the leader's pitch class and stays
     //     there while the conductor plays; the energy's neutral 0.5 changes nothing.
-    if ( from <= 18 )
+    if ( wanted( 18, "The family jam, following" ) )
     {
         Engine e;
         if ( !openOffline( e, true, 21 ) ) return 1;
@@ -663,7 +793,7 @@ int main( int argc, char **argv )
 
     // 19. A preset change fills the chord at speed (requestFill, Noctuary's way): with an event every
     //     two minutes the conductor alone has one or two notes after five seconds, filled it has all five.
-    if ( from <= 19 )
+    if ( wanted( 19, "A preset change fills the chord at speed (requestFill, Noctuary's way)" ) )
     {
         auto conducted = []( bool fill, int &count )
         {
@@ -686,7 +816,7 @@ int main( int argc, char **argv )
     }
 
     // 20. The modal hall decays at its time: with a decay of 2 s and no damping, 30 dB in a second.
-    if ( from <= 20 )
+    if ( wanted( 20, "The modal hall decays at its time" ) )
     {
         Engine e;
         quietEffects( e );
@@ -707,7 +837,7 @@ int main( int argc, char **argv )
 
     // 21. Tuned, it rings on the scale: 15 cents beside the voice's fourth harmonic the tail is
     //     far quieter than on it -- spread over the range it is not.
-    if ( from <= 21 )
+    if ( wanted( 21, "Tuned, it rings on the scale" ) )
     {
         double ratio[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -733,7 +863,7 @@ int main( int argc, char **argv )
     }
 
     // 22. Frozen, it holds: the level three seconds on within 1.5 dB of where it was.
-    if ( from <= 22 )
+    if ( wanted( 22, "Frozen, it holds" ) )
     {
         Engine e;
         quietEffects( e );
@@ -753,7 +883,7 @@ int main( int argc, char **argv )
 
     // 23. The echo arrives at its time: a tenth of a second of a note, then half a second of
     //     delay; the window around the echo is far louder than the gap before it.
-    if ( from <= 23 )
+    if ( wanted( 23, "The echo arrives at its time" ) )
     {
         Engine e;
         quietEffects( e );
@@ -774,7 +904,7 @@ int main( int argc, char **argv )
     }
 
     // 24. Everything at once, with the conductor: finite, inside the rails, at a sane level.
-    if ( from <= 24 )
+    if ( wanted( 24, "Everything at once, with the conductor" ) )
     {
         Engine e;
         for ( const auto &[id, v] :
@@ -806,7 +936,7 @@ int main( int argc, char **argv )
 
     // 25. The Scale field gathers the cloud onto the key: 20 cents beside the fourth harmonic (a
     //     pitch of the scale) a wide cloud has energy, gathered it has far less -- at the same level.
-    if ( from <= 25 )
+    if ( wanted( 25, "The Scale field gathers the cloud onto the key" ) )
     {
         double ratio[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -835,7 +965,7 @@ int main( int argc, char **argv )
 
     // 26. Swarm and Scatter: the level stays where it was, and the same seed plays the same (the
     //     attractors' Lorenz systems run on the host, from the seed).
-    if ( from <= 26 )
+    if ( wanted( 26, "Swarm and Scatter" ) )
     {
         auto play = []( int mode )
         {
@@ -862,7 +992,7 @@ int main( int argc, char **argv )
 
     // 27. Dispersion: with a second of it the high partials arrive first and the low ones after --
     //     the eighth harmonic sounds while the fundamental is still to come, and the other way round.
-    if ( from <= 27 )
+    if ( wanted( 27, "Dispersion" ) )
     {
         Engine e;
         quietEffects( e );
@@ -886,7 +1016,7 @@ int main( int argc, char **argv )
 
     // 28. Binaural: in front the ears hear the same; turned to the right (an orbit of a quarter turn
     //     a second, a second on) the right ear hears the highs louder and everything sooner.
-    if ( from <= 28 )
+    if ( wanted( 28, "Binaural" ) )
     {
         double ild[2] = { 0.0, 0.0 }, itdMs[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -917,7 +1047,7 @@ int main( int argc, char **argv )
 
     // 29. The memory: a released chord's ghosts rise over their bloom and are heard long after the
     //     chord; at the moment of release they add almost nothing.
-    if ( from <= 29 )
+    if ( wanted( 29, "The memory" ) )
     {
         double early[2] = { 0.0, 0.0 }, late[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -945,7 +1075,7 @@ int main( int argc, char **argv )
 
     // 30. Self-tuning: a C major triad in equal temperament settles towards just intervals -- the
     //     third from 400 towards 386 cents, the fifth from 700 towards 702.
-    if ( from <= 30 )
+    if ( wanted( 30, "Self-tuning" ) )
     {
         double third[2] = { 0.0, 0.0 }, fifth[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -977,7 +1107,7 @@ int main( int argc, char **argv )
 
     // 31. The spectral echo: its echo comes back at its time; tilted, the low band's echo comes
     //     back before the high band's.
-    if ( from <= 31 )
+    if ( wanted( 31, "The spectral echo" ) )
     {
         Engine e;
         quietEffects( e );
@@ -1009,7 +1139,7 @@ int main( int argc, char **argv )
     }
 
     // 32. The painted hall keeps its level (within 3 dB of the unpainted one) while the landscape moves it.
-    if ( from <= 32 )
+    if ( wanted( 32, "The painted hall keeps its level while the landscape moves it" ) )
     {
         double level[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1031,7 +1161,7 @@ int main( int argc, char **argv )
 
     // 33. The picture's snapshot: the partials of a sounding note come down from the GPU, at its
     //     harmonics, with their amplitudes; the silent voices' points are empty.
-    if ( from <= 33 )
+    if ( wanted( 33, "The picture's snapshot" ) )
     {
         Engine e;
         quietEffects( e );
@@ -1074,7 +1204,7 @@ int main( int argc, char **argv )
 
     // 34. Noctuary's sources move and keep to their ranges: each routed to the brightness, its live
     //     value sampled every half second over 40 s of the conductor.
-    if ( from <= 34 )
+    if ( wanted( 34, "Noctuary's sources move and keep to their ranges" ) )
     {
         const ModSourceE Sources[] = { ModSourceE::LENIA1,     ModSourceE::LORENZ_X, ModSourceE::ROSSLER_Z,
                                        ModSourceE::KURA1,      ModSourceE::ROOT_AGE, ModSourceE::NOTE,
@@ -1109,7 +1239,7 @@ int main( int argc, char **argv )
     }
 
     // 35. The Beat: in equal temperament a fifth beats and the source turns; in just intonation it stands.
-    if ( from <= 35 )
+    if ( wanted( 35, "The Beat" ) )
     {
         float swing[2] = { 0.0f, 0.0f };
         for ( int k = 0; k < 2; ++k )
@@ -1141,7 +1271,7 @@ int main( int argc, char **argv )
     }
 
     // 36. The via source scales the depth, and survives the text form.
-    if ( from <= 36 )
+    if ( wanted( 36, "The via source scales the depth, and survives the text form" ) )
     {
         float swing[2] = { 0.0f, 0.0f };
         for ( int k = 0; k < 2; ++k )
@@ -1175,7 +1305,7 @@ int main( int argc, char **argv )
 
     // 37. The living landscapes: Lenia and the Turing field live (the field at 6 s is not the field
     //     at 3 s), keep the level within 2 dB of no field, and the same seed plays the same.
-    if ( from <= 37 )
+    if ( wanted( 37, "The living landscapes" ) )
     {
         std::string report;
         bool        good = true;
@@ -1222,7 +1352,7 @@ int main( int argc, char **argv )
 
     // 38. Partial sync: coupled, the members of a harmonic fall into step and the harmonic pulses as
     //     one -- its level in tenths of a second swings far more than uncoupled -- at the same level.
-    if ( from <= 38 )
+    if ( wanted( 38, "Partial sync" ) )
     {
         double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1260,7 +1390,7 @@ int main( int argc, char **argv )
 
     // 39. What it hears of itself: louder with a note than in silence, brighter for a bright spectrum,
     //     more change at an attack than in a held note, rougher for a minor second than a pure fifth.
-    if ( from <= 39 )
+    if ( wanted( 39, "What it hears of itself" ) )
     {
         // A source's value through a row onto the brightness (depth 1 from 0): the live value is the source.
         auto heard = []( ModSourceE s, const std::vector<int> &notes, float tilt, double seconds, float attack,
@@ -1300,7 +1430,7 @@ int main( int argc, char **argv )
 
     // 40. The flock: a cloud's members move together -- the centre of the 4th harmonic's cloud wanders
     //     over ten seconds by several cents -- but keep their spread (no collapse), at the same level.
-    if ( from <= 40 )
+    if ( wanted( 40, "The flock" ) )
     {
         double moved[2] = { 0.0, 0.0 }, spread[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1367,7 +1497,7 @@ int main( int argc, char **argv )
 
     // 41. The ripple: notes struck one after another send waves along the spectrum, and a high
     //     harmonic's loudness rides them -- it swings far more than without -- at the same level.
-    if ( from <= 41 )
+    if ( wanted( 41, "The ripple" ) )
     {
         double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1416,7 +1546,7 @@ int main( int argc, char **argv )
 
     // 42. The reservoir: listening to the conductor its readout moves, inside its range, the same on
     //     every run; left alone it comes to rest when its chaos is low and runs on by itself when high.
-    if ( from <= 42 )
+    if ( wanted( 42, "The reservoir" ) )
     {
         auto run = [&]( float chaos, float input, bool conductor, std::vector<float> &seq )
         {
@@ -1462,7 +1592,7 @@ int main( int argc, char **argv )
 
     // 43. The melt: a note let go lingers in it, about as loud as it was; without spread it stays on
     //     its harmonics, with spread it melts into the space between them.
-    if ( from <= 43 )
+    if ( wanted( 43, "The melt" ) )
     {
         double dry = 0.0, tail[2] = { 0.0, 0.0 }, between[2] = { 0.0, 0.0 }, silent = 0.0;
         for ( int k = 0; k < 3; ++k )
@@ -1507,7 +1637,7 @@ int main( int argc, char **argv )
     // 44. The glide: one sound becomes another. Every number on its way in its own domain, the
     //     filter fading in by its share, the motion through nothing where it changes, the level
     //     stepping no more than either sound does by itself; and at the end exactly the new sound.
-    if ( from <= 44 )
+    if ( wanted( 44, "The glide" ) )
     {
         Engine e;
         quietEffects( e );
@@ -1584,7 +1714,7 @@ int main( int argc, char **argv )
 
     // 45. The A/B morph: the sound is the blend of two slots at A - B (matrix included); switching
     //     it on and off glides; off, the knobs play again.
-    if ( from <= 45 )
+    if ( wanted( 45, "The A/B morph" ) )
     {
         Engine e;
         quietEffects( e );
@@ -1627,7 +1757,7 @@ int main( int argc, char **argv )
     // 46. The journeys: every one that comes with the instrument reads, names presets the bank has
     //     and reads back from its text; a seeded player repeats; a journey played offline glides into
     //     each of its presets in turn.
-    if ( from <= 46 )
+    if ( wanted( 46, "The journeys" ) )
     {
         int bad = 0, unknown = 0, steps = 0;
         for ( int i = 0; i < numBuiltinJourneys(); ++i )
@@ -1695,7 +1825,7 @@ int main( int argc, char **argv )
 
     // 47. Stretch and Shift: stretched by 60 cents an octave, the 4th harmonic sits at 4^1.05 of the
     //     fundamental, not at 4; shifted by 50 Hz, the fundamental sits 50 Hz up.
-    if ( from <= 47 )
+    if ( wanted( 47, "Stretch and Shift" ) )
     {
         double stretched[2] = { 0.0, 0.0 }, shifted[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1740,7 +1870,7 @@ int main( int argc, char **argv )
     // 48. The spectral comb: standing, it cuts some harmonics deep and leaves others; sweeping, a
     //     harmonic dives and surfaces as the notches pass; over whole sweeps the level stays (one
     //     note standing is louder or softer as its fundamental meets a crest or a notch).
-    if ( from <= 48 )
+    if ( wanted( 48, "The spectral comb" ) )
     {
         double spread = 0.0, swing = 0.0, level[2] = { 0.0, 0.0 }, swept = 0.0;
         for ( int k = 0; k < 2; ++k )
@@ -1820,7 +1950,7 @@ int main( int argc, char **argv )
 
     // 49. The player's own landscape: one that is bright only around 1 kHz, chosen as Your Own and
     //     read by Aurora, lifts the 8th harmonic (near 1 kHz) far above the 2nd.
-    if ( from <= 49 )
+    if ( wanted( 49, "The player's own landscape" ) )
     {
         double tilt[2] = { 0.0, 0.0 };
         for ( int k = 0; k < 2; ++k )
@@ -1855,7 +1985,7 @@ int main( int argc, char **argv )
 
     // 50. The animated pictures: every one moves (the field at 6 s is not the field at 3 s), stays
     //     finite, keeps the level within 2 dB of no field, and the same seed plays the same.
-    if ( from <= 50 )
+    if ( wanted( 50, "The animated pictures" ) )
     {
         std::string report;
         bool        good = true;
@@ -1910,7 +2040,7 @@ int main( int argc, char **argv )
     // 51. The preset map: on a preset's own point, at the default radius, the blend is that preset;
     //     half way to a neighbour a number lies between the two; the engine follows the map's target
     //     over Map Glide; the routes that come with it read, write back and walk to their points.
-    if ( from <= 51 )
+    if ( wanted( 51, "The preset map" ) )
     {
         MapBlender blender;
         float      x = 0.0f, y = 0.0f;
@@ -1997,7 +2127,7 @@ int main( int argc, char **argv )
     //     itself does, the motion changes where its depth -- modulation included -- is nothing,
     //     the map's cursor jumping far does not make the partials or the motion jump, and a
     //     picture's landscape changes where the picture is at nothing.
-    if ( from <= 52 )
+    if ( wanted( 52, "A glide with modulation has no steps" ) )
     {
         Engine e;
         quietEffects( e );
@@ -2143,7 +2273,7 @@ int main( int argc, char **argv )
     //     circles by no more than the reach: when like phases gather they all stand as far from the
     //     middle (one place, or two opposite -- the ring model counts them alike, and they pulse
     //     against each other), when they part they scatter round the circle.
-    if ( from <= 53 )
+    if ( wanted( 53, "Chimeras and swarms (Phase 16a)" ) )
     {
         struct Watch
         {
@@ -2276,7 +2406,7 @@ int main( int argc, char **argv )
     //     (their columns hold more of it than the rest after a few seconds), the flow carries it on,
     //     the level holds, and two runs are the same bit for bit. The Islands: the field gathers --
     //     fewer borders along its rows after forty seconds than after five -- and the level holds.
-    if ( from <= 54 )
+    if ( wanted( 54, "The Fluid and the Islands (Phase 16b)" ) )
     {
         auto run = [&]( int mode, float character, double seconds, std::vector<float> &early, std::vector<float> &late,
                         std::vector<float> &out )
@@ -2382,7 +2512,7 @@ int main( int argc, char **argv )
     // 55. Turbulence (Phase 16c): a loud chord's energy climbs its harmonics -- its partials' centroid
     //     (power-weighted, from the picture's snapshot) rises -- without the chord growing louder; a soft
     //     chord's climbs far less; turned off, the spectrum settles back.
-    if ( from <= 55 )
+    if ( wanted( 55, "Turbulence (Phase 16c)" ) )
     {
         // The centroid in octaves above 20 Hz, averaged over the snapshots of a stretch, and the level.
         struct Heard
@@ -2459,7 +2589,7 @@ int main( int argc, char **argv )
     //     travelled into the middle -- the partials between 600 Hz and 1.5 kHz pass more than four
     //     times as strongly as those under 100 Hz and over 8 kHz (a fade would leave them alike).
     //     The filter's gain at a partial: its amplitude against the same voice without a filter.
-    if ( from <= 56 )
+    if ( wanted( 56, "The filter morphs by transport (Phase 16d)" ) )
     {
         // Every watched partial's (Hz, amplitude) at the start, half way and at the end of the glide.
         auto take = [&]( bool filtered, std::vector<float> &start, std::vector<float> &middle, std::vector<float> &end )
@@ -2541,7 +2671,7 @@ int main( int argc, char **argv )
     //     alone; a note let go keeps its bend when its channel is bent again for the next; the
     //     master's bend moves every played note. Pressure on Level lifts a note by up to 2^depth
     //     (3 dB at 0.5), slide on Brightness makes it brighter.
-    if ( from <= 57 )
+    if ( wanted( 57, "MPE (Phase 16e)" ) )
     {
         auto pitches = []( const Engine &e )
         {
@@ -2630,7 +2760,7 @@ int main( int argc, char **argv )
     // 58. The growing hall (Phase 17a): a chord held for a minute with Grow on teaches the hall its
     //     pitches. Growing, the hall's tail after the chord dies more slowly than a new hall's; eroding,
     //     faster. The memory brought out of the engine and put into a new one rings as the trained hall.
-    if ( from <= 58 )
+    if ( wanted( 58, "The growing hall (Phase 17a)" ) )
     {
         struct Tail
         {
@@ -2698,7 +2828,7 @@ int main( int argc, char **argv )
     // 59. The partials' own time (Phase 17b): where the spectrum is dense their drift slows (Time Bend
     //     positive) or quickens (negative), at the same level. The drift as heard: each partial's move
     //     weighted by its amplitude.
-    if ( from <= 59 )
+    if ( wanted( 59, "The partials' own time (Phase 17b)" ) )
     {
         double      speed[3] = { 0.0, 0.0, 0.0 }, level[3] = { 0.0, 0.0, 0.0 };
         bool        ran = true;
@@ -2755,7 +2885,7 @@ int main( int argc, char **argv )
 
     // 60. The Orbit field (Phase 17c): a partial circles its well -- its pitch swings about the
     //     scale's pitch, back and forth many times, within the radius -- at the level of no field.
-    if ( from <= 60 )
+    if ( wanted( 60, "The Orbit field (Phase 17c)" ) )
     {
         double sd[2] = { 0.0, 0.0 }, level[2] = { 0.0, 0.0 }, mean[2] = { 0.0, 0.0 }, widest = 0.0;
         int    crossings = 0;
@@ -2824,7 +2954,7 @@ int main( int argc, char **argv )
     // 61. The ripple's bend (Phase 17b): a struck note's wave lingers where it sounds -- with Bend, 0.6 s
     //     later the string still stands far higher at the note's fundamental; without, the wave has run on.
     //     And the waves leaving the slow zone are no louder for it (the whole string holds no more).
-    if ( from <= 61 )
+    if ( wanted( 61, "The ripple's bend (Phase 17b)" ) )
     {
         double kept[2] = { 0.0, 0.0 }, whole[2] = { 0.0, 0.0 };
         bool   ran = true;
@@ -2873,7 +3003,7 @@ int main( int argc, char **argv )
     //     motion. Following the light, the conductor puts far more of its notes there than without
     //     (without, the band is already the middle of its register, which it favours; and its rules
     //     against doublings and crowding keep spreading the chord).
-    if ( from <= 62 )
+    if ( wanted( 62, "Follow Light (Phase 19a)" ) )
     {
         Landscape band;
         band.m_columns = 128;
@@ -2979,7 +3109,7 @@ int main( int argc, char **argv )
     //     width, each by a good part of what the measured sensitivities predict, the level held; Calmer
     //     (a rule: the motion measured over eight seconds is too unsteady to steer by) slows every rate
     //     that moves something by 1.23 a quarter step and touches no knob at nothing.
-    if ( from <= 63 )
+    if ( wanted( 63, "Nudges (Phase 20)" ) )
     {
         const int   index = 64;   // Choirs' first
         float       values[NumParams], up[NumParams], wide[NumParams], calm[NumParams];
@@ -3027,7 +3157,7 @@ int main( int argc, char **argv )
 
     // 64. Variations: the same dice give the same variation, other dice another; a few heard shaping
     //     knobs move (four to eight), nothing else but the master that holds the level.
-    if ( from <= 64 )
+    if ( wanted( 64, "Variations" ) )
     {
         float values[NumParams], a[NumParams], b[NumParams], c[NumParams];
         presetValues( 64, values, nullptr );
@@ -3057,7 +3187,7 @@ int main( int argc, char **argv )
 
     // 65. A macro taught by example: at its places the knobs stand where they were taught, between them
     //     half way, and the macro's value glides them.
-    if ( from <= 65 )
+    if ( wanted( 65, "A macro taught by example" ) )
     {
         Engine e;
         quietEffects( e );
@@ -3087,7 +3217,7 @@ int main( int argc, char **argv )
     }
 
     // 66. Search by example: a preset measured as the bank was measured is found, nearest first.
-    if ( from <= 66 )
+    if ( wanted( 66, "Search by example" ) )
     {
         const int   index = 100;
         float       values[NumParams];
@@ -3111,7 +3241,7 @@ int main( int argc, char **argv )
     // 67. Foundation: with it the lowest sounding note is the root's, in the lowest octave of the
     //     register, nearly all the time, and every chord note stands a fifth above it or higher;
     //     without it the conductor's lowest note is only by chance the root.
-    if ( from <= 67 )
+    if ( wanted( 67, "Foundation" ) )
     {
         double rootShare[2] = { 0.0, 0.0 };
         int    looks[2] = { 0, 0 }, under = 0;
@@ -3208,7 +3338,7 @@ int main( int argc, char **argv )
     // 68. Overblow (Phase 26a): with breath the octave takes over -- the fundamental falls far under the
     //     second harmonic, the voice's power stays. And it holds: a note overblown, then given less breath,
     //     stays up where a note starting with that little breath stays down (hysteresis).
-    if ( from <= 68 )
+    if ( wanted( 68, "Overblow (Phase 26a)" ) )
     {
         auto play = [&]( float first, float then, double &oneOverTwo, double &power )
         {
@@ -3246,7 +3376,7 @@ int main( int argc, char **argv )
     // 69. Seasons (Phase 26b): five families take turns -- over a 20 s year, the fifth's family (harmonic 3)
     //     and the third's (harmonic 5) each swing by more than 10 dB, loudest at different times, while the
     //     voice's power holds within a decibel.
-    if ( from <= 69 )
+    if ( wanted( 69, "Seasons (Phase 26b)" ) )
     {
         Engine e;
         plainNote( e );
@@ -3288,7 +3418,7 @@ int main( int argc, char **argv )
     // 70. Avalanche (Phase 26c): the rice pile on a held note -- over a minute, many moments with a harmonic
     //     glinting 4 dB over its usual level, some with six or more glinting at once; without it none. The
     //     same seed renders the same bits.
-    if ( from <= 70 )
+    if ( wanted( 70, "Avalanche (Phase 26c)" ) )
     {
         auto play = [&]( float depth, int &events, int &large, std::vector<float> *keep )
         {
@@ -3356,7 +3486,7 @@ int main( int argc, char **argv )
     // 71. Subharmonics (Phase 26d): a loud held note grows a cloud an octave under it from nothing --
     //     absent at first, within 15 dB of the fundamental after 20 s -- and it fades again when the pump
     //     stops; without it there is none. The voice's power stays within a decibel.
-    if ( from <= 71 )
+    if ( wanted( 71, "Subharmonics (Phase 26d)" ) )
     {
         auto play = [&]( float depth, double &early, double &late, double &after, double &power )
         {
@@ -3404,7 +3534,7 @@ int main( int argc, char **argv )
     // 72. Horizon (Phase 26f): bent fully towards a horizon three octaves up, no partial of the note
     //     lies above it (and its cloud), where without it they reach past 10 kHz; the second harmonic
     //     stays within 15 cents of its place (6 bent, the rest its cloud).
-    if ( from <= 72 )
+    if ( wanted( 72, "Horizon (Phase 26f)" ) )
     {
         auto play = [&]( float amount, double &top, double &second, double &f0 )
         {
@@ -3445,7 +3575,7 @@ int main( int argc, char **argv )
 
     // 73. Grains (Phase 26g): all partials in grains a tenth of their time -- in the picture most of them
     //     are silent at any moment, where without grains none is; the level stays within 1.5 dB.
-    if ( from <= 73 )
+    if ( wanted( 73, "Grains (Phase 26g)" ) )
     {
         auto play = [&]( float share, double &silent, double &db )
         {
@@ -3492,7 +3622,7 @@ int main( int argc, char **argv )
     //     fell, drifting slowly -- after 8 s most of the string's (periodic) energy is still within 28 cells
     //     (about an octave) of the note's first four harmonics, where without breathers the waves have run
     //     up and down the whole string.
-    if ( from <= 74 )
+    if ( wanted( 74, "Breathers (Phase 26e)" ) )
     {
         auto play = [&]( float breathers, double &held )
         {
@@ -3538,7 +3668,7 @@ int main( int argc, char **argv )
     // 75. Phantom (Phase 27a): the phantom layer alone, carrying its melody. Between the ears the phase is turned
     //     half way round at the pitch it carries and not at all a fifth above, while each ear alone has no peak
     //     there: the pitch is only between them.
-    if ( from <= 75 )
+    if ( wanted( 75, "Phantom (Phase 27a)" ) )
     {
         Engine e;
         plainNote( e );
@@ -3579,7 +3709,7 @@ int main( int argc, char **argv )
     // 76. Talbot (Phase 27b): Revival over a 20 s period -- half way the timbre stands upside down (the 24th harmonic
     //     over the fundamental), after the period it is back within two decibels, the voice's power within one.
     //     Bloch: the energy's centre climbs the harmonics half way and comes back.
-    if ( from <= 76 )
+    if ( wanted( 76, "Talbot (Phase 27b)" ) )
     {
         auto play = [&]( float mode, double p1[3], double p24[3], double all[3], double centre[3] )
         {
@@ -3631,7 +3761,7 @@ int main( int argc, char **argv )
 
     // 77. Chimes (Phase 27c): in a wind of 0.6 the chimes strike many times in ten seconds and are heard across the
     //     field (left and right differ); without wind none strikes and the field is silent.
-    if ( from <= 77 )
+    if ( wanted( 77, "Chimes (Phase 27c)" ) )
     {
         auto play = [&]( float wind, long long &strikes, double &db, double &corr )
         {
@@ -3670,7 +3800,7 @@ int main( int argc, char **argv )
     // 78. Dream (Phase 27d): two chords heard, then nothing played: the dream keeps them (at least two memories) and
     //     sings what it remembered -- most of its power within 40 cents of the first six harmonics of the notes that
     //     were played.
-    if ( from <= 78 )
+    if ( wanted( 78, "Dream (Phase 27d)" ) )
     {
         Engine e;
         plainNote( e );
@@ -3719,7 +3849,7 @@ int main( int argc, char **argv )
 
     // 79. Premonition (Phase 27e): the conductor's first note heard coming -- two seconds into its premonition its
     //     cloud is spread three times as far or more as two seconds after it began, and softer.
-    if ( from <= 79 )
+    if ( wanted( 79, "Premonition (Phase 27e)" ) )
     {
         Engine e;
         plainNote( e );
@@ -3770,7 +3900,7 @@ int main( int argc, char **argv )
 
     // 80. Rain (Phase 28a): on a tin roof the drops ring long enough to be counted -- four times the rate, about four
     //     times the drops sounding at once -- and the rain is heard; switched off, it falls silent.
-    if ( from <= 80 )
+    if ( wanted( 80, "Rain (Phase 28a)" ) )
     {
         auto play = [&]( float rate, float rain, float &sounding, double &db )
         {
@@ -3803,7 +3933,7 @@ int main( int argc, char **argv )
     }
 
     // 81. Leaves (Phase 28a): in a calm they are silent; they rustle in the wind, louder in a strong one.
-    if ( from <= 81 )
+    if ( wanted( 81, "Leaves (Phase 28a)" ) )
     {
         auto play = [&]( float wind, double &db )
         {
@@ -3826,7 +3956,7 @@ int main( int argc, char **argv )
 
     // 82. Surf (Phase 28a): the sea comes in sets -- its loudness over a minute and a half, second by second, rises and
     //     falls by more than 6 dB -- and a wind raises it.
-    if ( from <= 82 )
+    if ( wanted( 82, "Surf (Phase 28a)" ) )
     {
         auto play = [&]( float wind, double &range, double &db )
         {
@@ -3859,7 +3989,7 @@ int main( int argc, char **argv )
     // 83. Bloom (Phase 28b): a chord struck and let go rings the plate; with its drive, half a second after the chord
     //     ends more of the plate's energy stands above 2 kHz than without -- it has climbed -- and the plate is not
     //     louder for it (the cascade only moves energy).
-    if ( from <= 83 )
+    if ( wanted( 83, "Bloom (Phase 28b)" ) )
     {
         auto play = [&]( float drive, float &high, double &db )
         {
@@ -3901,7 +4031,7 @@ int main( int argc, char **argv )
     //     follows its angle (S high, R low); falling into step too: all pulse as one (R near 1); falling out of step
     //     twice as strongly as they gather: a still disc of phases (both low). (At J = 1, K = -1 the ring turns
     //     instead -- the active phase wave, S 0.55: the disc lies past K = -1.2 J.)
-    if ( from <= 84 )
+    if ( wanted( 84, "Swarmalators (Phase 28c)" ) )
     {
         auto play = [&]( float j, float k, float &R, float &S )
         {
@@ -3933,7 +4063,7 @@ int main( int argc, char **argv )
     // 85. Physarum (Phase 28d): a note's partials as crawlers with a long sensor leave the harmonics -- a fifth of
     //     their power or more stands between them after fifteen seconds (without the physarum almost none) -- and the
     //     trail they leave is veined (its spread over its mean well above an even trail's).
-    if ( from <= 85 )
+    if ( wanted( 85, "Physarum (Phase 28d)" ) )
     {
         auto play = [&]( bool phys, double &between, float &spread )
         {
@@ -3983,7 +4113,7 @@ int main( int argc, char **argv )
     //     the engine renders the same, sample for sample) -- its sound lies below 2.5 kHz (the grid's band), and with
     //     rigid walls its tail half a second to a second and a half after the chord is far louder than with walls that
     //     take it up.
-    if ( from <= 86 )
+    if ( wanted( 86, "Wave room (Phase 29a)" ) )
     {
         auto play = [&]( float room, float absorb, std::vector<float> &out )
         {
@@ -4040,7 +4170,7 @@ int main( int argc, char **argv )
     //     clockwise or clockwise as asked, more than a quarter of the way in three seconds; made trivial, the gap holds
     //     nothing and it moves less than a third as far (what moves at all is the strike's edges, outside the gap:
     //     measured -35 degrees against +142).
-    if ( from <= 87 )
+    if ( wanted( 87, "Topological halo (Phase 29b)" ) )
     {
         auto play = [&]( float turn, float topology, float &moved, float &rim )
         {
@@ -4086,7 +4216,7 @@ int main( int argc, char **argv )
     //     fourth, a major or minor third or sixth) does not fall steadily as the wave spreads further between two
     //     looks: at a phase of 2 radians more of the moves go to a neighbour than at 0.5 -- interference, which a
     //     random walk cannot do (simulated: 78 % against 47 %). With it off the root does not move by it.
-    if ( from <= 88 )
+    if ( wanted( 88, "Quantum walk (Phase 29c)" ) )
     {
         auto play = [&]( float spread, long long &moves, long long &toNeighbour )
         {
@@ -4130,7 +4260,7 @@ int main( int argc, char **argv )
 
     // 89. Aeolian harp (Phase 30a): silent in a calm; in a wind its strings sing -- each locked onto a harmonic of its
     //     tuning --, and in a stronger wind higher harmonics (Strouhal's frequency grows with the wind's speed).
-    if ( from <= 89 )
+    if ( wanted( 89, "Aeolian harp (Phase 30a)" ) )
     {
         auto play = [&]( float wind, double &db, float &harmonic )
         {
@@ -4160,7 +4290,7 @@ int main( int argc, char **argv )
     // 90. Thunder (Phase 30b): a strike is heard as late as it is far (three seconds a kilometre, nothing before), deep
     //     (most of its energy below 400 Hz), and from where it struck: the head turned round (the headset) swaps the
     //     ears.
-    if ( from <= 90 )
+    if ( wanted( 90, "Thunder (Phase 30b)" ) )
     {
         auto play = [&]( float yaw, double &delay, double &distance, double &low, double &balance )
         {
@@ -4228,7 +4358,7 @@ int main( int argc, char **argv )
 
     // 91. Singing ice (Phase 30c): its cracks come as often as the cold says, and each is a chirp that falls -- its
     //     highs arrive first, then lower and lower (flexural waves are dispersive).
-    if ( from <= 91 )
+    if ( wanted( 91, "Singing ice (Phase 30c)" ) )
     {
         auto play = [&]( float cold, float &chirps, std::vector<float> &lr )
         {
@@ -4282,7 +4412,7 @@ int main( int argc, char **argv )
 
     // 92. Streams (Phase 30d): with Fusion at nothing the odd and the even harmonics move apart (their envelopes unlike:
     //     two streams), at full they move as one (alike: one sound).
-    if ( from <= 92 )
+    if ( wanted( 92, "Streams (Phase 30d)" ) )
     {
         auto play = [&]( float fusion, double &corr )
         {
@@ -4335,7 +4465,7 @@ int main( int argc, char **argv )
     // 93. Risset's rhythm (Phase 30e): the voices pulse, and over an octave's time the comb of the pulse's tempi slides
     //     down -- by 0.7 of an octave between 15 % and 85 % of it, so its strongest tempo lies 0.3 octaves (mod 1) up
     //     from where it began --, quickening the other way (0.7); it never arrives: the octave starts over.
-    if ( from <= 93 )
+    if ( wanted( 93, "Risset's rhythm (Phase 30e)" ) )
     {
         auto play = [&]( float way, double &shift, double &depth )
         {
@@ -4407,7 +4537,7 @@ int main( int argc, char **argv )
     // 94. Night arc (Phase 30f): the sun where it should be -- Berlin at noon on the June solstice about 61 degrees up,
     //     at midnight on the December one about 61 below --, and at night the arc darkens the sound; by day it changes
     //     nothing.
-    if ( from <= 94 )
+    if ( wanted( 94, "Night arc (Phase 30f)" ) )
     {
         const double june = 1782000000.0 + 11.0 * 3600.0 + 8.0 * 60.0;       // 2026-06-21 11:08 UTC, the sun due south
         const double december = 1797811200.0 + 23.0 * 3600.0 + 8.0 * 60.0;   // 2026-12-21 23:08 UTC
@@ -4456,7 +4586,7 @@ int main( int argc, char **argv )
 
     // 95. Dream journal (Phase 30g): what the dream kept comes down as a journal, and an instrument given it dreams from
     //     the same memories.
-    if ( from <= 95 )
+    if ( wanted( 95, "Dream journal (Phase 30g)" ) )
     {
         std::vector<std::uint8_t> journal;
         int                       kept = 0, restored = -1;
@@ -4500,7 +4630,7 @@ int main( int argc, char **argv )
 
     // 96. The headset (Phase 30h): the head turned right, a voice ahead moves into the left ear (the binaural cloud
     //     stays put in the room); a hand at the height of 490 Hz feeds the slime mould there, and its partials gather.
-    if ( from <= 96 )
+    if ( wanted( 96, "The headset (Phase 30h)" ) )
     {
         auto turn = [&]( float yaw, double &balance )
         {
@@ -4559,7 +4689,7 @@ int main( int argc, char **argv )
 
     // 97. Night chorus (Phase 31): warm crickets call faster than cold ones (Dolbear's law), and callers that answer
     //     each other fall into step -- the most numerous kind's clocks gather.
-    if ( from <= 97 )
+    if ( wanted( 97, "Night chorus (Phase 31)" ) )
     {
         auto play = [&]( float warmth, float sync, double &perSecond, double &order )
         {
@@ -4598,7 +4728,7 @@ int main( int argc, char **argv )
 
     // 98. Time mirror (Phase 31): a chord struck and let go in the wave room; without the mirror the room dies away,
     //     with it what the mirror heard comes back reversed in the next window, swelling towards its end.
-    if ( from <= 98 )
+    if ( wanted( 98, "Time mirror (Phase 31)" ) )
     {
         auto play = [&]( float mirror, double &chord, double &early, double &late )
         {
@@ -4633,7 +4763,7 @@ int main( int argc, char **argv )
     //     its depth through it. A loud harp over it: Floor raises the foundation until the share under 150 Hz is near
     //     its own. Pedal at 1 holds the foundation on the key's tonic while the conductor's root moves. Pressure
     //     makes the floor beat; Sub Octave puts power an octave under it.
-    if ( from <= 99 )
+    if ( wanted( 99, "The floor (Phase 32)" ) )
     {
         // power under fc, a second-order low pass (RBJ, Q 0.707) over interleaved stereo, per window of w frames
         auto lowWindows = []( const std::vector<float> &lr, double fc, size_t w, int passes = 1 )
@@ -4786,7 +4916,7 @@ int main( int argc, char **argv )
 
     // 100. Star (Phase 33): a sun's modes stand where asteroseismology puts them -- the radial ones at
     //      dnu (n + 1.4), dnu the root's (D2) two octaves down -- and between them is little.
-    if ( from <= 100 )
+    if ( wanted( 100, "Star (Phase 33)" ) )
     {
         auto    held = std::make_unique<Engine>();   // on the heap: main's frame holds enough of them
         Engine &e = *held;
@@ -4812,7 +4942,7 @@ int main( int argc, char **argv )
 
     // 101. Black hole (Phase 33): a note held at 440 Hz; with the hole a share of its partials falls, redshifted, so
     //      power appears far under the note where there was none.
-    if ( from <= 101 )
+    if ( wanted( 101, "Black hole (Phase 33)" ) )
     {
         auto under = [&]( float hole )
         {
@@ -4839,7 +4969,7 @@ int main( int argc, char **argv )
     // 102. Merger (Phase 33): asked for at once with a 20 s inspiral and a 70 Hz ringdown -- the field's width swings
     //      while the wave is too slow to hear (a swing of its own on top of the note's, the two adding as powers), and
     //      the ringdown stands far over the bass before it.
-    if ( from <= 102 )
+    if ( wanted( 102, "Merger (Phase 33)" ) )
     {
         double loudest = -200.0;   // dBFS: the loudest sample of a render with a merger
         auto   play = [&]( float merger, double &peak, double &before, double &swing )
@@ -4896,7 +5026,7 @@ int main( int argc, char **argv )
 
     // 103. Redshift hall (Phase 33): a chord into the modal hall and let go; with Redshift the tail sinks -- three
     //      seconds on, its power lies lower than without.
-    if ( from <= 103 )
+    if ( wanted( 103, "Redshift hall (Phase 33)" ) )
     {
         auto tail = [&]( float red )
         {
@@ -4931,7 +5061,7 @@ int main( int argc, char **argv )
     // 104. Scintillation (Phase 34): a note held, rendered twice alike but for the screen; its harmonics' levels in
     //      half seconds differ between the two by the screen's patches -- by several decibels, back and forth -- and
     //      on the whole stay as loud.
-    if ( from <= 104 )
+    if ( wanted( 104, "Scintillation (Phase 34)" ) )
     {
         auto levels = [&]( float scint, std::vector<double> &db )
         {
@@ -4967,7 +5097,7 @@ int main( int argc, char **argv )
 
     // 105. Lines (Phase 34): A2 with Lines: the eleventh harmonic's place is empty and Balmer alpha (11.36 times the
     //      lowest line, Pfund alpha, on the note) sounds; without, the other way round.
-    if ( from <= 105 )
+    if ( wanted( 105, "Lines (Phase 34)" ) )
     {
         auto at = [&]( float lines, double &balmer, double &eleventh )
         {
@@ -4996,7 +5126,7 @@ int main( int argc, char **argv )
 
     // 106. Absorption (Phase 34): a band of air round 440 Hz; with Absorption, Balmer alpha's place (on the root, D) is
     //      dark against the air beside it.
-    if ( from <= 106 )
+    if ( wanted( 106, "Absorption (Phase 34)" ) )
     {
         auto dip = [&]( float absorb )
         {
@@ -5030,7 +5160,7 @@ int main( int argc, char **argv )
 
     // 107. Wreck (Phase 34): struck sixty times a minute, a hull rings at its modes -- its lowest eight stand far over
     //      the gaps between them.
-    if ( from <= 107 )
+    if ( wanted( 107, "Wreck (Phase 34)" ) )
     {
         auto    held = std::make_unique<Engine>();
         Engine &e = *held;
@@ -5058,7 +5188,7 @@ int main( int argc, char **argv )
 
     // 108. Deep channel (Phase 34): a short note across 800 km of ocean comes back as a swell -- the arrivals spread over
     //      seconds, the loudest late -- and it ends at once.
-    if ( from <= 108 )
+    if ( wanted( 108, "Deep channel (Phase 34)" ) )
     {
         auto    held = std::make_unique<Engine>();
         Engine &e = *held;
@@ -5096,7 +5226,7 @@ int main( int argc, char **argv )
 
     // 109. Magnetosphere (Phase 35): whistlers fall -- the loudest pitch from one twentieth of a second to the next goes
     //      down far more often than up --, and the dawn chorus rises.
-    if ( from <= 109 )
+    if ( wanted( 109, "Magnetosphere (Phase 35)" ) )
     {
         // the share of steps, between neighbouring 50 ms windows that both sound, where the loudest pitch (on a grid
         // of sixths of an octave, 200 Hz .. 10 kHz) falls, and where it rises
@@ -5157,7 +5287,7 @@ int main( int argc, char **argv )
 
     // 110. Throat (Phase 35): one throat on D2; with Kargyraa an octave below sounds; its vowel i has a second formant
     //      far up, u not.
-    if ( from <= 110 )
+    if ( wanted( 110, "Throat (Phase 35)" ) )
     {
         auto sing = [&]( float sub, float vowel, double &below, double &centre )
         {
@@ -5197,7 +5327,7 @@ int main( int argc, char **argv )
     // 111. The time mirror stays bounded (Phase 36): the conductor playing into a wave room whose walls take little,
     //      the mirror at its fullest -- the loop that drove 44 of 48 mirror presets to full scale within a minute --
     //      sounds after 40 seconds within a few dB of the same room without the mirror, never near full scale.
-    if ( from <= 111 )
+    if ( wanted( 111, "The time mirror stays bounded (Phase 36)" ) )
     {
         auto play = [&]( float mirror, double &early, double &late, double &peakDb )
         {
@@ -5232,7 +5362,7 @@ int main( int argc, char **argv )
     //      room, a panic makes the output digital silence within two blocks and keeps it so; woken with the conductor
     //      off nothing rings on (the tails were emptied, not only gated); a played note wakes it by itself; and All
     //      Sound Off silences as deep but plays on.
-    if ( from <= 112 )
+    if ( wanted( 112, "The panic (11.11.2026)" ) )
     {
         auto    held = std::make_unique<Engine>();
         Engine &e = *held;
@@ -5294,7 +5424,7 @@ int main( int argc, char **argv )
     //      or major seventh to a chord tone at the time it was composed -- the chord stands still here); with three
     //      figures there are more notes in the same time; and the notes are heard: the first seconds of a note are
     //      louder with the figure than without, the conductor playing the same chord.
-    if ( from <= 113 )
+    if ( wanted( 113, "The figures (11.11.2026)" ) )
     {
         auto play = [&]( int figures, std::vector<int> &notes, double &level, int &count )
         {
@@ -5343,7 +5473,7 @@ int main( int argc, char **argv )
     //      their notes itself (a cluster holds seconds of its own) -- measured in cents of what the tuning plays, not
     //      in keys (in 7-limit on D a G is played as an F#). Before, the figures heard the first conductor only and
     //      judged keys: 33 of 302.
-    if ( from <= 114 )
+    if ( wanted( 114, "The figures against both conductors, in a tuning whose keys snap (19.11.2026)" ) )
     {
         auto    held = std::make_unique<Engine>();
         Engine &e = *held;
@@ -5375,7 +5505,7 @@ int main( int argc, char **argv )
     //      of their own, three seeds of ten minutes. The share of the time a note of one stands a semitone, a major
     //      seventh or a tritone from a note of the other (within two octaves) is small. Before, they shared the root
     //      and nothing else: 46 % of the time; now none.
-    if ( from <= 115 )
+    if ( wanted( 115, "The two conductors hear each other (19.11.2026)" ) )
     {
         int rubbing = 0, both = 0;
         for ( std::uint64_t seed : { 1151u, 1152u, 1153u } )
@@ -5408,7 +5538,7 @@ int main( int argc, char **argv )
     //      conductor set strictly consonant could still put a note a semitone beside one of its own. Consonance at
     //      0.95, three notes, three seeds of ten minutes: the share of the time with a minor second or a minor ninth
     //      among its own notes is small. Before: 9.6 %; now none.
-    if ( from <= 116 )
+    if ( wanted( 116, "A conductor hears its own notes (19.11.2026)" ) )
     {
         int rubbing = 0, chords = 0;
         for ( std::uint64_t seed : { 1161u, 1162u, 1163u } )
@@ -5439,7 +5569,7 @@ int main( int argc, char **argv )
     //      the attack of a pad that is no line at all: Velvet Dreaming played 466 Hz twice every loop. Two figures of
     //      two notes and two of five, chords that move, figures that change: no note of a round sounds the pitch of
     //      the note before it.
-    if ( from <= 117 )
+    if ( wanted( 117, "A figure never strikes the same pitch twice in a row (19.11.2026)" ) )
     {
         int notes = 0, repeats = 0;
         for ( int most : { 2, 5 } )
@@ -5471,7 +5601,7 @@ int main( int argc, char **argv )
     //      two cents -- and being the smallest move it won: the old voice let go and the same note struck again
     //      (Breathy Flute: three of its first three exchanges). JI 7-limit on C and on C#, the chord moving every
     //      eight seconds: no note begins within 25 cents of the one let go at that instant.
-    if ( from <= 118 )
+    if ( wanted( 118, "An exchange is a move (20.11.2026)" ) )
     {
         static double offAt = -1.0, offHz = 0.0;
         static int    exchanges = 0, same = 0;
@@ -5512,6 +5642,24 @@ int main( int argc, char **argv )
                fmt( "%d exchanges, %d of them within 25 cents of the note let go", exchanges, same ) );
     }
 
+    finishTest();
+    if ( g_sel.m_list ) return 0;
+    for ( size_t r = 0; r < g_sel.m_only.size(); ++r )
+        if ( !g_sel.m_hit[r] )
+        {
+            std::printf( "selftest: --only %d-%d matches no test\n", g_sel.m_only[r].first, g_sel.m_only[r].second );
+            return 2;
+        }
+    std::vector<size_t> order( g_sel.m_times.size() );
+    for ( size_t i = 0; i < order.size(); ++i ) order[i] = i;
+    std::sort( order.begin(), order.end(),
+               []( size_t a, size_t b ) { return g_sel.m_times[a].first > g_sel.m_times[b].first; } );
+    double total = 0.0;
+    for ( const auto &t : g_sel.m_times ) total += t.first;
+    std::printf( "%zu tests in %.1f s; the slowest:\n", g_sel.m_times.size(), total );
+    for ( size_t i = 0; i < order.size() && i < 5; ++i )
+        std::printf( "  %4d  %7.1f s  %s\n", g_sel.m_times[order[i]].second, g_sel.m_times[order[i]].first,
+                     g_sel.m_titles[order[i]].c_str() );
     std::printf( g_failures == 0 ? "selftest passed\n" : "selftest: %d FAILED\n", g_failures );
     return g_failures == 0 ? 0 : 1;
 }

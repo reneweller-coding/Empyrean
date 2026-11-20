@@ -230,6 +230,10 @@ entity documented, Doxygen) and pluginval at strictness 10 (where it is unpacked
 the release (`release` preset: static runtime, code for every RTX generation), runs the tests, makes the manual,
 stages, checks and packs it into `dist/`.
 
+The engine's self-test runs on the graphics card for about twenty minutes. To work on one part, `additiv_selftest
+--list` numbers its tests, `--only 62,113-117` runs just those (numbers and ranges; one that matches no test is an
+error) and `--from N` the tests from N on; every run prints each test's wall time and the five slowest.
+
 ## Render
 
 ```
