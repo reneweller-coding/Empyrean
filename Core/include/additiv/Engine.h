@@ -227,11 +227,16 @@ public:
      *                        transitions, Tools/presets/journey_transitions.py). When it is given, the parameters are
      *                        read every `paramEvery` steps whatever the matrix does, so a glide is stepped. May be
      *                        empty
+     * @param[in] listen      called every step with the audit's clock, after the parameters and before the
+     *                        conductors, without changing how often the parameters are read (plan E3: the offline
+     *                        jam sets the leader's root and notes there, setJamRoot() and setJamHeard(), and reads a
+     *                        leader's conductorNotes()). May be empty
      */
     void auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
                          const std::function<void( const AuditNote & )> &sink,
                          const std::function<void( double, int )>       &rootSink,
-                         const std::function<void( double )>            &tick = nullptr );
+                         const std::function<void( double )>            &tick = nullptr,
+                         const std::function<void( double )>            &listen = nullptr );
     /**
      * @brief The pitch the tuning gives a key now: the scale on its root, the reference pitch and Purity, without the
      *        tide, the self-tuning or a bend. For the tools (additiv_brain_audit --then); the instrument does not read it.
@@ -491,6 +496,40 @@ public:
      * @param[in] energy  0 .. 1
      */
     void setJamEnergy( float energy ) { m_jamEnergy.store( energy, std::memory_order_relaxed ); }
+    /**
+     * @brief The family jam, following with "Hear leader" on (plan E3, 20.11.2026): the notes the leader sounds, weighed
+     *        by both conductors as each weighs the other's (ClusterBrain::hearAlso) from the next block on, until the
+     *        next call that changes them. The plugin's audio thread calls it every block; nothing else does, and with
+     *        @p n 0 the conductors choose as they always did. Wait-free: a changed set goes through a small ring to the
+     *        render thread (when that is full, the next call tries again).
+     * @param[in] hz  the notes, Hz
+     * @param[in] n   how many (at most ClusterBrain::HeardMax are kept)
+     */
+    void setJamHeard( const double *hz, int n );
+    /**
+     * @brief The family jam, leading (plan E3): whether the render thread publishes what the conductors sound, for
+     *        jamNotes(). Any thread; off by default (nothing is published, nothing changes).
+     * @param[in] on  true while leading
+     */
+    void setJamLead( bool on ) { m_jamLead.store( on, std::memory_order_relaxed ); }
+    /**
+     * @brief The family jam, leading (plan E3): the notes both conductors sounded after the newest block the render
+     *        thread published (setJamLead()), as another conductor hears them (conductorNotes()). Wait-free; for one
+     *        reader, the plugin's audio thread.
+     * @param[out] hz   receives the notes
+     * @param[in]  cap  room in @p hz
+     * @return how many
+     */
+    int jamNotes( float *hz, int cap );
+    /**
+     * @brief The notes both conductors sound now, in Hz, as another conductor would hear them (plan E3): the first's,
+     *        then the second's while it plays (ClusterBrain::soundingHz), each at the pitch its voices really have
+     *        (heldHz(): a kept pitch as it is kept). The render thread's, or the audit's.
+     * @param[out] hz   receives the notes
+     * @param[in]  cap  room in @p hz
+     * @return how many
+     */
+    int conductorNotes( float *hz, int cap ) const;
 
     /** @brief Autoplay: exchange a voice of the cluster at the next block, whatever its timer says. Any thread. */
     void autoplayStep() { m_stepAsked.store( true, std::memory_order_relaxed ); }
@@ -1353,6 +1392,59 @@ private:
     std::atomic<float>                 m_pressure{ 0.0f };      ///< channel pressure
     float                              m_lastVelocity = 0.0f;   ///< the last note's velocity
     std::atomic<int>                   m_jamRoot{ -1 };         ///< the jam leader's root (pitch class), -1 none
+    /** @brief A set of notes for the jam's rings (plan E3). */
+    struct JamSet
+    {
+        int   m_count = 0;                          ///< notes in m_hz
+        float m_hz[ClusterBrain::HeardMax] = {};    ///< Hz
+    };
+    /** @brief A wait-free ring of note sets for one writer and one reader; the reader keeps the newest (plan E3). */
+    struct JamRing
+    {
+        std::array<JamSet, 4> m_items{};    ///< the slots
+        std::atomic<uint32_t> m_head{ 0 };  ///< the next slot to write (the writer's)
+        std::atomic<uint32_t> m_tail{ 0 };  ///< the next slot to read (the reader's)
+        /**
+         * @brief Writes @p s; false when full.
+         * @param[in] s  the set
+         * @return false when the ring is full
+         */
+        bool push( const JamSet &s )
+        {
+            const uint32_t h = m_head.load( std::memory_order_relaxed );
+            if ( h - m_tail.load( std::memory_order_acquire ) >= m_items.size() ) return false;
+            m_items[h % m_items.size()] = s;
+            m_head.store( h + 1, std::memory_order_release );
+            return true;
+        }
+        /**
+         * @brief Reads every set waiting into @p s, so the newest stays; false when none was waiting.
+         * @param[out] s  receives the newest set
+         * @return false when the ring was empty
+         */
+        bool popNewest( JamSet &s )
+        {
+            bool any = false;
+            for ( uint32_t t = m_tail.load( std::memory_order_relaxed ); t != m_head.load( std::memory_order_acquire );
+                  ++t )
+            {
+                s = m_items[t % m_items.size()];
+                m_tail.store( t + 1, std::memory_order_release );
+                any = true;
+            }
+            return any;
+        }
+    };
+    JamRing           m_jamHeardRing;            ///< audio thread -> render thread: the leader's notes (setJamHeard)
+    JamSet            m_jamHeardPosted;          ///< audio thread: the set it posted last
+    bool              m_jamHeardDirty = false;   ///< audio thread: a set still to post (the ring was full)
+    double            m_jamHeard[ClusterBrain::HeardMax] = {};   ///< render thread: the leader's notes, Hz
+    int               m_jamHeardCount = 0;       ///< render thread: how many (0 unless a follower hears the leader)
+    std::atomic<bool> m_jamLead{ false };        ///< leading: the render thread publishes its notes (setJamLead)
+    JamRing           m_jamOutRing;              ///< render thread -> audio thread: the notes it sounds (jamNotes)
+    JamSet            m_jamOutPosted;            ///< render thread: the set it published last
+    bool              m_jamOutDirty = false;     ///< render thread: a set still to publish (the ring was full)
+    JamSet            m_jamOutLast;              ///< audio thread: the newest set taken (jamNotes)
     std::atomic<float>                 m_jamEnergy{ 0.5f };     ///< the jam leader's section energy
     bool               m_phraseStart = false;   ///< a note arrived into silence: the envelopes start over
     int                m_prevSounding = 0;      ///< voices sounding after the block before

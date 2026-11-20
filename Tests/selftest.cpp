@@ -20,6 +20,7 @@
 #include "additiv/Route.h"
 #include "additiv/PresetMap.h"
 #include "additiv/Spectrum.h"
+#include "../Plugin/JamNotes.h"   // the family jam's notes (plan E3): JUCE-free, the plugin's own code
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -6244,6 +6245,96 @@ int main( int argc, char **argv )
                     "passed over), marked while running %zu, all marked %zu -- a passed-over step played: %s",
                     night.m_steps.size(), banned, names.size(), cyclic.size(), once.size(), midway.size(), all.size(),
                     journeys ? "no" : "YES" ) );
+    }
+
+    // 126. The family jam: a follower hears the leader (plan E3, 20.11.2026; Plugin/JamNotes.h, Engine::setJamHeard,
+    //      ClusterBrain::hearAlso). The notes go over the wire and come back exactly, a malformed, late or doubled
+    //      message is turned away and the notes are forgotten two seconds after the last; with no notes heard the
+    //      conductors play note for note what they played without; with the leader's chord heard (Consonance 1) no
+    //      onset stands a semitone or a tritone from it or on its very pitch, and the follower still plays. No card.
+    if ( wanted( 126, "The family jam: a follower hears the leader (20.11.2026, plan E3)" ) )
+    {
+        using frame::JamNotes;
+        JamNotes set;
+        set.m_seq = 3;
+        set.m_count = 2;
+        set.m_hz[0] = 146.83f;
+        set.m_hz[1] = 220.0f;
+        char      bytes[JamNotes::MaxBytes], id[24];
+        const int len = frame::encodeJamNotes( bytes, sizeof( bytes ), "e3", set );
+        JamNotes  got, bad;
+        const bool wire = len > 0 && frame::decodeJamNotes( bytes, len, id, sizeof( id ), got ) && got.sameNotes( set ) &&
+                          got.m_seq == 3 && std::strcmp( id, "e3" ) == 0 &&
+                          !frame::decodeJamNotes( bytes, len - 4, id, sizeof( id ), bad );
+        frame::JamNotesOrder order;
+        const bool           ordered = order.accept( "e3", 3, 100 ) && !order.accept( "e3", 2, 110 ) &&
+                             !order.accept( "e3", 3, 120 ) && order.accept( "e3", 4, 130 ) &&
+                             !order.accept( "other", 9, 140 ) && order.accept( "other", 9, 130 + JamNotes::ForgetMs );
+        frame::JamNotesHeld held;
+        double              hz[JamNotes::MaxNotes];
+        held.take( set, 1000 );
+        const bool forgets = held.notesAt( 1000 + JamNotes::ForgetMs - 1, hz ) == 2 &&
+                             held.notesAt( 1000 + JamNotes::ForgetMs, hz ) == 0;
+        // the conductors with nothing heard, and with the leader's chord on D heard
+        auto run = [&]( int mode, int &ons, int &rubs, int &unisons, std::vector<double> &stream )
+        {
+            auto         e = std::make_unique<Engine>();
+            EngineConfig c;
+            c.m_seed = 1261;
+            e->setParam( ParamIdE::AUTO_RATE, 6.0f );
+            e->setParam( ParamIdE::BRAIN_DENSITY, 4.0f );
+            e->setParam( ParamIdE::BRAIN_CONSONANCE, 1.0f );
+            e->setParam( ParamIdE::BRAIN2_ON, 1.0f );
+            std::vector<double> leader;
+            for ( int oct = 0; oct < 3; ++oct )
+                for ( int st : { 0, 4, 7 } ) leader.push_back( 73.4162 * std::pow( 2.0, oct + st / 12.0 ) );
+            Engine *eng = e.get();
+            e->auditConductor(
+                1800.0, c, c.m_gpuBlock / c.m_sampleRate, 1,
+                [&]( const Engine::AuditNote &n )
+                {
+                    stream.push_back( n.m_seconds );
+                    stream.push_back( n.m_note );
+                    if ( !n.m_on || ( n.m_source != 1 && n.m_source != 2 ) ) return;
+                    ++ons;
+                    for ( double l : leader )
+                    {
+                        const double d = std::fabs( 1200.0 * std::log2( n.m_hz / l ) );
+                        if ( d < 25.0 ) ++unisons;
+                        if ( d >= 2400.0 ) continue;
+                        double k = std::fmod( d, 1200.0 );
+                        k = std::min( k, 1200.0 - k );
+                        if ( ( k > 25.0 && k < 150.0 ) || ( k > 550.0 && k < 650.0 ) )
+                        {
+                            ++rubs;
+                            break;
+                        }
+                    }
+                },
+                {}, nullptr,
+                [&, mode]( double )
+                {
+                    eng->setJamRoot( 2 );
+                    eng->setJamEnergy( 0.5f );
+                    if ( mode > 0 ) eng->setJamHeard( leader.data(), mode == 1 ? 0 : static_cast<int>( leader.size() ) );
+                } );
+        };
+        int ons0 = 0, rubs0 = 0, uni0 = 0, ons1 = 0, rubs1 = 0, uni1 = 0, ons2 = 0, rubs2 = 0, uni2 = 0;
+        std::vector<double> s0, s1, s2;
+        run( 0, ons0, rubs0, uni0, s0 );   // the leader's root, nothing else (the jam before plan E3)
+        run( 1, ons1, rubs1, uni1, s1 );   // and no notes handed over ("Hear leader" off)
+        run( 2, ons2, rubs2, uni2, s2 );   // and the leader's chord heard
+        check( wire && ordered && forgets, "family jam: the leader's notes on the wire",
+               fmt( "round trip and a cut message %s, late and doubled turned away %s, forgotten after 2 s %s",
+                    wire ? "yes" : "NO", ordered ? "yes" : "NO", forgets ? "yes" : "NO" ) );
+        check( s0 == s1, "family jam: no notes heard, every note as before",
+               fmt( "%zu note events without, %zu with an empty set handed over every step", s0.size() / 2,
+                    s1.size() / 2 ) );
+        check( ons1 > 0 && rubs1 > 0 && ons2 >= ons1 / 3 && rubs2 == 0 && uni2 == 0,
+               "family jam: a follower that hears the leader takes no note against it",
+               fmt( "not heard: %d onsets, %d a semitone or tritone from the leader's chord, %d on its pitch; heard: "
+                    "%d onsets, %d, %d",
+                    ons1, rubs1, uni1, ons2, rubs2, uni2 ) );
     }
 
     finishTest();

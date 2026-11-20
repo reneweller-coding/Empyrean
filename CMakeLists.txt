@@ -104,6 +104,7 @@ if(ADDITIV_BUILD_TOOLS)
     # empy_render: the instrument offline -- the conductor alone for minutes or hours, or a chord.
     add_executable(empy_render Tools/render/main.cpp)
     target_compile_options(empy_render PRIVATE /W4 /permissive-)
+    target_compile_definitions(empy_render PRIVATE _CRT_SECURE_NO_WARNINGS)   # JamSim.h's fopen and sscanf
     target_link_libraries(empy_render PRIVATE AdditivCore)
     # An Engine lives on main's stack in the tools and the self-test; with its modulators (Lenia's field
     # among them) forty of them in one frame passed Windows' 1 MB: 8 MB, as the family's Linux builds have.
@@ -114,6 +115,7 @@ if(ADDITIV_BUILD_TOOLS)
     # for Tools/presets/music_audit.py.
     add_executable(additiv_brain_audit Tools/render/brain_audit.cpp)
     target_compile_options(additiv_brain_audit PRIVATE /W4 /permissive-)
+    target_compile_definitions(additiv_brain_audit PRIVATE _CRT_SECURE_NO_WARNINGS)   # JamSim.h's fopen and sscanf
     target_link_libraries(additiv_brain_audit PRIVATE AdditivCore)
     target_link_options(additiv_brain_audit PRIVATE /STACK:8388608)
     family_bin(additiv_brain_audit)

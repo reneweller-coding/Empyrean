@@ -8,6 +8,7 @@
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S] [--note-log]
  *                    [--then NAME|N --at S --glide S [--then-only LIST]] [--hold-pitch N]
+ *                    [--jam-lead FILE | --jam-follow FILE [--jam-hear 0|1] [--jam-seed N] [--jam-loss P]]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -26,6 +27,12 @@
  * begins with "-" takes everything but what it names. --hold-pitch 1 turns Engine::setHoldPitch on (plan D2b): a note
  * that sounds where a glide changes the tuning keeps its pitch until it ends; --note-log then prints each such note as
  * `H,<s>,<source>,<note>,<Hz kept>`.
+ *
+ * The family jam offline (plan E3, 20.11.2026; JamSim.h, as additiv_brain_audit): --jam-lead FILE writes what a
+ * leader's audio thread posts before each block (the conductor's root and the notes both conductors sound, on a
+ * change: Engine::jamNotes with setJamLead on); --jam-follow FILE plays the engine as a follower of such a file over
+ * the simulated network, the leader's root held (setJamRoot) and with --jam-hear 1 ("Hear leader") its notes heard
+ * (setJamHeard), as PluginProcessor hands them over before each block.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
@@ -34,6 +41,7 @@
 #include "additiv/Route.h"
 #include "additiv/Presets.h"
 #include "additiv/Scene.h"
+#include "JamSim.h"
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -324,6 +332,9 @@ int main( int argc, char **argv )
     std::string              thenOnly;                  // --then-only: the parts of the second preset glided into
     int                      holdPitch = 0;             // --hold-pitch: Engine::setHoldPitch
     bool                     brain = true, fill = false, noteLog = false;
+    std::string              jamLead, jamFollow;        // plan E3: the family jam offline (JamSim.h)
+    int                      jamHear = 0;
+    frame::JamNetwork        jamNet;
     for ( int i = 1; i < argc; ++i )
     {
         const std::string a = argv[i];
@@ -364,6 +375,16 @@ int main( int argc, char **argv )
             thenOnly = argv[++i];
         else if ( a == "--hold-pitch" && has )
             holdPitch = std::atoi( argv[++i] );
+        else if ( a == "--jam-lead" && has )
+            jamLead = argv[++i];
+        else if ( a == "--jam-follow" && has )
+            jamFollow = argv[++i];
+        else if ( a == "--jam-hear" && has )
+            jamHear = std::atoi( argv[++i] );
+        else if ( a == "--jam-seed" && has )
+            jamNet.m_seed = std::strtoull( argv[++i], nullptr, 10 );
+        else if ( a == "--jam-loss" && has )
+            jamNet.m_loss = std::atof( argv[++i] );
         else if ( a == "--route" && has )
             routeName = argv[++i];
         else if ( a == "--route-speed" && has )
@@ -536,8 +557,57 @@ int main( int argc, char **argv )
     int                blocks = 0;
     bool               released = chord.empty();
     const auto         t0 = std::chrono::steady_clock::now();
+    std::unique_ptr<frame::JamSim>                       jamSim;
+    std::unique_ptr<std::FILE, int ( * )( std::FILE * )> jamOut( nullptr, &std::fclose );
+    frame::JamLeadPost                                   jamPosted;
+    bool                                                 jamHavePosted = false;
+    if ( !jamFollow.empty() )
+    {
+        std::vector<frame::JamLeadPost> posts;
+        if ( !frame::readJamLeadPosts( jamFollow.c_str(), posts ) )
+        {
+            std::fprintf( stderr, "empy_render: cannot read %s\n", jamFollow.c_str() );
+            return 1;
+        }
+        jamSim = std::make_unique<frame::JamSim>( posts, static_cast<double>( total ) / c.m_sampleRate, jamNet,
+                                                  jamHear != 0 );
+    }
+    if ( !jamLead.empty() )
+    {
+        jamOut.reset( std::fopen( jamLead.c_str(), "w" ) );
+        if ( !jamOut )
+        {
+            std::fprintf( stderr, "empy_render: cannot write %s\n", jamLead.c_str() );
+            return 1;
+        }
+        e.setJamLead( true );
+    }
     for ( std::int64_t done = 0; done < total; done += n )
     {
+        if ( jamSim )
+        {   // plan E3: what the follower's audio thread hands the engine before the block (PluginProcessor)
+            const double t = static_cast<double>( done ) / c.m_sampleRate;
+            jamSim->advance( t );
+            const int r = jamSim->root( t );
+            e.setJamRoot( r );
+            e.setJamEnergy( 0.5f );   // JamState's energy when the leader sends no sections
+            double    hz[frame::JamNotes::MaxNotes];
+            const int k = jamSim->notes( t, hz );
+            e.setJamHeard( hz, k );
+        }
+        if ( jamOut )
+        {   // plan E3: what the leader's audio thread posts before the block
+            frame::JamLeadPost p;
+            p.m_t = static_cast<double>( done ) / c.m_sampleRate;
+            p.m_root = ( ( e.brainRoot() % 12 ) + 12 ) % 12;
+            p.m_notes.m_count = e.jamNotes( p.m_notes.m_hz, frame::JamNotes::MaxNotes );
+            if ( !jamHavePosted || p.m_root != jamPosted.m_root || !p.m_notes.sameNotes( jamPosted.m_notes ) )
+            {
+                frame::writeJamLeadPost( jamOut.get(), p );
+                jamPosted = p;
+                jamHavePosted = true;
+            }
+        }
         if ( !released && hold >= 0.0 && done >= static_cast<std::int64_t>( hold * c.m_sampleRate ) )
         {
             for ( int note : chord ) e.noteOff( note, 0 );

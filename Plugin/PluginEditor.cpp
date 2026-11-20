@@ -1938,6 +1938,7 @@ void AdditivEditor::showSettings()
         h.addItem( m_proc.pose().statusText(), false, false, nullptr );
     };
     m.m_jamStatus = [this] { return m_proc.jamStatus(); };   // the family jam: Off, Lead, Follow
+    m.m_jamHear = true;                                      // and "Hear leader" (plan E3)
     m.m_moreItems = [this]( juce::PopupMenu &menu )
     {
         juce::PopupMenu zoom;   // the controls larger, beside the window's size

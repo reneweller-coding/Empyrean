@@ -5,6 +5,7 @@
  *
  *     additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H (0.5)] [--seconds S] [--set key=value]...
  *                         [--seed N] [--dt S] [--param-every K] [--pairs FILE] [--tuning] [--hold-pitch N]
+ *                         [--jam-lead FILE | --jam-follow FILE [--jam-hear 0|1] [--jam-seed N] [--jam-loss P]]
  *
  * Prints, per preset, a line `# preset <number> <name>`, a line `A,<attack>,<figure attack>,<figure release>` (seconds,
  * as the preset sets them: what Tools/presets/music_audit.py measures "too short" and "still ringing" against), then
@@ -45,11 +46,21 @@
  *
  * `--hold-pitch 1` (plan D2b) turns Engine::setHoldPitch on: a note that sounds where a glide changes the tuning keeps
  * its pitch until it ends; each such note is printed as `H,<seconds>,<source>,<note>,<Hz kept>` when it is kept.
+ *
+ * The family jam offline (plan E3, 20.11.2026; JamSim.h, the same file as Noctuary's): `--jam-lead FILE` writes, as a
+ * leader's render thread publishes them, every change of the conductor's root and of the notes both conductors sound
+ * (Engine::conductorNotes) as lines `L,<seconds>,<root>,<count>,<Hz>...`; `--jam-follow FILE` plays this engine as a
+ * follower of such a file -- the leader's bus, a network that loses `--jam-loss` of the datagrams (default 0.05) and
+ * delays and reorders them (`--jam-seed`, default 1), and the follower's side of Jam.cpp -- its root held on the
+ * leader's (setJamRoot) and, with `--jam-hear 1` ("Hear leader"), the leader's notes heard (setJamHeard). A line
+ * `# jam ...` (JamSim::summary) follows each preset's F line. Noctuary's ambient_brain_audit reads and writes the same
+ * file. The jam is stepped through auditConductor's `listen`, so the parameters are read as without it.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
 #include "additiv/Params.h"
 #include "additiv/Presets.h"
+#include "JamSim.h"
 
 #include <cmath>
 #include <cstdio>
@@ -156,6 +167,9 @@ int main( int argc, char **argv )
     std::vector<Pair>        pairs;
     bool                     tuning = false;
     int                      holdPitch = 0;   // --hold-pitch: Engine::setHoldPitch
+    std::string              jamLead, jamFollow;   // plan E3: the offline jam
+    int                      jamHear = 0;
+    frame::JamNetwork        net;
     for ( int i = 1; i < argc; ++i )
     {
         const std::string a = argv[i];
@@ -192,6 +206,16 @@ int main( int argc, char **argv )
             tuning = true;
         else if ( a == "--hold-pitch" && has )
             holdPitch = std::atoi( argv[++i] );
+        else if ( a == "--jam-lead" && has )
+            jamLead = argv[++i];
+        else if ( a == "--jam-follow" && has )
+            jamFollow = argv[++i];
+        else if ( a == "--jam-hear" && has )
+            jamHear = std::atoi( argv[++i] );
+        else if ( a == "--jam-seed" && has )
+            net.m_seed = std::strtoull( argv[++i], nullptr, 10 );
+        else if ( a == "--jam-loss" && has )
+            net.m_loss = std::atof( argv[++i] );
         else if ( a == "--pairs" && has )
         {
             std::ifstream in( argv[++i] );
@@ -233,7 +257,8 @@ int main( int argc, char **argv )
         {
             std::fprintf( stderr, "additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H] [--seconds S] "
                                   "[--set key=value]... [--seed N] [--dt S] [--param-every K] [--pairs FILE] "
-                                  "[--tuning] [--hold-pitch N]\n" );
+                                  "[--tuning] [--hold-pitch N] [--jam-lead FILE | --jam-follow FILE "
+                                  "[--jam-hear 0|1] [--jam-seed N] [--jam-loss P]]\n" );
             return 2;
         }
     }
@@ -259,6 +284,18 @@ int main( int argc, char **argv )
         indices.push_back( index );
     }
     if ( indices.empty() ) indices.push_back( -1 );   // none: the defaults
+    std::vector<frame::JamLeadPost> jamPosts;
+    if ( !jamFollow.empty() && !frame::readJamLeadPosts( jamFollow.c_str(), jamPosts ) )
+    {
+        std::fprintf( stderr, "additiv_brain_audit: cannot read %s\n", jamFollow.c_str() );
+        return 2;
+    }
+    std::FILE *jamOut = jamLead.empty() ? nullptr : std::fopen( jamLead.c_str(), "w" );
+    if ( !jamLead.empty() && jamOut == nullptr )
+    {
+        std::fprintf( stderr, "additiv_brain_audit: cannot write %s\n", jamLead.c_str() );
+        return 2;
+    }
     std::vector<char> out( 1 << 20 );
     std::setvbuf( stdout, out.data(), _IOFBF, out.size() );
     auto noteLine = []( const Engine::AuditNote &n )
@@ -333,11 +370,53 @@ int main( int argc, char **argv )
         std::printf( "A,%.4f,%.4f,%.4f\n", static_cast<double>( e->param( ParamIdE::ATTACK ) ),
                      static_cast<double>( e->param( ParamIdE::FIGURE_ATTACK ) ),
                      static_cast<double>( e->param( ParamIdE::FIGURE_RELEASE ) ) );
-        e->auditConductor( seconds, config, dt, paramEvery, noteLine, rootLine );
+        // The offline jam (plan E3): as a leader, its posts; as a follower, what the network brings it.
+        std::unique_ptr<frame::JamSim> sim;
+        if ( !jamPosts.empty() ) sim = std::make_unique<frame::JamSim>( jamPosts, seconds, net, jamHear != 0 );
+        int                            root = -1;
+        frame::JamLeadPost             posted;
+        bool                           havePosted = false;
+        Engine                        *eng = e.get();
+        std::function<void( double )> listen;
+        if ( jamOut != nullptr || sim )
+            listen = [&]( double t )
+            {
+                if ( jamOut != nullptr )
+                {
+                    frame::JamLeadPost p;
+                    p.m_t = t;
+                    p.m_root = ( ( root % 12 ) + 12 ) % 12;
+                    p.m_notes.m_count = eng->conductorNotes( p.m_notes.m_hz, frame::JamNotes::MaxNotes );
+                    if ( !havePosted || p.m_root != posted.m_root || !p.m_notes.sameNotes( posted.m_notes ) )
+                    {
+                        frame::writeJamLeadPost( jamOut, p );
+                        posted = p;
+                        havePosted = true;
+                    }
+                }
+                if ( sim )
+                {
+                    sim->advance( t );
+                    eng->setJamRoot( sim->root( t ) );
+                    eng->setJamEnergy( 0.5f );   // JamState's energy when the leader sends no sections
+                    double    hz[frame::JamNotes::MaxNotes];
+                    const int n = sim->notes( t, hz );
+                    eng->setJamHeard( hz, n );
+                }
+            };
+        e->auditConductor( seconds, config, dt, paramEvery, noteLine,
+                           [&]( double t, int r )
+                           {
+                               root = r;
+                               rootLine( t, r );
+                           },
+                           nullptr, listen );
         int       left = 0;
         const int moved = e->figureMoved( left );
         std::printf( "F,%d,%d\n", moved, left );
+        if ( sim ) std::printf( "%s\n", sim->summary().c_str() );
     }
+    if ( jamOut != nullptr ) std::fclose( jamOut );
     std::fflush( stdout );
     return 0;
 }

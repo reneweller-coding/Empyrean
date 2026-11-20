@@ -141,6 +141,7 @@ void AdditivProcessor::timerCallback()
 {
     m_jam.setRole(
         frame::Settings::of( App ).jamRole() );   // the family jam (Jam.h): Off, Lead or Follow, from the settings
+    m_jam.setHear( frame::Settings::of( App ).jamHear() );   // "Hear leader" (plan E3): off by default
     pollHeadset();
     if ( m_stopPlayers.exchange( false, std::memory_order_acquire ) )
     {   // a panic that came from another thread
@@ -1513,13 +1514,22 @@ void AdditivProcessor::processBlock( juce::AudioBuffer<float> &buffer, juce::Mid
         const frame::JamState js = m_jam.stateAt( -1.0 );
         m_engine.setJamRoot( js.m_root );
         m_engine.setJamEnergy( js.m_root >= 0 ? js.m_energy : 0.5f );
+        double    heard[frame::JamNotes::MaxNotes];   // the leader's notes, while "Hear leader" is on (plan E3)
+        const int n = m_jam.leaderNotes( heard );
+        m_engine.setJamHeard( heard, n );
+        m_engine.setJamLead( false );
     }
     else
     {
         m_engine.setJamRoot( -1 );
         m_engine.setJamEnergy( 0.5f );
+        m_engine.setJamHeard( nullptr, 0 );
+        m_engine.setJamLead( m_jam.role() == frame::Settings::JamRoleE::LEAD );
         if ( m_jam.role() == frame::Settings::JamRoleE::LEAD )
         {
+            float     notes[frame::JamNotes::MaxNotes];   // the notes its conductors sound (plan E3)
+            const int n = m_engine.jamNotes( notes, frame::JamNotes::MaxNotes );
+            m_jam.postNotes( notes, n );
             const int root = ( ( m_engine.brainRoot() % 12 ) + 12 ) % 12;
             const int scale = juce::roundToInt( value( static_cast<int>( ParamIdE::SCALE ) ) );
             if ( root != m_jamPostedRoot || scale != m_jamPostedScale )

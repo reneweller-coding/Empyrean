@@ -618,7 +618,8 @@ void Engine::beginPiece( double controlRate )
 void Engine::auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
                              const std::function<void( const AuditNote & )> &sink,
                              const std::function<void( double, int )>       &rootSink,
-                             const std::function<void( double )>            &tick )
+                             const std::function<void( double )>            &tick,
+                             const std::function<void( double )>            &listen )
 {
     // Everything prepare() does that the conductors, the foundation and the figures depend on (beginPiece), and nothing
     // of the card: the cloud is never opened, and the few places those steps reach into it look at m_audit.
@@ -661,6 +662,7 @@ void Engine::auditConductor( double seconds, const EngineConfig &config, double 
         refreshSpectrum();
         refreshScale();
         refreshLandscape();
+        if ( listen ) listen( m_auditTime );   // the offline jam (plan E3)
         stepConductors( dt );
         auditVoices( dt );
         if ( rootSink && m_brain.root() != lastRoot )
@@ -4908,6 +4910,42 @@ void Engine::captureGhost( int i )
     g.m_env = 0.0f;
 }
 
+void Engine::setJamHeard( const double *hz, int n )
+{
+    JamSet set;
+    set.m_count = hz != nullptr ? std::clamp( n, 0, ClusterBrain::HeardMax ) : 0;
+    for ( int k = 0; k < set.m_count; ++k ) set.m_hz[k] = static_cast<float>( hz[k] );
+    bool same = set.m_count == m_jamHeardPosted.m_count;
+    for ( int k = 0; k < set.m_count && same; ++k ) same = set.m_hz[k] == m_jamHeardPosted.m_hz[k];
+    if ( same && !m_jamHeardDirty ) return;
+    m_jamHeardPosted = set;
+    m_jamHeardDirty = !m_jamHeardRing.push( set );   // full: tried again with the next call
+}
+
+int Engine::conductorNotes( float *hz, int cap ) const
+{
+    double    one[2 * ClusterBrain::Slots];
+    int       n = 0;
+    const int got1 =
+        m_brain.soundingHz( one, 2 * ClusterBrain::Slots, [this]( int note ) { return heldHz( note, 1, false ); } );
+    for ( int i = 0; i < got1 && n < cap; ++i ) hz[n++] = static_cast<float>( one[i] );
+    if ( m_blk.m_brain2 )
+    {
+        const int got2 =
+            m_brain2.soundingHz( one, 2 * ClusterBrain::Slots, [this]( int note ) { return heldHz( note, 2, false ); } );
+        for ( int i = 0; i < got2 && n < cap; ++i ) hz[n++] = static_cast<float>( one[i] );
+    }
+    return n;
+}
+
+int Engine::jamNotes( float *hz, int cap )
+{
+    m_jamOutRing.popNewest( m_jamOutLast );
+    const int n = std::min( cap, m_jamOutLast.m_count );
+    for ( int k = 0; k < n; ++k ) hz[k] = m_jamOutLast.m_hz[k];
+    return n;
+}
+
 void Engine::stepConductors( double dt )
 {
     const bool step = cur( ParamIdE::AUTO_STEP ) >= 0.5f;
@@ -4927,6 +4965,15 @@ void Engine::stepConductors( double dt )
     auto freqOf2 = [this]( int note ) { return heldHz( note, 2, false ); };
     // the two conductors hear each other (19.11.2026, as in Noctuary): each weighs its choices against the other's notes
     m_brain.listenTo( m_blk.m_brain2 ? &m_brain2 : nullptr, freqOf2 );
+    {   // the family jam's leader, when a follower hears it (plan E3): its notes as further notes of another
+        JamSet heard;
+        if ( m_jamHeardRing.popNewest( heard ) )
+        {
+            m_jamHeardCount = heard.m_count;
+            for ( int k = 0; k < heard.m_count; ++k ) m_jamHeard[k] = static_cast<double>( heard.m_hz[k] );
+        }
+    }
+    m_brain.hearAlso( m_jamHeard, m_jamHeardCount );
     m_brain.update( dt, m_bp, -1, freqOf,
                     [this]( const BrainEvent &e )
                     {
@@ -4954,6 +5001,7 @@ void Engine::stepConductors( double dt )
     updateFoundation();
     m_brain2.setRoot( std::clamp( m_brain.root() + m_blk.m_brain2Interval, 0, 127 ) );
     m_brain2.listenTo( &m_brain, freqOf );
+    m_brain2.hearAlso( m_jamHeard, m_jamHeardCount );
     m_brain2.update( dt, m_bp2, -1, freqOf2,
                      [this]( const BrainEvent &e )
                      {
@@ -4965,6 +5013,18 @@ void Engine::stepConductors( double dt )
                      } );
     stepFigures( dt );   // the figures (11.11.2026), to the chord as it stands now
     m_brainRoot.store( m_brain.root(), std::memory_order_relaxed );
+    if ( m_jamLead.load( std::memory_order_relaxed ) )
+    {   // the family jam's leader (plan E3): what both conductors sound, for the plugin to send when it changed
+        JamSet set;
+        set.m_count = conductorNotes( set.m_hz, ClusterBrain::HeardMax );
+        bool same = set.m_count == m_jamOutPosted.m_count;
+        for ( int k = 0; k < set.m_count && same; ++k ) same = set.m_hz[k] == m_jamOutPosted.m_hz[k];
+        if ( !same || m_jamOutDirty )
+        {
+            m_jamOutPosted = set;
+            m_jamOutDirty = !m_jamOutRing.push( set );
+        }
+    }
     {   // the conductor's countdown and the foundation, for the panel
         const double next = m_brain.untilNext();
         if ( next > m_conductorWas + 0.5 )
