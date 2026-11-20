@@ -1,18 +1,18 @@
-"""The presets as the search by example compares them: per preset its four measures (work/presets/descriptors.json:
+"""The presets as the search by example compares them: per preset its four measures (descriptors.py: the measurement
+in work/presets/descriptors.json, else its checked-in copy Tools/presets/descriptors.tsv;
 brightness, motion, width, noise) as features -- the motion on a log scale, where it is spread -- each centred on the
 bank's mean and scaled by its spread, so that no measure outweighs the others. Writes Core/src/Find.inc, in the
 bank's order.
 
     python make_find.py
 """
-import json
 import math
 import pathlib
 
+import descriptors
 import make_presets
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
-DESCRIPTORS = ROOT / "work" / "presets" / "descriptors.json"
 OUT = ROOT / "Core" / "src" / "Find.inc"
 
 
@@ -22,7 +22,7 @@ def raw(d):
 
 
 def main():
-    desc = json.loads(DESCRIPTORS.read_text(encoding="utf-8"))
+    desc = descriptors.load()
     bank = make_presets.build()
     rows = [raw(desc[name]) for name, *_ in bank]
     n = len(rows)

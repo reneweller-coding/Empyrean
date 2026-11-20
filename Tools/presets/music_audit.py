@@ -87,6 +87,14 @@ BLOCK = 128.0 / 48000.0   # one GPU block, the render's step
 GOLDEN_EVERY = 8          # the golden reads a modulated knob the notes hear every 8 blocks (21 ms)
 REST_S = 30.0             # the rest after letting a pitch go (ClusterBrain::resting's floor)
 SAME_C = 25.0             # two notes within this many cents are one pitch (as ClusterBrain::againstOther)
+ROUND_C = 0.1             # the audit's Hz are printed to a thousandth (%.3f): at 20 Hz that moves a difference by up
+                          # to 0.09 cents. Two keys exactly 25 cents apart (Purity 0.75 puts neighbouring keys there)
+                          # are two pitches to the engine (its test is < 25.0 on the unrounded Hz) and must stay two here
+
+
+def one_pitch(a, b):
+    """Whether two pitches in cents are one, as the engine judges them (< SAME_C), less the printed Hz's rounding."""
+    return abs(a - b) < SAME_C - ROUND_C
 SCALES = ["12-TET", "JI Major", "JI Minor", "JI 7-limit", "Pythagorean", "JI Pentatonic", "Harmonic 8-16",
           "Subharmonic 16-8", "Slendro", "Bohlen-Pierce", "Otonality 1-11", "User", "Timbre"]
 COLUMNS = ["name", "group", "mode", "scale", "attack", "fig_attack", "brain2", "ons", "notes", "restrike",
@@ -202,10 +210,10 @@ def measure(name, facts, attack, fig_attack, lines, hours):
                 f_ons += 1
                 fig, step = int(figs), int(steps)
                 last = fig_last.get(fig)
-                if last is not None and step > last[0] and abs(c - last[1]) < SAME_C:
+                if last is not None and step > last[0] and one_pitch(c, last[1]):
                     f_round += 1
                 fig_last[fig] = (step, c)
-                if fig_prev is not None and abs(c - fig_prev) < SAME_C:
+                if fig_prev is not None and one_pitch(c, fig_prev):
                     f_prev += 1
                 fig_prev = c
                 chord = [x[1] for x in held[1].values()] + [x[1] for x in held[2].values()]
@@ -227,12 +235,12 @@ def measure(name, facts, attack, fig_attack, lines, hours):
             if first is None:
                 first = t
             o = 3 - w
-            if any(abs(c - x[1]) < SAME_C for x in held[o].values()):
+            if any(one_pitch(c, x[1]) for x in held[o].values()):
                 doubling += 1
             offat[w] = [x for x in offat[w] if t - x[0] < REST_S]
-            if any(abs(c - x[1]) < SAME_C for x in offat[w]):
+            if any(one_pitch(c, x[1]) for x in offat[w]):
                 restrike += 1
-            if any(abs(c - x[1]) < SAME_C for x in held[w].values()):
+            if any(one_pitch(c, x[1]) for x in held[w].values()):
                 self_unison += 1
             if note in held[w]:
                 close(w, note, t)

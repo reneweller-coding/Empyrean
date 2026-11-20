@@ -234,6 +234,15 @@ The engine's self-test runs on the graphics card for about twenty minutes. To wo
 --list` numbers its tests, `--only 62,113-117` runs just those (numbers and ranges; one that matches no test is an
 error) and `--from N` the tests from N on; every run prints each test's wall time and the five slowest.
 
+The tables made from the bank's measures -- `Core/src/Find.inc`, `Journeys.inc`, `PresetMap.inc` with the routes and
+`Nudges.inc` -- are written by the scripts in `Tools/presets` from what every preset measures: `additiv_presets
+--describe work/presets/descriptors.json` plays each a chord of fourteen seconds on the card and writes its brightness,
+motion, width, noise and level (some hours for the whole bank). `work/` is not in the repository, so a copy is:
+`Tools/presets/descriptors.tsv`, a preset a line. The scripts read the measurement when it is there and the copy
+otherwise, and say which; `python Tools/presets/descriptors.py --check` compares the two (the ctest `descriptors`),
+`--refresh` writes the copy anew -- after every new measurement, committed with the tables made from it. (The nudges
+also need the knobs' sensitivity, `work/presets/sensitivity.jsonl`, which is not copied.)
+
 ## Render
 
 ```

@@ -20,7 +20,8 @@ would sit on top of each other.
 
 The routes' radii are in the spacing of the presets round a waypoint (PresetMap.h).
 
-Without descriptors.json the old axes from the parameters are used (and said so).
+The descriptions come from descriptors.py: the measurement when it is there, else its checked-in copy
+(Tools/presets/descriptors.tsv). Without either the old axes from the parameters are used (and said so).
 
 The routes are walks over the map (Route.h): waypoints by preset name, so they follow the
 presets if the map is laid out again, each with a travel time (the glide to it), a hold time and
@@ -62,18 +63,16 @@ def axes(table, p):
     return bright, moving
 
 
-DESCRIPTORS = ROOT / "work" / "presets" / "descriptors.json"
-
 
 def measured(names):
     """(bright, moving) per preset from descriptors.json, or None when it lacks any of them."""
-    import json
-    if not DESCRIPTORS.exists():
+    import descriptors
+    d = descriptors.load()
+    if not d:
         return None
-    d = json.loads(DESCRIPTORS.read_text(encoding="utf-8"))
     if any(n not in d for n in names):
         missing = [n for n in names if n not in d]
-        print(f"descriptors.json lacks {len(missing)} presets (first: {missing[0]}): the parameters' axes instead")
+        print(f"the descriptions lack {len(missing)} presets (first: {missing[0]}): the parameters' axes instead")
         return None
     return [(d[n][0], math.log(max(d[n][1], 1e-4))) for n in names]
 
@@ -148,7 +147,7 @@ def main():
         xs = to_square([a for a, _ in heard])
         ys = to_square([m for _, m in heard])
         xy = repel(list(zip(xs, ys)), steps=30, share=0.2)
-        print(f"the map from {DESCRIPTORS}")
+        print("the map from the descriptions")
     else:
         raw = []
         for name, g, params, _ in bank:

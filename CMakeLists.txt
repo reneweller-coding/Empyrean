@@ -141,6 +141,8 @@ if(ADDITIV_BUILD_TOOLS)
                  --check "${CMAKE_SOURCE_DIR}/Tests/golden/music_audit.json" --exe "$<TARGET_FILE:additiv_brain_audit>"
                  --tsv "${CMAKE_BINARY_DIR}/music_audit/check.tsv")
         set_tests_properties(music_audit PROPERTIES LABELS "slow" TIMEOUT 1800)
+        # The checked-in copy of the bank's measures against the measurement, where both are there (A7, 20.11.2026).
+        add_test(NAME descriptors COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/descriptors.py" --check)
     endif()
 endif()
 

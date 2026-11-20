@@ -103,7 +103,7 @@
   a quarter of the foundation at 73 Hz had come through and moved with every chord; the threshold is 6 dB again).
 - **Inside:** the sample rate is written in one place (`Rate.h`); the hall's prepare resets its send filter too.
 - **Inside: the self-test picks its tests** (20.11.2026). A full run takes twenty minutes on the card, and it knew
-  only `--from N`. `--list` numbers the 118 tests with their titles, `--only 62,113-117` runs those alone, and every
+  only `--from N`. `--list` numbers every test with its title, `--only 62,113-117` runs those alone, and every
   run prints each test's wall time and the five slowest; the last line stays `selftest passed`.
 - **Inside: the conductors without the graphics card** (20.11.2026). Any look at what the conductors played needed a
   render on the card, 35 seconds a preset for five minutes. `Engine::auditConductor` steps the same code -- the
@@ -146,6 +146,16 @@
   presets, an hour each: 103 such onsets of 18026 before, 5 of 18013 after (all five in one preset in the Timbre scale);
   the pace stays (90.1 changes an hour; JI 7-limit 88.4 -> 88.3, Harmonic 8-16 and
   Subharmonic 16-8 unchanged).
+- **Inside: the bank's measures in the repository** (20.11.2026). Find, the journeys and the map are made from what
+  every preset measures (`additiv_presets --describe`, hours on the card), and that lay only in `work/`, which is not
+  in the repository: a fresh clone could not make them again. `Tools/presets/descriptors.tsv` holds a copy, a preset a
+  line; the scripts read the measurement where it is and the copy otherwise, and say which (Find, the journeys, the
+  map and its routes come out byte for byte the same from either); `descriptors.py --check` (the ctest
+  `descriptors`) compares the two, `--refresh` writes the copy anew. The music audit judged a figure's repeat by Hz
+  printed to a thousandth, and 53 notes of the bank exactly 25 cents apart -- two keys Purity 0.75 sets there, two
+  pitches to the engine -- were counted as repeats; with the rounding allowed for, none (the golden sample unchanged).
+  And the ticker on the Conductor and Figures pages is checked against what was played: a new self-test (121) reads
+  it twice in a render and finds the notes the trace logged, newest first, to the millisecond.
 
 ## 1.0.0 (17.10.2026)
 

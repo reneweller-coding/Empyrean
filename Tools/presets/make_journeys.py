@@ -4,9 +4,10 @@ A journey (Core/include/additiv/Journey.h) is presets in a row, each held for a 
 range and glided into the next; cyclic, so a night plays itself. After Noctuary's
 Tools/make_journeys.py, which stands on its library's measurement. Here every preset is a point in two spaces at once
 (19.11.2026; before, in the second alone):
-  what it measures -- work/presets/descriptors.json, what additiv_presets --describe hears of a chord of fourteen
-      seconds and the map and the search by example read: its brightness, its motion, its width, its noise, each as
-      z-scores over the bank -- two thirds of the distance (PARAM_SHARE);
+  what it measures -- work/presets/descriptors.json (or its checked-in copy, descriptors.py), what
+      additiv_presets --describe hears of a chord of fourteen seconds and the map and the search by example read:
+      its brightness, its motion, its width, its noise, each as z-scores over the bank -- two thirds of the distance
+      (PARAM_SHARE);
   how it is set -- tilt, brightness, the cloud's width, shimmer, the motion, the envelope, the space, the filter, the
       effects, the conductor's pace, each normalised in its parameter's own (skewed) domain -- the other third: four
       measures do not tell a tuning, a hall or an effect from another, and the parameters do.
@@ -39,7 +40,6 @@ gentle glide, not of a good one.
 
     python Tools/presets/make_journeys.py
 """
-import json
 import math
 import pathlib
 import re
@@ -47,9 +47,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "Core" / "src" / "Journeys.inc"
-DESCRIPTORS = ROOT / "work" / "presets" / "descriptors.json"
 PARAM_SHARE = 1.0 / 3.0   # of the distance's spread, the parameters'; the measures have the rest
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import descriptors  # noqa: E402
 import make_presets  # noqa: E402
 
 # What is heard, and how much each counts in the distance.
@@ -287,11 +287,11 @@ def main():
         pmoving[name] = self_motion(table, p, byparams[name])
         pstill[name] = stillness_by_params(byparams[name])
         groups.setdefault(make_presets.GROUPS[g], []).append(name)
-    desc = json.loads(DESCRIPTORS.read_text(encoding="utf-8")) if DESCRIPTORS.exists() else {}
+    desc = descriptors.load()
     names = [name for name, *_ in bank]
     missing = [n for n in names if n not in desc]
     if missing:
-        print(f"descriptors.json lacks {len(missing)} presets (first: {missing[0]}): they stand on their parameters")
+        print(f"the descriptions lack {len(missing)} presets (first: {missing[0]}): they stand on their parameters")
     points, mz = points_of(names, byparams, desc)
     # What moves by itself: the measured motion (the spectrum's change over a quarter of a second to three seconds)
     # and the parameters' (the conductor's pace and the figures, which a chord of fourteen seconds cannot show), half

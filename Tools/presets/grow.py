@@ -182,7 +182,8 @@ def main():
     rng = random.Random(a.seed)
     space = Space(params())
     factory = bank()
-    desc = json.loads((ROOT / "work" / "presets" / "descriptors.json").read_text(encoding="utf-8"))
+    import descriptors   # the measurement, else its checked-in copy
+    desc = descriptors.load()
     names = [n for n in factory if n in desc]
     # the axes from the bank: its 1st to 99th percentile of brightness and motion
     bs = sorted(desc[n][0] for n in names)

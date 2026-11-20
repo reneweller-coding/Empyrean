@@ -5763,6 +5763,63 @@ int main( int argc, char **argv )
                     unison, doubled ) );
     }
 
+    // 121. The ticker tells what was played (20.11.2026, the open point of E1): the panel's list of the last notes
+    //      (Engine::recentNotes, a ring of atomics the render thread fills) against what Engine::M_NoteTrace saw in the
+    //      same render -- a preset with both conductors and figures, read after 15 s and after a minute. The newest
+    //      TickerSize notes of the conductors and the figures, newest first: the same source, key, onset or release,
+    //      and time to the millisecond; a figure's onset names a figure, nothing else does.
+    if ( wanted( 121, "The ticker tells what was played (20.11.2026)" ) )
+    {
+        using Note = std::array<long long, 4>;   // milliseconds, the source, on, the note
+        static std::vector<Note> traced;
+        traced.clear();
+        Engine::M_NoteTrace = []( double t, int note, int source, bool on, double )
+        {
+            if ( source == 1 || source == 2 || source == 5 )
+                traced.push_back( { std::llround( t * 1000.0 ), source, on ? 1 : 0, note } );
+        };
+        const int index = findPreset( "Crimson Giant" );
+        bool      opened = index >= 0;
+        auto      e = std::make_unique<Engine>();
+        if ( opened )
+        {
+            e->loadPreset( index );
+            opened = openOffline( *e, true );
+        }
+        if ( !opened ) Engine::M_NoteTrace = nullptr;
+        if ( !opened ) return 1;
+        // Read twice: after 15 s (the conductors' chord among the last notes) and after a minute (the figures').
+        int  shown = 0, same = 0, compared = 0, expected = 0, figures = 0, sources[6] = {};
+        bool named = true;
+        for ( double seconds : { 15.0, 45.0 } )
+        {
+            (void)render( *e, seconds );
+            TickerNote ticker[Engine::TickerSize];
+            shown = e->recentNotes( ticker, Engine::TickerSize );
+            expected += std::min( static_cast<int>( traced.size() ), Engine::TickerSize );
+            for ( int k = 0; k < shown && k < static_cast<int>( traced.size() ); ++k, ++compared )
+            {
+                const Note       &want = traced[traced.size() - 1 - static_cast<size_t>( k )];
+                const TickerNote &got = ticker[k];
+                if ( std::llabs( std::llround( got.m_seconds * 1000.0 ) - want[0] ) <= 1 && got.m_source == want[1] &&
+                     ( got.m_on ? 1 : 0 ) == want[2] && got.m_note == want[3] )
+                    ++same;
+                const bool onset = got.m_source == 5 && got.m_on;
+                named = named && ( onset ? got.m_figure >= 0 && got.m_figure < 4 : got.m_figure == -1 );
+                figures += onset ? 1 : 0;
+                ++sources[std::clamp( got.m_source, 0, 5 )];
+            }
+        }
+        Engine::M_NoteTrace = nullptr;
+        check( shown == Engine::TickerSize && compared == expected && same == compared && named &&
+                   figures > 0 && sources[1] > 0,
+               "ticker: the last notes as the trace saw them, newest first",
+               fmt( "%d traced; the ticker read at 15 s and at 60 s (%d then): %d of %d the same (conductor %d, "
+                    "brain 2 %d, figures %d, %d figure onsets named)",
+                    static_cast<int>( traced.size() ), shown, same, compared, sources[1], sources[2], sources[5],
+                    figures ) );
+    }
+
     finishTest();
     if ( g_sel.m_list ) return 0;
     for ( size_t r = 0; r < g_sel.m_only.size(); ++r )
