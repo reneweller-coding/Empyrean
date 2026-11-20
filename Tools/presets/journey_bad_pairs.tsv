@@ -1,0 +1,4091 @@
+# Pairs of presets measured as broken where a journey glides from the first into the second (Tools/presets/journey_transitions.py export-bad): more than 5 s of a minor second between the outgoing and the incoming chord (additiv_brain_audit --pairs, every pair of the journeys), or a level dip or peak over 3 LU (empy_render --then, a sample). make_journeys.py keeps them apart.
+from	to	why
+Abandoned Airlock	Scuttled Corridor	rub 89 s
+Abandoned Module	Ghost Airlock	rub 10 s
+Abiding Chapel	Centuried Abbey	rub 104 s
+Abyssal-Voiced Choir	Benthic-Sung Choir	rub 104 s
+Abyssal-Voiced Choir	Lightless-Sung Chant Line	rub 142 s
+Abyssal-Voiced Choir	Trench-Deep Assembly	rub 142 s
+Abyssal-Voiced Choir	Trench-Deep Choir	rub 90 s
+Abyssal-Voiced Choristers	Trench-Deep Choir	rub 11 s
+Accorded Chirpers	Attuned Peepers	rub 93 s
+Accorded Chirpers	Harmonious Chirpers	rub 6 s
+Accorded Fiddlers	Attuned Chirpers	rub 22 s
+Accreting Disk	Infalling Gyre	rub 34 s
+Aeolian Harp	Breath-Strung Psaltery	rub 81 s
+Aeolian Harp	Moaning Lyre	rub 104 s
+Aeolian Harp	Sighing Sounding Board	rub 93 s
+Aeolian Harp	Wind-Sung Wind Harp	rub 93 s
+Aeolian Harp	Windblown Lyre	rub 104 s
+Aeolian Lyre	Windblown Strings	rub 6 s
+Aeolian Strings	Aeolian Wind Harp	rub 5 s
+Aeolian Strings	Ringing Loch	rub 5 s
+Aeolian Strings	Wind-Sung Kithara	rub 11 s
+Alert Mirror	Answering Listener	rub 104 s
+Alien Continent	Tensile Horizon	rub 16 s
+Alien Continent	Tensile Spectrum	rub 9 s
+Alien Horizon	Alien Planet	rub 35 s
+Alien Octave	Alien Planet	rub 59 s
+Aligned Fireflies	Answering Reply	rub 9 s
+Aligned Fireflies	Folded Roessler	rub 31 s
+Aligned Fireflies	Kindred Crickets	rub 9 s
+Aligned Fireflies	Locked Lanterns	rub 9 s
+Aligned Fireflies	Pulsing Lanterns	rub 13 s
+Aligned Fireflies	Spotted Zebra	rub 9 s
+Aligned Fireflies	Turbulent Trajectory	rub 9 s
+Aligned Tremolo	Pulsing Fireflies	rub 11 s
+Alternating Gathering	Alternating Choir	rub 27 s
+Alternating Gathering	Answering Gathering	rub 11 s
+Alternating Gathering	Call-And-Answer Throng	rub 11 s
+Alternating Gathering	Calling Gathering	rub 11 s
+Alternating Gathering	Synchronous Host	rub 7 s
+Aluminium Spindles	Brass Tubes	rub 24 s
+Amber Lamplight	Amber Evening	rub 40 s
+Amber Murmur	Delta Stillness	rub 65 s
+Amber Murmur	Dozing Dreamscape	rub 119 s
+Amber Murmur	Hearth Organ	rub 119 s
+Amber Murmur	Hearth Pedal	rub 119 s
+Amber Murmur	Mellow Murmur	rub 64 s
+Ambivalent Sphinx	Patchwork Kernel	rub 27 s
+Ambivalent Sphinx	Two-Faced Griffin	rub 14 s
+Ambling Loggia	Strolling Ambulatory	rub 5 s
+Anchored Bourdon	Grounded Contra Bourdon	rub 5 s
+Anchored Bourdon	Grounded Diapason	rub 9 s
+Anchored Contra Bourdon	Abyssal Hadal Zone	rub 23 s
+Anchored Halo	Arched Undercroft	rub 108 s
+Anchored Halo	Pinned Halo	rub 8 s
+Anchored Halo	Stationed Glow	rub 145 s
+Anchored Pedalboard	Unmoving Diapason	rub 104 s
+Ancient Bourdon	Chapel Organ	rub 48 s
+Ancient Chapel	Timeless Cathedral	rub 94 s
+Ancient Diapason	Ancient Principal	rub 20 s
+Ancient Diapason	Open Principal	rub 89 s
+Ancient Diapason	Reed Celeste	rub 89 s
+Ancient Diapason	Reed Diapason	rub 58 s
+Ancient Principal	Ancient Bourdon	rub 26 s
+Ancient Principal	Chapel Organ	rub 46 s
+Ancient Principal	Flue Nave	rub 21 s
+Ancient Principal	Mixture Bourdon	rub 6 s
+Ancient Tremor	Ancient Wave	rub 82 s
+Ancient Tremor	Astral Choir	rub 71 s
+Ancient Tremor	Billion-Year Strain	rub 141 s
+Ancient Tremor	Chromatic Prominence	rub 119 s
+Ancient Tremor	Far-Off Spacetime Wave	rub 119 s
+Ancient Wave	Far-Off Strain	rub 10 s
+Ancient Wave	Far-Off Tremor	rub 46 s
+Ancient Wave	Faraway Wave	rub 107 s
+Ancient Wave	Remote Tremor	rub 75 s
+Angled Rays	Splitting Lights	rub 7 s
+Annular Einstein Ring	Wreathed Einstein Cross	rub 53 s
+Annular Ghost Image	Crowned Halo Image	rub 23 s
+Answering Feedback	Hearing Mirror	rub 9 s
+Answering Feedback	Heeding Feedback	rub 6 s
+Answering Reply	Folded Roessler	level dip 22.9 peak 2.3 LU
+Answering Reply	Gathered Metronomes	rub 20 s
+Antinodal Flutter	Antinodal Mode	rub 48 s
+Antinodal Mode	Droning Wave	rub 9 s
+Antinodal Mode	Nodal Mode	rub 104 s
+Antinodal Mode	Standing Wave	rub 9 s
+Antinodal Room Mode	Standing Boom	rub 7 s
+Antinodal Room Mode	Standing Mode	rub 6 s
+Antiphonal Lanterns	Reciprocal Lamps	rub 48 s
+Approaching Aureole	Gathering Limit	rub 107 s
+Approaching Limit	Asymptotic Limit	rub 128 s
+Approaching Limit	Gathering Limit	rub 119 s
+Approaching Limit	Gathering Vanishing Point	rub 60 s
+Approaching Vanishing Point	Brimming Boundary	rub 10 s
+Approaching Vanishing Point	Gathering Limit	rub 63 s
+Apsidal Vault Below	Nave-Deep Reliquary	rub 7 s
+Arboreal Bower	High-Bough Foliage	rub 43 s
+Arboreal Bower	Leafy-Crowned Bower	rub 119 s
+Arced Arc	Focused Glory	rub 41 s
+Arced Arc	Magnified Glory	rub 104 s
+Arced Mirage	Curved Arc	rub 133 s
+Arched Atrium	Echoing Gallery	rub 9 s
+Arched Atrium	Flagstone Gallery	rub 7 s
+Arched Great Hall	Colonnaded Hypostyle	rub 95 s
+Arctic Solstice	Polar Solstice	rub 104 s
+Arriving Swarm	Gathering Chord	rub 19 s
+Ash Weather	Grain Weather	rub 12 s
+Ash Weather	Rustling Mist	rub 6 s
+Astral Choir	Celestial-Choir Motet	rub 141 s
+Astral Choir	Celestial-Choir Psalm	rub 119 s
+Astral Choir	Far-Off Strain	rub 119 s
+Astral Choir	Star-Sung Anthem	rub 119 s
+Astral Choir	Stellar Canticle	rub 129 s
+Astral Choir	Stellar Choir	rub 119 s
+Asymptotic Aureole	Gathering Boundary	rub 93 s
+Asymptotic Limit	Haloed Nimbus	rub 5 s
+Attentive Feedback	Hearing Mirror	rub 18 s
+Attentive Feedback	Heeding Listener	rub 9 s
+Attentive Response	Alert Mirror	rub 93 s
+Attic Arbour	Attic Bower	rub 76 s
+Attic Arbour	Belvedere Harp	rub 64 s
+Attic Bower	Veranda Harp	rub 109 s; rub 80 s
+Attic Garden	Balcony Sill	rub 8 s
+Attracted Canticle	Drawn Chant	rub 56 s
+Attracted Choir	Polarised Antiphon	rub 14 s
+Attracted Choir	Polarised Choir	rub 79 s
+Attracted Choir	Swaying Antiphon	rub 79 s
+Attracted Choir	Tugged Canticle	rub 131 s
+Attracted Choir	Tugged Chorale	rub 94 s
+Auric Crescendo	Auric Heave	rub 119 s
+Auric Crescendo	Coursing Gyre	rub 50 s
+Auric Crescendo	Honeyed Seep	rub 142 s
+Auroral Arc Light	Borealis Sky Curtain	rub 104 s
+Auroral Sky Curtain	Flickering-Sky Substorm	rub 119 s
+Auroral Substorm	Auroral Sky Curtain	rub 34 s
+Autumnal Fallow	Budding Thaw	rub 51 s
+Autumnal Thaw	Seasonal Orchard	rub 9 s
+Awaited Portent	Oncoming Prelude	rub 19 s
+Awaited Presage	Imminent Foretaste	rub 25 s
+Awakening Chancel	Deepening Transept	rub 25 s
+Awakening Chancel	Ripening Gallery	rub 104 s
+Awakening Chancel	Unfurling Gallery	rub 93 s
+Aware Somnium	Lucid Somnium	rub 27 s
+Aware Somnium	Luminous Somnium	rub 92 s
+Backward Echo Glass	Mirrored Return	rub 19 s
+Backward Echo Glass	Rewound Recall	rub 17 s
+Backward Halo	Counterwise Gyre	rub 54 s
+Backward Halo	Widdershins Orbit	rub 109 s
+Backward Halo	Widdershins Spiral	rub 57 s
+Backward Looking-Glass	Backward Recall	rub 69 s
+Backward Looking-Glass	Time-Turned Echo Glass	rub 38 s
+Backwash Outflow	Dragging Backflow	rub 94 s
+Backwash Outflow	Dragging Outflow	rub 119 s
+Backwash Outflow	Rip-Current Backflow	rub 82 s
+Backwash Sink	Dragging Ebb Current	rub 119 s
+Backwash Sink	Seaward Undertow	rub 104 s
+Balcony Garden	Gable Strings	rub 81 s
+Balmer Ladder	Pfund Spectrum	rub 56 s
+Balmer Ladder	Trembling Capella	rub 6 s
+Balmer Level	Balmer Line Choir	rub 14 s
+Balmer Level	Brackett Choir	rub 6 s
+Balmy Long Evening	Velvet Summer Night	rub 30 s
+Balmy Summer Night	Lush Solstice Night	rub 15 s
+Banking Herons	Scattering Shoal	rub 60 s
+Banking Herons	Wheeling Geese	rub 85 s
+Banking Herons	Wheeling Swallows	rub 58 s
+Banking Swifts	Soaring Swifts	rub 40 s
+Barber Ascension	Escalating Illusion	rub 13 s
+Basalt Courtyard	Granite Cloister	rub 119 s
+Basilican Chancel	Apsidal Catacomb	rub 55 s
+Basilican Chancel	Nave-Deep Reliquary	rub 119 s
+Basilican Chancel	Vaulted Crypt	rub 56 s
+Basilican Ossuary	Choir-Deep Catacomb	rub 81 s
+Basin-Wide Voyage	Ocean-Long Ocean Echo	rub 66 s
+Battered Headland	Thundering Cliffs	rub 73 s
+Beading Splash	Splashing Rings	rub 59 s
+Beaming Bands	Refracting Rays	rub 64 s
+Beaming Prisms	Bent Spectrum	rub 19 s
+Beaming Prisms	Splitting Prisms	rub 74 s
+Beating Soliton	Lilting Lantern Chain	rub 85 s
+Beating Soliton	Nodding Pendulum Chain	rub 10 s
+Bent Mode	Tilted Comma	rub 7 s
+Bent Spectrum	Splitting Lights	rub 68 s
+Benthic Hadal Zone	Benthic Chasm	rub 119 s
+Benthic Hadal Zone	Bottomless Deep	rub 43 s
+Benthic Hadal Zone	Hadal Sinkhole	rub 66 s
+Benthic Hadal Zone	Hadal Trench	rub 119 s
+Benthic Hadal Zone	Moonless Load	rub 103 s
+Benthic Hadal Zone	Plunging Abyss	rub 119 s
+Benthic Hadal Zone	Plunging Chasm	rub 111 s
+Benthic Sinkhole	Bottomless Trench	rub 81 s
+Benthic Sinkhole	Hadal Trench	rub 104 s
+Benthic Sinkhole	Plunging Abyss	rub 119 s
+Benthic Sinkhole	Plunging Deep	rub 104 s
+Benthic Sinkhole	Unsounded Trench	rub 25 s; rub 72 s
+Billion-Year Strain	Ancient Wave	rub 73 s
+Billion-Year Strain	Billion-Year Swell	rub 132 s
+Billion-Year Strain	Billion-Year Tremor	rub 116 s
+Billion-Year Strain	Faraway Strain	rub 145 s
+Billion-Year Strain	Remote Tremor	rub 10 s
+Billion-Year Swell	Ancient Tremor	rub 72 s
+Billion-Year Swell	Ancient Wave	rub 96 s
+Billion-Year Swell	Billion-Year Tremor	rub 137 s
+Billion-Year Swell	Faraway Strain	rub 78 s
+Billion-Year Swell	Remote Ripple	rub 124 s
+Billion-Year Tremor	Ancient Tremor	rub 81 s
+Billion-Year Tremor	Slowing Beacon	rub 104 s
+Billowing Register	Bellowed Bellows	rub 10 s
+Billowing Register	Bellowed Windchest	rub 93 s
+Billowing Register	Lungful Bellows	rub 10 s
+Billowing Register	Sighing Tracker	rub 29 s
+Billowing Register	Swelling Windchest	rub 87 s
+Billowing Tracker	Bellowed Pallet	rub 119 s
+Billowing Tracker	Exhaled Wind Line	rub 142 s
+Billowing Tracker	Grained Pollen	rub 23 s
+Billowing Tracker	Lungful Windchest	rub 119 s
+Binary Coalescence	Converging Ringdown	rub 93 s
+Binary Merger	Converging Ringdown	rub 42 s
+Binary Merger	Paired Inspiral	rub 26 s
+Bitter Solstice	Bitter Midnight	rub 119 s
+Bitter Solstice	Polar Moonset	rub 141 s
+Black Crypt	Brooding Monolith	rub 8 s
+Black Crypt	Buried Drone	rub 90 s
+Black Crypt	Slow Basalt	rub 88 s
+Black Crypt	Slow Engine	rub 9 s
+Black Furnace	Black Crypt	rub 32 s; rub 99 s
+Black Furnace	Brooding Monolith	rub 93 s
+Black Furnace	Heavy Cavern	rub 70 s
+Black Furnace	Sombre Cavern	rub 110 s
+Black Furnace	Stellar Corona	rub 89 s
+Black Furnace	Subterranean Drone	rub 23 s
+Black Furnace	Weeping Candle	rub 104 s
+Bleeding Gouache	Bleeding Graphite	rub 44 s
+Bleeding Graphite	Washed Chalk	rub 43 s
+Bleeding Graphite	Washed Pastel	rub 119 s
+Blended Voices	Fused Schola	rub 16 s
+Blended Voices	Joined Consort	rub 44 s
+Blended Voices	Welded Choir	rub 101 s
+Blinking Swarm	Sparking Summer Night	rub 116 s
+Bloated Arcturus	Tired Mira	rub 146 s
+Bloated Envelope	Dimming Mira	rub 104 s
+Bloated Envelope	Late-Life Envelope	rub 93 s
+Bloated Envelope	Swollen Betelgeuse	rub 93 s
+Bloated Envelope	Swollen Helium Core	rub 93 s
+Blue-Deep Moan	Leviathan Path	rub 38 s
+Blue-Deep Road	Cetacean Call	rub 5 s
+Blue-Deep Road	Leviathan Path	rub 6 s
+Blue-Deep Song	Breaching Call	rub 41 s
+Blue-Deep Song	Breaching Path	rub 82 s
+Blue-Deep Song	Fluked Lament	rub 62 s
+Blue-Deep Song	Leviathan Road	rub 17 s
+Blurred Gouache	Blurred Pastel	rub 6 s
+Blustering Squall	Ragged Spectra	rub 6 s
+Boggy Mire	Croaking Mire	rub 10 s
+Boggy Mire	Duckweed Bog	rub 126 s
+Boggy Slough	Croaking Fen	rub 17 s
+Boggy Slough	Peeping Mire	rub 17 s
+Boiling Rapids	Seething Race	rub 7 s
+Boiling Rapids	Tumbling Wash	rub 10 s
+Boiling Shimmer Veil	Turbulent Mirage Air	rub 58 s
+Boiling Vortices	Boiling Rapids	rub 68 s
+Boiling Vortices	Churning Vortices	rub 104 s
+Booming Chamber	Plangent Vault	rub 93 s
+Booming Chamber	Ringing-Stone Dome	rub 14 s
+Booming Peal	Vast Thunderhead	rub 53 s
+Booming Peal	Vast Thundersheet	rub 13 s
+Booming Serac	Booming Ice Shelf	rub 94 s; rub 97 s
+Booming Serac	Drifting Serac	rub 119 s; rub 37 s
+Booming Silo	Booming Chamber	rub 11 s; rub 22 s
+Booming Silo	Booming Tank	rub 93 s
+Booming Thundersheet	Heavy Thundersheet	rub 11 s
+Booming-Voice Chant	Tempest-Chanted Invocation	rub 19 s
+Booming-Voice Chant	Thundering Chant	rub 19 s
+Bottomless Deep	Benthic Sinkhole	rub 141 s
+Bottomless Deep	Hadal Pit	rub 104 s
+Bottomless Deep	Hadal Sinkhole	rub 55 s
+Bottomless Deep	Plunging Chasm	rub 141 s
+Bottomless Deep	Plunging Deep	rub 37 s
+Bottomless Deep	Sunken Sinkhole	rub 93 s
+Bottomless Deep	Unsounded Trench	rub 119 s
+Bottomless Trench	Bottomless Deep	rub 43 s
+Bottomless Trench	Hadal Pit	rub 15 s
+Bottomless Trench	Plunging Deep	rub 104 s
+Bottomless Trench	Unlit Trench	rub 93 s
+Bottomless Trench	Unsounded Trench	rub 93 s
+Boundless Event	Fathomless Edge	rub 88 s
+Boundless Event	Suspended Abyss	rub 93 s
+Boundless Horizon	Boundless Rim	rub 16 s
+Boundless Horizon	Frozen Threshold	rub 10 s
+Boundless Keel	Cosmic Bedrock Sky	rub 93 s
+Bowed Cellos	Muted Ensemble	rub 44 s
+Brackett Spectrum	Balmer Line Choir	rub 14 s
+Branching Mitosis	Spotted Zebra	rub 82 s
+Brass Wind Chime	Nickel Wind Chime	rub 104 s
+Brazen Chime	Metallic Chime	rub 84 s
+Breaching Call	Leviathan Way	rub 93 s
+Breaching Call	Sounding-Whale Call	rub 19 s
+Breaching Call	Sounding-Whale Moan	rub 93 s
+Breaching Call	Sounding-Whale Route	rub 81 s
+Breaching Path	Cetacean Lament	rub 15 s
+Breaching Path	Deep-Diving Lament	rub 15 s
+Breaching Path	Fluked Lament	rub 93 s
+Breaking Bay	Coastal Cove	rub 19 s
+Breath-Strung Psaltery	Breath-Strung Strings	rub 11 s
+Breath-Strung Psaltery	Moaning Lyre	rub 76 s
+Breath-Strung Psaltery	Wind-Sung Kithara	rub 104 s
+Breath-Strung Psaltery	Windblown Lyre	rub 97 s
+Breath-Strung Strings	Aeolian Harp	rub 93 s
+Breath-Strung Strings	Windblown Lyre	rub 104 s
+Breathing Aria	Breathing Psalm	rub 7 s
+Breathing Aria	Distant Choir	rub 46 s
+Breathing Aria	Distant Hymn	rub 8 s
+Breathing Aria	Distant Litany	rub 25 s
+Breathing Aria	Distant Voices	rub 9 s
+Breathing Aria	Hollow Aria	rub 8 s
+Breathing Aria	Spectral Afternoons	rub 74 s
+Breathing Aria	Vowel Choir	rub 9 s
+Breathing Aria	Vowel Chorus	rub 107 s
+Breathing Chant	Distant Voices	rub 65 s
+Breathing Hearthstone	Slow-Heaving Undercroft	rub 39 s
+Breathing Psalm	Distant Choir	rub 38 s; rub 88 s
+Breathing-Field Band Noise	Steady Ion Sea	rub 47 s
+Breathing-Field Murmur Band	Hissing Plasma	rub 81 s
+Breathing-Field Murmur Band	Steady Belt	rub 93 s
+Breathy Recorder	Reedy Ocarina	rub 25 s
+Breathy Shakuhachi	Piping Pipe	rub 72 s
+Breathy Shakuhachi	Reedy Ney	rub 58 s
+Breathy Shakuhachi	Whistling Recorder	rub 76 s
+Breathy Shakuhachi	Windblown Ocarina	rub 29 s
+Breathy Shakuhachi	Windblown Panpipe	rub 51 s
+Breathy Shakuhachi	Windblown Pipe	rub 51 s
+Bright Dust	Bright Aurora	rub 87 s
+Bright Dust	Dappled Haze	rub 93 s
+Bright Dust	Flickering Sheen	rub 94 s
+Bright Dust	Glinting Light	rub 81 s
+Bright Dust	Glowing Dust	rub 82 s
+Bright Dust	Glowing Shimmer	rub 81 s
+Bright Shimmer	Silver Light	rub 9 s
+Briny Seabed	Dozing Dreamscape	rub 119 s
+Briny Seabed	Lunar Ebb	rub 119 s
+Briny Seabed	Lunar Waterline	rub 119 s
+Briny Seabed	Weightless Current	rub 119 s
+Brisk Air	Quickened Zephyr	rub 12 s
+Brisk Air	Skittering Whirl	rub 38 s
+Brittle Rime	Taut Sheet	rub 24 s
+Brittle Spire	Crystal Pane	rub 6 s
+Broken Boom	Long-Span Boom	rub 80 s
+Broken Boom	Skeletal Antenna	rub 32 s
+Broken Spar	Long-Span Antenna	rub 14 s
+Broken Spar	Long-Span Arm	rub 6 s
+Broken Spar	Long-Span Truss	rub 6 s
+Broken Surf	Calm Shore	rub 10 s
+Broken Surf	Endless Waves	rub 65 s
+Broken Surf	Long Current	rub 134 s
+Broken Surf	Long Surf	rub 11 s
+Broken Surf	Swelling Waves	rub 11 s
+Brooding Drone	Low Undertow	rub 104 s
+Brooding Furnace	Black Crypt	rub 21 s
+Brooding Furnace	Black Furnace	rub 119 s
+Brooding Furnace	Buried Cavern	rub 19 s
+Brooding Furnace	Heavy Cavern	rub 141 s
+Brooding Furnace	Sombre Cavern	rub 142 s
+Brooding Furnace	Sombre Monolith	rub 6 s
+Brooding Furnace	Thawing Snow	rub 92 s
+Brooding Monolith	Heavy Crypt	rub 39 s
+Brooding Monolith	Sombre Monolith	rub 47 s
+Brushed Lantern	Brushed Canvas	rub 7 s
+Brushed Lantern	Brushed Panel	rub 49 s
+Brushed Lantern	Gilded Light	rub 49 s
+Budding Culture	Teeming Fern	rub 81 s
+Buffeted Arbour	Thrashing Shrubbery	rub 6 s
+Building Hush	Deepening Inhalation	rub 141 s
+Building Hush	Indrawn Pause	rub 141 s
+Building Hush	Welling Anticipation	rub 119 s
+Buried Drone	Subterranean Drone	rub 119 s
+Buried Keep	Nether Keep	rub 9 s
+Buried Loop	Long-Wire Night Shift	rub 5 s
+Buried Mineshaft	Buried Hypogeum	rub 5 s
+Buried Undertow	Black Furnace	rub 21 s
+Buried Undertow	Heavy Basalt	rub 15 s
+Buried Undertow	Heavy Cavern	rub 197 s
+Buried Undertow	Sombre Cavern	rub 55 s
+Buried Undertow	Subterranean Cavern	rub 21 s
+Burnished Bronze Mirror	Flowering Bell Plate	rub 62 s
+Burnished Bronze Mirror	Opera Chau Gong	rub 7 s
+Burnished Swell	Auric Swell	rub 87 s
+Burnished Swell	Burnished Tidewater	rub 72 s
+Burnished Swell	Gilded Crescendo	rub 60 s
+Burnished Swell	Patinated Billow	rub 85 s
+Burnished Tam-Tam Hall	Burnished Gong Hall	level dip 6.5 peak 0.0 LU; rub 24 s
+Burnished Tam-Tam Hall	Hammered Chau Gong	rub 13 s
+Burrowing Wormhole	Boring Passage	rub 96 s
+Burrowing Wormhole	Receding Tube	rub 6 s
+Bursting Gong	Resounding Plate	rub 59 s
+Bursting Gong	Shivering Sheet	rub 29 s
+Bursting Shield	Shivering Plate	rub 25 s
+Calling Gathering	Alternating Choir	rub 24 s
+Calling Solo	Calling Song	rub 98 s
+Calling Solo	Warbling Lilt	rub 115 s
+Calling Song	Crooning Lilt	rub 104 s
+Calling Song	Pleading Voice	rub 104 s
+Calling Song	Sighing Plea	rub 91 s
+Calling Song	Singing Lament	rub 93 s
+Calling Song	Warbling Lilt	rub 82 s
+Calling Song	Yearning Cantilena	rub 74 s
+Calling Song	Yearning Lilt	rub 66 s
+Canopied Limbs	Leafy-Crowned Crowns	rub 28 s
+Canopied Limbs	Overhead Branches	rub 28 s
+Canopied Limbs	Sawing Treetops	rub 28 s
+Captured Lantern Light	Sinking Last Light	rub 82 s
+Captured Photon	Captured Lantern Light	rub 126 s
+Careering Gyre	Gyrating Merry-Go-Round	rub 77 s
+Caressed Cushion	Caressed Pad	rub 31 s
+Caressed Cushion	Leaning Fingertips	rub 29 s
+Caressed Cushion	Tender Pad	rub 50 s
+Caressed Hands	Pushing Pressure	rub 66 s
+Carpeted Drawing Room	Quilted Boudoir	rub 104 s
+Carpeted Library	Arched Undercroft	rub 54 s
+Carpeted Library	Carpeted Den	rub 13 s
+Carpeted Library	Chiral Circuit	rub 25 s
+Carpeted Library	Curtained Den	rub 48 s
+Carpeted Library	Edge-Bound Annulus	rub 28 s
+Carpeted Library	Resonant Mode	rub 90 s
+Carpeted Library	Trivial Aureole	rub 50 s
+Carpeted Library	Upholstered Parlour	rub 48 s
+Cascaded Faraday	Halved Period	rub 93 s
+Cascaded Octave Below	Halved Subharmonic	rub 97 s
+Cascading Avalanche	Cascading Snowslide	rub 15 s
+Cascading Fountains	Echoing Prisms	rub 10 s
+Cascading Fountains	Tumbling Fountains	rub 9 s
+Cascading Fountains	Tumbling Stairs	rub 25 s
+Cascading Rainbows	Cascading Fountains	rub 10 s
+Cascading Snowslide	Thundering Avalanche	rub 6 s
+Cascading Steps	Mirrored Stairs	rub 6 s
+Cascading Steps	Repeating Stairs	rub 42 s
+Cascading Talus	Cascading Snowslide	rub 9 s
+Cast-Iron Furnace	Cast-Iron Rail	rub 8 s
+Cast-Iron Furnace	Riveted Rivet Hall	rub 37 s
+Cast-Iron Furnace	Smelted Furnace	rub 8 s
+Cast-Iron Rivet Hall	Rusted Crucible	rub 15 s
+Cast-Iron Rivet Hall	Smelted Foundry	rub 18 s
+Ceaseless Wane	Eternal Wane	rub 14 s
+Ceaseless Wane	Ever-Slowing Lullaby	rub 14 s
+Ceaseless Wane	Ever-Slowing Slowing	rub 119 s
+Ceaseless Wane	Perpetual Ritardando	rub 14 s
+Celestial-Voice Orbit Prayer	Orbiting-Voice Hymn	rub 78 s
+Celestial-Voice Sky Psalm	Galactic-Sung Star Litany	rub 43 s
+Cetacean Call	Breaching Call	rub 6 s
+Cetacean Call	Cetacean Road	rub 40 s
+Cetacean Call	Deep-Diving Path	rub 5 s
+Cetacean Call	Migrating Road	rub 6 s
+Cetacean Call	Sounding-Whale Route	rub 6 s
+Cetacean Road	Deep-Diving Route	rub 5 s
+Cetacean Road	Migrating Moan	rub 17 s
+Channelled Sea Lane	Abyssal-Water Duct	rub 104 s
+Channelled Sea Lane	Deep-Sea Depth	rub 93 s
+Channelled Sea Lane	Pelagic-Deep Sea Lane	rub 81 s
+Chanted Puja	Cloistral Om	rub 67 s
+Chanted Puja	Intoned Syllable	rub 22 s
+Chanted Puja	Monastic Prayer Hall	rub 29 s
+Chantry Sacristy	Candlelit Chancel	rub 39 s
+Chantry Sacristy	Lady Sacristy	rub 38 s
+Chantry Transept	Limestone Great Hall	rub 119 s
+Chaotic Lorenz	Chaotic Trajectory	rub 104 s
+Chaotic Lorenz	Folded Roessler	rub 57 s
+Chaotic Lorenz	Turbulent Saddle	rub 104 s
+Chaotic Roessler	Chaotic Saddle	rub 26 s
+Chaotic Roessler	Strange Roessler	rub 13 s
+Chaotic Saddle	Strange Roessler	rub 6 s
+Chaotic Trajectory	Creeping Culture	rub 13 s
+Chaotic Trajectory	Looping Saddle	rub 119 s
+Chaotic Trajectory	Turbulent Saddle	rub 119 s
+Chapel Organ	Flue Nave	rub 8 s
+Charged Cloudburst	Storming Monsoon	rub 6 s
+Charged Cloudburst	Wind-Torn Storm	rub 88 s
+Charged Front	Charged Cyclone	rub 15 s
+Chill Coomb	Cool Hollow	rub 141 s
+Chill Lowland	Cool Hollow	rub 141 s
+Chill Lowland	Cool Wold	rub 141 s
+Chiming Canopy	Glinting Grove	rub 10 s
+Chiming Glade	Glinting Coppice	rub 17 s
+Chiming Glade	Ringing Coppice	rub 16 s
+Chiming Glade	Silvered Bower	rub 119 s
+Chiming Peepers	Attuned Chirpers	rub 13 s
+Chiming Thicket	Ringing Grove	rub 9 s
+Chiral Circuit	Arched Undercroft	rub 6 s
+Chirping Collision	Binary Ringdown	rub 141 s
+Chirping Collision	Binary Union	rub 82 s
+Chirping Collision	Paired Inspiral	rub 45 s
+Choir-Deep Catacomb	Crypt-Cold Crypt	rub 48 s
+Choir-Deep Sepulchre	Crypt-Cold Nave	rub 72 s
+Choir-Deep Sepulchre	Vaulted Ossuary	rub 9 s
+Chromatic Beams	Beaming Bands	rub 37 s
+Chromatic Beams	Chromatic Rays	rub 91 s
+Chromatic Beams	Refracting Bands	rub 62 s
+Chromatic Prominence	Intergalactic Foundation	rub 122 s
+Chromatic Rays	Prismatic Lights	rub 6 s
+Chthonic Floor	Hidden Grotto	rub 11 s
+Churning Street	Swirling Rapids	rub 104 s
+Circling Paradox	Circling Stair	rub 24 s
+Clattering Pebbles	Grinding Foreshore	rub 36 s
+Clattering Pebbles	Hissing Strandline	rub 60 s
+Clattering Pebbles	Washing Spit	rub 93 s
+Clear Harmonica	Lucid Glass	rub 7 s
+Clear Prism	Brittle Spire	rub 119 s
+Clear Prism	Clear Lens	rub 29 s
+Clear-Eyed Daydream	Clear-Eyed Rapture	rub 72 s
+Clear-Eyed Daydream	Transparent Dream	rub 21 s
+Clearing Climate	Changing Spell	rub 36 s
+Clearing Climate	Fickle Climate	rub 30 s
+Clearing Climate	Passing Forecast	rub 11 s
+Clearing Climate	Unsettled Weather Front	rub 72 s
+Clearing Weather	Passing Climate	rub 93 s
+Clearing Weather	Passing Forecast	rub 17 s
+Clearing Weather	Unsettled Climate	rub 93 s
+Cleft Splinters	Fissured Fragments	rub 93 s
+Cleft Splinters	Splintered Facets	rub 104 s
+Cleft Splinters	Splintered Shoals	rub 93 s
+Climbing Breakers	Rolling Swell	rub 55 s
+Climbing Flight	Climbing Run	rub 104 s
+Climbing Flight	Climbing Rush	rub 93 s
+Climbing Flight	Racing Flight	rub 81 s
+Climbing Flight	Spiralling Flight	rub 82 s
+Climbing Surf	Rising Breakers	rub 13 s
+Clock Clocks	Clock Metronome	rub 7 s
+Clock Clocks	Patient Escapement	rub 9 s
+Clock Clocks	Patient Pendulum	rub 5 s
+Clock Clocks	Slow Orbits	rub 6 s
+Clock Cycles	Pacing Escapement	rub 34 s
+Clock Cycles	Patient Gears	rub 15 s
+Clock Cycles	Swinging Gears	rub 14 s
+Clock Metronome	Patient Escapement	rub 9 s
+Clock Metronome	Steady Weights	rub 19 s
+Clock Metronome	Swinging Gears	rub 55 s
+Clockwork Almanac	Harmonic Conjunction	rub 63 s
+Clockwork Almanac	Harmonic Transit	rub 93 s
+Clockwork Almanac	Orbital Conjunction	rub 93 s
+Clockwork Almanac	Orbital Occultation	rub 72 s
+Clockwork Almanac	Periodic Conjunction	rub 105 s
+Clockwork Contraption	Clockwork Orrery	rub 141 s
+Clockwork Contraption	Lucid Device	rub 6 s
+Clockwork Machine	Whirring Device	rub 104 s
+Cloistered Chancel	Basilican Catacomb	rub 85 s
+Cloistered Chancel	Nave-Deep Nave	rub 19 s
+Cloistered Eaves	Mountain Hand Bells	rub 24 s
+Cloistered Eaves	Shrine Bells	rub 20 s
+Close Piano	Quiet Fingers	rub 21 s
+Closing Mouth Tide	Shifting-Vowel Vowel	rub 13 s
+Closing Syllable	Intoned Aum	rub 7 s
+Closing Wreath	Centripetal Garland	rub 10 s
+Closing Wreath	Spiralling-In Round	rub 71 s
+Closing Wreath	Spiralling-In Wreath	rub 50 s
+Cloudburst Rain Cellar	Squall-Pressed Undercloud	rub 113 s
+Coal Nocturne	Indigo Night Canticle	rub 104 s
+Coalescing Merger	Inspiralling Coalescence	rub 122 s
+Coastal Strand	Dune Strand	rub 17 s
+Coastal Strand	Tidal Bay	rub 141 s
+Coastal Strand	Tidal Beach	rub 11 s
+Coherent Tonic	Superposed Key	rub 50 s
+Coiled Fabric	Wound Lattice	level dip 4.6 peak 3.7 LU
+Coiled Manifold	Wound Topology	rub 120 s
+Coiled Maze	Veined Labyrinth	rub 42 s
+Coiled Maze	Veined Tracery	rub 119 s
+Coiled Space-Time	Inverted Topology	rub 20 s
+Coiled Space-Time	Linked Topology	rub 18 s; rub 20 s
+Coiled Space-Time	Woven-Space Torus	rub 9 s
+Coiled Tracery	Coiled Maze	rub 44 s
+Coiled Tracery	Veined Tracery	rub 32 s
+Coiled Tracery	Winding Channels	rub 104 s
+Coiling Fern	Droste Vortex	rub 93 s
+Coiling Helix	Droste Helix	rub 5 s
+Coiling Helix	Nautilus Shell	rub 9 s
+Coiling Helix	Whorled Shell	rub 22 s
+Coiling Helix	Winding Whorl	rub 12 s
+Cold Spire	Crystal Pane	rub 6 s
+Cold-Seep Abyssal Flat	Cold-Seep Plain	rub 18 s
+Cold-Seep Abyssal Flat	Pelagic Mud Flat	rub 93 s
+Cold-Seep Plain	Lightless Mud Flat	rub 31 s
+Cold-Seep Plain	Manganese Nodule Field	rub 15 s
+Cold-Seep Plain	Pelagic Mud Flat	rub 29 s
+Collapsing Chord	Coherent Mode Shift	rub 96 s
+Collapsing Concourse Hall	Infolding Dome Hall	rub 93 s
+Colonnaded Atrium	Colonnaded Hypostyle	rub 19 s
+Colossal Bellow	Cyclopean Throat	rub 119 s
+Colossal Bellow	Diffuse Hiss	rub 33 s
+Colossal Bellow	Kargyraa Rock Shelter	rub 46 s
+Colossal Bellow	Mountainous Larynx	rub 119 s
+Columned Buttress	Fifth-Built Buttress	rub 71 s
+Columned Buttress	Plinthed Colonnade	rub 116 s
+Columned Pier	Fifth-Built Buttress	rub 13 s
+Compact Diamond Core	Dense Remnant	rub 5 s
+Compline Carol	Softened Chant	rub 141 s
+Compline Hymn	Faraway Choir	rub 104 s
+Compline Hymn	Murmured Canticle	rub 119 s
+Compline Hymn	Softened Anthem	rub 119 s
+Compline Hymn	Softened Choir	rub 119 s
+Compressed Asymptote	Asymptotic Limit	rub 111 s
+Compressed Asymptote	Brimming Boundary	rub 126 s
+Concealed Compline	Soundless Compline	rub 8 s
+Concentric Puddle	Dropped Puddle	rub 62 s
+Concentric Water	Concentric Fountain	rub 36 s
+Concentric Water	Lapping Water	rub 26 s
+Concentric Water	Skimmed Rings	rub 37 s
+Consonant Callers	Accorded Chirpers	rub 93 s
+Constellated Psalm	Starlit Psalm	rub 142 s
+Convective Envelope	Universal Ground	rub 5 s
+Convective Giant	Astral Choir	rub 70 s
+Convective Giant	Chromatic Prominence	rub 44 s
+Convective Giant	Tired Mira	rub 75 s
+Converging Cupola	Imploding Hall	rub 5 s
+Converging Cupola	Imploding Vault	rub 82 s
+Converging Dome Hall	Infolding Nave	rub 92 s
+Converging Nimbus	Haloed Skyline	rub 7 s
+Converging Nimbus	Wavering Corona Band	rub 5 s
+Converging Ringdown	Converging Chirp	rub 13 s
+Cool Hollow	Misted Dewfall	rub 104 s
+Cool Wold	Chill Coomb	rub 9 s
+Cool Wold	Cool Hollow	rub 10 s
+Cool Wold	Fading Vale	rub 10 s
+Cool Wold	Misted Dale	rub 10 s
+Cool Wold	September Vale	rub 10 s
+Cooling Sirius B	Compact Diamond Core	rub 110 s
+Cooling Sirius B	Crystallising Ember Star	rub 6 s
+Cooling Sirius B	Dense Dwarf	rub 57 s
+Cooling-Metal Frame Joint	Cooling-Metal Spar Joint	rub 9 s
+Cooling-Metal Frame Joint	Snapping Spar Joint	rub 71 s
+Cooling-Metal Frame Joint	Ticking Spar Joint	rub 5 s
+Coppery Groundswell	Burnished Groundswell	rub 26 s
+Coronal Solar Wind	Photospheric Limb	rub 9 s
+Corrugated Awning	Rusted Lean-To	rub 12 s
+Cosmic Bedrock Sky	Cosmic Floor	rub 45 s
+Cosmic Drift	Cosmic Horizon	rub 119 s
+Cosmic Drift	Silent Nebula	rub 104 s
+Cosmic Drift	Stellar Abyss	rub 104 s
+Cosmic Drift	Void Corona	rub 119 s; rub 141 s
+Cosmic Floor	Boundless Keel	rub 6 s
+Cosmic Floor	Cosmic Footing	rub 13 s
+Cosmic Floor	Cosmic Foundation	rub 6 s
+Cosmic Horizon	Endless Ebb	rub 7 s
+Cosmic Horizon	Event Station	rub 44 s
+Cosmic Horizon	Orbital Drift	rub 64 s
+Cosmic Horizon	Silent Drift	rub 65 s
+Cosmic Horizon	Silent Nebula	rub 32 s
+Cosmic Horizon	Stellar Abyss	rub 36 s
+Cosmic Plinth Star	Intergalactic Foundation	rub 6 s
+Cosmic Plinth Star	Starbound Keel	rub 94 s
+Cosmic Star Litany	Galactic-Sung Orbit Prayer	rub 44 s
+Cosy Nest	Lulled Crib	rub 93 s
+Cosy Nest	Lulled Rocker	rub 93 s
+Counterwise Rotation	Widdershins Orbit	rub 77 s
+Counterwise Rotation	Widdershins Spiral	rub 74 s
+Coupled Metronomes	Locked Crickets	rub 6 s
+Coursing Whirligig	Coursing Roundel	rub 99 s
+Coursing Whirligig	Gyrating Merry-Go-Round	rub 6 s
+Coursing Whirligig	Looping Maelstrom	rub 8 s
+Cracking Icefall	Booming Serac	rub 8 s
+Cracking Icefall	Drifting Floe	rub 53 s
+Cracking Icefield	Booming Ice Shelf	rub 94 s
+Cracking Icefield	Groaning Icefield	rub 93 s
+Crackling Discharge	Sferic Discharge	rub 119 s
+Cratered Shield	Pierced Solar Panel	rub 119 s
+Creaking Frame Joint	Groaning Frame Joint	rub 119 s
+Creaking Frame Joint	Snapping Spar Joint	rub 78 s
+Creaking Frame Joint	Sounding-Whale Route	rub 26 s
+Creaking Frame Joint	Ticking Spar Joint	rub 59 s
+Creeping Culture	Coral Mitosis	rub 38 s
+Creeping Veins	Spreading Pathways	rub 5 s
+Crimson Envelope	Convective Envelope	rub 82 s
+Crimson Envelope	Crimson Red Clump	rub 29 s
+Crimson Envelope	Ember-Red Mira	rub 30 s
+Crimson Envelope	Tired Mira	rub 81 s
+Crimson Red Clump	Convective Arcturus	rub 94 s
+Crimson Red Clump	Ember-Red Mira	rub 9 s
+Croaking Mire	Lily Backwater	rub 11 s
+Croaking Slough	Lily Backwater	rub 37 s
+Crooning Cantilena	Calling Plea	rub 57 s
+Crooning Cantilena	Crooning Lilt	rub 48 s
+Crooning Cantilena	Pleading Voice	rub 63 s
+Crooning Lilt	Pleading Voice	rub 17 s
+Crooning Lilt	Singing Lament	rub 6 s
+Crowded Aureole	Converging Nimbus	rub 42 s
+Crowded Vanishing Point	Converging Skyline	rub 93 s
+Crumbling Crypt	Crumbling Undercroft	rub 34 s
+Crumbling Crypt	Weathered Arcade	rub 72 s
+Crypt-Cold Crypt	Cloistered Chancel	rub 8 s
+Crypt-Cold Nave	Vaulted Ossuary	rub 9 s
+Crystal Floe	Frozen Loch	rub 104 s
+Crystal Floe	Singing Floe	rub 93 s
+Crystal Pane	Brittle Spire	rub 77 s
+Crystal Pane	Frosted Prism	rub 10 s
+Crystal Pane	Lucid Harmonica	rub 29 s
+Crystal Pond	Ringing Loch	rub 5 s
+Crystal Pond	Whistling Loch	rub 7 s
+Crystalline Field	Hushed Blanket	rub 104 s
+Crystalline Field	Powdered Field	rub 104 s
+Crystalline Field	Powdered Snow	rub 93 s
+Crystalline Field	Settling Hoarfrost	rub 104 s
+Crystalline Field	Snowy Crystals	rub 93 s
+Crystallising Carbon Core	Degenerate Remnant	rub 52 s
+Curling Marble	Drifting Plumes	rub 105 s; rub 75 s
+Curling Marble	Eddying Eddies	rub 113 s
+Curtained Den	Carpeted Den	rub 32 s
+Curtained Den	Upholstered Parlour	rub 66 s
+Curtained Den	Velvet-Hung Parlour	rub 102 s
+Curving Tunnel	Spinning Conduit	rub 14 s
+Cut Spire	Cold Spire	rub 9 s
+Cut Spire	Lucid Glass	rub 13 s
+Cyclopean Larynx	Leviathan-Voiced Larynx	rub 53 s
+Cyclopean Throat	Giant Utterance	rub 141 s
+D-Layer Radio Sky	F-Layer Upper Air	rub 104 s; rub 93 s
+D-Layer Radio Sky	Ionospheric Sky Mirror	rub 81 s
+D-Layer Radio Sky	Layered Skip	rub 81 s
+D-Layer Radio Sky	Refracted Upper Air	rub 65 s
+D-Layer Skip	F-Layer Radio Sky	rub 104 s
+D-Layer Skip	Refracted Layer	rub 39 s
+Dappled Haze	Bright Aurora	rub 9 s
+Dappled Haze	Glinting Sheen	rub 7 s
+Dappled Haze	Silver Light	rub 9 s
+Dappled Shimmer	Dappled Haze	rub 8 s
+Dappled Shimmer	Glinting Sheen	rub 7 s
+Dappled Shimmer	Silver Light	rub 9 s
+Dark-Bound Brink	Boundless Rim	rub 104 s
+Dark-Bound Brink	Fathomless Edge	rub 104 s
+Dark-Bright Matins	Nocturnal Night Music	rub 93 s
+Dark-Bright Matins	Owl-Watched Concert	rub 93 s
+Dark-Bright Matins	Serenading Soiree	rub 81 s
+Darting Sough	Quickened Zephyr	rub 98 s
+Darting Sough	Skittering Breeze	rub 116 s
+Darting Zephyr	Quickened Zephyr	rub 23 s
+Dawdling Billow	Trapped Wavelet	rub 6 s
+Dawdling Undulation	Dawdling Wavelet	rub 40 s
+Dawn-Lit Daybreak	Morning-Side Riser	rub 9 s
+Deep Hours	Distant Choir	rub 142 s
+Deep Hours	Firefly Lawn	rub 119 s
+Deep Lantern	Moonlit Pergola	rub 66 s
+Deep Lantern	Slow Harbour	rub 81 s
+Deep Lantern	Spectral Footsteps	rub 104 s
+Deep-Diving Path	Migrating Moan	rub 8 s
+Deep-Diving Route	Cetacean Call	rub 86 s
+Deep-Diving Route	Deep-Diving Path	rub 32 s
+Deep-Diving Route	Migrating Moan	rub 7 s
+Deep-Echoing Flowstone	Grotto-Deep Speleothem	rub 47 s
+Deep-Night Burden	Starless Load	rub 84 s
+Deep-Night Weight	Deep-Night Gravity	rub 119 s
+Deep-Night Weight	Lights-Out Heaviness	rub 5 s
+Deep-Sea Sea Lane	Deep-Sea Depth	rub 55 s
+Deep-Sky Footing	Universal Floor	rub 138 s
+Deep-Sky Ground	Deep-Sky Floor	rub 66 s
+Deep-Sky Ground	Starbound Basement	rub 70 s
+Deepening Inhalation	Indrawn Pause	rub 119 s
+Deepening Rotunda	Awakening Gallery	rub 17 s
+Deepening Transept	Awakening Chancel	rub 50 s
+Deepening Transept	Ripening Gallery	rub 20 s
+Deepening Transept	Widening Transept	rub 81 s
+Degenerate Diamond Core	Ash-White Dwarf	rub 27 s
+Delta Hibernation	Amber Murmur	rub 119 s
+Delta Hibernation	Pelagic Fathoms	rub 141 s
+Delta Hibernation	Unconscious Sleep	rub 141 s
+Delta Stillness	Amber Murmur	rub 119 s
+Delta Stillness	Delta Hibernation	rub 116 s
+Delta Stillness	Dreamless Repose	rub 15 s
+Delta Stillness	Sunken Slumber	rub 57 s
+Delta Stillness	Unconscious Hibernation	rub 119 s
+Delta Stillness	Weighted Hibernation	rub 27 s
+Dense Dwarf	Cooling Sirius B	rub 22 s
+Dense Remnant	Dense Ice Star	rub 5 s
+Dense Remnant	Pulsating Cinder	rub 8 s
+Departing Nebula	Retreating Nebula	rub 19 s
+Dewfall Lowland	Cool Wold	rub 141 s
+Dewfall Lowland	Indigo Nocturne	rub 141 s
+Dewfall Lowland	Serenading Soiree	rub 141 s
+Dewy Orchard	Nightblooming Grove	rub 31 s
+Diffracted Nightfall	Fringed Darkness	rub 21 s
+Diffracted Nightfall	Interfering Nightfall	rub 11 s
+Diffracted Nightfall	Overlapping Eventide	rub 11 s
+Diffracted Nightfall	Superposing Nocturne	rub 11 s
+Diffracted Nightfall	Wave-Borne Night	rub 16 s
+Diffuse Charcoal	Washed Gouache	rub 106 s
+Diffuse Ink	Blurred Pastel	rub 68 s
+Diffuse Ink	Diffuse Graphite	rub 45 s
+Diffuse Murmur Band	Grey Band Noise	level dip 3.4 peak 0.3 LU; rub 70 s
+Diffuse Pastel	Blurred Gouache	rub 11 s
+Dilated Escapement	Lagging Clock	rub 6 s
+Dilated Escapement	Stretched Hour	rub 6 s
+Diminishing Nebula	Receding Supercluster	rub 36 s
+Dimmed Carol	Softened Canticle	rub 104 s
+Dimmed Psalm	Compline Hymn	rub 141 s; rub 94 s
+Dimmed Psalm	Evening Choir	rub 141 s
+Dimming Arcturus	Bloated Arcturus	rub 6 s
+Dimming Arcturus	Ember-Red Aldebaran	rub 9 s
+Dimming Arcturus	Ember-Red Helium Core	rub 6 s
+Dimming Arcturus	Swollen Arcturus	rub 119 s
+Dimming Arcturus	Tired Mira	rub 9 s
+Dimming Dusk	Golden Light	rub 142 s
+Dirac Edge Mode	Planck Bound State	rub 6 s
+Dirac Edge Mode	Uncertain-Rim Band	rub 6 s
+Disembodied Outer Dark	Shadow-Voiced Void	rub 66 s
+Disembodied Outer Dark	Unbodied Abyss Voice	rub 60 s
+Dispersed Pastel	Smeared Sepia	rub 6 s
+Dispersed Radio Night	Colossal Bellow	rub 28 s
+Dispersed Radio Night	Field-Line Radio Night	rub 142 s
+Dispersed Radio Night	Whistling Radio Night	rub 83 s
+Dissolving Fog	Dissolving Nimbus	rub 84 s
+Dissolving Fog	Separating Mist	rub 21 s
+Dissolving Haze	Dissolving Mist	rub 6 s
+Dissolving Icefield	Dissolving Icicles	rub 93 s
+Dissolving Mist	Parting Cloud	rub 7 s
+Dissolving Nimbus	Dissolving Fog	rub 5 s
+Dissolving Nimbus	Parting Haze	rub 30 s
+Dissolving Nimbus	Unravelling Haze	rub 41 s
+Distant Choir	Breathing Aria	rub 119 s; rub 81 s
+Distant Choir	Distant Litany	rub 93 s
+Distant Choir	Hollow Aria	rub 119 s
+Distant Choir	Moonlit Pergola	rub 65 s
+Distant Hymn	Breathing Psalm	rub 141 s
+Distant Litany	Breathing Aria	rub 57 s
+Distant Litany	Vowel Chant	rub 8 s
+Distant Showers	Dripping Showers	rub 119 s; rub 93 s
+Distant Showers	Quiet Downpour	rub 93 s
+Distant Voices	Breathing Chant	rub 13 s
+Distant Voices	Hollow Aria	rub 23 s
+Distended Horizon	Distended World	rub 9 s
+Distended Octave	Warped World	rub 13 s
+Distended World	Otherworldly Planet	rub 93 s
+Distended World	Strange Realm	rub 37 s
+Distended World	Tensile Spectrum	rub 11 s
+Distorted Mirage Air	Turbulent Eddy Light	rub 9 s
+Distorted Speckle	Distorted Mirage Air	rub 62 s
+Distorted Speckle	Turbulent Eddy Light	rub 94 s
+Dormant Firmament Night	Soundless Expanse	rub 104 s
+Dormant Slumber	Delta Stillness	rub 141 s
+Dormant Slumber	Dreamless Hibernation	rub 23 s
+Dormant Slumber	Dreamless Stillness	rub 119 s
+Dormant Slumber	Unconscious Depths	rub 104 s
+Dormer Bower	Veranda Sill	rub 7 s
+Doubled Halo Image	Annular Ghost Image	rub 12 s
+Doubled Rivers	Twin Rivers	rub 7 s
+Downpour Chorus	Rain-Loud Rainpool	rub 5 s
+Downpour Chorus	Stormlit Chorus	rub 5 s
+Downpour Chorus	Thunderous Lowmarsh	rub 5 s
+Downpour Chorus	Thunderous Rill	rub 5 s
+Downpour Chorus	Wet Rainpool	rub 11 s
+Downpour Puddle	Downpour Chorus	rub 7 s
+Downpour Puddle	Squally Bog	rub 30 s
+Downpour Puddle	Squally Puddle	rub 92 s
+Downpour Puddle	Squally Rill	rub 142 s
+Dozing Balloon	Hazy Current	rub 93 s
+Dozing Dreamscape	Hazy Haze	rub 142 s
+Dragging Backflow	Backwash Outflow	rub 79 s
+Draped Arc of Light	Draped Curtain	rub 107 s
+Draped Banner	Folding Corona Band	rub 15 s
+Draped Banner	Unfurled Arc of Light	rub 8 s
+Draped Streamer	Glimmering Streamer	rub 11 s
+Draped Veil	Unfurled Arc of Light	rub 18 s
+Drawn Chant	Attracted Canticle	rub 10 s
+Drawn Lodestone	Falling Centre	rub 57 s
+Dreaming Apparatus	Somnambulant Machine	rub 16 s
+Dreaming Attic	Musing Landing	rub 104 s
+Dreaming Attic	Somnambulant Parlour	rub 105 s
+Dreaming Automaton	Somnambulant Machine	rub 8 s
+Dreaming Network	Pondering Synapse	rub 31 s
+Dreaming Reverie	Dreaming Neurons	rub 93 s
+Dreaming Reverie	Listening Mind	rub 131 s
+Dreaming Reverie	Pondering Neurons	rub 130 s
+Dreaming Reverie	Thinking Cortex	rub 86 s
+Dreaming Synapse	Dreaming Cortex	rub 93 s
+Dreaming Synapse	Musing Cortex	rub 94 s
+Dreaming Synapse	Musing Thought	rub 35 s
+Dreamless Hibernation	Delta Hibernation	rub 23 s
+Dreamless Hibernation	Dreamless Rest	rub 94 s
+Dreamless Hibernation	Dreamless Stillness	rub 20 s
+Dreamless Hibernation	Sunken Sleep	rub 119 s
+Dreamless Hibernation	Unconscious Depths	rub 21 s
+Dreamless Repose	Delta Stillness	rub 20 s
+Dreamless Repose	Unconscious Hibernation	rub 18 s
+Dreamless Rest	Delta Stillness	rub 141 s
+Dreamless Rest	Dreamless Stillness	rub 119 s
+Dreamless Rest	Sunken Sleep	rub 119 s
+Dreamless Rest	Unconscious Sleep	rub 19 s
+Dreamless Rest	Unconscious Stillness	rub 104 s
+Dreamless Stillness	Delta Hibernation	rub 14 s
+Dreamless Stillness	Dreamless Hibernation	rub 23 s
+Dreamless Stillness	Liminal Threshold	rub 14 s
+Dreamless Stillness	Sunken Sleep	rub 19 s
+Dreamless Stillness	Twilit Doorway	rub 16 s
+Dreamless Stillness	Twilit Visions	rub 119 s
+Dreamless Stillness	Unconscious Depths	rub 104 s
+Dreamless Stillness	Unconscious Sleep	rub 141 s
+Drenched Wildwood	Dewy Copse	rub 51 s
+Drifting Feather	Hazy Current	rub 119 s
+Drifting Floe	Booming Serac	rub 41 s
+Drifting Plumes	Curling Marble	rub 104 s; rub 57 s
+Drifting Plumes	Eddying Eddies	rub 94 s
+Drifting Plumes	Pooling Silk	rub 104 s
+Drifting Plumes	Radiant Medallion	rub 119 s
+Drifting Plumes	Recursive Iteration	rub 65 s
+Drifting Plumes	Self-Similar Echoes	rub 115 s
+Drifting Plumes	Sheer Moire	rub 104 s
+Drifting Plumes	Streaming Dye	rub 88 s
+Drifting Serac	Booming Ice Shelf	rub 60 s
+Drifting-Signal Distress Call	Lost Telemetry	rub 105 s
+Dripping Chamber	Dripping Flowstone	rub 93 s
+Dripping Chamber	Hollow Speleothem	rub 97 s
+Dripping Chamber	Karst Sump Pool	rub 21 s
+Dripping Fountain	Sifting Motes	rub 7 s
+Dripping Fountain	Spilling Spray	rub 8 s
+Dripping Grotto	Grotto-Deep Speleothem	rub 93 s
+Dripping Grotto	Karst Sinter Pool	rub 104 s
+Dripping Grotto	Stalactite Sinter Pool	rub 18 s
+Dripping Hail	Pattering Hail	rub 52 s
+Dripping Rain	Steady Rain	rub 119 s
+Dripping Spatter	Misting Sprinkle	rub 7 s
+Dripping Spray	Twinkling Spray	rub 80 s
+Droning Prayer Hall	Droning Om	rub 11 s
+Droning Room Mode	Humming Mode	rub 29 s
+Dropped Fountain	Skimmed Rings	rub 8 s
+Dropped Puddle	Concentric Pond	rub 119 s
+Droste Whorl	Whorled Shell	rub 11 s
+Drowned-Voice Assembly	Abyssal-Voiced Choir	rub 27 s
+Drowned-Voice Assembly	Benthic-Sung Choristers	rub 22 s
+Drowned-Voice Assembly	Drowned-Voice Choir	rub 80 s
+Drowned-Voice Assembly	Lightless-Sung Dirge	rub 23 s
+Drowned-Voice Assembly	Pressure-Sung Cantors	rub 119 s
+Drowned-Voice Choir	Trench-Deep Choir	rub 11 s
+Drowsing Doorway	Drowsing Edge	rub 104 s
+Drowsing Doorway	Hypnagogic Glimpses	rub 93 s
+Drowsing Doorway	Nodding Glimpses	rub 93 s
+Drowsing Doorway	Nodding Images	rub 93 s
+Drowsing Edge	Nodding Glimpses	rub 93 s
+Drowsing Metronome	Stretched Escapement	rub 6 s
+Drowsing Metronome	Stretched Metronome	rub 61 s
+Duckweed Bog	Duckweed Fen	rub 10 s
+Duckweed Bog	Peeping Mire	rub 142 s
+Duckweed Bog	Reedy Fen	rub 142 s
+Ducted Night Wave	Dispersed Swoop	rub 35 s
+Ducted Swoop	Falling-Tone Night Wave	rub 93 s
+Ducted Swoop	Sliding Radio Night	rub 81 s; rub 93 s
+Dune Machair	Alpine Cedars	rub 100 s
+Dune Machair	Dripping Pond	rub 104 s
+Dune Machair	Dune Strand	rub 119 s
+Dune Machair	Revolving Wheel	rub 79 s
+Dune Machair	Sandy Beach	rub 119 s
+Dune Machair	Shoreline Strand	rub 119 s
+Dune Machair	Tidal Bay	rub 50 s
+Dune Shallows	Breaking Bay	rub 93 s
+Dune Shore	Dune Machair	rub 141 s
+Dusk Hour	Late Bow	rub 104 s
+Dusk Watch	Moonrise Watch	rub 13 s
+Dusky Pergola	Starlit Hedge	rub 93 s
+Dusty Weather	Salt Weather	rub 91 s
+Dwindling Last Light	Captured Photon	rub 34 s
+Dwindling Last Light	Slowing Beacon	rub 70 s
+E-Layer Ion Roof	E-Layer Skip	rub 111 s
+E-Layer Ion Roof	F-Layer Sky Mirror	rub 119 s
+E-Layer Ion Roof	Layered Skip	rub 119 s
+E-Layer Ion Roof	Reflecting Skip	rub 104 s
+Eagle Cloud	Ionised-Gas Plume	rub 104 s
+Earthen Hyphae	Damp Root Web	rub 119 s
+Earthen Hyphae	Dripping Pond	rub 104 s
+Earthen Hyphae	Earthen Mycelium	rub 119 s
+Earthen Hyphae	Sandy Beach	rub 119 s
+Earthen Hyphae	Slow-Growing Forest Floor	rub 119 s
+Earthen Hyphae	Slow-Growing Mushroom Ring	rub 119 s; rub 141 s
+Earthen Hyphae	Underground Loam	rub 119 s
+Earthen Mycelium	Dripping Pond	rub 10 s
+Earthen Mycelium	Hidden Hyphae	rub 9 s
+Earthen Mycelium	Midnight Hyphae	rub 141 s
+Earthen Mycelium	Sandy Beach	rub 9 s
+Earthen Mycelium	Slow-Growing Mushroom Ring	rub 9 s
+Earthen Mycelium	Slow-Growing Spores	rub 11 s
+Earthen Mycelium	Underground Loam	rub 9 s
+Ebbing Tide	Oscillating Tide	rub 142 s
+Echo-State Network	Musing Cortex	rub 5 s
+Echoed Apse	Vaulted Basilica	rub 8 s
+Echoed Basilica	Columned Rotunda	rub 7 s
+Echoed Basilica	Painted Cloister	rub 12 s
+Echoic Chamber	Sonorous Space	rub 6 s
+Echoic Chamber	Sonorous Vault	rub 35 s
+Echoic Silo	Echoic Space	rub 7 s
+Echoic Silo	Resounding Space	rub 7 s
+Echoic Silo	Resounding Vault	rub 7 s
+Echoic Silo	Reverberant Cistern	rub 26 s
+Echoic Silo	Sonorous Rotunda Space	rub 7 s
+Echoic Silo	Sonorous Space	rub 7 s
+Echoic Silo	Vibrant Chamber	rub 7 s
+Echoing Congregation	Alternating Choir	rub 47 s
+Echoing Congregation	Alternating Gathering	rub 16 s
+Echoing Congregation	Answering Gathering	rub 23 s
+Echoing Congregation	Call-And-Answer Throng	rub 8 s
+Echoing Congregation	Calling Choir	rub 9 s
+Echoing Great Hall	Limestone Undercroft	rub 49 s
+Echoing Great Hall	Pillared Basilica	rub 104 s
+Echoing Great Hall	Pillared Undercroft	rub 64 s
+Echoing Host	Antiphonal Chorus	rub 6 s
+Echoing Prisms	Cascading Fountains	rub 10 s
+Echoing Rainbows	Cascading Fountains	rub 10 s
+Echoing Rainbows	Echoing Fountains	rub 9 s
+Echoing Undercroft	Pillared Undercroft	rub 36 s
+Eclipsed Prism Light	Notched Rainbow	rub 12 s
+Ecological Food Web	Foraging Food Web	rub 8 s
+Eddying Eddies	Curling Marble	rub 5 s
+Eddying Merry-Go-Round	Eddying Round Dance	rub 43 s
+Eddying Merry-Go-Round	Spinning Rondeau	rub 90 s
+Eddying Round Dance	Circling Whirl	rub 11 s
+Edge-Bound Annulus	Girding Rim	rub 61 s
+Edge-Bound Ring	Chiral Perimeter	rub 35 s
+Edge-Bound Ring	One-Way Rim	rub 46 s
+Eerie Bower	Ghost Arbour	rub 83 s
+Eerie Maze	Shade Trellis	rub 6 s
+Eerie Maze	Wraith Fountain	rub 49 s
+Elastic Harmony	Elastic Octave	rub 7 s
+Elastic Octave	Otherworldly Planet	rub 47 s
+Elder Last Hydrogen	Long-Lived Evening Star	rub 87 s
+Elder Last Hydrogen	Long-Lived Late Burn	rub 93 s
+Elder Last Hydrogen	Old-Light Old Flame	rub 59 s
+Elder Last Hydrogen	Venerable Old Flame	rub 11 s
+Elder Late Burn	Long-Lived Old Flame	rub 50 s
+Eleventh Comma	Foreign Mode	rub 94 s
+Elongated Escapement	Mossed Pillar	rub 142 s
+Elongated Escapement	Rounded Step	rub 6 s
+Elongated Escapement	Unhastened Metronome	rub 58 s
+Elsewhere Hinterland	Further Country	rub 104 s
+Elsewhere Hinterland	Unmapped Coast	rub 93 s
+Elsewhere Hinterland	Unmapped Province	rub 93 s
+Ember-Red Aldebaran	Convective Giant	rub 174 s
+Ember-Red Aldebaran	Tired Giant	rub 115 s
+Ember-Red Aldebaran	Tired Mira	rub 170 s
+Ember-Red Mira	Convective Arcturus	rub 100 s
+Embered Glow	Embered Warmth	rub 141 s
+Embracing Atmosphere	Immersed Cloud	rub 6 s
+Embracing Atmosphere	Immersed Field	rub 7 s
+Embroidered Tapestry	Fractal Carpet	rub 8 s
+Emission-Red Veil Nebula	Eagle Cloud	rub 36 s
+Encircled Corona Ring	Wreathed Einstein Cross	rub 71 s
+Endless Dwindling	Unending Ritardando	rub 119 s
+Endless Easing	Ever-Slowing Slowing	rub 82 s
+Endless Ebb	Climbing Tide	rub 141 s
+Endless Ebb	Endless Tide	rub 141 s
+Endless Ocean	Broken Surf	rub 7 s
+Endless Ocean	Long Current	rub 9 s
+Endless Ocean	Swelling Waves	rub 73 s
+Endless Passage	Boring Passage	rub 106 s
+Endless Tide	Spiral Ascent	rub 10 s
+Endless Tide	Tidal Tide	rub 98 s
+Endless Waves	Calm Shore	rub 10 s
+Endless Waves	Endless Ocean	rub 5 s
+Endless Waves	Swelling Waves	rub 5 s
+Enormous Breath	Mountainous Throat	rub 21 s
+Enormous Utterance	Titanic Gullet	rub 156 s
+Enormous Utterance	Vast-Chested Gullet	rub 104 s
+Enveloping Dome	Immersed Cloud	rub 25 s
+Escalating Illusion	Ever-Rising Climb	rub 93 s
+Escalating Pole	Barber Ascension	rub 6 s
+Estival Orchard	Autumnal Fallow	rub 18 s
+Estival Orchard	Autumnal Orchard	rub 18 s
+Estival Orchard	Autumnal Pasture	rub 9 s
+Estival Orchard	Autumnal Thaw	rub 18 s
+Estival Orchard	Equinoctial Blossom	rub 9 s
+Estival Orchard	Estival Fallow	rub 18 s
+Estival Orchard	Hibernal Season	rub 18 s
+Estival Orchard	Ripening Fallow	rub 20 s
+Estival Orchard	Ripening Thaw	rub 16 s
+Estival Orchard	Seasonal Thaw	rub 27 s
+Eternal Wane	Ever-Slowing Slowing	rub 26 s
+Eternal Wane	Perpetual Ritardando	rub 8 s
+Ethereal Nowhere	Disembodied Void	rub 93 s
+Euler Ramble	Neo-Riemannian Trail	rub 81 s
+Euler Ramble	Tonnetz Ramble	rub 104 s
+Euler Ramble	Tonnetz Wayfaring	rub 50 s
+Evening Choir	Compline Carol	rub 119 s
+Evening Choir	Cosy Shelter	rub 119 s
+Evening Choir	Cradled Arms	rub 119 s
+Evening Choir	Faraway Choir	rub 119 s
+Evening Choir	Murmured Canticle	rub 141 s
+Event Station	Endless Ebb	rub 7 s
+Ever-Falling Paradox	Circling Paradox	rub 33 s
+Ever-Slowing Lullaby	Boundless Ritardando	rub 93 s
+Ever-Slowing Lullaby	Ceaseless Lullaby	rub 119 s
+Ever-Slowing Lullaby	Endless Easing	rub 93 s
+Ever-Slowing Lullaby	Eternal Wane	rub 141 s
+Ever-Slowing Lullaby	Ever-Slowing Settling	rub 142 s
+Ever-Slowing Lullaby	Ever-Slowing Slowing	rub 93 s
+Ever-Slowing Lullaby	Infinite Settling	rub 105 s
+Ever-Slowing Lullaby	Unending Ritardando	rub 119 s
+Ever-Slowing Slowing	Eternal Wane	rub 47 s
+Ever-Slowing Slowing	Ever-Slowing Lullaby	rub 84 s
+Ever-Slowing Slowing	Perpetual Ritardando	rub 38 s
+Evergreen Pines	Boreal Cedars	rub 5 s
+Excited Singing Bowl	Emission Bowl	rub 93 s
+Excited Singing Bowl	H-Beta Gong	rub 27 s
+Excited Singing Bowl	Ionised Handbell	rub 13 s
+Excited Singing Bowl	Spectral Chime	rub 12 s
+Exhaling Foundation Stone	Deep-Sighing Undercroft	rub 69 s
+Exhaling Foundation Stone	Rising-Falling Foundation Stone	rub 8 s
+Exhaling Rhythm	Exhaling Pulse	rub 104 s
+Expanding Rivet Line	Cooling-Metal Joint	rub 87 s
+Expanding Spar Joint	Cooling-Metal Joint	rub 35 s
+Expanding Spar Joint	Expanding Rivet Line	rub 54 s
+Expanding Spar Joint	Snapping Spar Joint	rub 119 s
+Expanding Spar Joint	Ticking Joint	rub 24 s; rub 72 s
+Expanding Spar Joint	Ticking Rivet Line	rub 33 s
+Expanding Spar Joint	Ticking Seam	rub 16 s
+Extraterrestrial Hymn	Outlandish Concord	rub 12 s
+F-Layer Radio Sky	D-Layer Radio Sky	rub 93 s
+F-Layer Radio Sky	Ionospheric Sky Mirror	rub 47 s
+F-Layer Radio Sky	Refracted Layer	rub 47 s
+F-Layer Upper Air	D-Layer Radio Sky	rub 44 s
+F-Layer Upper Air	Refracted Upper Air	rub 15 s
+Fading Candle	Thawing Snow	rub 16 s
+Fading Dale	Cool Lowland	rub 81 s
+Fading Dale	Cool Wold	rub 94 s
+Fading Icefield	Fading Icicles	rub 11 s
+Fading Icefield	Softened Snow	rub 93 s
+Fading Icicles	Thawing Snow	rub 20 s
+Fading Signal	Lost Echo Signal	rub 102 s
+Faint Diamond Core	Dense Remnant	rub 41 s
+Faint Milky Way	Polar Firmament	rub 21 s
+Faint Milky Way	Starry Sky	rub 19 s
+Faint-Signal Distress Call	Fading Signal	rub 92 s
+Faint-Signal Distress Call	Garbled Carrier	rub 10 s
+Fair Weather Front	Changing Climate	rub 7 s
+Fair Weather Front	Changing Weather	rub 6 s
+Fair Weather Front	Unsettled Climate	rub 6 s
+Falling Centre	Gravitating Magnet	rub 104 s
+Falling Centre	Orbiting Core	rub 45 s
+Falling Centre	Orbiting Lodestone	rub 68 s
+Falling Centre	Sinking Core	rub 107 s
+Familiar Gallery	Remembered Library	rub 9 s
+Familiar Gallery	Storied Palace	rub 77 s
+Familiar Gallery	Treasured Corridor	rub 104 s
+Familiar Gallery	Unforgotten Corridor	rub 10 s
+Familiar Mansion	Familiar Palace	rub 16 s
+Familiar Palace	Storied Room	rub 141 s
+Far-Off Front	Hushed Squall	rub 16 s
+Far-Off Spacetime Wave	Ancient Wave	rub 106 s
+Far-Off Storm	Far-Off Front	rub 80 s
+Far-Off Storm	Far-Off Weather	rub 104 s
+Far-Off Storm	Remote Thunder	rub 141 s
+Far-Off Strain	Ancient Tremor	rub 54 s
+Far-Off Strain	Billion-Year Strain	rub 5 s
+Far-Off Strain	Billion-Year Tremor	rub 139 s
+Far-Off Strain	Firmament Foundation	rub 96 s
+Far-Off Strain	Slowing Beacon	rub 88 s
+Far-Off Swell	Faraway Echo Wave	rub 25 s
+Far-Off Thunder	Faint Cloudbank	rub 11 s
+Far-Off Thunder	Far-Off Weather	rub 14 s
+Far-Off Tremor	Ancient Tremor	rub 92 s
+Far-Off Tremor	Billion-Year Swell	rub 120 s
+Far-Off Tremor	Billion-Year Tremor	rub 141 s
+Far-Off Tremor	Far-Off Strain	rub 119 s
+Far-Off Tremor	Faraway Strain	rub 112 s
+Far-Off Tremor	Faraway Wave	rub 119 s
+Far-Off Undulation	Long-Travelled Echo Wave	rub 13 s
+Far-Off Weather	Far-Off Tempest	rub 104 s
+Far-Shore Far Call	Basin-Wide Current	rub 17 s
+Far-Shore Far Call	Ocean-Long Transit	rub 93 s
+Far-Shore Far Call	Transoceanic Passage	rub 13 s
+Faraway Coast	Elsewhere Hinterland	rub 33 s
+Faraway Echo Wave	Ancient Tremor	rub 81 s
+Faraway Echo Wave	Long-Travelled Swell	rub 104 s
+Faraway Province	Unmapped Hinterland	rub 35 s
+Faraway Strain	Billion-Year Tremor	rub 74 s
+Faraway Strain	Faraway Wave	rub 119 s
+Faraway Strain	Remote Ripple	rub 109 s
+Faraway Strain	Remote Tremor	rub 104 s
+Faraway Wave	Billion-Year Strain	rub 94 s
+Faraway Wave	Billion-Year Swell	rub 33 s
+Faraway-Tuned Antenna	Buried Loop	rub 81 s
+Faraway-Tuned Antenna	Listening Station	rub 21 s
+Faraway-Tuned Antenna	Loop-Antenna Logbook	rub 88 s
+Faraway-Tuned Loop	Tuned Station	rub 89 s
+Faraway-Tuned Night Shift	Buried Baseband	rub 8 s
+Faraway-Tuned Night Shift	Tuned Wire	rub 81 s
+Faulted Magma Chamber	Faulted Graben	rub 104 s
+Faulted Magma Chamber	Faulted Plate	rub 104 s
+Faulted Magma Chamber	Subducting Magma Chamber	rub 104 s
+Faulted Plate	Grinding Rift	rub 84 s
+Featureless Torus	Seething-Band Band Noise	rub 84 s
+Felted Salon	Curtained Bedchamber	rub 142 s
+Felted Salon	Quilted Den	rub 141 s
+Felted Salon	Upholstered Parlour	rub 40 s
+Felted Study	Tapestry-Hung Boudoir	rub 93 s
+Feral Ecology	Ecological Food Web	rub 14 s
+Feral Ecology	Foraging Food Web	rub 16 s
+Feral Ecology	Symbiotic Biome	rub 7 s
+Feral Ecology	Teeming Food Web	rub 24 s
+Fern Cloudforest	Sodden Holt	rub 119 s
+Feverish Harmonics	Feverish Whirlwind	rub 38 s
+Feverish Whirlwind	Feverish Maelstrom	rub 7 s
+Fey Arbour	Spectral Lawn	rub 105 s
+Fiddling Verge	Fescue Lea	rub 141 s
+Fiddling Verge	Trilling Pasture	rub 142 s
+Field-Bent Dynamo	Polarised Line	rub 41 s
+Field-Bent Dynamo	Sunspot Domain	rub 9 s
+Field-Bent Field	Magnetised Domain	rub 46 s
+Field-Bent Field	Polarised Dynamo	rub 19 s
+Field-Bent Field	Split Pole	rub 16 s
+Field-Bent Flux	Field-Bent Domain	rub 109 s
+Field-Bent Flux	Polarised Line	rub 23 s
+Field-Bent Flux	Triplet Magnetogram	rub 136 s
+Field-Bent Line	Gyromagnetic Flux	rub 19 s
+Field-Bent Line	Gyromagnetic Pole	rub 19 s
+Field-Bent Line	Sunspot Loop	rub 9 s
+Field-Bent Line	Triplet Magnetogram	rub 55 s
+Field-Bent Pole	Field-Bent Line	rub 24 s
+Field-Bent Pole	Gyromagnetic Pole	rub 24 s
+Field-Bent Pole	Sunspot Loop	rub 6 s
+Field-Bent Pole	Triplet Domain	rub 24 s
+Field-Line Glide Tone	Dispersed Radio Night	rub 21 s
+Field-Line Glide Tone	Whistling Radio Night	rub 27 s
+Fifth-Built Buttress	Load-Bearing Architrave	rub 28 s
+Fifth-Built Buttress	Load-Bearing Pier	rub 5 s
+Fifth-Built Buttress	Twin-Pillared Architrave	rub 24 s
+Fifth-Built Pier	Hewn Architrave	rub 15 s
+Fifth-Wise Circuit Walk	Neo-Riemannian Trail	rub 143 s
+Fifth-Wise Circuit Walk	Riemannian Ramble	rub 86 s
+Fifth-Wise Trail	Tonnetz Journey	rub 6 s
+Filtered Wash	Swirled Comb	rub 25 s
+Filtered Wash	Whooshing Flanger	rub 69 s
+Filtered Wash	Whooshing Swirl	rub 71 s
+Firefly Hedge	Dewy Orchard	rub 49 s
+Firefly Hedge	Moonlit Pergola	rub 24 s
+Firefly Meadow	Blinking Hedgerow	rub 34 s
+Firefly Meadow	Firefly Hedgerow	rub 93 s
+Firefly Meadow	Pulsing Meadow	rub 104 s
+Firefly Meadow	Sparking Summer Night	rub 81 s
+Firmament Foundation	Starbound Floor	rub 24 s
+Fissured Circles	Fissured Phases	rub 59 s
+Fissured Circles	Sundered Facets	rub 89 s
+Fissured Shards of Light	Cleft Phases	rub 94 s
+Fissured Shards of Light	Cleft Splinters	rub 61 s
+Fissured Shards of Light	Riven Shoals	rub 11 s
+Fissured Shards of Light	Splintered Facets	rub 75 s
+Fissured Shards of Light	Splintered Shoals	rub 90 s
+Fissured Shoals	Cleft Shards of Light	rub 13 s
+Fissured Shoals	Riven Arcs	rub 58 s
+Flagstone Atrium	Echoing Great Hall	rub 32 s
+Flagstone Atrium	Pillared Undercroft	rub 81 s
+Flanged Flanger	Swirled Flanger	rub 18 s
+Flanged Flanger	Whooshing Swirl	rub 29 s
+Flanged Wash	Phasing Notch	rub 19 s
+Flanged Wash	Swirled Flanger	rub 73 s
+Flanged Wash	Swirled Notch	rub 18 s
+Flattened Achernar	Flattened Vega	rub 9 s
+Flattened Achernar	Oblate Regulus	rub 9 s
+Flattened Regulus	Gyring Vega	rub 12 s
+Fleeing Quasar	Diminishing Horizon Light	rub 89 s
+Fleeing Quasar	Withdrawing Nebula	rub 119 s
+Fleet Air	Brisk Air	rub 120 s
+Fleet Air	Brisk Zephyr	rub 17 s
+Fleet Air	Darting Breeze	rub 18 s
+Fleet Air	Darting Zephyr	rub 93 s
+Fleet Air	Fleet Zephyr	rub 7 s
+Fleet Air	Hastened Draught	rub 93 s
+Fleet Air	Hastened Updraft	rub 93 s
+Fleet Air	Quickened Zephyr	rub 81 s
+Fleet Air	Skittering Breeze	rub 119 s
+Fleet Air	Skittering Flurry	rub 119 s
+Fleet Air	Skittering Whirl	rub 93 s
+Fleet Draught	Fleet Flurry	rub 57 s
+Flickering Lantern Cloud	Luminous Marsh	rub 17 s
+Flickering Rigel	Sparkling-Far Polaris	rub 9 s
+Flickering-Sky Substorm	Kilometric Arc Light	rub 119 s
+Floating Atolls	Pooling Holms	rub 12 s
+Floating Islands	Floating Atolls	rub 8 s
+Flocking Starlings	Scattering Shoal	rub 105 s
+Flocking Starlings	Scattering Swifts	rub 104 s
+Flowering Bell Plate	Opera Bell Plate	rub 12 s
+Flowering Bell Plate	Opera Chau Gong	rub 10 s
+Flowering Bell Plate	Opera Peking Gong	rub 104 s
+Flowering Bell Plate	Sounding Wind Gong	rub 104 s
+Flowing Ebb	Neap Waterline	level dip 3.3 peak 1.8 LU
+Flowing Marble	Curling Currents	rub 11 s
+Flue Organ	Ancient Principal	rub 119 s
+Flue Pipes	Stopped Bourdon	rub 105 s
+Fluked Lament	Breaching Call	rub 52 s
+Fluked Lament	Cetacean Lament	rub 104 s
+Fluked Lament	Sounding-Whale Call	rub 16 s
+Fluked Lament	Sounding-Whale Moan	rub 52 s
+Flute-Voiced Cave	Whistled Hollow	rub 7 s
+Focused Lens	Magnified Corona	rub 90 s
+Focused Lens	Magnified Glory	rub 44 s
+Focusing Circle	Centripetal Garland	rub 20 s
+Focusing Circle	Closing Wreath	rub 7 s
+Folded Snowflake	Folded Mosaic	rub 10 s
+Folded Snowflake	Radiant Lantern	rub 24 s
+Folded Snowflake	Radiant Medallion	rub 32 s
+Folding Banner	Glimmering Corona Band	rub 81 s
+Folding Cascade	Iterated Cascade	rub 93 s
+Folding Cascade	Iterated Echoes	rub 55 s
+Folding Cascade	Returning Cascade	rub 93 s
+Folding Cascade	Returning Echoes	rub 81 s
+Folding Regress	Self-Similar Loop	rub 104 s
+Footworn Plinth	Polished Stone	rub 11 s
+Foraging Food Web	Thriving Commons	rub 46 s
+Foraging Mould	Branching Filaments	rub 115 s
+Foraging Mould	Branching Network	rub 98 s
+Foraging Mould	Golden Tendrils	rub 79 s
+Foraging Mould	Spreading Plasmodium	rub 19 s
+Foraging Mould	Threaded Pathways	rub 94 s
+Foreign Anthem	Extraterrestrial Hymn	rub 77 s
+Foreign Anthem	Foreign Song	rub 103 s
+Foreign Anthem	Martian Consonance	rub 31 s
+Foreign Anthem	Outlandish Song	rub 83 s
+Foreign Anthem	Uncanny Anthem	rub 15 s
+Foreign Gamelan	Seventh Gamelan	rub 104 s
+Foretold Presage	Foreseen Foretaste	rub 79 s
+Foretold Presage	Foreseen Prelude	rub 82 s
+Foretold Presage	Imminent Premonition	rub 6 s
+Forged Girder	Riveted Furnace	rub 8 s
+Forked Threads	Twin Rivers	rub 51 s
+Formant Swell	Murmured Aum	rub 67 s
+Formant Tide	Vowelled Hum Tide	rub 64 s
+Former Afternoons	Recalled Footsteps	rub 104 s
+Former Afternoons	Spectral Footsteps	rub 104 s
+Former Footsteps	Vanished Footsteps	rub 119 s
+Former Footsteps	Vanished Gardens	rub 104 s
+Founded Contra Bourdon	Founded Subbass	rub 10 s
+Founded Subbass	Moored Diapason	rub 12 s
+Founded Subbass	Pedal-Held Swell Box	rub 104 s
+Fractal Brocade	Jacquard Rug	rub 17 s
+Fractal Carpet	Fractal Tapestry	rub 93 s
+Fractal Carpet	Jacquard Tapestry	rub 79 s
+Fractal Carpet	Twilled Brocade	rub 93 s
+Fractal Carpet	Twilled Carpet	rub 93 s
+Fractal Echoes	Nested Recursion	rub 119 s
+Fractal Tapestry	Fractal Carpet	rub 23 s
+Fractal Tapestry	Jacquard Rug	rub 13 s
+Fractal Tapestry	Jacquard Tapestry	rub 13 s
+Fractal Tapestry	Tapestried Loom	rub 81 s
+Fractal Tapestry	Tessellated Mosaic	rub 93 s
+Fractal Tapestry	Twilled Carpet	rub 28 s
+Fractured Fountains	Tumbling Fountains	rub 9 s
+Fractured Prisms	Tumbling Fountains	rub 80 s
+Fragrant Midsummer	Humming Solstice Night	rub 11 s
+Fragrant Midsummer	Velvet Summer Night	rub 14 s
+Fraunhofer Gap	Fraunhofer Shadow Line	rub 8 s
+Fraunhofer Gap	Veiled Spectrum	rub 28 s
+Fraunhofer Shadow Line	Eclipsed Prism Light	rub 10 s
+Fraunhofer Shadow Line	Fraunhofer Gap	rub 9 s
+Freezing Lantern Light	Freezing Last Light	rub 102 s
+Fringed Darkness	Phased Eventide	rub 12 s
+Fringed Darkness	Wave-Borne Midnight	rub 15 s
+Frosty Moonset	Bitter Solstice	rub 23 s
+Frosty Moonset	Hoarfrost Night	rub 9 s
+Frozen Edge	Eternal Brink	rub 12 s
+Frozen Loch	Humming Lagoon	rub 13 s
+Frozen Threshold	Dark-Bound Brink	rub 9 s
+Gable Strings	Belvedere Harp	rub 26 s
+Gable Strings	Veranda Sill	rub 47 s
+Galactic Motet	Astral Choir	rub 104 s
+Galactic Motet	Celestial-Choir Antiphon	rub 105 s
+Galactic Motet	Celestial-Choir Vespers	rub 93 s
+Galactic Motet	Starlit Vespers	rub 93 s
+Galactic Zenith	Liminal Threshold	rub 141 s
+Gale Cape	Battered Headland	rub 57 s
+Gale Cape	Untamed Cliffs	rub 33 s
+Gale Headland	Thundering Cliffs	rub 18 s
+Gale-Grounded Rain Cellar	Squall-Pressed Storm Cellar	rub 141 s
+Gale-Sung Chant	Gale-Sung Rite	rub 33 s
+Gale-Sung Chant	Roaring Call	rub 89 s
+Gale-Sung Chant	Tempest-Chanted Cry	rub 49 s
+Gale-Sung Rite	Roaring Summoning	rub 16 s
+Galvanised Roof	Rattling Barn	rub 11 s
+Garbled Carrier	Ghostly Ping	rub 9 s
+Garlanded Einstein Ring	Mirrored Corona Ring	rub 27 s
+Gathered Crickets	Gathered Metronomes	rub 6 s
+Gathered Crickets	Kindred Crickets	rub 67 s
+Gathered Metronomes	Aligned Fireflies	rub 17 s
+Gathered Metronomes	Heeding Feedback	rub 11 s
+Gathered Metronomes	Kindred Tremolo	rub 57 s
+Gathered Metronomes	Locked Lanterns	rub 8 s
+Gathered Metronomes	Pulsing Lanterns	rub 9 s
+Gathered Metronomes	Spotted Zebra	rub 8 s
+Gathered Tremolo	Coupled Hearts	rub 46 s
+Gathered Undulation	Dawdling Ripple	rub 25 s
+Gathered Undulation	Stilled Undulation	rub 81 s
+Gathering Birds	Converging Birds	rub 6 s
+Gathering Birds	Converging Voices	rub 119 s
+Gathering Chord	Rising Swarm	rub 9 s
+Gathering Front	Far-Off Front	rub 7 s
+Gathering Holms	Gathering Skerries	rub 102 s
+Gathering Holms	Settling Continents	rub 119 s
+Gathering Limit	Compressed Asymptote	rub 49 s
+Gathering Limit	Gathering Vanishing Point	rub 94 s
+Gathering Skerries	Floating Holms	rub 7 s
+Gathering Skerries	Gathering Isles	rub 15 s
+Gathering Skerries	Merging Isles	rub 106 s
+Gathering Skerries	Pooling Atolls	rub 96 s
+Gathering Skerries	Pooling Continents	rub 6 s
+Gathering Skerries	Ripening Holms	rub 5 s
+Gathering Vanishing Point	Brimming Boundary	rub 29 s
+Gauzy Gauze	Gauzy Mesh	rub 93 s
+Gauzy Gauze	Interfering Moire	rub 119 s
+Gauzy Gauze	Layered Moire	rub 102 s
+Gauzy Gauze	Layered Screen	rub 93 s
+Gauzy Gauze	Overlaid Screen	rub 119 s
+Gauzy Gauze	Recursive Iteration	rub 119 s
+Gauzy Gauze	Self-Similar Echoes	rub 68 s
+Gauzy Gauze	Sheer Tulle	rub 138 s
+Gauzy Gauze	Shimmering Organza	rub 119 s
+Gauzy Gauze	Spattering Splash	rub 47 s
+Gauzy Gauze	Wet Beads	rub 42 s
+Gauzy Mesh	Layered Moire	rub 26 s
+Gauzy Mesh	Overlaid Organza	rub 8 s
+Gauzy Mesh	Sheer Screen	rub 57 s
+Gauzy Mesh	Shimmering Veil	rub 75 s
+Gauzy Moire	Curling Marble	rub 119 s
+Gauzy Tulle	Layered Organza	rub 72 s
+Gauzy Tulle	Layered Screen	rub 72 s
+Gauzy Tulle	Overlaid Moire	rub 72 s
+Gauzy Tulle	Rippled Screen	rub 72 s
+Gentle Keys	Felt Chords	rub 44 s
+Gentle Keys	Night Fingers	rub 74 s
+Gentle Keys	Night Keys	rub 7 s
+Gentle Keys	Night Touch	rub 23 s
+Gentle Keys	Played Touch	rub 6 s
+Gentle Keys	Soft Hands	rub 51 s
+Ghost Airlock	Gutted Fuselage	rub 93 s
+Ghost Airlock	Silent-Hulled Airlock	rub 93 s
+Ghost Corridor	Tumbling Hab Ring	rub 81 s
+Ghost Hull	Ghost Fuselage	rub 43 s
+Ghostly Beacon Call	Ghostly Carrier	rub 7 s
+Ghostly Carrier	Lost Ping	rub 104 s
+Ghostly Lauds	Ghostly Madrigal	rub 83 s
+Ghostly Lauds	Mindborne Compline	rub 23 s
+Ghostly Signal	Last-Known Ping	rub 15 s
+Giant Utterance	Cyclopean Larynx	rub 106 s
+Giant Utterance	Enormous Breath	rub 106 s
+Giant Utterance	Leviathan-Voiced Throat	rub 95 s
+Giant Utterance	Titanic Gullet	rub 121 s
+Giant Utterance	Vast-Chested Larynx	rub 30 s
+Gilded Fresco	Gilded Panel	rub 83 s
+Glacial Moonset	Glacial Night	rub 119 s
+Glacial Moonset	Welded Choir	rub 142 s
+Glazed Panel	Tinted Panel	rub 7 s
+Gliding Bows	Amber Strings	rub 93 s
+Gliding Bows	Bowed Cellos	rub 94 s
+Gliding Bows	Muted Quartet	rub 104 s
+Gliding Bows	Silken Section	rub 103 s
+Gliding Bows	Sustained Quartet	rub 33 s
+Gliding Bows	Warm Ensemble	rub 81 s
+Gliding Bows	Warm Section	rub 19 s
+Gliding Bows	Warm Strings	rub 119 s
+Glimmering Corona Band	Draped Curtain	rub 21 s
+Glimmering Corona Band	Draped Streamer	rub 7 s
+Glimmering Corona Band	Northern Veil	rub 28 s
+Glimmering Corona Band	Wavering Drapery	rub 10 s
+Glinting Canopy	Silvered Canopy	rub 7 s
+Glinting Canopy	Silvered Thicket	rub 5 s
+Glinting Coppice	Imagined Tune	rub 96 s
+Glinting Coppice	Silvered Bower	rub 119 s
+Glinting Light	Bright Aurora	rub 9 s
+Glinting Sheen	Bright Aurora	rub 9 s
+Glinting Sheen	Sparkling Sheen	rub 6 s
+Glinting Veil	Bright Shimmer	rub 8 s
+Glinting Veil	Glinting Sheen	rub 7 s
+Glinting-Voice Grotto Song	Reedy Niche	rub 15 s
+Glinting-Voice Hollow	Harmonic-Sung Cavern Voice	rub 76 s
+Glistening Ripples	Spattering Beads	rub 44 s
+Glistening Ripples	Trickling Droplets	rub 40 s
+Glistening Splash	Splashing Beads	rub 7 s
+Glittering Motes	Dripping Motes	rub 35 s
+Glittering Motes	Dripping Spangles	rub 119 s
+Glittering Motes	Glittering Sequins	rub 104 s
+Glittering Motes	Raining Cascade	rub 36 s
+Glittering Motes	Raining Motes	rub 94 s
+Glittering Motes	Sifting Motes	rub 81 s
+Glowing Bed	Hearth Organ	rub 104 s
+Glowing Bed	Mellow Murmur	rub 141 s
+Glowing Cloud	Orion Veil Nebula	rub 93 s
+Glowing Ground	Hearth Bed	rub 104 s
+Glowing Ground	Mellow Ground	rub 49 s
+Glowing Meadow	Sparking Marsh	rub 26 s
+Glowing Murmur	Hearth Bed	rub 104 s
+Glowing Murmur	Mellow Murmur	rub 44 s
+Glowing Murmur	Warm Organ	rub 11 s
+Golden Afterglow	Fading Light	rub 104 s
+Golden Afterglow	Golden Horizon	rub 93 s
+Golden Afterglow	Lingering Warmth	rub 93 s
+Golden Coil	Winding Whorl	rub 8 s
+Golden Evening	Cosy Shelter	rub 119 s
+Golden Evening	Golden Embers	rub 119 s
+Golden Evening	Last Afterglow	rub 104 s
+Golden Evening	Rosy Embers	rub 104 s
+Golden Spiral	Coiling Fern	rub 93 s
+Golden Spiral	Droste Vortex	rub 93 s
+Golden Spiral	Logarithmic Spiral	rub 81 s
+Golden Spiral	Whorled Coil	rub 94 s
+Golden Tendrils	Branching Filaments	rub 120 s
+Golden Tendrils	Branching Network	rub 48 s
+Golden Tendrils	Foraging Mould	rub 85 s
+Golden Tendrils	Spreading Plasmodium	rub 31 s
+Golden-Disk Limb	Chromatic Limb	rub 9 s
+Golden-Disk Limb	Chromatic Prominence	rub 5 s
+Golden-Disk Limb	Granular Limb	rub 6 s
+Golden-Disk Prominence	Photospheric Limb	rub 9 s
+Golden-Disk Solar Wind	Golden-Disk Limb	rub 141 s
+Golden-Disk Sunspot	Solar Solar Wind	rub 136 s
+Gonglike Peking Gong	Burnished Gong Hall	rub 6 s
+Grain Weather	Rustling Mist	rub 6 s
+Grain Weather	Rustling Veil	rub 89 s
+Grained Pollen	Milled Sand	rub 15 s
+Grained Pollen	Milled Spore	rub 11 s
+Grained Pollen	Powdered Silt	rub 62 s
+Grained Silt	Milled Flour	rub 30 s
+Grained Silt	Powdered Silt	rub 29 s
+Granite Cloister	Mossed Terrace	rub 19 s
+Granular Limb	Chromatic Limb	rub 34 s
+Granular Prominence	Photospheric Limb	rub 26 s
+Granular Solar Wind	Solar Solar Wind	rub 69 s
+Graphite Megalith	Graphite Menhir	rub 18 s
+Graphite Megalith	Lightless-Black Cairn	rub 14 s
+Graphite Menhir	Pitch Menhir	rub 22 s
+Grassy Glade	Fiddling Verge	rub 119 s
+Grassy Glade	Trilling Pasture	rub 141 s
+Gravitating Magnet	Sinking Centre	rub 67 s
+Gravitating Transit	Precise Syzygy	rub 124 s
+Gravitating Transit	Precise Transit	rub 39 s
+Gravitational Assembly	Warped Chorus	rub 93 s
+Gravitational Gathering	Heavy-Sky Concert	rub 104 s
+Green Cane	Hollow Reedbed	rub 40 s
+Green Cane	Tapping Stalk	rub 46 s
+Green Clump	Clacking Culm	rub 34 s
+Green Clump	Green Culm	rub 32 s
+Green Clump	Knocking Clump	rub 93 s
+Green Clump	Knocking Shoot	rub 26 s
+Green Clump	Wooden Shoot	rub 31 s
+Green Culm	Clacking Culm	rub 37 s
+Green Culm	Wooden Shoot	rub 36 s
+Grey Band Noise	Breathing-Field Band Noise	rub 20 s
+Grey Band Noise	Diffuse Murmur Band	rub 32 s
+Grey Band Noise	Leviathan-Voiced Lung	rub 14 s
+Grey Band Noise	Trench-Deep Choir	rub 72 s
+Grey Hum	Plasmaspheric Hiss	rub 10 s
+Grey Hum	Plasmaspheric Murmur Band	rub 7 s
+Grey Hum	Steady Hiss	rub 17 s
+Grey Torus	Grey Hum	rub 36 s
+Grey Torus	Plasmaspheric Hiss	rub 93 s
+Grey-Haired Evening Star	Grey-Haired Star	rub 85 s
+Grey-Haired Old Flame	Grey-Haired Evening Star	rub 13 s
+Grey-Haired Old Flame	Old-Light Last Hydrogen	rub 77 s
+Grinding Foreshore	Washing Shingle	rub 141 s
+Grinding Rift	Shifting Mantle	rub 10 s
+Grinding Sandbar	Hissing Cobbles	rub 142 s
+Grinding Sandbar	Hissing Pebbles	rub 10 s
+Grinding Sandbar	Washing Shingle	level dip 3.8 peak 0.0 LU
+Groaning Glacier	Booming Ice Shelf	rub 18 s
+Groaning Glacier	Drifting Serac	rub 15 s
+Groaning Icefield	Fracturing Icefall	rub 8 s
+Grotto-Deep Grotto	Dripping Chamber	rub 72 s
+Grotto-Deep Grotto	Stalactite Chamber	rub 34 s
+Grotto-Deep Speleothem	Hollow Grotto	rub 15 s
+Grotto-Deep Speleothem	Hollow Speleothem	rub 81 s
+Grounded Contra Bourdon	Grounded Diapason	rub 90 s
+Grounded Contra Bourdon	Pedal-Held Diapason	rub 11 s
+Grounded Contra Bourdon	Unmoving Diapason	rub 96 s
+Grounded Open Wood	Founded Subbass	rub 7 s
+Grounded Open Wood	Moored Subbass	rub 6 s
+Grounded Open Wood	Steadfast Contra Bourdon	rub 25 s
+Growing Gallery	Burgeoning Rotunda	rub 110 s
+Growing Meadow	Budding Culture	rub 29 s
+Growing Structure	Organic Edifice	rub 12 s
+Growling Valley	Rumbling-Voice Mountain Pass	rub 61 s
+Growling Valley	Rumbling-Voice Yurt	rub 47 s
+Growling Valley	Tuvan Gorge	rub 50 s
+Growling Yurt	Growling Valley	rub 15 s
+Grumbling Boom	Hillside Thunder	rub 13 s
+Grumbling Boom	Mountain Rumble	rub 94 s
+Grumbling Boom	Rolling Thunder	rub 93 s
+Grumbling Thunder	Grumbling Boom	rub 32 s
+Grumbling Thunder	Rolling Thunder	rub 6 s
+Grumbling Thunder	Valley Boom	rub 11 s
+Gusting Tempest	Wind-Torn Storm	rub 8 s
+Gyral Cyclotron	Polar Coil	rub 93 s
+Gyral Cyclotron	Polar Spindle	rub 93 s
+Gyral Ion	Spinning Helix	rub 7 s
+Gyrating Merry-Go-Round	Coursing Roundel	rub 53 s
+Gyrating Merry-Go-Round	Wheeling Starling Ring	rub 8 s
+Gyrating Swarm	Pirouetting Gyre	rub 82 s
+Gyrating Swarm	Rotating Starling Ring	rub 14 s
+Gyrating Swarm	Spiralling Gyre	rub 80 s
+Gyrating Swarm	Spiralling Merry-Go-Round	rub 9 s
+Gyring Ringlet	Circling Corona	rub 9 s
+Gyring Ringlet	Spinning Merry-Go-Round	rub 76 s
+Gyromagnetic Flux	Gyromagnetic Pole	rub 7 s
+Gyromagnetic Flux	Sunspot Loop	rub 6 s
+Gyromagnetic Pole	Precessing Dynamo	rub 13 s
+Gyuto Mantra	Benthic-Sung Choir	rub 104 s
+Gyuto Mantra	Chanted Prayer Hall	rub 119 s
+Gyuto Mantra	Chanted Puja	rub 119 s
+Gyuto Mantra	Intoned Syllable	rub 119 s
+Gyuto Mantra	Monastic Prayer Hall	rub 119 s
+Gyuto Mantra	Shifting-Vowel Vowel	rub 141 s
+Gyuto Mantra	Tantric Om	rub 142 s
+Gyuto Om	Cloistral Om	rub 81 s
+Gyuto Om	Cloistral Prayer Hall	rub 81 s
+Gyuto Om	Gyuto Litany	rub 93 s
+Gyuto Om	Monastic Litany	rub 31 s
+H-Alpha Handbell	Ionised Tubular Bell	rub 106 s
+H-Beta Tubular Bell	H-Beta Chime	rub 74 s
+H-Delta Chime	Ionised Tubular Bell	rub 42 s
+H-Delta Tubular Bell	Emission Bowl	rub 44 s
+H-Delta Tubular Bell	Ionised Singing Bowl	rub 7 s
+Hadal Sinkhole	Benthic Sinkhole	rub 119 s
+Hadal Sinkhole	Lantern-Lit Shrine	rub 8 s
+Hadal Sinkhole	Starless Density	rub 12 s
+Hadal Trench	Abyssal Hadal Zone	rub 84 s
+Hadal Trench	Benthic Chasm	rub 88 s
+Hadal Trench	Bottomless Deep	rub 119 s
+Hadal Trench	Unlit Deep	rub 26 s
+Haloed Altar	Shining Reliquary	rub 19 s
+Haloed Round Dance	Circling Corona	rub 22 s
+Haloed Round Dance	Gyring Ringlet	rub 74 s
+Haloed Round Dance	Orbiting Corona	rub 92 s
+Haloed Round Dance	Vortical Ringlet	rub 104 s
+Halved Subharmonic	Split Bifurcation	rub 121 s
+Hammered Chau Gong	Burnished Gong Hall	rub 22 s
+Harmonic Almanac	Precise Syzygy	rub 7 s
+Harmonic Transit	Gravitating Transit	rub 120 s
+Harmonious Callers	Attuned Chirpers	rub 45 s
+Harmonious Callers	Chiming Fiddlers	rub 35 s
+Hastened Updraft	Quickened Zephyr	rub 12 s
+Hastening Pulse	Climbing Run	rub 104 s
+Haunted Library	Familiar Gallery	rub 88 s
+Haunted Library	Recalled Archive	rub 105 s
+Haunted Library	Storied Gallery	rub 80 s
+Haunted Library	Storied Palace	rub 81 s
+Hayfield Field	Chirring Hayloft	rub 78 s
+Hazy Shallows	Dim Lagoon	rub 119 s
+Hazy Shallows	Slumbering Shallows	rub 119 s
+Hearing Mirror	Heeding Feedback	rub 6 s
+Hearth Pedal	Mellow Organ	rub 14 s
+Heavenly Moon	Astral Sphere	rub 93 s
+Heavenly Moon	Planetary Comet	rub 119 s
+Heavenly Moon	Planetary Planetarium	rub 141 s
+Heavenly Moon	Starlit Orrery	rub 119 s
+Heavenly Moon	Starlit Planet	rub 142 s
+Heavenly Moon	Zodiacal Equinox	rub 104 s
+Heavenly Moon	Zodiacal Planetarium	rub 104 s
+Heavenly Moon	Zodiacal Solstice	rub 93 s
+Heaving Ballast	Pressing Depth Gauge	rub 95 s
+Heaving Bulkhead	Compressed Bulkhead	rub 7 s
+Heavy Basalt	Black Furnace	rub 53 s
+Heavy Crypt	Heavy Cavern	rub 30 s
+Heavy Rumble	Looming Thunderhead	rub 10 s
+Heavy Rumble	Mighty Thunderhead	rub 10 s
+Heavy Thundersheet	Booming Stormcloud	rub 14 s
+Heavy Thundersheet	Mighty Thunderhead	rub 5 s
+Heavy-Sky Choir	Orbiting Gathering	rub 35 s; rub 54 s
+Heavy-Sky Concert	Gravitational Gathering	rub 77 s
+Heeding Listener	Alert Echo	rub 6 s
+Held Intake	Drawing Sigh	rub 128 s
+Held Intake	Gathered Stillness	rub 77 s
+Held Intake	Indrawn Sigh	rub 120 s
+Held Intake	Welling Intake	rub 116 s
+Hewn Architrave	Hewn Colonnade	rub 16 s
+Hewn Architrave	Load-Bearing Colonnade	rub 49 s
+Hewn Colonnade	Twin-Pillared Architrave	rub 31 s
+Hexagonal Lantern	Hexagonal Facets	rub 66 s
+Hexagonal Mandala	Folded Snowflake	rub 8 s
+Hexagonal Mandala	Symmetric Medallion	rub 74 s
+Hexagonal Rosette	Mirrored Lantern	rub 71 s
+Hibernal Season	Autumnal Fallow	rub 8 s
+Hidden Grotto	Buried Root Cellar	rub 29 s
+Hidden Grotto	Chthonic Floor	rub 10 s
+High-Bough Bower	High-Bough Foliage	rub 44 s
+High-Bough Bower	Rasping Canopy	rub 76 s
+High-Bough Treetops	Arboreal Bower	rub 119 s
+High-Bough Treetops	High-Bough Foliage	rub 119 s
+High-Bough Treetops	Lofty Crowns	rub 19 s
+High-Bough Treetops	Lofty Limbs	rub 10 s
+High-Bough Treetops	Rasping Canopy	rub 119 s
+Highland Pines	Needled Conifers	rub 75 s
+Highland Pines	Northern Conifers	rub 79 s
+Highland Pines	Northern Hemlocks	rub 90 s
+Highland Pines	Taiga Spruces	rub 81 s
+Hillside Drumroll	Rolling Drumroll	rub 120 s
+Hillside Thunder	Rolling Thunder	rub 6 s
+Hissing Cobbles	Grinding Foreshore	rub 14 s
+Hissing Cobbles	Grinding Pebbles	rub 104 s
+Hissing Cobbles	Rounded Pebbles	rub 11 s
+Hissing Cobbles	Washing Shingle	rub 5 s
+Hissing Cobbles	Washing Spit	rub 93 s
+Hissing Hiss	Hissing Plasma	rub 32 s
+Hissing Pebbles	Grinding Foreshore	rub 9 s
+Holed Hatch	Punched Plate	rub 7 s
+Hollow Aria	Breathing Psalm	rub 11 s
+Hollow Bamboo	Green Bamboo	rub 125 s
+Hollow Bamboo	Green Shoot	rub 107 s
+Hollow Bamboo	Hollow Reedbed	rub 47 s
+Hollow Bamboo	Rustling Clump	rub 107 s
+Hollow Bamboo	Rustling Reedbed	rub 15 s
+Hollow Bamboo	Tapping Cane	rub 124 s
+Hollow Flowstone	Grotto-Deep Speleothem	rub 93 s
+Hollow Litany	Vowel Chant	rub 64 s
+Hollow Reedbed	Green Cane	rub 142 s
+Hollow Tunnel	Burrowing Burrow	rub 11 s
+Hollow Tunnel	Curving Tunnel	rub 47 s
+Hollow Tunnel	Endless Conduit	rub 17 s
+Hollow Tunnel	Endless Tube	rub 14 s
+Hollow-Hulled Airlock	Derelict Airlock	rub 111 s
+Homing Circle	Centripetal Halo	rub 93 s
+Homing Circle	Spiralling-In Halo	rub 93 s
+Homing Garland	Narrowing Wreath	rub 8 s
+Homing Starlings	Banking Herons	rub 6 s
+Homing Starlings	Murmuring Starlings	rub 14 s
+Honeyed Dusk	Tepid Dusk	rub 57 s
+Honeyed Dusk	Tepid Evening	rub 9 s
+Honeyed Gloaming Hour	Amber Lamplight	rub 11 s
+Honeyed Gloaming Hour	Tepid Lamplight	rub 22 s
+Howling Coast	Stormy Lighthouse	rub 37 s; rub 52 s
+Howling Coast	Thundering Cliffs	rub 57 s
+Howling Coast	Thundering Reef	rub 120 s
+Humid Thunderstorm	Torrid Deluge	rub 90 s
+Humming Engine	Dreaming Apparatus	rub 81 s
+Humming Engine	Lucid Contraption	rub 11 s
+Humming Lagoon	Crystal Floe	rub 93 s
+Humming Lagoon	Singing Floe	rub 93 s
+Humming Node	Antinodal Room Mode	rub 95 s
+Humming Node	Chantry Transept	rub 119 s
+Humming Node	Interfering Vigil	rub 141 s
+Humming Node	Resonant Mode	rub 119 s
+Humming Node	Standing Boom	rub 119 s
+Humming Node	Standing Mode	rub 119 s; rub 140 s
+Humming Tarn	Crystal Floe	rub 94 s
+Humming Waveguide	Humming Mode	rub 17 s
+Hushed Crystals	Settling Hoarfrost	rub 104 s
+Hushed Tempest	Horizon Rumble	rub 119 s
+Hushed Tempest	Remote Thunder	rub 141 s
+Hushed-Stone Chantry	Hushed-Stone Shrine	rub 9 s
+Hushed-Stone Chantry	Low-Vaulted Sanctuary	rub 62 s
+Hushed-Stone Shrine	Plainsong Sanctuary	rub 107 s
+Hydrogenic Transition	Brackett Spectrum	rub 106 s
+Hydrophone Channel	Deep-Sea Sea Lane	rub 93 s
+Hyperspace Lightspeed	Comet Lightspeed	rub 93 s
+Hypnagogic Edge	Nodding Shapes	rub 141 s
+Hypnagogic Edge	Twilit Visions	rub 14 s
+Hypnagogic Edge	Vanishing Shapes	rub 13 s
+Icebound Moonset	Arctic Twilight	rub 93 s
+Icebound Moonset	Bitter Twilight	rub 104 s
+Icebound Moonset	Glacial Darkness	rub 93 s
+Icebound Moonset	Polar Darkness	rub 93 s
+Icebound Moonset	Wintry Starlight	rub 93 s
+Illumined Font	Gilded Baptistery	rub 14 s
+Illumined Font	Glorified Font	rub 44 s
+Illumined Font	Nimbed Shrine	rub 115 s
+Illumined Font	Radiant Baptistery	rub 44 s
+Illumined Shrine	Haloed Altar	rub 119 s
+Imagined Tune	Luminous Dream	rub 120 s
+Imagined Tune	Musing Bedchamber	rub 119 s
+Imagined Tune	Quiet Cadence	rub 119 s
+Imagined Tune	Quiet Tune	rub 120 s
+Imagined Voice	Murmured Descant	rub 120 s
+Imagined Voice	Murmured Strain	rub 141 s
+Immersed Space	Inner Space	rub 49 s
+Imploding Cathedral	Imploding Hall	rub 5 s
+Imploding Cathedral	Imploding Vault	rub 93 s
+Imploding Vault	Infolding Dome Hall	rub 78 s
+Indigo Night Song	Obsidian Notturno	rub 10 s
+Indigo Nocturne	Indigo Night Song	rub 141 s
+Indigo Nocturne	Obsidian Notturno	rub 11 s
+Indigo Nocturne	Quicksilver Hermitage	rub 11 s
+Indigo Nocturne	Velvet-Dark Nocturne	rub 9 s
+Indigo Nocturne	Velvet-Dark Notturno	rub 21 s
+Indigo Plume	Wafting Sepia Cloud	rub 7 s
+Indrawn Pause	Drawing Sigh	rub 120 s
+Indrawn Pause	Drawing Stillness	rub 104 s
+Indrawn Pause	Held Intake	rub 104 s
+Indrawn Pause	Welling Anticipation	rub 119 s
+Indrawn Pause	Welling Intake	rub 120 s
+Infalling Gyre	Winding Torus	rub 94 s
+Infinite Brink	Familiar Palace	rub 101 s
+Infinite Event	Frozen Edge	rub 119 s
+Infolding Cathedral	Collapsing Concourse Hall	rub 81 s
+Infolding Cathedral	Converging Dome Hall	rub 93 s
+Infolding Cathedral	Infolding Dome Hall	rub 14 s
+Infolding Cathedral	Inward Dome Hall	rub 93 s
+Infolding Dome Hall	Inward Dome Hall	rub 9 s
+Infolding Hall	Imploding Great Room	rub 47 s
+Infolding Nave	Imploding Hall	rub 16 s
+Infolding Nave	Imploding Vault	rub 48 s
+Infolding Nave	Infolding Cathedral	rub 51 s
+Infolding Nave	Infolding Dome Hall	rub 52 s
+Ingathering Cathedral	Collapsing Great Room	rub 46 s
+Ingathering Cupola	Collapsing Nave	rub 118 s
+Ingathering Cupola	Gathering-In Nave	rub 122 s
+Ingathering Cupola	Imploding Great Room	rub 119 s
+Ingathering Cupola	Infolding Hall	rub 141 s
+Ingathering Cupola	Ingathering Vault	rub 120 s
+Inhaled Tremulant	Bellowed Pallet	rub 20 s
+Inhaling Bedrock	Slow-Heaving Undercroft	rub 23 s
+Inhaling Floorboard	Breathing Bedrock	rub 75 s
+Inhaling Floorboard	Deep-Sighing Hearthstone	rub 6 s
+Inhaling Lowland Floor	Breathing Bedrock	rub 104 s
+Ink Small-Hours Air	Ink Night Piece	rub 84 s
+Ink Small-Hours Air	Velvet-Dark Nocturne	rub 9 s
+Inked Sepia Cloud	Wafting Cloudlet	rub 69 s
+Inner Descant	Private Voice	rub 19 s
+Inspiralling Coalescence	Converging Coalescence	rub 11 s
+Inspiralling Coalescence	Inspiralling Collision	rub 74 s
+Inspiralling Coalescence	Inspiralling Merger	rub 8 s
+Inspiralling Coalescence	Merging Inspiral	rub 8 s
+Inspiralling Merger	Coalescing Chirp	rub 89 s
+Interfering Nightfall	Interfering Vigil	rub 120 s
+Interfering Nightfall	Overlapping Eventide	rub 104 s
+Interfering Nightfall	Superposing Small Hours	rub 119 s
+Interfering Nightfall	Wave-Borne Night	rub 142 s
+Interfering Tulle	Gauzy Gauze	rub 35 s
+Interfering Tulle	Rippled Organza	rub 96 s
+Interfering Vigil	Chantry Transept	rub 119 s
+Interfering Vigil	Diffracted Nightfall	rub 92 s
+Interfering Vigil	Limestone Great Hall	rub 119 s
+Interfering Vigil	Overlapping Eventide	rub 99 s
+Interfering Vigil	Superposing Nocturne	rub 86 s
+Interfering Vigil	Superposing Small Hours	rub 104 s
+Intergalactic Foundation	Ancient Tremor	rub 122 s
+Interlaced Brocade	Jacquard Rug	rub 48 s
+Interstellar Photons	Comet Lightspeed	rub 12 s
+Inverted Continuum	Wound Topology	rub 116 s
+Ionised Singing Bowl	Emission Bowl	rub 104 s
+Ionised Spindle	Polar Spindle	rub 93 s
+Ionised-Gas Nursery	Eagle Cloud	rub 100 s
+Ionised-Gas Nursery	Rosette Nebula	rub 28 s
+Ionised-Gas Plume	Balmer Ladder	rub 59 s
+Ionospheric Sky Mirror	D-Layer Radio Sky	rub 10 s
+Ionospheric Sky Mirror	D-Layer Skip	rub 10 s
+Ionospheric Sky Mirror	Refracted Layer	rub 58 s
+Iron Bell	Temple Carillon	rub 19 s
+Iron Bell	Temple Toll	rub 6 s
+Iron Bell	Tibetan Toll	rub 20 s
+Jacquard Rug	Fractal Brocade	rub 7 s
+Jacquard Rug	Fractal Carpet	rub 111 s
+Jacquard Rug	Interlaced Brocade	rub 7 s
+Jacquard Rug	Jacquard Tapestry	rub 111 s
+Jacquard Rug	Patterned Rug	rub 7 s
+Jacquard Rug	Patterned Tapestry	rub 7 s
+Jacquard Rug	Tapestried Loom	rub 100 s
+Jacquard Rug	Tapestried Weave	rub 84 s
+Jacquard Rug	Twilled Brocade	rub 111 s
+Janus Centaur	Patchwork Kernel	rub 29 s
+Janus Centaur	Two-Faced Griffin	rub 7 s
+Jet Slab	Basalt Menhir	rub 11 s
+Jet Slab	Graphite Dolmen	rub 19 s
+Jet Slab	Jet Megalith	rub 6 s
+Joined Consort	Welded Choir	rub 52 s
+Joined Ensemble	Merged Ensemble	rub 35 s
+Kept Mansion	Familiar Corridor	rub 110 s
+Kept Mansion	Recalled Corridor	rub 104 s
+Kept Mansion	Remembered Gallery	rub 71 s
+Kept Mansion	Treasured Mansion	rub 110 s
+Kilometric Arc Light	Borealis Oval	rub 6 s
+Kilometric Pulsation	Auroral Arc Light	rub 50 s
+Kilometric Pulsation	Borealis Oval	rub 104 s
+Kilometric Pulsation	Borealis Sky Curtain	rub 104 s
+Kindled Disc	Blooming Disc	rub 93 s
+Kindled Disc	Shivering Sheet	rub 5 s
+Kindled Plate	Blooming Tympan	rub 51 s
+Kindled Plate	Bursting Gong	rub 42 s
+Kindred Crickets	Gathered Metronomes	rub 6 s
+Kindred Crickets	Pulsing Lanterns	rub 9 s
+Kindred Tremolo	Chaotic Trajectory	rub 89 s
+Knocking Shoot	Green Cane	rub 89 s
+Knocking Shoot	Green Culm	rub 29 s
+Knocking Shoot	Wooden Shoot	rub 29 s
+Knotted Lattice	Woven Fabric	rub 67 s
+Labouring Ballast	Low-Pulsing Bulkhead	rub 141 s
+Labouring Ballast	Throbbing Pressure Hull	rub 105 s
+Labyrinth Shell	Mottled Maze	rub 93 s
+Labyrinth Shell	Patterned Pattern	rub 13 s
+Labyrinth Shell	Patterned Pigment	rub 93 s
+Lady Apse	Whitewashed Apse	rub 93 s
+Lambent Altar	Haloed Altar	rub 119 s
+Lambent Altar	Shining Reliquary	rub 45 s
+Languid Rivulet	Oozing Ooze	rub 119 s
+Languid Rivulet	Syrupy Rivulet	rub 25 s
+Languid Rivulet	Treacly Rivulet	rub 119 s
+Languid Seep	Honeyed Seep	rub 100 s
+Languid Seep	Oozing Stream	rub 47 s
+Lapping Fountain	Lapping Water	rub 10 s
+Lapping Jetty	Moonlit Waterside	rub 56 s
+Lapping Pier	Lapping Jetty	rub 142 s
+Lapping Pier	Lapping Mere Shore	rub 104 s
+Lapping Pier	Rippling Jetty	rub 54 s
+Lapping Pier	Silver Lagoon Night	rub 96 s
+Lapping Pier	Silver Mere Shore	rub 119 s
+Lapping Pier	Still-Water Pier	rub 86 s
+Lapping Rings	Lapping Water	rub 8 s
+Lasering Lagoon	Singing Floe	rub 93 s
+Lasering Lake	Chirping Mere	rub 11 s
+Last-Known Carrier	Last-Known Telemetry	rub 86 s
+Last-Known Ping	Garbled Carrier	rub 8 s
+Late Sweep	Moonrise Bow	rub 41 s
+Late Sweep	Nightfall Hour	rub 7 s
+Late-Life Giant	Bloated Envelope	rub 16 s
+Late-Life Giant	Swollen Helium Core	rub 86 s
+Lattice Truss	Twisted Spar	rub 58 s
+Layered Moire	Interfering Moire	rub 119 s
+Layered Moire	Shimmering Veil	rub 141 s
+Layered Skip	F-Layer Sky Mirror	rub 5 s
+Leaden Knell	Lowered Knell	rub 8 s
+Leaden Knell	Muffled Knell	rub 61 s
+Leafy Copse	Dewy Copse	rub 68 s
+Leafy Copse	Sodden Rainforest	rub 110 s
+Leafy-Crowned Bower	Lofty Limbs	rub 5 s
+Leafy-Crowned Canopy	Lofty Limbs	rub 5 s
+Leaky Lean-To	Ringing Tin Barn	rub 93 s
+Lengthening Chamber Hall	Expanding Cupola	rub 119 s
+Lengthening Chamber Hall	Sinking-Tail Chamber Hall	rub 104 s
+Lengthening Chamber Hall	Stretched Hall	rub 11 s
+Leviathan Path	Breaching Call	rub 13 s
+Leviathan Road	Leviathan Way	rub 19 s
+Leviathan Way	Blue-Deep Song	rub 17 s
+Leviathan Way	Fluked Lament	rub 6 s
+Leviathan Way	Sounding-Whale Route	rub 81 s
+Leviathan-Voiced Bellow	Leviathan-Voiced Lung	rub 33 s
+Leviathan-Voiced Gullet	Leviathan-Voiced Larynx	rub 104 s
+Leviathan-Voiced Gullet	Vast-Chested Throat	rub 93 s
+Leviathan-Voiced Lung	Colossal Breath	rub 197 s
+Leviathan-Voiced Lung	Diffuse Murmur Band	rub 152 s
+Leviathan-Voiced Lung	Leviathan-Voiced Bellow	rub 119 s
+Leviathan-Voiced Lung	Leviathan-Voiced Utterance	rub 185 s
+Leviathan-Voiced Lung	Pressure-Sung Cantors	rub 119 s; rub 138 s
+Leviathan-Voiced Throat	Titanic Utterance	rub 7 s
+Leviathan-Voiced Utterance	Leviathan-Voiced Bellow	rub 13 s
+Leviathan-Voiced Utterance	Leviathan-Voiced Lung	rub 15 s
+Leviathan-Voiced Utterance	Mountainous Throat	rub 15 s
+Lightless Abyssal Flat	Manganese Silt Bed	rub 60 s; rub 82 s
+Lightless Mud Flat	Pelagic Silt Bed	rub 84 s
+Lightless Mud Flat	Silted Silt Bed	rub 16 s
+Lightless-Black Menhir	Onyx Menhir	rub 73 s
+Lightless-Sung Chant Line	Benthic-Sung Psalmody	rub 104 s
+Lightless-Sung Dirge	Abyssal-Voiced Choir	rub 119 s
+Lightless-Sung Dirge	Drowned-Voice Assembly	rub 69 s
+Lightless-Sung Dirge	Pressure-Sung Cantors	rub 11 s
+Lightless-Sung Dirge	Trench-Deep Assembly	rub 10 s
+Lilting Kink	Heaving Breather	rub 94 s
+Lilting Kink	Nodding Pendulum Chain	rub 19 s; rub 7 s
+Lilting Kink	Nodding Soliton	rub 80 s
+Lilting Kink	Pulsing Breather	rub 7 s
+Lilting Pendulum Chain	Beating Lantern Chain	rub 23 s
+Lily Pond	Boggy Slough	rub 28 s
+Lily Pond	Peeping Mire	rub 93 s
+Limestone Undercroft	Echoing Great Hall	rub 9 s
+Limestone Undercroft	Echoing Undercroft	rub 24 s
+Limestone Undercroft	Pillared Basilica	rub 9 s
+Liminal Valley	Faraway Country	rub 6 s
+Lingering Gardens	Vanished Gardens	rub 93 s
+Lingering Undulation	Pooling Undulation	rub 11 s
+Lingering Waltz	Recalled Footsteps	rub 44 s
+Lingering Waltz	Spectral Footsteps	rub 62 s
+Lingering Waltz	Vanished Footsteps	rub 61 s
+Lingering Warmth	Rosy Light	rub 81 s
+Linked Manifold	Knotted-Space Lattice	rub 14 s
+Linked Manifold	Plaited Surface	rub 9 s
+Listening Mind	Dreaming Neurons	rub 55 s
+Listening Mind	Dreaming Reverie	rub 104 s
+Listening Mind	Pondering Neurons	rub 82 s
+Listening Mind	Recurrent Mind	rub 48 s
+Listening Network	Dreaming Neurons	rub 6 s
+Living Structure	Evolving Architecture	rub 23 s
+Load-Bearing Architrave	Load-Bearing Pier	rub 13 s
+Load-Bearing Architrave	Monumental Pylon	rub 6 s
+Load-Bearing Architrave	Upright Colonnade	rub 7 s
+Load-Bearing Architrave	Upright Pillar	rub 19 s
+Load-Bearing Obelisk	Fifth-Built Buttress	rub 87 s
+Load-Bearing Obelisk	Fifth-Built Colonnade	rub 87 s
+Load-Bearing Obelisk	Hewn Colonnade	rub 87 s
+Load-Bearing Obelisk	Twin-Pillared Architrave	rub 14 s
+Load-Bearing Pier	Twin-Pillared Architrave	rub 17 s
+Localized Crown	Gapped Glow	rub 24 s
+Localized Crown	Pinned Glow	rub 13 s
+Lofty Limbs	Lofty Canopy	rub 19 s
+Loitering Surge	Dawdling Billow	rub 6 s
+Loitering Surge	Trapped Wavelet	rub 6 s
+Loitering Undulation	Lingering Undulation	rub 6 s
+Loitering Wavelet	Dawdling Billow	rub 75 s
+Loitering Wavelet	Loitering Surge	rub 31 s
+Loitering Wavelet	Lulled Wave	rub 93 s
+Loitering Wavelet	Trapped Wavelet	rub 50 s
+Long Breakers	Climbing Breakers	rub 11 s
+Long Breakers	Rising Breakers	rub 7 s
+Long Thunder	Rumbling Boom	rub 18 s
+Long-Range Gyre Sound	Basin-Wide Current	rub 46 s
+Long-Range Gyre Sound	Long-Range Passage	rub 50 s
+Long-Range Gyre Sound	Ocean-Long Ocean Echo	rub 47 s
+Long-Range Gyre Sound	Trembling Capella	rub 10 s
+Long-Range Gyre Sound	Wide-Water Far Call	rub 84 s
+Long-Range Ocean Echo	Ocean-Long Far Call	rub 24 s
+Long-Range Ocean Echo	Transoceanic Passage	rub 62 s
+Long-Span Antenna	Broken Spar	rub 13 s
+Long-Span Antenna	Long-Span Arm	rub 81 s
+Long-Span Boom	Broken Boom	rub 93 s
+Long-Span Boom	Sheared Mast	rub 93 s
+Long-Travelled Ripple	Ancient Swell	rub 13 s
+Long-Travelled Ripple	Ancient Tremor	rub 78 s
+Long-Travelled Ripple	Faraway Echo Wave	rub 77 s
+Long-Travelled Ripple	Primordial Ripple	rub 100 s
+Long-Travelled Ripple	Primordial Strain	rub 77 s
+Long-Wire Antenna	Buried Loop	rub 5 s
+Long-Wire Night Shift	Buried Loop	rub 5 s
+Long-Wire Receiver	Long-Wire Night Shift	rub 83 s
+Long-Wire Wire	Faraway-Tuned Station	rub 13 s
+Long-Wire Wire	Loop-Antenna Logbook	rub 11 s
+Long-Wire Wire	Loop-Antenna Wire	rub 11 s
+Long-Wire Wire	Tuned Station	rub 11 s
+Loop-Antenna Logbook	Long-Wire Wire	rub 30 s
+Looping Maelstrom	Coursing Roundel	rub 119 s
+Looping Maelstrom	Gyrating Merry-Go-Round	rub 69 s
+Looping Maelstrom	Patinated Billow	rub 119 s
+Lost Ping	Lost Echo Signal	rub 108 s
+Lost Ping	Lost Signal	rub 142 s
+Lost Signal	Ghostly Beacon Call	rub 7 s
+Lost Signal	Ghostly Carrier	rub 7 s
+Lost Signal	Lost Echo Signal	rub 20 s
+Lost Summer	Faded Night	rub 119 s
+Lost Summer	Old Night	rub 142 s
+Lost Summer	Quiet Tune	rub 119 s
+Lost Summer	Welling Intake	rub 141 s
+Lost Telemetry	Faint-Signal Telemetry	rub 44 s
+Low Undertow	Sombre Monolith	rub 36 s
+Lowered Knell	Grave Tenor Bell	rub 47 s
+Lowered Knell	Underwater Great Bell	rub 12 s
+Lucid Device	Mechanical Orrery	rub 119 s
+Lucid Dream	Clear-Eyed Daydream	rub 65 s
+Lucid Dream	Clear-Eyed Rapture	rub 32 s
+Lucid Glass	Thin Lens	rub 9 s
+Lucid Somnium	Lucid Trance	rub 94 s
+Lucid Somnium	Luminous Daydream	rub 93 s
+Lucid Somnium	Transparent Reverie	rub 93 s
+Lucid Somnium	Transparent Somnium	rub 93 s
+Lucid Somnium	Vivid Rapture	rub 81 s; rub 93 s
+Lucid Spire	Cold Facet	rub 7 s
+Lucid Spire	Lucid Glass	rub 7 s
+Lucid Trance	Luminous Daydream	rub 26 s
+Lucid Vision	Sleepwalking Stairwell	rub 59 s
+Lulled Wave	Loitering Surge	rub 49 s
+Lulled Wave	Loitering Wavelet	rub 67 s
+Lulled Wave	Trapped Wavelet	rub 62 s
+Lulled Wavelet	Dawdling Wavelet	rub 119 s
+Lulled Wavelet	Lingering Undulation	rub 11 s
+Lulled Wavelet	Stilled Undulation	rub 18 s
+Lulling Shoreline	Pelagic Swells	rub 119 s
+Luminous Daydream	Lucid Somnium	rub 47 s
+Luminous Daydream	Lucid Trance	rub 40 s
+Luminous Dream	Wakeful Trance	rub 12 s
+Luminous Glass	Pastel Fresco	rub 16 s
+Luminous Paddock	Sparking Marsh	rub 80 s
+Luminous Somnium	Lucid Somnium	rub 54 s
+Luminous Somnium	Transparent Reverie	rub 26 s
+Lunar Beam	Waning Night	rub 62 s
+Lung-Slow Groundswell	Lung-Slow Seabed	rub 48 s
+Lung-Slow Groundswell	Slow-Heaving Undercroft	rub 28 s
+Lung-Slow Seabed	Plainsong Oratory	rub 83 s
+Lungful Bellows	Rising Ventil	rub 93 s
+Lungful Bellows	Sighing Tracker	rub 12 s
+Lungful Ventil	Billowing Tracker	rub 45 s
+Lungful Windchest	Bellowed Pallet	rub 84 s
+Lush Firefly Night	Lush Solstice Night	rub 8 s
+Lush July Night	Starry Firefly Night	rub 66 s
+Lush Long Evening	Lush July Night	rub 104 s
+Lush Long Evening	Lush Solstice Night	rub 109 s
+Lush Solstice Night	Lush Dog Days	rub 5 s
+Lush Solstice Night	Starry Harvest Night	rub 6 s
+Lyman Level	Hydrogenic Transition	rub 43 s
+Lyman Level	Paschen Line Choir	rub 63 s
+Lyman Level	Pfund Ladder	rub 84 s
+Lyman Level	Pfund Spectrum	rub 119 s
+Lyman Level	Quantised Emission	rub 104 s
+Magnetic Corona Sky	Auroral Arc Light	rub 93 s
+Magnetic Corona Sky	Flickering-Sky Substorm	rub 15 s
+Magnetic Pulsation	Kilometric Arc Light	rub 17 s
+Magnetic Sky Curtain	Auroral Sky Curtain	rub 86 s
+Magnetic Sky Curtain	Borealis Pulsation	rub 120 s
+Magnetic Sky Curtain	Flickering-Sky Substorm	rub 53 s
+Magnetised Antiphon	Magnetised Motet	rub 26 s
+Magnetised Domain	Split Pole	rub 89 s
+Magnetised Domain	Sunspot Loop	rub 93 s
+Magnetised Domain	Triplet Domain	rub 93 s
+Magnetised Flux	Field-Bent Line	rub 6 s
+Magnetised Psalm	Swaying Choir	rub 81 s
+Magnified Corona	Arced Mirage	rub 20 s
+Magnified Corona	Magnified Arc	rub 5 s
+Manganese Basin	Manganese Nodule Field	rub 37 s
+Manganese Basin	Sediment Silt Bed	rub 78 s
+Manganese Nodule Field	Sediment Basin	rub 93 s
+Manganese Nodule Field	Still-Water Nodule Field	rub 101 s
+Manganese Seafloor	Cold-Seep Abyssal Flat	rub 30 s
+Manganese Seafloor	Cold-Seep Plain	rub 22 s; rub 84 s
+Manganese Seafloor	Silted Silt Bed	rub 47 s
+Manganese Silt Bed	Manganese Nodule Field	rub 128 s
+Marble Cloister	Echoed Apse	rub 111 s
+Martian Choir	Foreign Anthem	rub 21 s
+Martian Concord	Outlandish Choir	rub 31 s
+Martian Concord	Unearthly Chord	rub 70 s
+Massive Consort	Curving Concert	rub 75 s
+Massive Consort	Gravitational Gathering	rub 83 s
+Mazy Channels	Tangled Corridors	rub 17 s
+Meandering Dreamscape	Drifting Feather	rub 6 s
+Meandering Dreamscape	Unmoored Dreamscape	rub 14 s
+Meandering Labyrinth	Serpentine Maze	rub 6 s
+Measured Pendulum	Calm Shore	rub 59 s
+Measured Pendulum	Clock Clocks	rub 7 s
+Measured Pendulum	Patient Clocks	rub 11 s
+Measured Pendulum	Patient Escapement	rub 12 s
+Measured Pendulum	Slow Escapement	rub 13 s
+Mechanical Orrery	Somnambulant Machine	rub 8 s
+Mellow Bass	Amber Murmur	rub 104 s
+Mellow Bass	Velvety Murmur	rub 141 s
+Mellow Bass	Warm Organ	rub 104 s
+Mellow Drone	Mellow Ground	rub 49 s
+Mellow Drone	Warm Bass	rub 93 s
+Mellow Ground	Hearth Bed	rub 66 s
+Mellow Murmur	Hearth Organ	rub 104 s
+Mellow Murmur	Hearth Pedal	rub 104 s
+Mellow Murmur	Mellow Bass	rub 119 s
+Mellow Murmur	Mellow Organ	rub 35 s
+Mellow Murmur	Velvety Pedal	rub 93 s
+Mellow Murmur	Woollen Murmur	rub 26 s
+Mellow Organ	Amber Murmur	rub 104 s
+Mellow Organ	Mellow Bass	rub 119 s
+Mellow Organ	Mellow Murmur	rub 141 s
+Mellow Organ	Velvety Murmur	rub 141 s
+Melting Frost	Molten Icefield	rub 120 s
+Melting Icefield	Dissolving Icicles	rub 105 s
+Melting Icefield	Dissolving Wax	rub 53 s
+Mercurial Cell	Rewound Recall	rub 33 s
+Merging Isles	Gathering Holms	rub 9 s
+Merging Isles	Settling Continents	rub 119 s
+Meshed Weave	Beating Loom	rub 14 s
+Midnight Copse	Ferny Copse	rub 104 s
+Midnight Copse	Wooded Thicket	rub 119 s
+Midnight Grove	Dewy Grove	rub 27 s
+Midnight Grove	Firefly Grove	rub 9 s
+Midnight Hyphae	Earthen Hyphae	rub 18 s
+Midnight Hyphae	Slow-Growing Forest Floor	rub 11 s
+Midnight Root Web	Slow-Growing Root Web	rub 76 s
+Midnight Wind	Sleepless Frost	rub 7 s
+Mighty Squall Line	Heavy Rumble	rub 30 s
+Mighty Squall Line	Looming Thunderhead	rub 55 s
+Mighty Thundersheet	Growling Rumble	rub 57 s
+Migrating Moan	Breaching Call	rub 61 s
+Migrating Moan	Cetacean Call	rub 51 s
+Migrating Moan	Cetacean Road	rub 117 s
+Migrating Moan	Migrating Road	rub 8 s
+Migrating Moan	Sounding-Whale Route	rub 123 s
+Migrating Moan	Wide-Water Gyre Sound	rub 111 s
+Migrating Road	Breaching Call	rub 6 s
+Migrating Road	Migrating Moan	rub 66 s
+Mild Gloaming Hour	Tepid Evening	rub 18 s
+Mild Song	Golden Dusk	rub 104 s
+Milled Flour	Dusted Silt	rub 10 s; rub 7 s
+Milled Flour	Sifted Pollen	rub 93 s
+Milled Silt	Grained Silt	rub 93 s
+Milled Silt	Powdered Silt	rub 104 s
+Mirrored Corona Ring	Annular Ghost Image	rub 12 s
+Mirrored Corona Ring	Doubled Light Ring	rub 5 s
+Mirrored Corona Ring	Encircled Einstein Cross	rub 5 s
+Mirrored Corona Ring	Wreathed Einstein Cross	rub 5 s
+Mirrored Corona Ring	Wreathed Ghost Image	rub 5 s
+Mirrored Kaleidoscope	Hexagonal Rosette	rub 10 s
+Mirrored Lantern	Hexagonal Rosette	rub 7 s
+Mirrored Lantern	Mirrored Kaleidoscope	rub 29 s
+Mirrored Mirrors	Mirrored Stairs	rub 60 s
+Mirrored Mirrors	Splintered Steps	rub 100 s
+Mirrored Mirrors	Tumbling Fountains	rub 104 s
+Mirrored Mirrors	Tumbling Steps	rub 99 s
+Mirrored Mosaic	Symmetric Mandala	rub 119 s
+Mirrored Mosaic	Turning Snowflake	rub 142 s
+Mirrored Retrace	Returning Looking-Glass	rub 7 s
+Mirrored Return	Backward Echo Glass	rub 13 s
+Mirrored Return	Backward Return	rub 13 s
+Mirrored Return	Recursive Rewind	rub 24 s
+Mirrored Return	Retracing Retrace	rub 14 s
+Mirrored Return	Rewound Recall	rub 35 s
+Mirrored Return	Rewound Rewind	rub 132 s
+Mirrored Stairs	Mirrored Mirrors	rub 82 s
+Mirrored Stairs	Repeating Stairs	rub 13 s
+Misting Sleet	Dripping Spatter	rub 91 s
+Misting Sleet	Sprinkled Sleet	rub 11 s
+Moaning Lyre	Breath-Strung Psaltery	rub 5 s
+Moaning Wind Harp	Aeolian Wind Harp	rub 37 s
+Moaning Wind Harp	Gale-Tuned Zither	rub 35 s
+Moaning Wind Harp	Wind-Sung Wind Harp	rub 74 s
+Modal Flutter	Resonant Mode	rub 25 s
+Monastery Gust	Shrine Bells	rub 15 s
+Monastery Gust	Zen Air Bells	rub 23 s
+Monastic Litany	Droning Om	rub 11 s
+Monastic Litany	Pressure-Sung Cantors	rub 13 s
+Monastic Litany	Tantric Puja	rub 96 s
+Monastic Mantra	Cloistral Chant	rub 71 s
+Monastic Mantra	Gyuto Mantra	rub 104 s
+Monastic Mantra	Low-Voiced Recitation	rub 111 s
+Monolithic Menhir	Lightless-Black Cairn	rub 16 s
+Monolithic Menhir	Pitch Menhir	rub 16 s
+Monolithic Stele	Onyx Slab	rub 7 s
+Moonless Mass	Witching-Hour Gravity	rub 81 s
+Moonlit Brake	Nocturne Hollow	rub 5 s
+Moonlit Brake	Owlish Fen	rub 5 s
+Moonlit Brake	Shadowed Bog	rub 12 s; rub 9 s
+Moonlit Pergola	Amber Strings	rub 25 s
+Moonlit Pergola	Dewy Orchard	rub 141 s
+Moonlit Pergola	Hushed Lantern	rub 106 s
+Moonlit Pergola	Teeming Lichen	level dip 4.0 peak 0.0 LU
+Moonrise Arc	Moonrise Bow	rub 13 s
+Moonrise Bow	Dusk Arc	rub 120 s
+Moonrise Bow	Gloaming Turn	rub 64 s
+Moonrise Bow	Late Bow	rub 93 s
+Moonrise Bow	Late Sweep	rub 48 s
+Moonrise Bow	Nightfall Hour	rub 36 s
+Moonrise Bow	Starrise Passage	rub 104 s
+Moored Bourdon	Founded Contra Bourdon	rub 10 s
+Moored Open Wood	Founded Subbass	rub 10 s
+Moored Open Wood	Steadfast Contra Bourdon	rub 8 s
+Moored Subbass	Anchored Bourdon	rub 67 s
+Moored Subbass	Anchored Contra Bourdon	rub 30 s
+Morning-Side Riser	Dawn-Lit Daybreak	rub 6 s
+Mossed Flagstone	Footworn Plinth	rub 22 s
+Mossy Cloudforest	Misty Copse	rub 8 s
+Mossy Lichen	Creeping Reef	rub 93 s
+Mossy Lichen	Mossy Meadow	rub 104 s
+Mossy Lichen	Mossy Reef	rub 93 s
+Mossy Lichen	Verdant Garden	rub 104 s
+Mountain Air Bells	Mountain Hand Bells	rub 84 s
+Mountain Rumble	Grumbling Thunder	rub 42 s
+Mountain Rumble	Hillside Thunder	rub 12 s
+Mountainous Larynx	Colossal Breath	rub 141 s
+Mountainous Larynx	Cyclopean Throat	rub 119 s
+Mountainous Larynx	Giant Utterance	rub 141 s
+Mountainous Throat	Vast-Chested Larynx	rub 28 s
+Mounting Stride	Rising Gallop	rub 86 s
+Muffled Bell Pit	Grave Tenor Bell	rub 6 s
+Muffled Cloudbank	Distant Weather	rub 38 s
+Muffled Cloudbank	Gathering Front	rub 39 s
+Muffled Knell	Underwater Great Bell	rub 16 s
+Murmured Swell	Murmured Vowel	rub 89 s
+Murmured Vowel	Dispersed Radio Night	rub 51 s
+Murmured Vowel	Gyuto Mantra	rub 7 s
+Murmured Vowel	Intoned Syllable	rub 9 s
+Murmured Vowel	Shifting-Vowel Vowel	rub 6 s
+Murmuring Geese	Homing Sparrows	rub 6 s
+Murmuring Geese	Soaring Geese	rub 9 s
+Murmuring Sparrows	Wheeling Swallows	rub 97 s
+Murmuring Swallows	Scattering Shoal	rub 23 s
+Murmurous Summer Night	Lush Solstice Night	rub 115 s
+Murmurous Summer Night	Starry Harvest Night	rub 60 s
+Musing Bedchamber	Cloistered Bells	level dip 3.3 peak 0.7 LU
+Musing Bedchamber	Silvered Bower	rub 93 s
+Musing Cortex	Dreaming Cortex	rub 78 s
+Musing Cortex	Neural Network	rub 8 s
+Musing Cortex	Pondering Thought	rub 7 s
+Musing Parlour	Sleepwalking Attic	rub 24 s
+Musing Parlour	Wandering Stairwell	rub 6 s
+Musing Study	Daydreaming Attic	rub 16 s
+Musing Thought	Dreaming Network	rub 7 s
+Musing Thought	Musing Cortex	rub 12 s
+Musing Thought	Musing Neurons	rub 13 s
+Musing Thought	Neural Network	rub 9 s
+Musing Thought	Recurrent Memory	rub 9 s
+Muted Section	Gliding Bows	rub 58 s
+Muted Section	Spectral Afternoons	rub 19 s
+Narrowing Crown	Homing Circle	rub 19 s
+Narrowing Crown	Spiralling-In Halo	rub 104 s
+Narrowing Crown	Spiralling-In Wreath	rub 93 s
+Narrowing Crown	Tightening Corona	rub 44 s
+Nave-Deep Nave	Vaulted Ossuary	rub 9 s
+Nave-Deep Reliquary	Vaulted Crypt	rub 106 s
+Nebular Plume	Emission-Red Plume	rub 93 s
+Nebular Plume	Glowing Cloud	rub 93 s
+Nebular Plume	Ionised-Gas Gas Bubble	rub 82 s
+Nebular Plume	Orion Veil Nebula	rub 93 s
+Neo-Riemannian Trail	Euler Ramble	rub 7 s
+Neo-Riemannian Trail	Neo-Riemannian Wayfaring	rub 100 s
+Neo-Riemannian Trail	Riemannian Wayfaring	rub 35 s
+Neo-Riemannian Trail	Tonnetz Wayfaring	rub 79 s
+Nested Abyss	Iterated Cascade	rub 36 s
+Nether Keep	Buried Hypogeum	rub 13 s
+Nether Keep	Chthonic Keep	rub 21 s
+Nether Keep	Chthonic Root Cellar	rub 13 s; rub 38 s
+Nether Keep	Hidden Mineshaft	rub 104 s
+Nether Keep	Underground Mineshaft	rub 31 s
+New Glaze	Shining Rime	rub 54 s
+Nickel Columns	Nickel Pipes	rub 141 s
+Nickel Wind Chime	Brass Tubes	rub 82 s
+Nickel Wind Chime	Copper Tubes	rub 16 s
+Nickel Wind Chime	Silver Pipes	rub 16 s
+Nickel Wind Chime	Steel Pipes	rub 11 s
+Night-Long Matins	Nocturnal Night Music	rub 32 s
+Nightblooming Arbour	Firefly Grove	rub 13 s
+Nightblooming Grove	Dusky Pergola	rub 15 s
+Nightfall Curve	Moonrise Watch	rub 32 s
+Nightfall Turn	Moonrise Arc	rub 10 s
+Nimbed Altar	Illumined Shrine	rub 65 s
+Nimbed Reliquary	Illumined Font	rub 104 s
+Nimbed Reliquary	Nimbed Shrine	rub 119 s
+Nimble Updraft	Fleet Draught	rub 5 s
+Nocturnal Evensong	Dark-Bright Matins	rub 14 s
+Nocturnal Evensong	Night-Long Matins	rub 14 s
+Nocturnal Evensong	Owl-Watched Vigil Song	rub 93 s
+Nocturnal Evensong	Serenading Vigil Song	rub 81 s
+Nodding Lantern Chain	Heaving Breather	rub 84 s
+Nodding Lantern Chain	Pulsing Breather	rub 38 s
+Nodding Pendulum Chain	Lilting Lantern Chain	rub 75 s
+Nodding Pulse	Heaving Breather	rub 61 s
+Nodding Soliton	Beating Soliton	rub 9 s
+Nodding Soliton	Lilting Lantern Chain	rub 9 s
+Nodding Soliton	Pulsing Breather	rub 8 s
+Nodding Soliton	Pulsing Pendulum Chain	rub 10 s
+Northern Hemlocks	Boreal Cedars	rub 94 s
+Northern Hemlocks	Needled Conifers	rub 81 s
+Northern Hemlocks	Northern Conifers	rub 81 s
+Northern Hemlocks	Taiga Spruces	rub 81 s
+Northern Veil	Rippling Veil	rub 49 s
+Notched Flanger	Swirled Comb	rub 25 s
+Notched Prism Light	Fraunhofer Rainbow	rub 81 s
+Notched Rainbow	Fraunhofer Rainbow	rub 19 s
+Notched Rainbow	Shadowed Absorber	rub 20 s
+Oblate Regulus	Flattened Achernar	rub 7 s
+Obscured Absorber	Eclipsed Band	rub 93 s
+Obscured Absorber	Obscured Band	rub 104 s
+Obscured Absorber	Veiled Band	rub 45 s
+Obscured Gap	Notched Rainbow	rub 64 s
+Obscured Gap	Obscured Continuum	rub 141 s
+Obscured Gap	Veiled Spectrum	rub 36 s
+Obsidian Night Song	Sable Notturno	rub 104 s
+Obsidian Night Song	Velvet-Dark Notturno	rub 10 s
+Obsidian-Black Cairn	Jet Megalith	rub 9 s
+Obsidian-Black Cairn	Monolithic Stele	rub 7 s
+Obsidian-Black Slab	Onyx Slab	rub 62 s
+Ocean-Long Ocean Echo	Long-Range Passage	rub 119 s; rub 93 s
+Ocean-Long Ocean Echo	Transoceanic Passage	rub 46 s
+Ocean-Long Transit	Basin-Wide Current	rub 17 s
+Old-Light Last Hydrogen	Ageing Star	rub 94 s
+Old-Light Last Hydrogen	Long-Lived Evening Star	rub 141 s
+Old-Light Last Hydrogen	Slow-Burning Old Sun	rub 93 s
+Old-Light Old Flame	Old-Light Old Sun	rub 27 s
+Oncoming Omen	Imminent Premonition	rub 93 s
+Oncoming Omen	Oncoming Premonition	rub 81 s
+Oncoming Prelude	Impending Prelude	rub 104 s
+Oncoming Prelude	Impending Presage	rub 25 s
+Oncoming Premonition	Imminent Foretaste	rub 9 s
+Onyx Menhir	Jet Slab	rub 36 s
+Onyx Menhir	Onyx Slab	rub 64 s
+Onyx Slab	Pitch Dolmen	rub 19 s
+Oozing Ooze	Honeyed Stream	rub 63 s
+Oozing Ooze	Languid Seep	rub 18 s
+Open Principal	Ancient Nave	rub 111 s
+Open Principal	Pedal Nave	rub 95 s
+Opera Bronze Mirror	Opera Chau Gong	rub 10 s
+Opera Chau Gong	Opera Bell Plate	rub 7 s
+Opera Chau Gong	Opera Peking Gong	rub 47 s
+Opera Chau Gong	Sounding Bell Plate	rub 15 s
+Opera Peking Gong	Burnished Bronze Mirror	rub 93 s
+Opera Peking Gong	Sounding Wind Gong	rub 15 s
+Orbital Corona	Stellar Corona	rub 72 s
+Orbital Corona	Void Corona	rub 74 s
+Orbital Dewar	Spherical Fuel Tank	rub 18 s
+Orbital Drift	Event Expanse	rub 48 s
+Orbital Drift	Orbital Corona	rub 38 s
+Orbital Drift	Silent Drift	rub 45 s
+Orbital Drift	Stellar Drift	rub 21 s
+Orbital Occultation	Periodic Conjunction	rub 5 s
+Orbiting Corona	Gyring Ringlet	rub 65 s
+Orbiting Corona	Spinning Merry-Go-Round	rub 114 s
+Orbiting Corona	Vortical Ringlet	rub 117 s
+Orbiting Gathering	Tidal-Pulled Ensemble	rub 9 s
+Orbiting Merry-Go-Round	Circling Corona	rub 50 s
+Orbiting Merry-Go-Round	Gyring Ringlet	rub 9 s
+Orbiting Merry-Go-Round	Revolving Rondeau	rub 93 s
+Orbiting-Voice Hymn	Void-Sung Mantra Sky	rub 29 s
+Orbiting-Voice Om Star	Galactic-Sung Star Litany	rub 9 s
+Orbiting-Voice Orbit Prayer	Celestial-Voice Sky Psalm	rub 101 s
+Orbiting-Voice Orbit Prayer	Stellar-Sung Star Litany	rub 131 s
+Orbiting-Voice Sky Psalm	Orbiting-Voice Orbit Prayer	rub 71 s
+Orbiting-Voice Sky Psalm	Stellar-Sung Star Litany	rub 81 s
+Organic Edifice	Evolving Spire	rub 7 s
+Orion Cloud	Eagle Nebula	rub 48 s
+Orion Cloud	Rosette Cloud	rub 37 s
+Orion Nebula	Long-Range Voyage	rub 119 s
+Orion Nebula	Scintillant Rigel	rub 56 s
+Orion Nebula	Wide-Water Gyre Sound	rub 85 s
+Orion Nursery	Balmer Ladder	rub 5 s
+Orion Pillar Gas	Nebular Plume	rub 16 s
+Oscillating Neap	Upwelling Spring Tide	rub 105 s
+Outlandish Choir	Extraterrestrial Song	rub 49 s
+Outlandish Consonance	Foreign Anthem	rub 9 s
+Outlandish Harmony	Uncanny Choir	rub 72 s
+Outlandish Harmony	Unearthly Concord	rub 19 s
+Overblown Pipe	Windblown Pipe	rub 7 s
+Overcast Density	Deep-Night Weight	rub 141 s
+Overcast Density	Moonless Load	rub 119 s
+Overcast Density	Witching-Hour Gravity	rub 111 s
+Overcast Load	Overcast Burden	rub 93 s
+Overhead Treetops	Sawing Limbs	rub 58 s
+Overlaid Organza	Layered Organza	rub 13 s
+Overtone Recess	Bright-Sung Niche	rub 88 s
+Owl-Watched Vigil Song	Nocturnal Evensong	rub 105 s
+Pacing Escapement	Slow Orbits	rub 6 s
+Pacing Hallway	Drifting Arcade	rub 94 s
+Pacing Hallway	Roaming Arcade	rub 93 s
+Pacing Pendulum	Patient Escapement	rub 8 s
+Painted Atrium	Echoed Basilica	rub 54 s
+Painted Atrium	Resonant Rotunda	rub 93 s
+Painted Light	Gilded Fresco	rub 93 s
+Painted Light	Luminous Glass	rub 104 s
+Painted Light	Pastel Icon	rub 82 s
+Painted Window	Curling Marble	rub 5 s
+Painted Window	Tinted Panel	rub 7 s
+Paired Inspiral	Binary Coalescence	rub 16 s
+Paired Inspiral	Converging Ringdown	rub 15 s
+Parted Rivers	Forked Currents	rub 44 s
+Parted Rivers	Twin Rivers	rub 69 s
+Passing Outlook	Fitful Skies	rub 18 s
+Pastel Canvas	Tinted Panel	rub 120 s
+Pastel Icon	Gilded Icon	rub 25 s; rub 5 s
+Pastel Icon	Glazed Panel	rub 29 s
+Pastel Icon	Tinted Panel	rub 27 s
+Patchwork Chimera	Alternating Semaphores	rub 28 s
+Patchwork Chimera	Coursing Gyre	rub 16 s
+Patchwork Chimera	Doubled Pendants	rub 59 s
+Patchwork Chimera	Janus Griffin	rub 141 s
+Patchwork Chimera	Patchwork Kernel	rub 115 s
+Patchwork Chimera	Patinated Billow	rub 67 s
+Patchwork Chimera	Two-Faced Hybrid	rub 104 s
+Patchwork Chimera	Uneven Chimera	rub 97 s
+Patchwork Chimera	Uneven Mosaic	rub 119 s
+Patchwork Chimera	Viscous Runnel	rub 119 s
+Patchwork Kernel	Partial Griffin	rub 119 s
+Patchwork Kernel	Two-Faced Griffin	rub 138 s
+Patchwork Kernel	Twofold Mirage	rub 19 s
+Patchwork Mirage	Twofold Mosaic	rub 93 s
+Patient Clocks	Clock Clocks	rub 119 s
+Patient Clocks	Endless Swell	rub 119 s
+Patient Clocks	Gathering Birds	rub 120 s
+Patient Clocks	Pacing Orbits	rub 94 s
+Patient Clocks	Slow Orbits	rub 93 s
+Patient Clocks	Swinging Gears	rub 120 s; rub 81 s
+Patient Escapement	Swinging Cycles	rub 107 s
+Patient Sanctuary	Ancient Chapel	rub 93 s
+Patient Sanctuary	Centuried Cathedral	rub 105 s
+Patient Sanctuary	Patient Minster	rub 5 s
+Patient Sanctuary	Timeless Cathedral	rub 41 s
+Patient Sanctuary	Venerable Abbey	rub 11 s
+Patient Vault	Ageless Dome	rub 119 s
+Patient Vault	Ancient Vault	rub 141 s
+Patient Vault	Enduring Dome	rub 141 s
+Patinated Billow	Rusted Groundswell	rub 106 s
+Patinated Heave	Brazen Billow	rub 104 s
+Patinated Heave	Rusted Tidewater	rub 94 s
+Pattering Lake	Rippled Tarn	rub 12 s
+Patterned Brocade	Interlaced Brocade	rub 67 s
+Patterned Rug	Embroidered Tapestry	rub 54 s
+Patterned Rug	Jacquard Rug	rub 30 s
+Patterned Tapestry	Jacquard Rug	rub 27 s
+Pedal-Held Diapason	Anchored Contra Bourdon	rub 104 s
+Pedal-Held Diapason	Grounded Diapason	rub 50 s
+Peeping Mire	Boggy Slough	rub 104 s
+Peeping Mire	Croaking Fen	rub 17 s
+Peeping Mire	Croaking Mire	rub 17 s
+Peeping Mire	Duckweed Fen	rub 17 s
+Peeping Mire	Reedy Fen	rub 119 s
+Pelagic Mud Flat	Manganese Seafloor	rub 104 s
+Pelagic Mud Flat	Pelagic Silt Bed	rub 104 s
+Pelagic Nodule Field	Cold-Seep Mud Flat	rub 128 s
+Pelagic Nodule Field	Pelagic Mud Flat	rub 93 s
+Pelagic Nodule Field	Sediment Plain	rub 18 s
+Pelagic Silt Bed	Cold-Seep Plain	rub 93 s
+Pelagic Silt Bed	Manganese Seafloor	rub 93 s
+Pelagic Silt Bed	Silted Silt Bed	rub 93 s
+Pelagic-Deep Channel	Thermocline Axis	rub 83 s
+Pelagic-Deep Depth	Abyssal-Water Channel	rub 119 s
+Pelagic-Deep Depth	Sounding Waveguide	level dip 4.9 peak 0.0 LU
+Pelagic-Deep Water Column	Deep-Sea Depth	rub 48 s
+Pelagic-Deep Water Column	Thermocline Water Column	rub 10 s
+Pelting Sprinkle	Dappled Sprinkle	rub 12 s
+Pelting Sprinkle	Sprinkled Shower	rub 93 s
+Perforated Deck	Riddled Panel	rub 25 s
+Perforated Shield	Punched Hatch	rub 14 s
+Periodic Almanac	Gravitating Transit	rub 86 s
+Periodic Almanac	Periodic Ephemeris	rub 13 s
+Periodic Crest	Oscillating Tide	rub 141 s
+Periodic Crest	Upwelling Current	rub 141 s
+Periodic Crest	Waning Tide	rub 92 s
+Periodic Ephemeris	Clockwork Syzygy	rub 8 s
+Periodic Ephemeris	Harmonic Conjunction	rub 8 s
+Periodic Ephemeris	Harmonic Transit	rub 8 s
+Periodic Ephemeris	Orbital Occultation	rub 8 s
+Periodic Ephemeris	Periodic Almanac	rub 8 s
+Periodic Ephemeris	Precise Eclipse	rub 8 s
+Periodic Ephemeris	Tidal Almanac	rub 40 s
+Periodic Ephemeris	Tidal Occultation	rub 8 s
+Perpetual Descent	Revolving Descent	rub 54 s
+Perpetual Descent	Unending Illusion	rub 102 s
+Perpetual Wane	Ceaseless Ritardando	rub 104 s
+Perpetual Wane	Ever-Slowing Lullaby	rub 82 s
+Persistent Frontier	Persistent Verge	rub 12 s
+Persistent Margin	Resilient Boundary	rub 12 s
+Persistent Margin	Unscattered Margin	rub 93 s
+Persistent Verge	Resilient Border	rub 82 s
+Persistent Verge	Unbroken Boundary	rub 9 s
+Persistent Verge	Unscattered Brink	rub 7 s
+Persistent Verge	Unscattered Margin	rub 5 s
+Pfund Choir	Ionised-Gas Plume	rub 29 s
+Pfund Spectrum	Hydrogenic Emission	rub 27 s
+Pfund Spectrum	Hydrogenic Transition	rub 93 s
+Pfund Spectrum	Hydrophone Waveguide	rub 95 s
+Pfund Spectrum	Ionised-Gas Plume	rub 81 s
+Pfund Spectrum	Long-Range Gyre Sound	rub 15 s
+Pfund Spectrum	Lyman Spectrum	rub 8 s
+Pfund Spectrum	Pfund Choir	rub 78 s
+Pfund Spectrum	Quantised Emission	rub 75 s
+Phantasmal Arbour	Wraith Fountain	rub 119 s
+Phantasmal Lawn	Spectral Bower	rub 142 s
+Phantasmal Maze	Ghost Garden	rub 17 s
+Phantasmal Maze	Shade Trellis	rub 6 s
+Phantom Plainsong	Ghostly Anthem	rub 110 s
+Phantom Plainsong	Ghostly Lauds	rub 84 s
+Phantom Plainsong	Ghostly Madrigal	rub 87 s
+Phantom Plainsong	Mindborne Madrigal	rub 89 s
+Phantom Plainsong	Unheard Lauds	rub 5 s
+Phased Eventide	Overlapping Night	rub 10 s
+Phased Eventide	Phased Vigil	rub 93 s
+Phased Vigil	Wave-Borne Nightfall	rub 105 s
+Phasing Comb	Flanged Wash	rub 93 s
+Phasing Comb	Notched Swirl	rub 93 s
+Pierced Solar Panel	Cratered Panel	rub 7 s
+Pierced Solar Panel	Holed Deck	rub 7 s
+Pierced Solar Panel	Riddled Panel	rub 37 s
+Pierced Solar Panel	Riddled Sheet	rub 11 s
+Pillared Basilica	Cavernous Atrium	rub 71 s
+Pillared Undercroft	Echoing Great Hall	rub 94 s
+Pinging Barn	Corrugated Awning	rub 17 s
+Pinned Aureole	Anchored Halo	rub 17 s
+Pinned Aureole	Gapped Glow	rub 11 s
+Pinned Halo	Localized Glow	rub 48 s
+Piping Pipe	Reedy Shakuhachi	rub 104 s
+Pirouetting Merry-Go-Round	Spiralling Merry-Go-Round	rub 104 s
+Pitch Menhir	Graphite Megalith	rub 14 s
+Pitted Bulkhead Plate	Perforated Deck	rub 15 s
+Pitted Shield	Pitted Panel	rub 9 s
+Pitted Shield	Punched Plate	rub 7 s
+Pitted Shield	Riddled Hatch	rub 7 s
+Plainsong Cell	Compline Chantry	rub 8 s
+Plainsong Oratory	Anchored Pedalboard	rub 9 s
+Plainsong Oratory	Benthic Hadal Zone	rub 76 s
+Plainsong Oratory	Low-Vaulted Chantry	rub 106 s
+Plainsong Oratory	Vesper Shrine	rub 12 s
+Plainsong Oratory	Witching-Hour Gravity	rub 121 s
+Plainsong Sanctuary	Low-Vaulted Sanctuary	rub 83 s
+Plainsong Sanctuary	Vesper Cell	rub 119 s
+Plaited Surface	Wound Lattice	rub 100 s
+Planck Bound State	Uncertain-Rim Band	rub 16 s
+Planck Edge Mode	Planck Bound State	rub 7 s
+Planck Edge Mode	Quantized Bound State	rub 8 s
+Planck Edge Mode	Uncertain-Rim Edge Mode	rub 6 s
+Planetary Orrery	Sidereal Planet	rub 93 s
+Plangent Vault	Booming Silo	rub 108 s
+Plasmaspheric Murmur Band	Plasmaspheric Hiss	rub 12 s
+Plasmaspheric Murmur Band	Steady Hiss	rub 12 s
+Played Chords	Felt Chords	rub 102 s
+Played Hands	Felt Chords	rub 44 s
+Played Keys	Felt Chords	rub 93 s
+Played Keys	Played Notes	rub 93 s
+Played Keys	Soft Pad	rub 93 s
+Played Piano	Night Keys	rub 48 s
+Played Piano	Quiet Notes	rub 25 s
+Played Touch	Night Keys	rub 119 s
+Played Touch	Quiet Fingers	rub 21 s
+Pleading Cantilena	Keening Plea	rub 8 s
+Plinthed Pier	Load-Bearing Architrave	rub 12 s
+Plinthed Pier	Upright Colonnade	rub 24 s
+Plucked Rings	Plucked Lake	rub 18 s
+Plucked Stones	Plucked Lake	rub 31 s
+Plumed Sepia Cloud	Inky Cloudlet	rub 6 s
+Plunging Abyss	Hadal Sinkhole	rub 142 s
+Plunging Abyss	Hadal Trench	rub 104 s
+Plunging Abyss	Unsounded Trench	rub 119 s
+Plunging Chasm	Benthic Sinkhole	rub 197 s
+Plunging Chasm	Bottomless Trench	rub 39 s
+Plunging Chasm	Hadal Pit	rub 15 s
+Plunging Chasm	Hadal Sinkhole	rub 197 s
+Plunging Chasm	Unsounded Chasm	rub 72 s
+Plunging Deep	Benthic Sinkhole	rub 16 s
+Plunging Deep	Bottomless Trench	rub 14 s
+Plunging Deep	Hadal Pit	rub 30 s
+Plunging Deep	Plunging Chasm	rub 62 s
+Plunging Deep	Unsounded Trench	rub 40 s
+Polar Arc Light	Kilometric Arc Light	rub 101 s
+Polar Corona Sky	Flickering-Sky Substorm	rub 14 s
+Polar Pulsation	Borealis Oval	rub 29 s
+Polar Spindle	Ionised Spindle	rub 104 s
+Polar Spindle	Spinning Ion	rub 93 s
+Polar Substorm	Magnetic Sky Curtain	rub 8 s
+Polar Zenith	Faint Firmament	rub 141 s
+Polar Zenith	Twinkling Meridian	rub 93 s
+Polarised Antiphon	Swaying Antiphon	rub 14 s
+Polarised Dynamo	Field-Bent Pole	rub 67 s
+Polarised Line	Field-Bent Domain	rub 119 s
+Polarised Line	Magnetised Flux	rub 104 s
+Pondering Synapse	Dreaming Reverie	rub 26 s
+Pondering Synapse	Echo-State Network	rub 26 s
+Pondering Synapse	Musing Cortex	rub 26 s
+Pondering Synapse	Musing Neurons	rub 26 s
+Pooling Atolls	Viscous Runnel	rub 62 s
+Pooling Continents	Gathering Isles	rub 114 s
+Pooling Silk	Curling Marble	rub 116 s
+Pooling Silk	Eddying Eddies	rub 96 s
+Pooling Silk	Eddying Smoke	rub 82 s
+Prayer Hand Bells	Cloistered Air Bells	rub 6 s
+Prayerful Chant	Tantric Puja	rub 86 s
+Precise Conjunction	Periodic Ephemeris	rub 8 s
+Precise Transit	Harmonic Almanac	rub 90 s
+Precise Transit	Precise Syzygy	rub 82 s
+Pressing Bathysphere	Heaving Ballast	rub 12 s
+Pressing Bathysphere	Labouring Ballast	rub 119 s
+Pressing Bathysphere	Low-Pulsing Bulkhead	rub 88 s
+Pressing Depth Gauge	Pressing Bathysphere	rub 47 s
+Pressure-Sung Cantors	Benthic-Sung Choristers	rub 45 s
+Pressure-Sung Cantors	Diffuse Murmur Band	rub 32 s
+Pressure-Sung Cantors	Drowned-Voice Assembly	rub 55 s
+Pressure-Sung Cantors	Grey Band Noise	rub 55 s
+Pressure-Sung Cantors	Lightless-Sung Dirge	rub 37 s
+Pressure-Sung Cantors	Trench-Deep Choir	rub 31 s
+Pressure-Sung Cantors	Vast-Chested Gullet	rub 30 s
+Pressurised Reservoir Tank	Empty Dewar	rub 93 s
+Pressurised Reservoir Tank	Riveted-Steel Tank	rub 104 s
+Pressurised Reservoir Tank	Spherical Reservoir Tank	rub 81 s
+Primordial Ripple	Ancient Swell	rub 50 s
+Primordial Ripple	Primordial Swell	rub 47 s
+Prismatic Lights	Beaming Bands	rub 7 s
+Prismatic Lights	Splitting Lights	rub 7 s
+Prismatic Shards	Bent Spectrum	rub 62 s
+Prismatic Shards	Splitting Lights	rub 18 s
+Probabilistic Band	Quantized Spin Ring	rub 119 s
+Probabilistic Band	Uncertain-Rim Edge Mode	rub 119 s
+Probabilistic Chern Ring	Uncertain-Rim Edge Mode	rub 5 s
+Probabilistic Halo	Dirac Spin Ring	rub 8 s
+Probabilistic Halo	Probabilistic Orbital	rub 8 s
+Probabilistic Orbital	Planck Bound State	rub 7 s
+Probabilistic Orbital	Quantized Ring State	rub 6 s
+Probabilistic Orbital	Uncertain-Rim Band	rub 17 s
+Probabilistic Orbital	Uncertain-Rim Edge Mode	rub 6 s
+Probabilistic Orbital	Uncertain-Rim Ring State	rub 8 s
+Promenading Arcade	Drifting Arcade	rub 20 s
+Puddled Millpond	Brimming Millpond	rub 94 s
+Puddled Millpond	Plinking Mere	rub 86 s
+Puddled Millpond	Puddled Pool	rub 81 s
+Puddled Millpond	Rippled Pool	rub 81 s
+Puddled Millpond	Rippled Tarn	rub 104 s
+Pulled Well	Falling Magnet	rub 8 s
+Pulsing Breather	Beating Lantern Chain	rub 20 s
+Pulsing Breather	Lilting Lantern Chain	rub 93 s
+Pulsing Breather	Nodding Pulse	rub 94 s
+Pulsing Paddock	Blinking Hedgerow	rub 48 s
+Pulsing Summer Night	Glowing Meadow	rub 13 s
+Pulsing Swarm	Firefly Meadow	rub 11 s
+Pulsing Swarm	Flickering Lantern Cloud	rub 70 s
+Punched Hatch	Holed Hatch	rub 93 s
+Punched Hatch	Perforated Shield	rub 94 s
+Punched Hatch	Pitted Panel	rub 9 s
+Punched Hatch	Punched Plate	rub 93 s
+Pushing Felt	Held Pad	rub 91 s
+Pushing Felt	Pushing Pressure	rub 49 s
+Pushing Pressure	Tender Pad	rub 60 s
+Quaking Graben	Faulted Magma Chamber	rub 30 s
+Quaking Rift	Faulted Plate	rub 81 s
+Quaking Rift	Grinding Rift	rub 12 s
+Quaking Rift	Grinding Subduction	rub 81 s
+Quaking Rift	Seismic Graben	rub 18 s
+Quaking Rift	Seismic Subduction	rub 12 s
+Quaking Rift	Subducting Rift	rub 93 s
+Quantised Emission	Hydrogenic Emission	rub 123 s
+Quantised Emission	Pfund Choir	rub 119 s
+Quantized Ring State	Planck Edge Mode	rub 27 s
+Quantized Ring State	Quantized Bound State	rub 8 s
+Quantized Ring State	Quantized Edge Mode	rub 96 s
+Quantized Spin Ring	Probabilistic Chern Ring	rub 23 s
+Quantized Spin Ring	Uncertain-Rim Edge Mode	rub 6 s
+Quantum Chord	Collapsing Chord	rub 79 s
+Quickened Zephyr	Darting Sough	rub 119 s
+Quickened Zephyr	Fleet Air	rub 88 s
+Quickened Zephyr	Skittering Breeze	rub 142 s
+Quiet Fingers	Night Fingers	rub 104 s
+Quiet Fingers	Night Keys	rub 124 s
+Quiet Fingers	Quiet Notes	rub 141 s
+Quiet Notes	Night Keys	rub 74 s
+Quiet Touch	Quiet Notes	rub 141 s
+Quiet Touch	Soft Hands	rub 98 s
+Quiet Touch	Touched Fingers	rub 82 s
+Quiet Tune	Glinting Canopy	rub 104 s
+Quiet Tune	Held Intake	rub 119 s
+Quiet Tune	Imagined Voice	rub 104 s
+Quiet Tune	Inner Tune	rub 104 s
+Quiet Tune	Inner Voice	rub 141 s
+Quiet Tune	Private Melody	rub 104 s
+Quiet Tune	Wandering Bedchamber	rub 120 s
+Quiet Tune	Whispered Cadence	rub 119 s
+Quilted Den	Velvet-Hung Parlour	rub 27 s
+Quilted Library	Quilted Boudoir	rub 6 s
+Quilted Library	Upholstered Parlour	rub 6 s
+Quivering Fountain	Lapping Fountain	rub 50 s
+Radiant Lantern	Folded Mosaic	rub 48 s
+Radiant Lantern	Gauzy Gauze	rub 24 s
+Radiant Lantern	Spattering Splash	rub 66 s
+Radiant Lantern	Symmetric Medallion	rub 50 s
+Ragged Spectra	Feverish Maelstrom	rub 93 s
+Ragged Spectra	Wild Squall	rub 15 s
+Ragged Whirlwind	Feverish Maelstrom	rub 61 s
+Ragged Whirlwind	Unruly Overtones	rub 114 s
+Ragged Whirlwind	Untamed Partials	rub 9 s
+Raging Reef	Gale Skerries	rub 85 s
+Raging Reef	Stormy Headland	rub 20 s
+Raging Reef	Untamed Headland	rub 38 s
+Rain-Loud Ditch	Downpour Ditch	rub 93 s
+Rain-Loud Ditch	Downpour Swamp	rub 93 s
+Rain-Loud Ditch	Sodden Chorus	rub 93 s
+Rain-Weighted Squall Line	Downpour Storm Cellar	rub 30 s
+Rain-Weighted Storm Cellar	Downpour Storm Cellar	rub 32 s
+Rain-Weighted Storm Cellar	Rain-Weighted Squall Line	rub 18 s
+Rain-Weighted Storm Floor	Storm-Floored Thunder Vault	rub 93 s
+Raining Cascade	Spilling Fountain	rub 22 s
+Raining Droplets	Glittering Motes	rub 24 s
+Raining Motes	Raining Sequins	rub 23 s
+Rainy Dew	Tapping Rings	rub 47 s
+Rainy Splash	Glistening Splash	rub 11 s
+Rainy Splash	Splashing Beads	rub 8 s
+Raked Courtyard	Raked Garden	rub 5 s
+Rasping Canopy	Arboreal Bower	rub 141 s
+Rasping Canopy	High-Bough Foliage	rub 141 s
+Rattling Barn	Galvanised Porch	rub 75 s
+Raven Night Song	Indigo Night Canticle	rub 15 s
+Rebounding Current	Upwelling Spring Tide	rub 36 s
+Recalled Corridor	Familiar Corridor	rub 118 s
+Recalled Corridor	Familiar Palace	rub 119 s
+Recalled Corridor	Recalled Archive	rub 77 s
+Recalled Corridor	Storied Gallery	rub 63 s
+Recalled Footsteps	Recalled Waltz	rub 66 s
+Recalled Footsteps	Spectral Afternoons	rub 70 s
+Recalled Waltz	Remembered Rooms	rub 53 s
+Recalled Waltz	Spectral Summers	rub 61 s
+Receding Backflow	Dragging Undercurrent	rub 93 s
+Receding Backflow	Receding Sink	rub 93 s
+Receding Backflow	Rip-Current Backflow	rub 40 s
+Receding Backflow	Rip-Current Ebb Current	rub 93 s
+Receding Drawback	Sinking Sink	rub 20 s
+Receding Filament	Fleeing Quasar	rub 86 s
+Receding Tube	Boring Conduit	rub 25 s
+Reciprocal Lamps	Antiphonal Calls	rub 93 s
+Reciprocal Lamps	Opposed Lanterns	rub 93 s
+Reciprocal Lamps	Twin Calls	rub 33 s
+Reciprocal Lanterns	Patchwork Chimera	rub 78 s
+Reciprocal Semaphores	Antiphonal Lanterns	rub 81 s
+Recoiling Neap	Oscillating Current	rub 104 s
+Recurrent Mind	Dreaming Reverie	rub 104 s
+Recursive Reflection	Backward Looking-Glass	rub 93 s
+Recursive Reflection	Recursive Return	rub 93 s
+Recursive Return	Backward Recall	rub 12 s
+Recursive Return	Returning Looking-Glass	rub 7 s
+Reddening Chamber Hall	Expanding Atrium	rub 6 s
+Reddening Chamber Hall	Sinking-Tail Vault	rub 9 s
+Reddening Rotunda	Downward Hall	rub 92 s
+Reddening Rotunda	Redshifted Atrium	rub 15 s
+Reddening Rotunda	Redshifted Hall	rub 18 s
+Redshifted Lantern Light	Falling Last Light	rub 77 s
+Redshifted Lantern Light	Freezing Last Light	rub 7 s
+Redshifted Lantern Light	Redshifted Last Light	rub 7 s
+Redshifted Signal	Dwindling Lantern Light	rub 76 s
+Reed Celeste	Stopped Bourdon	rub 104 s
+Reedy Niche	Harmonic-Sung Cavern Voice	rub 6 s
+Reedy Ocarina	Fluttering Pipe	rub 6 s
+Reedy Ocarina	Piping Ney	rub 7 s
+Reedy Ocarina	Whistling Recorder	rub 42 s
+Reedy Shakuhachi	Breathy Recorder	rub 30 s; rub 59 s
+Reedy Shakuhachi	Fluttering Ney	rub 66 s
+Reedy Shakuhachi	Piping Ney	rub 35 s
+Reflecting Upper Air	F-Layer Sky Mirror	rub 135 s
+Refracted Layer	F-Layer Radio Sky	rub 30 s
+Regressing Regress	Iterated Recursion	rub 27 s
+Remembered Gallery	Familiar Corridor	rub 119 s
+Remembered Gallery	Kept Mansion	rub 120 s
+Remembered Gallery	Storied Room	rub 58 s
+Remembered Library	Familiar Archive	rub 93 s
+Remembered Library	Familiar Gallery	rub 93 s
+Remembered Library	Treasured Corridor	rub 93 s
+Remembered Rooms	Vanished Waltz	rub 93 s
+Remote Drift	Cosmic Horizon	rub 19 s
+Remote Drift	Event Expanse	rub 58 s
+Remote Drift	Orbital Corona	rub 47 s
+Remote Drift	Orbital Drift	rub 21 s
+Remote Drift	Silent Drift	rub 65 s
+Remote Nebula	Void Horizon	rub 9 s
+Remote Ripple	Faraway Strain	rub 120 s
+Remote Storm	Far-Off Tempest	rub 42 s
+Remote Tremor	Ancient Tremor	rub 119 s
+Remote Tremor	Billion-Year Swell	rub 120 s
+Remote Tremor	Billion-Year Tremor	rub 60 s
+Remote Tremor	Far-Off Spacetime Wave	rub 93 s
+Remote Tremor	Far-Off Strain	rub 76 s
+Remote Valley	Faraway Country	rub 11 s
+Repeating Stairs	Fractured Fountains	rub 8 s
+Repeating Stairs	Mirrored Mirrors	rub 8 s
+Repeating Stairs	Mirrored Stairs	rub 9 s
+Repeating Stairs	Splintered Steps	rub 9 s
+Repeating Stairs	Tumbling Fountains	rub 8 s
+Resilient Border	Resilient Frontier	rub 94 s
+Resilient Frontier	Persistent Verge	rub 21 s
+Resilient Frontier	Resilient Border	rub 38 s
+Resilient Frontier	Steadfast Border	rub 11 s
+Resilient Frontier	Undeterred Edge	rub 93 s
+Resinous Larches	Northern Hemlocks	rub 12 s
+Resinous Spruces	Boreal Cedars	rub 62 s
+Resonant Cloister	Echoed Basilica	rub 30 s
+Resonant Mode	Arched Undercroft	rub 6 s
+Resonant Mode	Standing Boom	rub 118 s
+Resonant Node	Antinodal Wave	rub 104 s
+Resonant Rotunda	Painted Cloister	rub 10 s
+Resounding Gong Hall	Hammered Chau Gong	rub 7 s
+Resounding Space	Echoic Chamber	rub 7 s
+Resounding Space	Echoic Silo	rub 24 s
+Resounding Vault	Vibrant Chamber	rub 46 s
+Responding Assembly	Synchronous Congregation	rub 104 s
+Restless Squall	Unruly Harmonics	rub 9 s
+Restless Wash	Swirling Street	rub 10 s
+Retracing Retrace	Recursive Rewind	rub 9 s
+Retreating Cluster	Departing Nebula	rub 89 s
+Retreating Cluster	Retreating Nebula	rub 64 s; rub 66 s
+Retreating Horizon Light	Fleeing Quasar	rub 93 s
+Returning Loop	Gauzy Moire	rub 5 s
+Returning Return	Mirrored Return	rub 38 s
+Returning Return	Recursive Rewind	rub 32 s
+Returning Return	Rewound Recall	rub 35 s
+Returning Return	Rewound Rewind	rub 120 s
+Reverberating Rumble	Rumbling Boom	rub 24 s
+Revolving Descent	Barber Paradox	rub 129 s
+Revolving Rondeau	Eddying Merry-Go-Round	rub 18 s
+Revolving Wheel	Orbiting Corona	rub 83 s
+Revolving Wheel	Sounding Bell Plate	rub 29 s
+Revolving Wheel	Spattered Tarn	rub 96 s
+Rewound Retrace	Recursive Return	rub 53 s
+Rewound Retrace	Time-Turned Retrace	rub 65 s
+Riddled Deck	Riddled Panel	rub 12 s
+Riemannian Ramble	Fifth-Wise Circuit Walk	rub 146 s
+Riemannian Ramble	Fifth-Wise Trail	rub 5 s
+Riemannian Ramble	Neo-Riemannian Trail	rub 121 s
+Riemannian Wayfaring	Lattice Wayfaring	rub 15 s
+Riemannian Wayfaring	Neo-Riemannian Circuit Walk	rub 14 s
+Riemannian Wayfaring	Neo-Riemannian Path	rub 14 s
+Rifting Crust	Faulted Graben	rub 104 s
+Rifting Crust	Faulted Magma Chamber	rub 119 s
+Rifting Crust	Faulted Plate	rub 104 s
+Rifting Crust	Quaking Graben	rub 65 s
+Rifting Crust	Subducting Magma Chamber	rub 104 s
+Rifting Graben	Subducting Plate	rub 104 s
+Rifting Rift	Seismic Graben	rub 119 s
+Ringing Basilica	Hollowed Apse	rub 21 s
+Ringing Coppice	Glinting Coppice	rub 26 s
+Ringing Lagoon	Chirping Mere	rub 21 s
+Ringing Loch	Unending Ritardando	rub 23 s
+Ringing Loch	Veranda Harp	rub 141 s
+Ringing Loch	Whistling Loch	rub 7 s
+Ringing-Stone Dome	Booming Silo	rub 18 s
+Rip-Current Backflow	Dragging Backflow	rub 16 s
+Rip-Current Backflow	Dragging Undercurrent	rub 5 s
+Rip-Current Backflow	Receding Backflow	rub 104 s
+Rip-Current Backflow	Receding Sink	rub 22 s
+Rip-Current Ebb Current	Receding Drawback	rub 9 s
+Ripening Gallery	Widening Nave	rub 93 s
+Ripening Holms	Floating Holms	rub 164 s
+Ripening Holms	Pooling Continents	rub 119 s
+Ripening Holms	Settling Continents	rub 18 s
+Ripening Holms	Uneven Mosaic	rub 121 s
+Ripening Isles	Floating Atolls	rub 11 s
+Ripening Isles	Floating Islands	rub 91 s
+Rippling Banner	Draped Banner	rub 104 s; rub 93 s
+Rippling Banner	Rippling Veil	rub 93 s
+Rippling Drapery	Chthonic Root Cellar	rub 20 s
+Rippling Drapery	Draped Streamer	rub 7 s
+Rippling Drapery	Folding Drapery	rub 20 s
+Rippling Drapery	Glimmering Corona Band	rub 119 s
+Rippling Drapery	Glimmering Streamer	rub 10 s; rub 20 s
+Rippling Drapery	Hanging Arc of Light	rub 20 s
+Rippling Drapery	Wavering Corona Band	rub 20 s
+Rippling Jetty	Moonlit Waterside	rub 14 s
+Rippling Lagoon Night	Shoreline-Night Lagoon Night	rub 119 s
+Rippling Ribbon	Draped Streamer	rub 141 s
+Rippling Ribbon	Glimmering Corona Band	rub 119 s
+Rippling Veil	Draped Veil	rub 22 s
+Rippling Veil	Folding Corona Band	rub 8 s
+Rising Chord	Arriving Cloud	rub 141 s
+Rising Chord	Bending Birds	rub 142 s
+Rising Chord	Converging Voices	rub 119 s
+Rising Chord	Gathering Birds	rub 109 s
+Rising Cloud	Sliding Glissando	rub 23 s
+Rising Dawn	Field-Line Radio Night	rub 71 s
+Rising Dawn	Shifting-Vowel Vowel	rub 27 s
+Rising Dawn	Warbling Chorus	rub 106 s
+Rising Dawn	Warbling Upsweep	rub 52 s
+Rising Rush	Spiralling Flight	rub 7 s
+Rising Wren Song	Chirping Wren Song	rub 102 s
+Rising Wren Song	Dawn-Lit Daybreak	rub 93 s
+Rising Wren Song	Morning-Side Chirp Field	rub 94 s
+Rising Wren Song	Morning-Side Riser	rub 104 s
+Riven Arcs	Cleft Shards of Light	rub 30 s
+Riven Facets	Fissured Phases	rub 76 s
+Riven Facets	Shattered Shoals	rub 18 s
+Riven Facets	Sundered Shoals	rub 74 s
+Riveted Furnace	Iron Rail	rub 27 s
+Riveted Furnace	Iron Rivet Hall	rub 93 s
+Riveted Furnace	Riveted Boiler	rub 32 s
+Riveted Furnace	Riveted Rivet Hall	rub 14 s
+Riveted Rivet Hall	Iron Anvil Floor	rub 66 s
+Riveted-Steel Dewar	Cryogenic Vessel	rub 20 s
+Riveted-Steel Dewar	Pressurised Sphere	rub 77 s
+Riveted-Steel Fuel Tank	Riveted-Steel Dewar	rub 9 s
+Riveted-Steel Tank	Pressurised Sphere	rub 9 s
+Roaming Ambulatory	Sauntering Arcade	rub 111 s
+Roaming Ambulatory	Wandering Passage	rub 56 s
+Roaring Call	Roaring Roar	rub 146 s
+Roaring Chant	Rumble-Sung Chant	rub 23 s
+Roaring Chant	Tempest-Chanted Invocation	rub 104 s
+Roaring Chant	Thundering Incantation	rub 18 s
+Roaring Roar	Tempest-Chanted Cry	rub 141 s
+Roaring Thunder	Heavy Stormcloud	rub 97 s
+Rocking Song	Faraway Choir	rub 141 s
+Roiling Air Column	Boiling Shimmer Veil	rub 7 s
+Roiling Eddy Light	Distorted Mirage Air	rub 6 s
+Roiling Eddy Light	Unsteady Mirage Air	rub 64 s
+Rolling Cobbles	Washing Pebbles	rub 86 s
+Rolling Pebbles	Hissing Pebbles	rub 119 s
+Rolling Pebbles	Rolling Sandbar	rub 7 s
+Rolling Swell	Rising Breakers	rub 7 s
+Rolling Thunderroll	Grumbling Boom	rub 84 s
+Rolling Thunderroll	Rumbling Boom	rub 6 s
+Romanesque Chancel	Candlelit Chancel	rub 73 s
+Rosette Cloud	Nebular Cloud	rub 104 s
+Rosette Cloud	Orion Cloud	rub 99 s
+Rotating Merry-Go-Round	Coursing Roundel	rub 6 s
+Rotating Merry-Go-Round	Pirouetting Whirligig	rub 141 s
+Rotating Starling Ring	Coursing Gyre	rub 9 s
+Rotating Starling Ring	Pirouetting Maelstrom	rub 6 s
+Rounded Cornerstone	Mossed Flagstone	rub 10 s
+Rounded Flagstone	Rounded Cornerstone	rub 93 s
+Rounded Pebbles	Hissing Strandline	rub 17 s
+Rounded Pebbles	Rounded Shingle	rub 104 s
+Rounded Pebbles	Tumbling Cobbles	rub 9 s
+Rounded Step	Softened Cornerstone	rub 122 s
+Rounded Step	Unhastened Metronome	rub 82 s
+Rounding Ellipse	Rounding Perihelion	rub 104 s
+Rounding Perihelion	Circling Circuit	rub 21 s
+Rumble-Sung Rite	Booming-Voice Chant	rub 104 s
+Rumble-Sung Rite	Gale-Sung Rite	rub 8 s
+Rumble-Sung Rite	Rumble-Sung Chant	rub 100 s
+Rumble-Sung Rite	Storm-Voiced Rite	rub 35 s
+Rumbling-Voice Hall	Ventricular Yurt	rub 101 s
+Rumbling-Voice Yurt	Colossal Bellow	rub 33 s
+Rumbling-Voice Yurt	Growling Yurt	rub 119 s
+Rumbling-Voice Yurt	Gyuto Mantra	rub 109 s
+Rumbling-Voice Yurt	Kargyraa Rock Shelter	rub 119 s
+Rumbling-Voice Yurt	Morning-Side Chirp Field	rub 73 s
+Rumbling-Voice Yurt	Rumbling-Voice Hall	rub 119 s
+Rumbling-Voice Yurt	Rumbling-Voice Mountain Pass	rub 41 s
+Rumbling-Voice Yurt	Shifting-Vowel Vowel	rub 141 s
+Rumbling-Voice Yurt	Tuvan Rock Shelter	rub 141 s
+Rushing Tunnel	Boring Shaft	rub 49 s
+Rushing Tunnel	Spinning Corridor	rub 50 s
+Rusted Barn	Ringing Tin Barn	rub 93 s
+Rusted Groundswell	Alternating Semaphores	rub 51 s
+Rusted Groundswell	Auric Crescendo	rub 119 s
+Rusted Groundswell	Auric Heave	rub 93 s
+Rusted Groundswell	Burnished Swell	rub 93 s
+Rusted Groundswell	Burnished Tidewater	rub 119 s
+Rusted Groundswell	Gilded Surge	rub 142 s
+Rusted Groundswell	Oozing Ooze	rub 141 s
+Rusted Groundswell	Patchwork Chimera	rub 75 s
+Rusted Groundswell	Patinated Billow	rub 78 s
+Rusted Groundswell	Patinated Heave	rub 93 s
+Rusted Groundswell	Rusted Tidewater	rub 93 s
+Rusted Groundswell	Tawny Crescendo	rub 119 s
+Rusted Groundswell	Tawny Tidewater	rub 93 s
+Rusted Groundswell	Uneven Mosaic	rub 120 s
+Rusted Rail	Iron Rail	rub 10 s
+Rustling Clump	Knocking Shoot	rub 80 s
+Rustling Reedbed	Green Shoot	rub 119 s
+Rustling Reedbed	Knocking Clump	rub 104 s
+Rustling Reedbed	Rustling Clump	rub 119 s
+Rustling Reedbed	Tapping Cane	rub 119 s
+Rustling Reedbed	Wooden Cane	rub 93 s
+Rustling Veil	Dusty Field	rub 6 s
+Rustling Veil	Spiral Ascent	rub 6 s
+Rustling Veil	Tidal Tide	rub 92 s
+Sable Night Song	Indigo Night Canticle	rub 31 s
+Sandblown Ruin	Wasted Ruin	rub 93 s
+Sandblown Ruin	Weathered Crypt	rub 42 s
+Sandblown Ruin	Worn Arcade	rub 104 s
+Sanded Dust Cloud	Grained Silt	rub 11 s
+Sandy Bay	Tidal Bay	rub 34 s
+Satellite Apogee	Revolving Circuit	rub 104 s
+Sauntering Arcade	Sauntering Concourse	rub 81 s
+Sauntering Arcade	Wandering Concourse	rub 93 s
+Sauntering Hallway	Roaming Passage	rub 103 s
+Sawing Treetops	Overhead Crowns	rub 9 s
+Scattering Haze	Dissolving Mist	rub 6 s
+Scattering Haze	Dissolving Veil	rub 6 s
+Scattering Sparrows	Banking Sparrows	rub 61 s
+Scattering Sparrows	Wheeling Geese	rub 27 s
+Scattering Swallows	Flocking Starlings	rub 83 s
+Scattering Swifts	Wheeling Shoal	rub 23 s
+Scintillant Rigel	Shivering Starlight	level dip 15.7 peak 4.5 LU
+Scintillant Rigel	Trembling Capella	level dip 13.5 peak 3.9 LU
+Scuttled Corridor	Ghost Module	rub 119 s
+Sea-Washed Shore	Breaking Bay	rub 104 s
+Sea-Washed Shore	Coastal Bay	rub 93 s
+Sea-Washed Shore	Dune Shallows	rub 104 s
+Sea-Washed Shore	Tidal Beach	rub 93 s
+Seeded Dust Cloud	Billowing Register	rub 16 s
+Seeded Dust Cloud	Grained Silt	rub 91 s
+Seeded Dust Cloud	Milled Silt	rub 142 s
+Seething Eddy Light	Turbulent Air Column	level dip 24.9 peak 1.6 LU
+Seething Mirage Air	Rippled Seeing	rub 11 s
+Seething Race	Boiling Whirlpool	rub 39 s
+Seething Race	Restless Wash	rub 104 s
+Seething Race	Swirling Street	rub 141 s
+Seething Race	Tumbling Torrent	rub 127 s
+Seething Turbulence	Seething Speckle	rub 9 s
+Seething Whirlpool	Seething Race	rub 6 s
+Seething Whirlpool	Seething Torrent	rub 6 s
+Seething Whirlpool	Swirling Street	rub 10 s
+Seething-Band Band Noise	Featureless Torus	rub 21 s
+Seething-Band Band Noise	Plasmaspheric Murmur Band	rub 75 s
+Seething-Band Band Noise	Steady Hiss	rub 17 s
+Seismic Graben	Quaking Graben	rub 142 s
+Seismic Graben	Subducting Plate	rub 104 s
+Seismic Subduction	Rifting Rift	rub 30 s
+Seismic Subduction	Seismic Graben	rub 101 s
+Seismic Subduction	Shifting Mantle	rub 71 s
+Seismic Subduction	Subducting Subduction	rub 49 s
+Self-Similar Echoes	Curling Marble	rub 5 s
+Separating Cirrus	Dissolving Cloud	rub 141 s
+Separating Cirrus	Dissolving Mist	rub 6 s
+Separating Cirrus	Parting Cloud	rub 104 s
+Separating Mist	Dissolving Fog	rub 63 s
+Separating Mist	Scattering Cirrus	rub 52 s
+September Vale	Cool Hollow	rub 141 s
+Serenading Soiree	Nocturnal Evensong	rub 35 s
+Serenading Vigil Song	Nocturnal Night Music	rub 18 s
+Settled Aura	Pinned Nimbus	rub 36 s
+Settled Crown	Pinned Nimbus	rub 88 s
+Settled Crown	Riemannian Trail	rub 14 s
+Settled Glow	Gapped Glow	rub 26 s
+Settled Glow	Stationed Gloriole	rub 26 s
+Settling Continents	Gathering Isles	rub 76 s
+Settling Hoarfrost	Hushed Snowfall	rub 81 s
+Settling Hoarfrost	Powdered Snow	rub 93 s
+Severed Shards of Light	Riven Arcs	rub 142 s
+Severed Shards of Light	Shattered Shoals	rub 116 s
+Sferic Bolt Chain	Crackling Static Front	rub 142 s
+Shade Bower	Ghost Arbour	rub 104 s
+Shade Bower	Ghost Garden	rub 93 s
+Shade Bower	Phantasmal Maze	rub 93 s
+Shade Bower	Spectral Lawn	rub 94 s
+Shade Bower	Wisp Arbour	rub 93 s
+Shadow-Voiced Void	Disembodied Nothing	rub 97 s
+Shadow-Voiced Void	Ethereal Silence	rub 45 s
+Shadowed Absorber	Eclipsed Prism Light	rub 24 s
+Shadowed Absorber	Fraunhofer Rainbow	rub 11 s
+Shadowed Absorber	Obscured Gap	rub 12 s
+Shadowed Absorber	Shadowed Rainbow	rub 31 s
+Shadowed Bog	Dew-Laden Bog	rub 14 s
+Shadowed Bog	Dew-Laden Moor	rub 13 s
+Shadowed Bog	Whispering Bog	rub 8 s
+Shadowed Rainbow	Notched Rainbow	rub 142 s
+Shadowed Rainbow	Obscured Continuum	rub 142 s
+Shadowed Rainbow	Obscured Gap	rub 119 s
+Shattered Shoals	Fissured Circles	rub 86 s
+Shattered Shoals	Fissured Shoals	rub 5 s
+Shattered Shoals	Riven Arcs	rub 114 s
+Shattered Shoals	Sundered Facets	rub 55 s
+Shattered Shoals	Sundered Shoals	rub 69 s
+Shearing Landslip	Slumping Rockfall	rub 71 s
+Shearing Landslip	Toppling Rockfall	rub 9 s
+Sheer Screen	Overlaid Moire	rub 75 s
+Sheer Screen	Rippled Screen	rub 47 s
+Sheer Screen	Shimmering Veil	rub 26 s
+Shifting Pavilion	Unfolding Edifice	rub 34 s
+Shifting Rift	Faulted Plate	rub 12 s
+Shifting Rift	Quaking Rift	rub 104 s
+Shifting Subduction	Quaking Graben	rub 38 s
+Shifting Subduction	Rifting Rift	rub 114 s
+Shifting Subduction	Seismic Subduction	rub 105 s
+Shifting Subduction	Subducting Magma Chamber	rub 104 s
+Shifting Subduction	Tectonic Mantle	rub 6 s
+Shifting-Vowel Aum	Closing Mouth Tide	rub 19 s
+Shifting-Vowel Swell	Closing Syllable	rub 19 s
+Shifting-Vowel Vowel	Murmured Hum Tide	rub 79 s
+Shimmering Organza	Shimmering Veil	rub 66 s
+Shining Reliquary	Haloed Baptistery	rub 102 s
+Shining Reliquary	Illumined Shrine	rub 72 s
+Shining Reliquary	Nimbed Reliquary	rub 119 s
+Shivering Sheet	Bursting Gong	rub 93 s
+Shivering Sheet	Kindled Plate	rub 93 s
+Shivering Tam-Tam	Blooming Disc	rub 10 s
+Shivering Tympan	Shivering Plate	rub 13 s
+Shooting Comets	Hyperspace Trails	rub 10 s
+Shoreline-Night Lagoon Night	Fading Coomb	rub 104 s
+Shoreline-Night Lagoon Night	Lapping Bay Night	rub 18 s
+Shoreline-Night Lagoon Night	Moonlit Waterside	rub 84 s
+Shoreline-Night Lagoon Night	Serenading Soiree	rub 8 s
+Shoreline-Night Lagoon Night	Silver Mere Shore	rub 104 s
+Shoreline-Night Lagoon Night	Still-Water Lagoon Night	rub 104 s
+Shrine Bells	Monastery Breeze	rub 97 s
+Shrine Wind Bells	Shrine Winds	rub 7 s
+Shrine Winds	Mountain Breeze	rub 72 s
+Sidereal Comet	Astral Sphere	rub 119 s
+Sidereal Comet	Planetary Planetarium	rub 119 s
+Sidereal Comet	Zodiacal Planetarium	rub 104 s
+Sidereal Milky Way	Polar Firmament	rub 12 s
+Sidereal Milky Way	Twinkling Stars	rub 21 s
+Sifted Grain	Dusted Silt	rub 104 s
+Sifted Grain	Grained Silt	rub 93 s
+Sifted Grain	Milled Flour	rub 104 s
+Sifted Grain	Milled Silt	rub 93 s
+Sifted Grain	Sanded Dust Cloud	rub 93 s
+Sifted Pollen	Dusted Silt	rub 93 s
+Sifting Motes	Raining Cascade	rub 93 s
+Sifting Motes	Raining Droplets	rub 40 s
+Sighing Sounding Board	Breath-Strung Psaltery	rub 5 s
+Sighing Sounding Board	Wind-Sung Kithara	rub 6 s
+Silent Copse	Hollow Thicket	rub 141 s
+Silent Copse	Wooded Clearing	rub 119 s
+Silent Copse	Wooded Thicket	rub 119 s
+Silent Corona	Orbital Corona	rub 21 s
+Silent Nebula	Cosmic Drift	rub 141 s
+Silent Nebula	Fading Icicles	rub 12 s
+Silent Nebula	Orbital Corona	rub 21 s
+Silent Nebula	Void Corona	rub 136 s
+Silent-Hulled Fuselage	Hollow-Hulled Airlock	rub 123 s
+Silent-Hulled Fuselage	Orion Nebula	rub 44 s
+Silent-Hulled Fuselage	Scuttled Corridor	rub 119 s
+Silted Silt Bed	Pelagic Mud Flat	rub 93 s
+Silver Mere Shore	Ink Night Piece	rub 119 s
+Silver Mere Shore	Rippling Jetty	rub 14 s
+Silver Mere Shore	Silver Lagoon Night	rub 122 s
+Silvered Canopy	Silvered Bower	rub 120 s
+Silvered Canopy	Silvered Thicket	rub 5 s
+Silvered Glow	Gibbous Night	rub 119 s
+Silvered Glow	Lunar Beam	rub 119 s
+Silvered Glow	Moonbeam Night	rub 119 s
+Silvered Glow	Waxing Night	rub 141 s
+Singing Tarn	Singing Ice	rub 8 s
+Sinking Centre	Falling Centre	rub 6 s
+Sinking Core	Gravitating Lodestone	rub 14 s
+Sinking Core	Gravitating Magnet	rub 35 s
+Sinking Core	Orbiting Lodestone	rub 17 s
+Sinking Magnet	Pulled Centre	rub 6 s
+Skeletal Truss	Lattice Truss	rub 104 s
+Skeletal Truss	Strutted Frame	rub 104 s
+Skimmed Lake	Concentric Pond	rub 70 s
+Skimmed Lake	Concentric Puddle	rub 105 s
+Skimmed Lake	Dropped Puddle	rub 86 s
+Skimmed Lake	Lapping Water	rub 34 s
+Skimmed Lake	Quivering Fountain	rub 32 s
+Skimmed Lake	Skimmed Water	rub 51 s
+Skimmed Rings	Skimmed Water	rub 23 s
+Skimmed Water	Concentric Fountain	rub 28 s
+Skittering Breeze	Brisk Air	rub 16 s
+Skittering Flurry	Skittering Whirl	rub 7 s
+Skywave Ionosphere	D-Layer Radio Sky	rub 8 s
+Skywave Ionosphere	F-Layer Radio Sky	rub 10 s
+Skywave Ionosphere	Refracted Upper Air	rub 17 s
+Sleepwalking Landing	Daydreaming Landing	rub 93 s
+Sleepwalking Landing	Dreaming Attic	rub 93 s
+Sleepwalking Landing	Reverie Attic	rub 104 s
+Sleepwalking Landing	Somnambulant Parlour	rub 94 s
+Sliding Glissando	Bending Lights	rub 6 s
+Sliding Sferic Echo	Falling-Tone Night Wave	rub 93 s
+Sliding Sferic Echo	Sliding Radio Night	rub 81 s
+Sliding Sferic Echo	Sliding Swoop	rub 81 s
+Sliding Swoop	Diffuse Murmur Band	rub 12 s
+Sliding Swoop	Dispersed Radio Night	rub 119 s
+Sliding Swoop	Ducted Night Wave	rub 37 s
+Sliding Swoop	Falling-Tone Night Wave	rub 93 s
+Sliding Swoop	Sliding Field Song	rub 42 s
+Slow Basalt	Brooding Furnace	rub 15 s
+Slow Basalt	Sombre Monolith	rub 36 s
+Slow Engine	Thawing Snow	rub 120 s
+Slow Orbits	Measured Pendulum	rub 120 s
+Slow-Heaving Undercroft	Lung-Slow Groundswell	rub 104 s
+Slow-Heaving Undercroft	Lung-Slow Lowland Floor	rub 119 s
+Slow-Heaving Undercroft	Lung-Slow Seabed	rub 119 s
+Slow-Heaving Undercroft	Slow-Heaving Groundswell	rub 67 s
+Slowing Beacon	Dwindling Lantern Light	rub 30 s
+Slowing Beacon	Falling Last Light	rub 68 s
+Slowing Beacon	Redshifted Signal	rub 52 s
+Slowing Spark	Darkening Light	rub 5 s
+Small-Hours Weight	Blackout Burden	rub 119 s
+Small-Hours Weight	Lights-Out Heaviness	rub 119 s
+Small-Hours Weight	Witching-Hour Gravity	rub 23 s
+Small-Hours Weight	Witching-Hour Pressure	rub 119 s
+Smeared Sepia	Bleeding Graphite	rub 47 s
+Smoky Smoke Ring	Wafting Sepia Cloud	rub 99 s
+Smoothed Cornerstone	Rounded Stone	rub 11 s
+Smudged Watercolour	Blurred Gouache	rub 38 s
+Smudged Watercolour	Diffuse Graphite	rub 9 s
+Smudged Watercolour	Diffuse Pastel	rub 37 s
+Snapping Spar Joint	Cooling-Metal Spar Joint	rub 9 s
+Snapping Spar Joint	Creaking Frame Joint	rub 89 s
+Soaring Geese	Creeping Culture	rub 19 s
+Soaring Geese	Kindred Tremolo	rub 21 s
+Soaring Geese	Murmuring Geese	rub 53 s
+Soaring Swallows	Banking Sparrows	rub 120 s
+Soft Pad	Felt Chords	rub 44 s
+Softened Cornerstone	Mossed Pillar	rub 92 s
+Softened Plinth	Rounded Cornerstone	rub 78 s
+Softened Plinth	Rounded Flagstone	rub 70 s
+Softened Snow	Dissolving Icicles	rub 105 s
+Sombre Cavern	Black Crypt	rub 80 s
+Sombre Monolith	Buried Cavern	rub 93 s
+Somnambulant Engine	Lucid Device	rub 6 s
+Somnambulant Machine	Lucid Device	rub 6 s
+Somnambulant Machine	Whirring Apparatus	rub 6 s
+Sounding Tam-Tam Hall	Sounding Bell Plate	rub 6 s
+Sounding Waveguide	Channelled Sea Lane	rub 94 s
+Sounding-Whale Moan	Breaching Call	rub 11 s
+Sounding-Whale Moan	Fluked Lament	rub 19 s
+Sounding-Whale Moan	Sounding-Whale Call	rub 10 s
+Soundless Expanse	Quiet Cosmos	rub 81 s
+Soundless Expanse	Quiet Heavens	rub 104 s
+Soundless Expanse	Soundless Starfall	rub 81 s
+Soundless Expanse	Still Firmament Night	rub 93 s
+Soundless Universe	Dormant Night Sky	rub 93 s
+Sparking Marsh	Luminous Swarm	rub 26 s
+Sparking Marsh	Sparking Paddock	rub 112 s
+Sparking Meadow	Sparking Marsh	rub 16 s
+Sparkling Fountain	Raining Droplets	rub 13 s
+Sparkling Glitter	Raining Cascade	rub 81 s
+Sparkling Glitter	Raining Sequins	rub 93 s
+Sparkling Glitter	Spilling Fountain	rub 93 s
+Sparkling Glitter	Twinkling Cascade	rub 104 s
+Sparkling Light	Flickering Dust	rub 12 s
+Sparkling Light	Sparkling Sheen	rub 6 s
+Sparkling Shimmer	Bright Dust	rub 104 s
+Sparkling Shimmer	Dappled Sheen	rub 93 s
+Sparkling Shimmer	Glowing Dust	rub 93 s
+Sparkling Shimmer	Glowing Shimmer	rub 93 s
+Sparkling Shimmer	Trembling Shimmer	rub 93 s
+Spattering Rings	Rainy Splash	rub 112 s
+Spattering Splash	Rainy Splash	rub 6 s
+Spattering Splash	Streaming Trails	rub 8 s
+Spectral Chime	H-Beta Gong	rub 6 s
+Spectral Lawn	Eerie Trellis	rub 119 s
+Spectral Lawn	Ghost Lawn	rub 119 s
+Spectral Lawn	Phantasmal Lawn	rub 72 s
+Spectral Lawn	Shade Maze	rub 119 s
+Spectral Lawn	Spectral Bower	rub 142 s
+Spectral Lawn	Wisp Arbour	rub 7 s
+Spectral Summers	Spectral Footsteps	rub 119 s
+Spectral Summers	Vanished Footsteps	rub 119 s
+Spectral-Voiced Void	Unbodied Abyss Voice	rub 93 s
+Spinning Coil	Ionised Spindle	rub 79 s
+Spinning Conduit	Boring Passage	rub 7 s
+Spinning Conduit	Burrowing Burrow	rub 20 s
+Spinning Conduit	Curving Wormhole	rub 141 s
+Spinning Conduit	Endless Passage	rub 11 s
+Spinning Conduit	Hollow Tube	rub 14 s
+Spinning Conduit	Hollow Tunnel	rub 9 s
+Spinning Conduit	Rushing Tunnel	rub 104 s
+Spinning Conduit	Spinning Corridor	rub 12 s
+Spinning Corridor	Curving Tunnel	rub 14 s
+Spinning Corridor	Spinning Conduit	rub 14 s
+Spiral Ascent	Dusty Field	rub 100 s
+Spiral Ascent	Endless Ebb	rub 96 s
+Spiral Ascent	Swinging Gears	rub 104 s
+Spiral Ascent	Tidal Ladder	rub 141 s
+Spiral Ascent	Tidal Moon	rub 69 s
+Spiral Spiral	Eternal Flood	rub 51 s
+Spiral Staircase	Tidal Moon	rub 68 s
+Spiralling-In Halo	Homing Circle	rub 7 s
+Spiralling-In Wreath	Focusing Circle	rub 9 s
+Splashing Beads	Spattering Splash	rub 8 s
+Splashing Beads	Trickling Ripples	rub 13 s
+Splashing Pond	Rainy Splash	rub 6 s
+Splashing Raindrops	Trickling Droplets	rub 6 s
+Splintered Shoals	Cleft Phases	rub 88 s
+Splintered Shoals	Fissured Fragments	rub 65 s
+Splintered Shoals	Fissured Phases	rub 42 s
+Splintered Shoals	Riven Shoals	rub 88 s
+Split Dynamo	Split Pole	rub 97 s
+Split Faraday	Doubled Faraday	rub 93 s
+Split Line	Field-Bent Flux	rub 115 s
+Split Line	Polarised Line	rub 76 s
+Spotted Maze	Dappling Zebra	rub 57 s
+Spotted Shell	Branching Mitosis	rub 7 s
+Spotted Zebra	Gathered Metronomes	rub 82 s
+Spotted Zebra	Heeding Feedback	rub 6 s
+Spreading Colony	Growing Bloom	rub 7 s
+Spreading Garden	Teeming Colony	rub 10 s
+Spreading Mould	Golden Mould	rub 104 s
+Spreading Mould	Spreading Plasmodium	rub 24 s
+Spreading Plasmodium	Golden Tendrils	rub 28 s
+Spring Waterline	Neap Ebb	rub 141 s
+Squall-Pressed Undercloud	Squall-Pressed Squall Line	rub 119 s
+Squalling Gale	Wind-Torn Storm	rub 10 s
+Squalling Storm	Storming Monsoon	rub 96 s
+Squalling Storm	Tempestuous Gale	rub 90 s
+Squalling Storm	Thunderous Monsoon	rub 119 s
+Squalling Storm	Wind-Torn Monsoon	rub 56 s
+Squalling Storm	Wind-Torn Storm	rub 86 s
+Squally Bog	Squally Rill	rub 142 s
+Squally Chorus	Downpour Chorus	rub 33 s
+Squally Puddle	Downpour Puddle	rub 6 s
+Squally Rainpool	Sodden Chorus	rub 93 s
+Squally Rainpool	Wet Puddle	rub 93 s
+Squally Rill	Squally Bog	rub 81 s
+Squally Rill	Squally Puddle	rub 51 s
+Standing Mode	Chantry Transept	rub 65 s
+Standing Mode	Humming Node	rub 27 s; rub 43 s
+Standing Mode	Nodal Mode	rub 37 s
+Standing Mode	Resonant Mode	rub 73 s
+Standing Wave	Humming Mode	rub 14 s
+Standing Wave	Humming Node	rub 14 s
+Standing Wave	Humming Waveguide	rub 13 s
+Starborne Star Litany	Starborne Hymn	rub 10 s; rub 26 s
+Starbound Basement	Interstellar Bedrock Sky	rub 104 s
+Starbound Basement	Universal Floor	rub 171 s
+Starbound Bedrock Sky	Starbound Basement	rub 38 s
+Starless Density	Sediment Basin	rub 8 s
+Starless Load	Overcast Burden	rub 93 s
+Starless Load	Overcast Heaviness	rub 81 s
+Starless Load	Overcast Load	rub 93 s
+Starless Load	Starless Density	rub 81 s
+Starless Load	Witching-Hour Weight	rub 93 s
+Starrise Passage	Late Sweep	rub 9 s
+Starry Firefly Night	Lush Dog Days	rub 119 s
+Starry Harvest Night	Balmy Summer Night	rub 52 s
+Starry Long Evening	Velvet Summer Night	rub 7 s
+Static Bolt Chain	Sferic Discharge	rub 7 s
+Static Discharge	Atmospheric Static Front	rub 93 s
+Static Discharge	Sferic Crackle	rub 94 s
+Static Discharge	Spark-Lit Crackle	rub 104 s
+Static Discharge	Static Tweek	rub 28 s
+Static Lightning Radio	Clicking Static Front	rub 128 s
+Static Lightning Radio	Crackling Static Front	rub 108 s
+Static Lightning Radio	Discharging Bolt Chain	rub 81 s
+Static Lightning Radio	Tweeking Storm	rub 93 s
+Static Tweek	Spark-Lit Static Front	rub 21 s
+Static Veil	Grain Hiss	rub 79 s
+Static Veil	Rustling Spray	rub 7 s
+Stationed Gloriole	Pinned Glow	rub 63 s
+Steadfast Contra Bourdon	Anchored Contra Bourdon	rub 8 s
+Steadfast Open Wood	Founded Subbass	rub 13 s
+Steadfast Open Wood	Moored Bourdon	rub 10 s
+Steady Weights	Measured Pendulum	rub 43 s
+Stellar Abyss	Event Station	rub 119 s
+Stellar Abyss	Remote Horizon	rub 19 s
+Stellar Abyss	Void Corona	rub 141 s
+Stellar Abyss	Void Signal	rub 33 s
+Stellar Canticle	Celestial-Choir Motet	rub 5 s
+Stellar Choir	Celestial-Choir Psalm	rub 5 s
+Stellar Choir	Star-Sung Anthem	rub 120 s
+Stellar Corona	Cosmic Drift	rub 11 s
+Stellar Drift	Remote Drift	rub 93 s
+Stellar Drift	Remote Nebula	rub 104 s
+Stellar Drift	Void Horizon	rub 93 s
+Stellar Horizon	Stellar Abyss	rub 14 s
+Stellar-Sung Chant	Orbiting-Voice Om Star	rub 5 s
+Stellar-Sung Om Star	Galactic-Sung Star Litany	rub 12 s
+Stellar-Sung Om Star	Orbiting-Voice Orbit Prayer	rub 7 s
+Stellar-Sung Star Litany	Galactic-Sung Hymn	rub 46 s
+Stellar-Sung Star Litany	Stellar-Sung Hymn	rub 9 s
+Steppe Steppe Night	Subharmonic Rock Shelter	rub 94 s
+Still Infinity	Celestial-Choir Canticle	rub 120 s
+Still Infinity	Soundless Night Sky	rub 104 s
+Still-Water Lagoon Night	Shoreline-Night Lagoon Night	rub 52 s
+Stilled Surge	Pooling Undulation	rub 28 s
+Stilled Swell	Pooling Undulation	rub 23 s
+Stirring Oaks	Murmuring Birches	rub 79 s
+Storm-Torn Partials	Wild Cyclone	rub 119 s
+Storm-Voiced Rite	Booming-Voice Rite	rub 120 s
+Storm-Voiced Rite	Gale-Sung Rite	rub 66 s
+Storm-Voiced Rite	Rumble-Sung Rite	rub 21 s
+Storming Gale	Wind-Torn Front	rub 8 s
+Stormlit Bog	Downpour Chorus	rub 42 s
+Stormlit Puddle	Squally Bog	rub 93 s
+Stormy Hedge	Wild-Wind Hedge	rub 104 s
+Stormy Hedge	Wild-Wind Shrubbery	rub 104 s
+Strange Torus	Butterfly Torus	rub 12 s
+Strange World	Warped World	rub 33 s
+Streaming Dye	Eddying Eddies	rub 84 s
+Streaming Photons	Shooting Lightspeed	rub 18 s
+Stretched Clock	Dilated Escapement	rub 96 s
+Stretched Clock	Lagging Clock	rub 104 s
+Stretched Clock	Lengthened Hour	rub 104 s
+Stretched Dial	Tarrying Hour	rub 141 s
+Stretched Hall	Expanding Cupola	rub 80 s
+Stretched Hall	Lengthening Chamber Hall	rub 101 s
+Stretched Metronome	Unhastened Chronometer	rub 119 s
+Striped Pigment	Coral Mitosis	rub 35 s
+Strolling Walkway	Wandering Concourse	rub 11 s
+Stupa Breeze	Monastery Breeze	rub 16 s
+Stupa Gust	Pagoda Hand Bells	rub 104 s
+Stupa Gust	Shrine Wind Bells	rub 104 s
+Subducting Plate	Grinding Rift	rub 93 s
+Subducting Plate	Rifting Graben	rub 93 s
+Subducting Plate	Seismic Subduction	rub 93 s
+Subducting Plate	Shifting Mantle	rub 94 s
+Subducting Plate	Shifting Rift	rub 93 s
+Subducting Rift	Grinding Subduction	rub 18 s
+Subducting Subduction	Quaking Rift	rub 104 s
+Subducting Subduction	Seismic Graben	rub 93 s
+Subharmonic Riverbank	Tuvan Gorge	rub 104 s; rub 93 s
+Submarine Sea Lane	Abyssal-Water Channel	rub 104 s
+Submarine Sea Lane	Pelagic-Deep Depth	rub 44 s
+Submarine Sea Lane	Sounding Sea Lane	rub 119 s
+Submarine Sea Lane	Sounding Water Column	rub 119 s
+Subterranean Cavern	Heavy Cavern	rub 37 s
+Subterranean Drone	Buried Undertow	rub 89 s
+Subterrene Flowstone	Dripping Chamber	rub 122 s
+Subterrene Flowstone	Grotto-Deep Grotto	rub 130 s
+Subterrene Flowstone	Hollow Speleothem	rub 98 s
+Subterrene Flowstone	Limestone Chamber	rub 130 s
+Sullen Thundersheet	Growling Thunderclap	rub 104 s
+Sullen Thundersheet	Looming Stormcloud	rub 104 s
+Sullen Thundersheet	Vast Thunderhead	rub 93 s
+Sullen Thundersheet	Vast Thundersheet	rub 93 s
+Sun-Warmed Evening	Honeyed Dusk	rub 96 s
+Sunken Sleep	Delta Hibernation	rub 19 s
+Sunken Sleep	Unconscious Sleep	rub 141 s
+Sunlit Granule	Chromatic Limb	rub 6 s
+Sunlit Granule	Golden-Disk Solar Wind	rub 15 s
+Sunlit Granule	Photospheric Granule	rub 10 s
+Sunlit Sun	Golden-Disk Prominence	rub 41 s
+Sunwise Round	Reversed Circle	rub 42 s
+Superposing Nocturne	Wave-Borne Night	rub 142 s
+Superposing Small Hours	Coherent-Night Nightfall	rub 141 s
+Superposing Small Hours	Overlapping Eventide	rub 93 s
+Superposing Small Hours	Phased Midnight	rub 93 s
+Superposing Small Hours	Phased Vigil	rub 93 s
+Superposing Small Hours	Superposing Midnight	rub 93 s
+Superposing Small Hours	Wave-Borne Night	rub 142 s
+Surrounding Cloud	Inward Field	rub 94 s
+Swarming Birds	Sliding Voices	rub 104 s
+Swarming Swarm	Rising Chord	rub 7 s
+Swaying Antiphon	Attracted Choir	rub 93 s
+Swaying Choir	Aligned Antiphon	rub 53 s
+Swaying Choir	Attracted Motet	rub 11 s
+Swaying Choir	Swaying Motet	rub 6 s
+Swaying Hump	Lilting Kink	rub 7 s
+Swaying Motet	Magnetised Psalm	rub 6 s
+Swaying Motet	Swaying Antiphon	rub 104 s
+Sweeping Flanger	Whooshing Flanger	rub 5 s
+Sweeping Wash	Whooshing Flanger	rub 5 s
+Swelling Plate	Shivering Plate	rub 23 s
+Swelling Waves	Calm Shore	rub 105 s
+Swelling Waves	Long Current	rub 9 s
+Swelling Waves	Long Surf	rub 6 s
+Swelling Waves	Rolling Waves	rub 119 s
+Swinging Cycles	Clock Metronome	rub 32 s
+Swinging Cycles	Measured Pendulum	rub 22 s
+Swinging Cycles	Pacing Pendulum	rub 119 s
+Swinging Cycles	Slow Orbits	rub 6 s
+Swinging Cycles	Steady Weights	rub 119 s
+Swinging Gears	Clock Clocks	rub 78 s
+Swinging Gears	Measured Pendulum	rub 119 s
+Swinging Gears	Patient Pendulum	rub 5 s
+Swinging Gears	Slow Orbits	rub 141 s; rub 6 s
+Swirled Comb	Swirled Jet	rub 142 s
+Swirled Jet	Phasing Sweep	rub 46 s
+Swirled Jet	Whooshing Swirl	rub 78 s
+Swirled Notch	Flanged Flanger	rub 61 s
+Swirled Notch	Phasing Notch	rub 30 s
+Swirled Notch	Swirled Flanger	rub 84 s
+Swirled Notch	Whooshing Flanger	rub 27 s
+Swirled Notch	Whooshing Swirl	rub 55 s
+Swirled Wash	Flanged Wash	rub 70 s
+Swirled Wash	Whooshing Swirl	rub 89 s
+Swirling Torrent	Boiling Overfall	rub 79 s
+Swirling Torrent	Racing Street	rub 14 s
+Swirling Torrent	Restless Whirlpool	rub 14 s
+Swirling Torus	Turbulent-Ring Halo Ring	rub 93 s
+Swirling Torus	Whirlpool Accretion Flow	rub 44 s
+Swollen Envelope	Tired Giant	rub 89 s
+Symmetric Mandala	Turning Snowflake	rub 10 s
+Synchronous Choir	Alternating Gathering	rub 7 s
+Synchronous Throng	Echoing Congregation	rub 101 s
+Tangled Corridors	Coiled Maze	rub 64 s
+Tangled Corridors	Winding Channels	rub 63 s
+Tangled Pathways	Winding Channels	rub 5 s
+Tantric Om	Droning Om	rub 64 s
+Tantric Om	Tantric Mantra	rub 119 s; rub 81 s
+Tantric Puja	Droning Prayer Hall	rub 47 s
+Tapestried Rug	Interlaced Weave	rub 6 s
+Tapestried Rug	Tapestried Weave	rub 10 s
+Tapping Cane	Green Bamboo	rub 7 s
+Tapping Ripples	Glistening Splash	rub 11 s
+Tapping Ripples	Trickling Ripples	rub 10 s
+Tapping Stalk	Hollow Bamboo	rub 93 s
+Tapping Stalk	Hollow Reedbed	rub 18 s
+Tawny Crescendo	Auric Crescendo	rub 119 s
+Tawny Crescendo	Burnished Tidewater	rub 119 s
+Tawny Crescendo	Gilded Surge	rub 142 s
+Tawny Crescendo	Patinated Tidewater	rub 104 s
+Tawny Crescendo	Rusted Upwelling	rub 119 s
+Tectonic Mantle	Rifting Rift	rub 13 s
+Tectonic Mantle	Shifting Subduction	rub 31 s
+Teeming Colony	Budding Lichen	rub 104 s
+Teeming Commons	Symbiotic Biome	rub 44 s
+Teeming Ecosystem	Ecological Food Web	rub 19 s
+Teeming Ecosystem	Feral Ecology	rub 97 s
+Teeming Ecosystem	Foraging Food Web	rub 104 s
+Teeming Ecosystem	Symbiotic Ecology	rub 87 s
+Teeming Fern	Teeming Culture	rub 36 s
+Teeming Long Evening	Balmy Long Evening	rub 10 s
+Teeming Solstice Night	Fragrant Midsummer	rub 20 s
+Teeming Summer Night	Balmy Long Evening	rub 18 s
+Teeming Summer Night	Teeming July Night	rub 14 s
+Tempest-Chanted Call	Booming-Voice Chant	rub 10 s
+Tempest-Chanted Call	Thundering Call	rub 11 s
+Tempest-Chanted Call	Thundering Chant	rub 93 s
+Tempest-Chanted Cry	Booming-Voice Rite	rub 119 s
+Tempest-Chanted Cry	Roaring Call	rub 84 s
+Tempest-Chanted Cry	Rumble-Sung Rite	rub 77 s
+Tempest-Chanted Cry	Storm-Voiced Roar	rub 94 s
+Tempest-Deep Rain Cellar	Gale-Grounded Storm Floor	rub 93 s
+Tempestuous Orchard	Thrashing Hedge	rub 26 s
+Tender Pad	Pushing Felt	rub 141 s
+Tensile Horizon	Alien Horizon	rub 63 s
+Tensile Horizon	Alien Octave	rub 112 s
+Tensile Horizon	Alien Planet	rub 7 s
+Tensile Horizon	Strange Realm	rub 14 s
+Tensile Horizon	Strange World	rub 51 s
+Tensile Horizon	Warped Spectrum	rub 19 s
+Tensile Horizon	Warped World	rub 16 s
+Tensile Realm	Otherworldly Continent	rub 72 s
+Tensile Realm	Tensile Horizon	rub 39 s
+Tessellated Mosaic	Fractal Carpet	rub 31 s
+Tethered Anchor	Sinking Mass	rub 92 s
+Thawing Snow	Fading Candle	rub 54 s
+Thawing Snow	Fading Icefield	rub 31 s
+Thawing Snow	Weeping Icefield	rub 75 s
+Thawing Snow	Weeping Wax	rub 90 s
+Thin Ice	Black Veneer	rub 26 s
+Thin Ice	Brittle Shelf	rub 8 s
+Thin Ice	New Glaze	rub 20 s
+Thin Ice	Taut Sheet	rub 8 s
+Thinking Cortex	Chaotic Trajectory	rub 90 s
+Thinking Cortex	Dreaming Memory	rub 104 s
+Thinking Cortex	Kindred Tremolo	rub 31 s
+Thinking Cortex	Listening Thought	rub 58 s
+Thinking Cortex	Moonlit Pergola	rub 60 s
+Thinking Cortex	Pondering Mind	rub 46 s
+Thinned Crypt	Crumbling Undercroft	rub 10 s
+Thrashing Hedge	Stormy Terrace	rub 6 s
+Threaded Pathways	Branching Filaments	rub 119 s
+Threaded Pathways	Foraging Mould	rub 80 s
+Threaded Pathways	Spreading Plasmodium	rub 10 s
+Throbbing Soliton	Beating Bead	rub 74 s
+Thunder-Founded Low Front	Gale-Grounded Storm Floor	rub 16 s
+Thunder-Founded Low Front	Squall-Pressed Squall Line	rub 119 s
+Thunder-Founded Low Front	Storm-Floored Storm Floor	rub 107 s
+Thunder-Founded Low Front	Storm-Floored Thunder Vault	rub 93 s
+Thundering Avalanche	Cascading Snowslide	rub 14 s
+Thundering Call	Booming-Voice Chant	rub 104 s
+Thundering Call	Tempest-Chanted Call	rub 18 s
+Thundering Cliffs	Gale Cliffs	rub 32 s
+Thundering Incantation	Roaring Summoning	rub 41 s
+Thundering Snowslide	Shearing Landslip	rub 71 s
+Thundering Snowslide	Slumping Rockfall	rub 74 s
+Thundering Snowslide	Toppling Rockfall	rub 9 s
+Thunderous Cry	Booming-Voice Rite	rub 120 s
+Thunderous Cyclone	Charged Cloudburst	rub 75 s
+Thunderous Cyclone	Tempestuous Gale	rub 74 s
+Tibetan Gong	Struck Carillon	rub 6 s
+Ticking Joint	Cooling-Metal Joint	rub 11 s
+Ticking Joint	Expanding Rivet Line	rub 21 s
+Ticking Joint	Snapping Spar Joint	rub 94 s
+Ticking Joint	Ticking Seam	rub 31 s
+Ticking Rivet Line	Snapping Spar Joint	rub 90 s
+Ticking Rivet Line	Ticking Joint	rub 93 s
+Ticking Rivet Line	Ticking Seam	rub 77 s
+Ticking Seam	Ticking Strut	rub 5 s
+Ticking Spar Joint	Snapping Spar Joint	rub 119 s
+Tidal Almanac	Harmonic Conjunction	rub 6 s
+Tidal Almanac	Orbital Occultation	rub 6 s
+Tidal Almanac	Periodic Conjunction	rub 6 s
+Tidal Almanac	Periodic Ephemeris	rub 6 s
+Tidal Almanac	Precise Conjunction	rub 6 s
+Tidal Ascent	Tidal Flood	rub 14 s
+Tidal Bay	Tidal Machair	rub 105 s
+Tidal Hearthstone	Deep-Sighing Hearthstone	rub 93 s
+Tidal Hearthstone	Exhaling Foundation Stone	rub 93 s
+Tidal Hearthstone	Rising-Falling Foundation Stone	rub 76 s
+Tidal Ladder	Arriving Swarm	rub 6 s
+Tidal Ladder	Dusty Field	rub 106 s
+Tidal Ladder	Rustling Veil	rub 47 s
+Tidal Syzygy	Precise Conjunction	rub 99 s
+Tidal Syzygy	Precise Eclipse	rub 41 s
+Tidal Tide	Endless Ebb	rub 86 s
+Tidal Tide	Spiral Ascent	rub 12 s; rub 6 s
+Tidal Tide	Tidal Moon	rub 62 s
+Tidal-Pulled Ensemble	Gravitational Assembly	rub 5 s
+Tidal-Pulled Ensemble	Tidal-Pulled Chorus	rub 51 s
+Tightening Corona	Closing Wreath	rub 7 s
+Tightening Corona	Spiralling-In Wreath	rub 81 s
+Tightening Round	Homing Ring	rub 23 s
+Tilted Comma	Tilted Ratio	rub 9 s
+Tilted Comma	Tritave Gamelan	rub 93 s
+Tilted Ratio	Eleventh Comma	rub 7 s
+Tinkling Canopy	Chiming Coppice	rub 93 s
+Tinkling Canopy	Glassy Grove	rub 93 s
+Tinkling Canopy	Glinting Grove	rub 93 s
+Tinted Panel	Gilded Icon	rub 64 s
+Tired Giant	Dimming Arcturus	rub 18 s
+Tired Giant	Tired Mira	rub 142 s
+Tired Mira	Astral Choir	rub 10 s
+Tired Mira	Ember-Red Aldebaran	rub 87 s
+Tired Mira	Slowing Beacon	rub 118 s
+Tired Mira	Swollen Envelope	rub 35 s
+Titanic Gullet	Colossal Bellow	rub 104 s
+Titanic Utterance	Leviathan-Voiced Utterance	rub 93 s
+Titanic Utterance	Mountainous Throat	rub 104 s
+Titanic Utterance	Vast-Chested Larynx	rub 93 s
+Tonic Swell Box	Moored Subbass	rub 129 s
+Tonic Swell Box	Unmoving Diapason	rub 104 s
+Tonnetz Trail	Tonnetz Wayfaring	rub 84 s
+Trailing Cloudlet	Pooling Atolls	rub 98 s
+Transoceanic Passage	Ocean-Long Transit	rub 104 s
+Transparent Reverie	Luminous Daydream	rub 7 s
+Trapped Wavelet	Loitering Surge	rub 9 s
+Travertine Atrium	Limestone Hypostyle	level dip 53.0 peak 7.6 LU
+Treacly Rivulet	Honeyed Seep	rub 112 s
+Treacly Rivulet	Viscous Ooze	rub 10 s
+Trembling Capella	Scintillant Antares	rub 9 s
+Trench-Deep Assembly	Lightless-Sung Chant Line	rub 40 s
+Trench-Deep Choir	Benthic-Sung Choristers	rub 109 s
+Trench-Deep Choir	Deep-Throated Chant Line	rub 104 s
+Trench-Deep Choir	Drowned-Voice Assembly	rub 141 s
+Trench-Deep Choir	Leviathan-Voiced Lung	rub 119 s
+Trench-Deep Choir	Lightless-Sung Dirge	rub 119 s
+Trench-Deep Choir	Monastic Litany	rub 119 s
+Trench-Deep Choir	Vast-Chested Gullet	rub 119 s
+Triadic Circuit Walk	Riemannian Ramble	rub 76 s
+Triadic Trail	Neo-Riemannian Circuit Walk	rub 12 s
+Triadic Trail	Neo-Riemannian Wayfaring	rub 42 s
+Triadic Trail	Tonnetz Journey	rub 6 s
+Trilling Hayloft	Trilling Meadow	rub 104 s
+Triplet Magnetogram	Magnetised Flux	rub 64 s
+Trivial Aureole	Settled Crown	level dip 4.4 peak 0.0 LU
+Trivial Gloriole	Stationed Glow	rub 95 s
+Tugged Canticle	Polarised Antiphon	rub 39 s
+Tugged Canticle	Tugged Chorale	rub 56 s
+Tugged Chorale	Aligned Antiphon	rub 138 s
+Tugged Chorale	Tugged Canticle	rub 117 s
+Tumbling Capsule	Derelict Airlock	rub 119 s
+Tumbling Talus	Cascading Snowslide	rub 8 s
+Tumbling Talus	Toppling Rockfall	rub 104 s
+Tuned Baseband	Loop-Antenna Loop	rub 45 s
+Tuned Chorus	Harmonious Callers	rub 83 s
+Tuned Logbook	Antarctic Baseband	rub 104 s
+Turbulent Air Column	Unsteady Mirage Air	rub 93 s
+Turbulent Eddy Light	Roiling Eddy Light	rub 10 s
+Turbulent Mirage Air	Roiling Air Column	rub 141 s
+Turbulent-Ring Gyre	Whirlpool Torus	rub 21 s
+Turning Facets	Folded Mandala	rub 93 s
+Turning Facets	Hexagonal Rosette	rub 94 s
+Turning Facets	Jewelled Mosaic	rub 93 s
+Turning Facets	Radiant Medallion	rub 81 s; rub 94 s
+Turning Lantern	Hexagonal Rosette	rub 18 s
+Turning Lantern	Turning Facets	rub 10 s
+Tuvan Hall	Kargyraa Hall	rub 55 s
+Tuvan Hall	Steppe Steppe Night	rub 40 s
+Tuvan Riverbank	Steppe Hall	rub 121 s
+Tweeking Discharge	Static Tweek	rub 104 s
+Twilit Doorway	Liminal Glimpses	rub 141 s
+Twilit Doorway	Liminal Threshold	rub 119 s; rub 141 s
+Twilit Doorway	Twilit Threshold	rub 96 s
+Twilit Threshold	Nodding Shapes	rub 141 s
+Twilit Threshold	Vanishing Edge	rub 141 s
+Twin Rivers	Doubled Choirs	rub 20 s
+Twin Rivers	Parted Currents	rub 6 s
+Twin Rivers	Split Streams	rub 67 s
+Twin Rivers	Split Voices	rub 59 s
+Twin Rivers	Twin Lines	rub 55 s
+Twin Rivers	Twin Tones	rub 93 s
+Twin-Pillared Architrave	Columned Buttress	rub 17 s
+Twin-Pillared Architrave	Fifth-Built Buttress	rub 12 s; rub 65 s
+Twin-Pillared Architrave	Hewn Colonnade	rub 103 s
+Twin-Pillared Architrave	Monumental Pylon	rub 35 s
+Twin-Pillared Architrave	Plinthed Colonnade	rub 13 s
+Twin-Pillared Architrave	Plinthed Pier	rub 20 s
+Twin-Pillared Architrave	Upright Colonnade	rub 77 s
+Twin-Pillared Colonnade	Columned Buttress	rub 148 s
+Twin-Pillared Colonnade	Fifth-Built Buttress	rub 133 s
+Twin-Pillared Plinth	Load-Bearing Plinth	rub 21 s
+Twin-Pillared Plinth	Twin-Pillared Architrave	rub 8 s
+Twinkling Cascade	Twinkling Spray	rub 94 s
+Twinkling Meridian	Polar Firmament	rub 93 s
+Twinkling Meridian	Sidereal Milky Way	rub 81 s
+Twinkling Spray	Glittering Glitter	rub 26 s
+Twinkling Spray	Raining Droplets	rub 10 s
+Twinkling Spray	Raining Sequins	rub 17 s
+Twinkling Spray	Sifting Motes	rub 12 s
+Twisted Mast	Broken Spar	rub 91 s
+Twisted Mast	Long-Span Antenna	rub 91 s
+Twisted Mast	Long-Span Arm	rub 69 s
+Twisted Mast	Long-Span Truss	rub 141 s
+Twisted Space-Time	Inverted Torus	rub 15 s
+Twisted Spar	Strutted Frame	level dip 0.0 peak 4.6 LU
+Two-Faced Griffin	Janus Griffin	rub 81 s
+Two-Faced Griffin	Partial Griffin	rub 98 s
+Two-Faced Griffin	Twofold Mirage	rub 119 s
+Two-Faced Griffin	Uneven Mosaic	rub 65 s
+Two-Faced Hybrid	Two-Faced Griffin	rub 142 s
+Two-Faced Hybrid	Twofold Mirage	rub 10 s
+Unbodied Abyss Voice	Ethereal Silence	rub 90 s
+Unbodied Abyss Voice	Shadow-Voiced Void	rub 120 s
+Unbroken Boundary	Unscattered Margin	rub 15 s
+Unbroken Frontier	Persistent Frontier	rub 105 s
+Uncanny Choir	Unearthly Concord	rub 96 s
+Unceasing Year	Annual Almanack	rub 119 s
+Unceasing Year	Perennial Almanack	rub 20 s
+Unceasing Year	Perennial Calendar	rub 141 s
+Unceasing Year	Yearlong Calendar	rub 120 s
+Unceasing Year	Yearlong Year	rub 142 s
+Uncertain-Rim Band	Planck Edge Mode	rub 61 s
+Uncertain-Rim Band	Quantized Bound State	rub 51 s
+Unconscious Depths	Dreamless Repose	rub 17 s
+Unconscious Depths	Dreamless Stillness	rub 19 s
+Unconscious Hibernation	Delta Stillness	rub 141 s
+Unconscious Hibernation	Dreamless Hibernation	rub 104 s
+Unconscious Sleep	Dreamless Hibernation	rub 23 s
+Unconscious Sleep	Dreamless Rest	rub 14 s
+Unconscious Stillness	Dormant Stillness	rub 21 s
+Unconscious Stillness	Dreamless Sleep	rub 21 s
+Underground Aquifer	Chthonic Floor	rub 104 s
+Underground Mineshaft	Nether Keep	rub 9 s
+Undeterred Brink	Persistent Margin	rub 47 s
+Unearthly Anthem	Foreign Hymn	rub 96 s
+Unearthly Anthem	Outlandish Harmony	rub 22 s
+Unearthly Anthem	Unearthly Chord	rub 8 s
+Unearthly Anthem	Unearthly Hymn	rub 95 s
+Unearthly Consonance	Outlandish Choir	rub 6 s
+Unearthly Consonance	Uncanny Anthem	rub 65 s
+Unearthly Consonance	Unearthly Anthem	rub 56 s
+Unearthly Hymn	Extraterrestrial Song	rub 84 s
+Unending Ritardando	Eternal Dwindling	rub 16 s
+Unending Ritardando	Ever-Slowing Settling	rub 142 s
+Uneven Mosaic	Patchwork Kernel	rub 96 s
+Uneven Mosaic	Patinated Billow	rub 74 s
+Unfolding Bastion	Evolving Structure	rub 74 s
+Unfolding Bastion	Unfolding Edifice	rub 16 s
+Unfolding Tower	Growing Structure	rub 105 s
+Unforgotten Archive	Kept Library	rub 147 s
+Unfurling Gallery	Ripening Gallery	rub 16 s
+Unhurried Eddy	Viscous Runnel	rub 8 s
+Universal Floor	Deep-Sky Ground	rub 129 s
+Universal Floor	Intergalactic Foundation	rub 30 s
+Universal Floor	Starbound Bedrock Sky	rub 162 s; rub 207 s
+Universal Ground	Far-Off Strain	rub 102 s
+Unlit Deep	Benthic Chasm	rub 15 s
+Unmapped Province	Faraway Shore	rub 13 s
+Unmapped Province	Unmapped Coast	rub 93 s
+Unmapped Shore	Faraway Province	rub 63 s
+Unmoored Dreamscape	Dozing Dreamscape	rub 104 s
+Unmoored Dreamscape	Dozing Reverie	rub 104 s
+Unmoored Dreamscape	Meandering Dreamscape	rub 119 s
+Unmoored Dreamscape	Weightless Raft	rub 119 s
+Unravelling Cloud	Dissolving Mist	rub 9 s
+Unravelling Cloud	Dissolving Veil	rub 12 s
+Unravelling Cloud	Separating Cirrus	rub 9 s
+Unravelling Cloud	Unweaving Vapour	rub 9 s
+Unruly Harmonics	Feverish Whirlwind	rub 27 s
+Unscattered Edge	Persistent Margin	rub 7 s
+Unscattered Verge	Unbroken Frontier	rub 80 s
+Unsounded Chasm	Benthic Sinkhole	rub 53 s
+Unsounded Trench	Benthic Hadal Zone	rub 102 s
+Unsounded Trench	Benthic Sinkhole	rub 69 s; rub 93 s
+Unsounded Trench	Bottomless Deep	rub 119 s
+Unsounded Trench	Bottomless Trench	rub 81 s
+Unsounded Trench	Hadal Sinkhole	rub 141 s
+Unsounded Trench	Plunging Chasm	rub 76 s; rub 93 s
+Unsounded Trench	Unsounded Chasm	rub 92 s
+Unsteady Air Column	Rippled Shimmer Veil	rub 11 s
+Unsteady Mirage Air	Seething Mirage Air	rub 61 s
+Unsteady Shimmer Veil	Distorted Speckle	rub 20 s
+Untamed Coast	Stormy Coast	rub 5 s
+Untamed Coast	Windswept Point	rub 22 s
+Untamed Whirlwind	Feverish Harmonics	rub 9 s
+Untamed Whirlwind	Storm-Torn Partials	rub 32 s
+Untamed Whirlwind	Wild Cyclone	rub 9 s
+Untamed Whirlwind	Wild Squall	rub 9 s
+Upholstered Den	Carpeted Drawing Room	rub 93 s
+Upholstered Den	Quilted Boudoir	rub 93 s
+Upholstered Den	Quilted Library	rub 93 s
+Upholstered Den	Tapestry-Hung Library	rub 82 s
+Upholstered Parlour	Velvet-Hung Parlour	rub 80 s
+Upholstered Study	Curtained Den	rub 8 s
+Upright Pillar	Upright Colonnade	rub 18 s
+Upswept Wren Song	Ascending Riser	rub 104 s
+Upswept Wren Song	Dawn-Lit Chirp Field	rub 141 s
+Upswept Wren Song	Dawn-Lit Lark Wave	rub 141 s
+Upswept Wren Song	Warbling Upsweep	rub 104 s
+Upwelling Ascent	Recoiling Neap	rub 41 s
+Upwelling Spring Tide	Oscillating Neap	rub 93 s
+Upwelling Spring Tide	Waxing Spring Tide	rub 93 s
+Vanished Footsteps	Recalled Waltz	rub 66 s
+Vanishing Edge	Twilit Visions	rub 104 s
+Vanishing Supercluster	Diminishing Cluster	rub 119 s
+Vanishing Supercluster	Diminishing Nebula	rub 119 s
+Vanishing Supercluster	Fleeing Quasar	rub 35 s
+Vanishing Supercluster	Receding Supercluster	rub 55 s
+Vast Thundersheet	Booming Peal	rub 12 s
+Vast Thundersheet	Growling Rumble	rub 98 s
+Vast Thundersheet	Heavy Stormcloud	rub 119 s
+Vast-Chested Gullet	Leviathan-Voiced Bellow	rub 48 s
+Vast-Chested Gullet	Leviathan-Voiced Lung	rub 60 s
+Vast-Chested Gullet	Titanic Utterance	rub 42 s
+Vast-Chested Gullet	Vast-Chested Larynx	rub 22 s
+Vast-Chested Larynx	Leviathan-Voiced Utterance	rub 11 s
+Vast-Chested Throat	Cyclopean Larynx	rub 104 s
+Vast-Chested Throat	Leviathan-Voiced Throat	rub 93 s
+Vaulted Ossuary	Cloistered Chancel	rub 5 s
+Veiled Absorber	Fraunhofer Gap	rub 119 s
+Veiled Absorber	Fraunhofer Shadow Line	rub 77 s
+Veiled Absorber	Veiled Spectrum	rub 119 s
+Veiled Band	Dark-Banded Prism Light	rub 31 s
+Veiled Band	Fraunhofer Rainbow	rub 14 s
+Veiled Spectrum	Absorbed Spectrum	rub 77 s
+Veined Warren	Coiled Tracery	rub 8 s
+Veined Warren	Tangled Corridors	rub 141 s
+Velvet-Dark Night Song	Coal Nocturne	rub 23 s
+Velvet-Dark Night Song	Indigo Night Canticle	rub 8 s
+Velvet-Dark Nocturne	Indigo Night Song	rub 142 s
+Velvet-Dark Nocturne	Indigo Nocturne	rub 141 s; rub 8 s
+Velvet-Dark Nocturne	Obsidian Notturno	rub 69 s
+Velvety Drone	Warm Organ	rub 104 s
+Velvety Ground	Glowing Murmur	rub 93 s
+Velvety Ground	Velvety Pedal	rub 93 s
+Velvety Hum	Glowing Ground	rub 104 s
+Velvety Hum	Warm Bass	rub 93 s
+Velvety Murmur	Amber Murmur	rub 36 s
+Velvety Murmur	Embered Bass	rub 79 s
+Velvety Murmur	Hearth Organ	rub 104 s
+Velvety Murmur	Mellow Murmur	rub 19 s
+Velvety Murmur	Woollen Murmur	rub 16 s
+Velvety Pedal	Glowing Murmur	rub 93 s
+Velvety Pedal	Mellow Drone	rub 104 s
+Velvety Pedal	Mellow Ground	rub 104 s
+Venerable Abbey	Abiding Chapel	rub 81 s
+Venerable Abbey	Abiding Vault	rub 93 s
+Venerable Abbey	Ageless Basilica	rub 81 s
+Venerable Abbey	Centuried Abbey	rub 104 s
+Venerable Abbey	Patient Chapel	rub 93 s
+Venerable Basilica	Enduring Minster	rub 119 s
+Venerable Basilica	Patient Dome	rub 109 s
+Venerable Basilica	Timeless Basilica	rub 122 s
+Venerable Elder Light	Old-Light Last Hydrogen	rub 120 s
+Ventricular Yurt	Steppe Hall	rub 119 s
+Veranda Harp	Aeolian Strings	rub 119 s
+Veranda Harp	Aeolian Wind Harp	rub 21 s
+Veranda Harp	Attic Bower	rub 40 s
+Veranda Harp	Gable Sill	rub 115 s
+Veranda Harp	Late Bow	rub 35 s
+Veranda Harp	Veranda Sill	rub 111 s
+Veranda Harp	Window Sill	rub 87 s
+Veranda Sill	Balcony Trellis	rub 49 s
+Veranda Sill	Gable Strings	rub 44 s
+Vesper Cell	Low-Vaulted Sanctuary	rub 8 s
+Vesper Cell	Plainsong Sanctuary	rub 11 s
+Vespered Oratory	Candlelit Chancel	rub 48 s
+Vespered Transept	Arched Rotunda	rub 6 s
+Vespered Transept	Neo-Riemannian Path	rub 13 s
+Vespered Transept	Riemannian Trail	rub 9 s
+Vibrant Vault	Plangent Vault	rub 94 s
+Viscous Ooze	Unhurried Eddy	rub 8 s
+Vivid Rapture	Clear-Eyed Daydream	rub 42 s
+Vivid Rapture	Transparent Dream	rub 16 s
+Vivid Rapture	Wakeful Trance	rub 29 s
+Vivid Rapture	Waking Dream	rub 79 s
+Voiceless Emptiness	Unbodied Silence	rub 73 s
+Voiceless Nowhere	Ethereal Silence	rub 96 s
+Voiceless Nowhere	Unbodied Abyss Voice	rub 7 s
+Void-Sung Mantra Sky	Cosmic Om Star	rub 7 s
+Void-Sung Mantra Sky	Orbiting-Voice Hymn	rub 13 s
+Void-Sung Star Litany	Galactic-Sung Star Litany	rub 101 s
+Void-Sung Star Litany	Starborne Hymn	rub 71 s
+Void-Sung Star Litany	Starborne Star Litany	rub 78 s
+Votive Nave	Arched Rotunda	rub 19 s
+Vowelled Hum Tide	Intoned Syllable	rub 20 s
+Vowelled Hum Tide	Murmured Swell	rub 17 s
+Vowelled Hum Tide	Murmured Vowel	rub 51 s
+Vowelled Syllable	Intoned Syllable	rub 49 s
+Wafting Cloudlet	Plumed Sepia Cloud	rub 93 s
+Wafting Sepia Cloud	Trailing Pall	rub 98 s
+Wakeful Somnium	Luminous Dream	rub 99 s
+Wakeful Trance	Clear-Eyed Daydream	rub 65 s
+Wakeful Trance	Lucid Vision	rub 39 s
+Wakeful Trance	Transparent Dream	rub 84 s
+Waking Vision	Clear-Eyed Rapture	rub 18 s
+Wandering Arcade	Pacing Hallway	rub 76 s
+Wandering Arcade	Strolling Walkway	rub 7 s
+Wandering Bedchamber	Silvered Bower	rub 81 s
+Wandering Haze	Unmoored Float	rub 90 s
+Wandering Lorenz	Folded Trajectory	rub 14 s
+Wandering Lorenz	Looping Saddle	rub 119 s
+Wandering Stairwell	Daydreaming Stairwell	rub 59 s
+Waning Spring Tide	Upwelling Spring Tide	rub 104 s
+Waning Spring Tide	Waxing Current	rub 93 s
+Warm Bass	Velvety Pedal	rub 93 s
+Warm Bed	Warm Bass	rub 11 s
+Warm Organ	Dozing Dreamscape	rub 119 s
+Warm Organ	Dreamless Stillness	rub 141 s
+Warm Organ	Embered Bass	rub 119 s
+Warm Organ	Hearth Bed	rub 104 s
+Warm Organ	Hearth Pedal	rub 104 s
+Warm Organ	Liminal Threshold	rub 141 s
+Warm Organ	Mellow Drone	rub 104 s
+Warm Organ	Mellow Murmur	rub 93 s
+Warm Organ	Twilit Doorway	rub 119 s
+Warm Organ	Velvety Ground	rub 93 s
+Warm Organ	Velvety Murmur	rub 141 s
+Warm Organ	Weightless Current	rub 119 s
+Warm Organ	Woollen Murmur	rub 119 s
+Warm Strings	Gliding Quartet	rub 22 s
+Warm Window	Dripping Showers	rub 81 s
+Warm Window	Pattering Drizzle	rub 104 s
+Warm Window	Quiet Downpour	rub 93 s
+Warm Window	Quiet Showers	rub 104 s
+Warped Assembly	Orbiting Assembly	rub 8 s
+Warped Chorus	Heavy-Sky Choir	rub 81 s
+Warped Planet	Alien Planet	rub 34 s
+Warped World	Tensile Realm	rub 120 s
+Warped World	Warped Spectrum	rub 14 s
+Warping Lightspeed	Rushing Stars	rub 29 s
+Washed Chalk	Bleeding Graphite	rub 78 s
+Washed Chalk	Smeared Sepia	rub 15 s
+Washed Charcoal	Smudged Sepia	rub 67 s
+Washed Charcoal	Washed Pastel	rub 89 s
+Washed Gouache	Diffuse Ink	rub 5 s
+Washed Gouache	Smudged Ink	rub 8 s
+Washing Pebbles	Clattering Pebbles	rub 104 s
+Washing Pebbles	Rolling Strandline	rub 81 s
+Washing Pebbles	Tumbling Foreshore	rub 81 s
+Washing Shingle	Hissing Pebbles	rub 51 s
+Washing Shingle	Rolling Sandbar	rub 35 s
+Washing Shingle	Washing Shingle Beach	rub 59 s
+Wasted Portico	Crumbling Crypt	rub 15 s
+Wasted Portico	Sandblown Ambulatory	rub 48 s
+Wasted Portico	Thinned Apse	rub 66 s
+Wasted Portico	Worn Undercroft	rub 29 s
+Wavering Corona Band	Draped Streamer	rub 8 s
+Wavering Corona Band	Rippling Drapery	rub 57 s
+Wavering Drapery	Draped Arc of Light	rub 120 s
+Wavering Drapery	Wavering Corona Band	rub 119 s
+Wavering Drapery	Wavering Streamer	rub 142 s
+Wavering Pinpoint	Glinting Starlight	rub 85 s
+Waxing Current	Waning Spring Tide	rub 20 s
+Weathered Arcade	Crumbling Undercroft	rub 6 s
+Weeping Icefield	Molten Glacier	rub 36 s
+Weeping Icefield	Thawing Snow	rub 54 s
+Weighted Bathysphere	Labouring Sump	rub 24 s
+Welded Choir	Far-Off Weather	rub 87 s
+Welded Voices	Welded Choir	rub 6 s
+Welling Anticipation	Welling Intake	rub 46 s
+Welling Breath	Drawing Sigh	rub 142 s
+Wet Beads	Spattering Splash	rub 8 s
+Wet Beads	Splashing Beads	rub 58 s
+Wet Beads	Tapping Ripples	rub 12 s
+Wheeling Geese	Banking Sparrows	rub 6 s
+Wheeling Geese	Homing Starlings	rub 6 s
+Wheeling Geese	Murmuring Starlings	rub 7 s
+Wheeling Geese	Scattering Sparrows	rub 6 s
+Wheeling Geese	Wheeling Murmuration	rub 10 s
+Wheeling Murmuration	Banking Herons	rub 36 s
+Wheeling Murmuration	Murmuring Starlings	rub 68 s
+Wheeling Murmuration	Scattering Sparrows	rub 119 s
+Wheeling Shoal	Soaring Swifts	rub 8 s
+Wheeling Starling Ring	Careering Gyre	rub 55 s
+Wheeling Starling Ring	Coursing Gyre	rub 43 s
+Wheeling Starling Ring	Coursing Whirligig	rub 119 s
+Wheeling Starling Ring	Looping Maelstrom	rub 104 s
+Wheeling Starling Ring	Rotating Merry-Go-Round	rub 118 s
+Whirlpool Accretion Flow	Winding Disk	rub 100 s
+Whispering-Void Abyss Voice	Disembodied Nothing	rub 5 s
+Whistled Den	Bright-Sung Niche	rub 7 s
+Whistled Den	Flute-Voiced Grotto Song	rub 93 s
+Whistled Den	Overtone Recess	rub 81 s
+Whistling Glide Tone	Dispersed Radio Night	rub 77 s
+Whistling Loch	Singing Ice	rub 8 s
+Whistling Loch	Singing Tarn	rub 9 s
+Whistling Recorder	Piping Pipe	rub 112 s
+Whistling Recorder	Windblown Ocarina	rub 117 s
+Whistling Recorder	Windblown Pipe	rub 13 s
+Whistling Whistler	Dispersed Swoop	rub 104 s
+Whooshing Flanger	Flanged Wash	rub 95 s
+Whooshing Flanger	Phasing Sweep	rub 120 s
+Whooshing Flanger	Sweeping Wash	rub 119 s
+Whooshing Swirl	Combed Phaser	rub 104 s
+Whooshing Swirl	Filtered Wash	rub 104 s
+Whooshing Swirl	Flanged Wash	rub 104 s
+Whooshing Swirl	Notched Flanger	rub 119 s
+Whooshing Swirl	Phasing Comb	rub 104 s
+Whooshing Swirl	Sweeping Phaser	rub 104 s
+Whooshing Swirl	Swirled Comb	rub 68 s
+Whorled Coil	Logarithmic Spiral	rub 6 s
+Whorled Coil	Unwinding Helix	rub 10 s
+Whorled Whorl	Coiling Helix	rub 52 s
+Whorled Whorl	Whorled Galaxy	rub 24 s
+Widdershins Spiral	Contrary Circle	rub 32 s
+Widdershins Spiral	Counterwise Gyre	rub 26 s
+Wide-Water Far Call	Long-Range Passage	rub 60 s
+Wide-Water Far Call	Ocean-Long Ocean Echo	rub 38 s
+Wide-Water Gyre Sound	Across-Sea Ocean Echo	rub 81 s
+Wide-Water Gyre Sound	Balmer Ladder	rub 44 s
+Wide-Water Gyre Sound	Long-Range Gyre Sound	rub 76 s
+Wide-Water Gyre Sound	Long-Range Voyage	rub 119 s
+Wide-Water Gyre Sound	Sounding Waveguide	rub 29 s
+Wide-Water Gyre Sound	Transoceanic Voyage	rub 64 s
+Wide-Water Gyre Sound	Wide-Water Far Call	rub 119 s
+Widening Nave	Deepening Transept	rub 73 s
+Widening Nave	Maturing Transept	rub 92 s
+Widening Nave	Unfurling Cloister	rub 41 s
+Widening Nave	Widening Transept	rub 81 s
+Wild Cyclone	Feverish Maelstrom	rub 15 s; rub 32 s
+Wild Cyclone	Feverish Whirlwind	rub 71 s
+Wild Squall	Feverish Harmonics	rub 119 s
+Wild Squall	Feverish Maelstrom	rub 93 s
+Wild Squall	Feverish Whirlwind	rub 34 s; rub 64 s
+Wild Squall	Storm-Torn Cyclone	rub 104 s
+Wild Squall	Unruly Overtones	rub 119 s
+Wild Squall	Wild Cyclone	rub 119 s
+Wild-Wind Garden	Lashing Allotment	rub 142 s
+Wind Mist	Rain Weather	rub 119 s
+Wind Mist	Rustling Mist	rub 141 s
+Wind Mist	Salt Weather	rub 113 s
+Wind Mist	Static Field	rub 119 s
+Wind-Sung Kithara	Moaning Lyre	rub 7 s
+Wind-Sung Lyre	Moaning Wind Harp	rub 81 s
+Wind-Torn Front	Charged Front	rub 9 s
+Wind-Torn Front	Wind-Torn Storm	rub 10 s
+Wind-Torn Monsoon	Charged Cloudburst	rub 29 s
+Wind-Torn Monsoon	Thunderous Monsoon	rub 52 s
+Wind-Torn Storm	Charged Cloudburst	rub 40 s
+Wind-Torn Storm	Squalling Gale	rub 97 s
+Windblown Harp	Aeolian Strings	rub 119 s
+Windblown Harp	Aeolian Wind Harp	rub 119 s
+Windblown Harp	Gable Sill	rub 104 s
+Windblown Harp	Moaning Wind Harp	rub 141 s
+Windblown Harp	Veranda Harp	rub 94 s
+Windblown Harp	Wind-Sung Lyre	rub 141 s
+Windblown Ocarina	Breathy Shakuhachi	rub 102 s
+Windblown Ocarina	Fluttering Shakuhachi	rub 49 s
+Windblown Ocarina	Overblown Shakuhachi	rub 104 s
+Windblown Ocarina	Piping Pipe	rub 113 s
+Windblown Ocarina	Windblown Panpipe	rub 88 s
+Windblown Ocarina	Windblown Pipe	rub 103 s
+Windblown Panpipe	Windblown Ocarina	rub 117 s
+Windblown Pipe	Piping Flute	rub 92 s
+Windblown Pipe	Reedy Ney	rub 21 s
+Window Sill	Attic Bower	rub 124 s
+Window Sill	Belvedere Harp	rub 153 s
+Wisp Arbour	Eerie Maze	rub 82 s
+Wisp Arbour	Shade Trellis	rub 105 s
+Witching-Hour Gravity	Abyssal Hadal Zone	rub 43 s
+Witching-Hour Gravity	Deep-Night Weight	rub 7 s
+Witching-Hour Gravity	Moonless Load	rub 115 s
+Witching-Hour Pressure	Deep-Night Weight	rub 7 s
+Witching-Hour Pressure	Moonless Pressure	rub 13 s
+Witching-Hour Pressure	Starless Density	rub 86 s
+Witching-Hour Pressure	Witching-Hour Gravity	rub 85 s
+Wooden Shoot	Clacking Culm	rub 94 s
+Wooden Shoot	Knocking Clump	rub 7 s
+Woollen Murmur	Amber Murmur	rub 104 s
+Woollen Murmur	Embered Bass	rub 119 s
+Woollen Murmur	Mellow Bass	rub 119 s
+Worn Portico	Crumbling Crypt	rub 15 s
+Worn Portico	Eroded Apse	rub 24 s
+Worn Portico	Sandblown Ambulatory	rub 24 s
+Worn Portico	Thinned Apse	rub 119 s
+Worn Portico	Wasted Portico	rub 16 s
+Worn Portico	Wind-Scoured Crypt	rub 19 s
+Wound Continuum	Knotted-Space Topology	rub 7 s
+Wound Continuum	Plaited Surface	rub 68 s
+Wound Topology	Plaited Torus	rub 6 s
+Wrought Rivet Hall	Cast-Iron Furnace	rub 20 s
+Wrought Rivet Hall	Iron Crucible	rub 21 s
+Yearlong Calendar	Perennial Calendar	rub 142 s
+Yearlong Year	Annual Almanack	rub 119 s
+Yearning Cantilena	Yearning Lilt	level dip 0.0 peak 3.1 LU
+Zen Air Bells	Shrine Bells	rub 8 s

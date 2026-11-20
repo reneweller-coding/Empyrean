@@ -208,6 +208,20 @@
   files again. What came with it changes nothing that plays: Root Every as a parameter of the conductor at Empyrean's
   old 240 seconds (the 720 is three of it, exactly), and a reason for every note let go that only a tool reads. The
   music audit's 200 presets, an hour each, give the same numbers and the same line for every preset, byte for byte.
+- **Journeys that do not rub where they glide** (20.11.2026, plan D2). That a journey's neighbours measure alike was
+  a promise, not a check. What a glide does: at its middle the scale and its root change, every note that sounds keeps
+  its key and slides into the new tuning within seconds, and the conductors go on with their chord -- in JI 7-limit,
+  whose keys snap, a sixth of the keys move by about a semitone between two roots, between two scales half of them.
+  Measured over all 6600 glides of the 531 journeys (the conductors without the card, `journey_transitions.py`): in
+  1305 (19.8 %) a note of the chord leaving and one arriving stood a minor second apart for more than five seconds
+  (12 s on average over all glides). The journeys are made anew with a cost for a glide between two tunings (another
+  root of one scale, another scale; never a tritone between two roots) and the pairs measured as broken kept apart
+  where another order allows (`Tools/presets/journey_bad_pairs.tsv`): 708 glides (10.7 %, 6.7 s on average), none
+  between roots a tritone apart (319 before). The same presets in each journey; the step between neighbours by the
+  measures is 5 % longer (median 4.6 %), a journey's spread and its stays are unchanged. The ctest `journeys` holds it.
+  On the card, a sample of 78 glides: the level fell or rose more than 3 LU beyond what either preset does by itself
+  in 16 of 67 before and 8 of 52 after; the deepest holes (13 to 53 LU at the glide's middle) belong to a few presets
+  whatever their neighbour, and are not mended here.
 
 ## 1.0.0 (17.10.2026)
 

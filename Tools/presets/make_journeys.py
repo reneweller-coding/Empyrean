@@ -36,9 +36,22 @@ Before, every step of a journey drew from the same six to twelve minutes, of a n
 night twelve to twenty.
 
 A nearest neighbour here is a preset that sounds alike in four measures and is set alike, which is the promise of a
-gentle glide, not of a good one.
+gentle glide, not of a good one. What a glide does was measured (20.11.2026, plan D2,
+Tools/presets/journey_transitions.py): at its middle the scale and its root change, and every note that sounds keeps
+its key and is retuned into the new scale within seconds -- the conductors are not restarted, their chord stays.
+Between two presets of one scale on different roots a sixth of the register's keys move by a quarter tone or more (in
+JI 7-limit, whatever the fifths between the roots: its keys snap), between two scales half of them; a note retuned so
+stands against the notes chosen after it, and there the outgoing and the incoming chord rub (measured: a minor second
+for more than five seconds in a fifth of the shipped journeys' glides of 19./20.11.2026, in a quarter of those between
+two roots of one scale, in 3 % of those within one tuning). So a step between two tunings costs
+(tuning_cost): nothing within one tuning, ROOT_COST between the roots of one scale (a little more for every fifth
+between them, and ROOT_TRITONE more for a tritone, which rubbed in a third of the glides), SCALE_COST between two
+scales; and a pair measured as broken -- more than five seconds of a minor
+second between the outgoing and the incoming chord, or a level dip or peak of more than 3 LU --
+(Tools/presets/journey_bad_pairs.tsv, written by journey_transitions.py) costs BAD_COST, so the chain and its
+untangling go round it where they can.
 
-    python Tools/presets/make_journeys.py
+    python Tools/presets/make_journeys.py [--out FILE]      (FILE: a candidate, instead of Core/src/Journeys.inc)
 """
 import math
 import pathlib
@@ -48,6 +61,13 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUT = ROOT / "Core" / "src" / "Journeys.inc"
 PARAM_SHARE = 1.0 / 3.0   # of the distance's spread, the parameters'; the measures have the rest
+# What a step between tunings costs, added to the distance (whose median step between neighbours is about 2):
+ROOT_COST = 0.35     # one scale, another root (and ROOT_FIFTH more for each fifth between the two roots)
+ROOT_FIFTH = 0.0     # measured: one to five fifths rubbed alike (23 to 27 % of the glides)
+ROOT_TRITONE = 6.0   # and roots a tritone apart (34 %): kept apart (the ctest journeys allows none)
+SCALE_COST = 0.25    # another scale (or another Purity, key map or A4): 15 % of the glides rubbed
+BAD_COST = 0.75      # a pair measured as broken (journey_bad_pairs.tsv), either way round
+BAD_PAIRS = pathlib.Path(__file__).resolve().parent / "journey_bad_pairs.tsv"
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import descriptors  # noqa: E402
 import make_presets  # noqa: E402
@@ -197,6 +217,46 @@ def distance(a, b):
     return math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
 
 
+def tuning_of(table, params):
+    """What tunes a preset's keys: (scale, root, Purity, key map, A4). The root is left out where it tunes nothing --
+    12-TET, or Purity 0 (equal temperament whatever the scale)."""
+    def get(k):
+        return float(params[k]) if k in params else table[k][3]
+    scale, purity = int(get("scale")), round(get("purity"), 2)
+    root = -1 if scale == 0 or purity == 0.0 else int(get("root"))
+    return (scale, root, purity, int(get("keymap")), round(get("ref_pitch"), 1))
+
+
+def tuning_cost(ta, tb):
+    """What a glide from one tuning into the other costs: nothing within one, ROOT_COST (and ROOT_FIFTH a fifth, and
+    ROOT_TRITONE for a tritone) between two roots of one scale, SCALE_COST between two scales."""
+    if ta == tb:
+        return 0.0
+    if ta[0] == tb[0] and ta[2:] == tb[2:]:
+        d = (7 * (tb[1] - ta[1])) % 12
+        f = min(d, 12 - d)
+        return ROOT_COST + ROOT_FIFTH * f + (ROOT_TRITONE if f == 6 else 0.0)
+    return SCALE_COST
+
+
+def bad_pairs():
+    """The pairs measured as broken (journey_bad_pairs.tsv: from, to, why), as unordered pairs."""
+    out = set()
+    if BAD_PAIRS.exists():
+        for line in BAD_PAIRS.read_text(encoding="utf-8").splitlines():
+            if line and not line.startswith("#") and not line.startswith("from\t"):
+                a, b = line.split("\t")[:2]
+                out.add(frozenset((a, b)))
+    return out
+
+
+def step_cost(tunings, bad):
+    """cost(a, b): what a step costs beyond the distance -- the tunings it crosses and a measured fault."""
+    def cost(a, b):
+        return tuning_cost(tunings[a], tunings[b]) + (BAD_COST if frozenset((a, b)) in bad else 0.0)
+    return cost
+
+
 def stillness_by_params(f):
     return sum(w * (f[k] if w > 0 else 1.0 - f[k]) * abs(w) for k, w in STILL.items())
 
@@ -240,17 +300,19 @@ def spread(points, names, count):
     return chosen
 
 
-def chain(points, names):
+def chain(points, names, cost=None):
     """The names as a chain of nearest neighbours, from the first; then untangled (2-opt): a journey is cyclic, and
     the greedy chain's last step back to the first was its longest -- a section turned round wherever that makes the
-    whole round shorter, the first staying first."""
+    whole round shorter, the first staying first. `cost(a, b)` (step_cost), when given, is added to every step: the
+    tunings a glide crosses and the pairs measured as broken; it is the same either way round, as 2-opt needs."""
+    def d(a, b):
+        return distance(points[a], points[b]) + (cost(a, b) if cost else 0.0)
     left = list(names[1:])
     out = [names[0]]
     while left:
-        nxt = min(left, key=lambda n: distance(points[out[-1]], points[n]))
+        nxt = min(left, key=lambda n: d(out[-1], n))
         out.append(nxt)
         left.remove(nxt)
-    d = lambda a, b: distance(points[a], points[b])
     better = True
     while better and len(out) > 3:
         better = False
@@ -277,6 +339,9 @@ def standardised(values):
     return dict(zip(names, (r[0] for r in zscores([[values[n]] for n in names]))))
 
 
+TUNINGS = {}   # name -> tuning_of(), filled by measures()
+
+
 def measures():
     """The bank as the journeys see it: (bank, groups, points, mz, moving, still_score, pstill) -- the bank as
     make_presets builds it, group name -> its presets, every preset's point (points_of), its measured z-scores, how
@@ -287,6 +352,7 @@ def measures():
     byparams, groups, pmoving, pstill = {}, {}, {}, {}
     for name, g, params, _ in bank:
         p = dict(kv.split("=", 1) for kv in params.split())
+        TUNINGS[name] = tuning_of(table, p)
         byparams[name] = features(table, p)
         pmoving[name] = self_motion(table, p, byparams[name])
         pstill[name] = stillness_by_params(byparams[name])
@@ -308,7 +374,13 @@ def measures():
 
 
 def main():
+    out = OUT
+    if "--out" in sys.argv:
+        out = pathlib.Path(sys.argv[sys.argv.index("--out") + 1])
     bank, groups, points, mz, moving, still_score, _ = measures()
+    bad = bad_pairs()
+    cost = step_cost(TUNINGS, bad)
+    print(f"{len(bad)} pairs measured as broken ({BAD_PAIRS.name})")
 
     def stillness(n):
         return still_score[n]
@@ -316,15 +388,15 @@ def main():
     journeys = []
     for group in make_presets.GROUPS:
         names = groups[group]
-        journeys.append((f"{group} - Journey", journey(f"{group} - Journey", chain(points, spread(points, names, 12)), moving, "journey")))
+        journeys.append((f"{group} - Journey", journey(f"{group} - Journey", chain(points, spread(points, names, 12), cost), moving, "journey")))
         still = sorted(names, key=lambda n: stillness(n))[:12]
-        journeys.append((f"{group} - Night", journey(f"{group} - Night", chain(points, still), moving, "night")))
+        journeys.append((f"{group} - Night", journey(f"{group} - Night", chain(points, still, cost), moving, "night")))
     for title, family in WHOLE_NIGHTS:
         per = math.ceil(24 / len(family))   # the stillest few of every group in the family
         still = [n for g in family for n in sorted(groups[g], key=lambda n: stillness(n))[:per]][:24]
         start = min(still, key=lambda n: stillness(n))
         still.remove(start)
-        journeys.append((title, journey(title, chain(points, [start] + still), moving, "night")))
+        journeys.append((title, journey(title, chain(points, [start] + still, cost), moving, "night")))
     lines = ["// Generated by Tools/presets/make_journeys.py -- do not edit; edit the script and run it again.",
              "/// The journeys the instrument comes with (Journey.h), each as its file would read.",
              "const char* const Journeys[] = {"]
@@ -332,8 +404,8 @@ def main():
         body = text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
         lines.append(f'    "{body}",')
     lines.append("};")
-    OUT.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
-    print(f"{len(journeys)} journeys -> {OUT}")
+    out.write_bytes(("\n".join(lines) + "\n").encode("utf-8"))
+    print(f"{len(journeys)} journeys -> {out}")
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
  *        of a preset's notes in a fraction of a second (plan 20.11.2026, A2; Noctuary's ambient_brain_audit).
  *
  *     additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H (0.5)] [--seconds S] [--set key=value]...
- *                         [--seed N] [--dt S] [--param-every K]
+ *                         [--seed N] [--dt S] [--param-every K] [--pairs FILE] [--tuning]
  *
  * Prints, per preset, a line `# preset <number> <name>`, a line `A,<attack>,<figure attack>,<figure release>` (seconds,
  * as the preset sets them: what Tools/presets/music_audit.py measures "too short" and "still ringing" against), then
@@ -33,12 +33,22 @@
  *
  * `--presets FILE` audits every preset in the file (a name or a number per line) in turn, each on a fresh engine:
  * one process for a whole bank, as Noctuary found a process per preset spends its time starting.
+ *
+ * A journey's transition (plan D2, 20.11.2026; Tools/presets/journey_transitions.py): `--pairs FILE` takes lines
+ * `<from>|<to>|<at>|<glide>|<seconds>` and audits each on a fresh engine: the first preset from the start, the second
+ * loaded at `at` seconds with a glide of `glide` seconds (Engine::loadPreset, as the journey player does), `seconds` in
+ * all. Each pair prints `# pair <from> | <to>`, `P,<0|1>,<attack>,<release>` for the two presets as they set them,
+ * `G,<at>,<glide>`, the note lines and the root lines as above, and `T,<seconds>,<Hz of key 0>,...,<Hz of key 127>`
+ * -- every key's pitch as the tuning gives it (Engine::keyHz) -- at the start and whenever a key's pitch has moved by
+ * more than half a cent (looked at every tenth of a second): a glide changes the scale and the root at its middle, and
+ * what sounds is retuned. `--tuning` prints, per preset asked for, `# preset ...` and one T line of its own tuning.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
 #include "additiv/Params.h"
 #include "additiv/Presets.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
@@ -98,6 +108,33 @@ int presetIndex( const std::string &what )
     return index >= 0 && index < numPresets() ? index : -1;
 }
 
+/**
+ * @brief Prints a T line: every key's pitch as the engine's tuning gives it now.
+ * @param[in] e  the engine
+ * @param[in] t  the audit's clock, seconds
+ * @param[out] hz  receives the 128 pitches printed
+ */
+void printTuning( const Engine &e, double t, double *hz )
+{
+    std::printf( "T,%.4f", t );
+    for ( int k = 0; k < 128; ++k )
+    {
+        hz[k] = e.keyHz( k );
+        std::printf( ",%.4f", hz[k] );
+    }
+    std::printf( "\n" );
+}
+
+/** @brief One journey transition to audit (--pairs): two presets, when the second is loaded, its glide, the length. */
+struct Pair
+{
+    int    m_from = -1;       ///< the preset that plays first
+    int    m_to = -1;         ///< the preset glided into
+    double m_at = 0.0;        ///< seconds after the start when the glide begins
+    double m_glide = 0.0;     ///< the glide's seconds
+    double m_seconds = 0.0;   ///< the audit's length
+};
+
 }   // namespace
 
 /**
@@ -113,6 +150,8 @@ int main( int argc, char **argv )
     int                      paramEvery = 1;
     std::uint64_t            seed = EngineConfig{}.m_seed;
     std::vector<std::string> names, sets;
+    std::vector<Pair>        pairs;
+    bool                     tuning = false;
     for ( int i = 1; i < argc; ++i )
     {
         const std::string a = argv[i];
@@ -145,10 +184,50 @@ int main( int argc, char **argv )
             seed = std::strtoull( argv[++i], nullptr, 10 );
         else if ( a == "--set" && has )
             sets.push_back( argv[++i] );
+        else if ( a == "--tuning" )
+            tuning = true;
+        else if ( a == "--pairs" && has )
+        {
+            std::ifstream in( argv[++i] );
+            if ( !in )
+            {
+                std::fprintf( stderr, "additiv_brain_audit: cannot read %s\n", argv[i] );
+                return 2;
+            }
+            for ( std::string line; std::getline( in, line ); )
+            {
+                while ( !line.empty() && ( line.back() == '\r' || line.back() == '\n' ) ) line.pop_back();
+                if ( line.empty() || line[0] == '#' ) continue;
+                std::vector<std::string> f;
+                for ( size_t p = 0;; )
+                {
+                    const size_t bar = line.find( '|', p );
+                    f.push_back( line.substr( p, bar == std::string::npos ? std::string::npos : bar - p ) );
+                    if ( bar == std::string::npos ) break;
+                    p = bar + 1;
+                }
+                Pair pr;
+                if ( f.size() == 5 )
+                {
+                    pr.m_from = presetIndex( f[0] );
+                    pr.m_to = presetIndex( f[1] );
+                    pr.m_at = std::atof( f[2].c_str() );
+                    pr.m_glide = std::atof( f[3].c_str() );
+                    pr.m_seconds = std::atof( f[4].c_str() );
+                }
+                if ( pr.m_from < 0 || pr.m_to < 0 || pr.m_seconds <= 0.0 )
+                {
+                    std::fprintf( stderr, "additiv_brain_audit: bad pair line %s\n", line.c_str() );
+                    return 2;
+                }
+                pairs.push_back( pr );
+            }
+        }
         else
         {
             std::fprintf( stderr, "additiv_brain_audit [--preset NAME|N]... [--presets FILE] [--hours H] [--seconds S] "
-                                  "[--set key=value]... [--seed N] [--dt S] [--param-every K]\n" );
+                                  "[--set key=value]... [--seed N] [--dt S] [--param-every K] [--pairs FILE] "
+                                  "[--tuning]\n" );
             return 2;
         }
     }
@@ -176,6 +255,51 @@ int main( int argc, char **argv )
     if ( indices.empty() ) indices.push_back( -1 );   // none: the defaults
     std::vector<char> out( 1 << 20 );
     std::setvbuf( stdout, out.data(), _IOFBF, out.size() );
+    auto noteLine = []( const Engine::AuditNote &n )
+    {
+        std::printf( "E,%.4f,%d,%d,%d,%.3f,%.3f,%d,%d\n", n.m_seconds, n.m_source, n.m_on ? 1 : 0, n.m_note,
+                     static_cast<double>( n.m_velocity ), n.m_hz, n.m_figure, n.m_step );
+    };
+    auto rootLine = []( double t, int root ) { std::printf( "R,%.4f,%d\n", t, root ); };
+    for ( const Pair &pr : pairs )
+    {   // a journey's transition: the first preset, the second glided into at m_at (as JourneyPlayer and empy_render)
+        auto e = std::make_unique<Engine>();
+        e->setRealtime( false );
+        std::printf( "# pair %s | %s\n", preset( pr.m_from ).m_name, preset( pr.m_to ).m_name );
+        for ( int k = 0; k < 2; ++k )
+        {
+            e->loadPreset( k == 0 ? pr.m_to : pr.m_from );   // read the second's envelope, then stand on the first
+            std::printf( "P,%d,%.4f,%.4f\n", 1 - k, static_cast<double>( e->param( ParamIdE::ATTACK ) ),
+                         static_cast<double>( e->param( ParamIdE::RELEASE ) ) );
+        }
+        e->setParam( ParamIdE::BRAIN_ON, 1.0f );   // a journey keeps the conductor playing
+        std::printf( "G,%.4f,%.4f\n", pr.m_at, pr.m_glide );
+        double hz[128] = {}, lastLook = -1.0;
+        bool   loaded = false, first = true;
+        Engine *eng = e.get();
+        e->auditConductor( pr.m_seconds, config, dt, paramEvery, noteLine, rootLine,
+                           [&]( double t )
+                           {
+                               if ( !loaded && t >= pr.m_at )
+                               {
+                                   eng->loadPreset( pr.m_to, std::max( pr.m_glide, 0.5 ) );
+                                   eng->setParam( ParamIdE::BRAIN_ON, 1.0f );
+                                   loaded = true;
+                               }
+                               if ( t - lastLook < 0.1 ) return;
+                               lastLook = t;
+                               bool moved = first;
+                               for ( int k = 0; k < 128 && !moved; ++k )
+                                   moved = std::fabs( 1200.0 * std::log2( eng->keyHz( k ) / hz[k] ) ) > 0.5;
+                               if ( moved ) printTuning( *eng, t, hz );
+                               first = false;
+                           } );
+    }
+    if ( !pairs.empty() )
+    {
+        std::fflush( stdout );
+        return 0;
+    }
     for ( const int index : indices )
     {
         auto e = std::make_unique<Engine>();   // a fresh one each: an Engine is large, the heap and not the stack
@@ -188,17 +312,17 @@ int main( int argc, char **argv )
                 return 2;
             }
         std::printf( "# preset %d %s\n", index, index >= 0 ? preset( index ).m_name : "(defaults)" );
+        if ( tuning )
+        {   // one step sets the scale (the Timbre scale from the spectrum), then the keys' pitches
+            double hz[128];
+            e->auditConductor( dt, config, dt, paramEvery, []( const Engine::AuditNote & ) {}, nullptr );
+            printTuning( *e, 0.0, hz );
+            continue;
+        }
         std::printf( "A,%.4f,%.4f,%.4f\n", static_cast<double>( e->param( ParamIdE::ATTACK ) ),
                      static_cast<double>( e->param( ParamIdE::FIGURE_ATTACK ) ),
                      static_cast<double>( e->param( ParamIdE::FIGURE_RELEASE ) ) );
-        e->auditConductor(
-            seconds, config, dt, paramEvery,
-            []( const Engine::AuditNote &n )
-            {
-                std::printf( "E,%.4f,%d,%d,%d,%.3f,%.3f,%d,%d\n", n.m_seconds, n.m_source, n.m_on ? 1 : 0, n.m_note,
-                             static_cast<double>( n.m_velocity ), n.m_hz, n.m_figure, n.m_step );
-            },
-            []( double t, int root ) { std::printf( "R,%.4f,%d\n", t, root ); } );
+        e->auditConductor( seconds, config, dt, paramEvery, noteLine, rootLine );
         int       left = 0;
         const int moved = e->figureMoved( left );
         std::printf( "F,%d,%d\n", moved, left );

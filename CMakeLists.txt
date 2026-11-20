@@ -154,6 +154,10 @@ if(ADDITIV_BUILD_TOOLS)
         # copied from Noctuary, its home of record. The copy in Core must be what Tools/family/sync_brain.py writes.
         add_test(NAME brain_in_sync COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/family/sync_brain.py"
                  --check "${CMAKE_SOURCE_DIR}/Core/include/additiv/ClusterBrain.h" --product additiv)
+        # The journeys' glides (plan D2, 20.11.2026): no two neighbours of one scale on roots a tritone apart, and few
+        # neighbour pairs measured as broken (Tools/presets/journey_bad_pairs.tsv). No card, no program.
+        add_test(NAME journeys COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/Tools/presets/journey_transitions.py"
+                 --check)
     endif()
 endif()
 

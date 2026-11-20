@@ -194,10 +194,23 @@ public:
      * @param[in] sink        receives every note begun and let go
      * @param[in] rootSink    receives (seconds, root) at the start and at every change of the conductor's root; may
      *                        be empty
+     * @param[in] tick        called at the start of every step with the audit's clock, before the parameters are
+     *                        read; it may load a preset with a glide (loadPreset), as a journey does (the journeys'
+     *                        transitions, Tools/presets/journey_transitions.py). When it is given, the parameters are
+     *                        read every `paramEvery` steps whatever the matrix does, so a glide is stepped. May be
+     *                        empty
      */
     void auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
                          const std::function<void( const AuditNote & )> &sink,
-                         const std::function<void( double, int )>       &rootSink );
+                         const std::function<void( double, int )>       &rootSink,
+                         const std::function<void( double )>            &tick = nullptr );
+    /**
+     * @brief The pitch the tuning gives a key now: the scale on its root, the reference pitch and Purity, without the
+     *        tide, the self-tuning or a bend. For the tools (additiv_brain_audit --then); the instrument does not read it.
+     * @param[in] note  MIDI note
+     * @return hertz
+     */
+    double keyHz( int note ) const { return frequencyOf( note ); }
 
     /** @brief The GPU, for the logs. @return its name and compute capability ("" before prepare) */
     std::string deviceName() const;

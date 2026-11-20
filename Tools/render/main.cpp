@@ -7,6 +7,7 @@
  *     empy_render [--seconds S (120)] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS]
  *                    [--chord 50,57,62,66] [--hold S] [--no-brain] [--journey NAME|FILE] [--journey-seed N]
  *                    [--route NAME|FILE] [--route-speed X] [--fill] [--log S] [--note-log]
+ *                    [--then NAME|N --at S --glide S]
  *     empy_render --dump-params        (the parameter table as JSON, for Tools/manual/make_manual.py)
  *
  * --preset loads a factory preset (its name, or its number 0 .. 2047) with its matrix; --set takes any
@@ -17,7 +18,9 @@
  * one that comes with the instrument by its name ("Dawn") or a .route file, the sound the blend of
  * the presets round the cursor, followed over Map Glide. --fill lets the conductor's chord arrive within
  * seconds, as a preset chosen on the panel does, instead of entering one voice at a time. The WAV is written as it is rendered; beyond an hour
- * it is cut into files of an hour (render-01.wav, render-02.wav, ...).
+ * it is cut into files of an hour (render-01.wav, render-02.wav, ...). --then glides into a second preset at --at
+ * seconds over --glide seconds, as a journey's step does (the conductor kept on): one transition of a journey, for
+ * Tools/presets/journey_transitions.py.
  * @author Rene Weller
  */
 #include "additiv/Engine.h"
@@ -277,6 +280,8 @@ int main( int argc, char **argv )
     std::string              presetName, journeyName, routeName;
     double                   routeSpeed = 1.0;
     std::uint64_t            journeySeed = 1;
+    std::string              thenName;                  // --then: a second preset glided into
+    double                   thenAt = 60.0, thenGlide = 30.0;
     bool                     brain = true, fill = false, noteLog = false;
     for ( int i = 1; i < argc; ++i )
     {
@@ -308,6 +313,12 @@ int main( int argc, char **argv )
             journeyName = argv[++i];
         else if ( a == "--journey-seed" && has )
             journeySeed = std::strtoull( argv[++i], nullptr, 10 );
+        else if ( a == "--then" && has )
+            thenName = argv[++i];
+        else if ( a == "--at" && has )
+            thenAt = std::atof( argv[++i] );
+        else if ( a == "--glide" && has )
+            thenGlide = std::atof( argv[++i] );
         else if ( a == "--route" && has )
             routeName = argv[++i];
         else if ( a == "--route-speed" && has )
@@ -335,6 +346,7 @@ int main( int argc, char **argv )
                 stderr,
                 "empy_render [--seconds S] [--out FILE] [--seed N] [--preset NAME|N] [--set key=value]... [--mod ROWS] [--chord 50,57,62] [--hold S] [--no-brain]\n"
                 "            [--journey NAME|FILE] [--journey-seed N] [--route NAME|FILE] [--route-speed X]\n"
+                "            [--then NAME --at S --glide S] [--fill] [--log S] [--note-log]\n"
                 "empy_render --dump-params\n" );
             return 1;
         }
@@ -347,6 +359,13 @@ int main( int argc, char **argv )
         Engine::M_NoteTrace = []( double t, int note, int source, bool on, double hz )
         { std::printf( "N,%.4f,%d,%d,%d,%.3f\n", t, note, source, on ? 1 : 0, hz ); };
     }
+    const int thenIndex = thenName.empty() ? -1 : findPreset( thenName.c_str() );
+    if ( !thenName.empty() && thenIndex < 0 )
+    {
+        std::fprintf( stderr, "empy_render: no preset %s\n", thenName.c_str() );
+        return 1;
+    }
+    bool thenDone = thenIndex < 0;
     if ( !presetName.empty() )
     {
         const int index = applyPreset( e, presetName );
@@ -495,6 +514,14 @@ int main( int argc, char **argv )
                 std::printf( "  %5.0f s: towards %d, %s\n", done / c.m_sampleRate, route.segment() + 1,
                              w.m_preset >= 0 ? preset( w.m_preset ).m_name : "a place" );
             }
+        }
+        if ( !thenDone && done >= static_cast<std::int64_t>( thenAt * c.m_sampleRate ) )
+        {   // --then: a journey's step, alone
+            e.loadPreset( thenIndex, std::max( thenGlide, 0.5 ) );
+            e.setParam( ParamIdE::BRAIN_ON, 1.0f );
+            thenDone = true;
+            std::printf( "  %5.0f s: glide into %s, %.0f s\n", done / c.m_sampleRate, preset( thenIndex ).m_name,
+                         thenGlide );
         }
         if ( player.running() )
         {   // the journey: a step glides into its preset

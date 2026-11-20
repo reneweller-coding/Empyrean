@@ -245,6 +245,19 @@ otherwise, and say which; `python Tools/presets/descriptors.py --check` compares
 `--refresh` writes the copy anew -- after every new measurement, committed with the tables made from it. (The nudges
 also need the knobs' sensitivity, `work/presets/sensitivity.jsonl`, which is not copied.)
 
+Where a journey glides from one preset into the next, the scale and its root change at the glide's middle and every
+note that sounds is retuned into the new scale within seconds; the conductors go on with their chord.
+`Tools/presets/journey_transitions.py` measures what that does to every neighbour pair of the journeys: without the
+card (`static`, `notes`: `additiv_brain_audit --pairs` plays the first preset, glides into the second and prints the
+notes and the tuning as it changes) the seconds of a minor second between the outgoing and the incoming chord and the
+retune of what sounds; on the card, for a sample (`render`: `empy_render --then NAME --at S --glide S`), the level's dip
+or peak and the roughness. `export-bad` writes the pairs measured as broken to `Tools/presets/journey_bad_pairs.tsv`,
+which `make_journeys.py` keeps apart, beside a cost for every glide between two tunings; `--check` is the ctest
+`journeys` (no two neighbours of one scale on roots a tritone apart, at most a tenth of the neighbour pairs of
+`Journeys.inc` listed as broken).
+`Tools/presets/journey_eval.py BEFORE AFTER` compares two journeys files by the measures (the step between
+neighbours, a journey's spread).
+
 ## Render
 
 ```

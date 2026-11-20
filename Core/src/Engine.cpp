@@ -617,7 +617,8 @@ void Engine::beginPiece( double controlRate )
 
 void Engine::auditConductor( double seconds, const EngineConfig &config, double dt, int paramEvery,
                              const std::function<void( const AuditNote & )> &sink,
-                             const std::function<void( double, int )>       &rootSink )
+                             const std::function<void( double, int )>       &rootSink,
+                             const std::function<void( double )>            &tick )
 {
     // Everything prepare() does that the conductors, the foundation and the figures depend on (beginPiece), and nothing
     // of the card: the cloud is never opened, and the few places those steps reach into it look at m_audit.
@@ -638,7 +639,7 @@ void Engine::auditConductor( double seconds, const EngineConfig &config, double 
     // moves one that the notes hear: otherwise every reading gives what the first gave.
     const bool colours = base( ParamIdE::BRAIN_TIMBRE ) > 0.0f || base( ParamIdE::BRAIN_LIGHT ) > 0.0f ||
                          static_cast<int>( std::lround( base( ParamIdE::SCALE ) ) ) == TimbreScaleIndex;
-    bool       moving = always;
+    bool       moving = always || tick;   // a tick may load another preset: its glide is read as a render reads it
     for ( int r = 0; r < m_sound.m_rowCount; ++r )
     {
         const ModRow &row = m_sound.m_rows[r];
@@ -652,6 +653,7 @@ void Engine::auditConductor( double seconds, const EngineConfig &config, double 
     {
         // renderBlock's order: the parameters, the spectrum, the scale, the landscape, then the conductors (section 2),
         // then the voices' lives (what section 3 decides about a voice being free, fading or stolen).
+        if ( tick ) tick( m_auditTime );
         if ( moving && s % paramEvery == 0 )
             readParams();
         else
