@@ -5,6 +5,9 @@
  *        into (Engine::loadPreset, or the player's own preset by Engine::beginMorph and its knobs), the conductor on,
  *        the engine offline as fast as the card allows.
  *
+ * Besides the journeys that come with the instrument, three nights of the night director (NightDirector.h): 6, 8 and
+ * 10 hours with a form, from the groups the Whole Nights draw from.
+ *
  * The journeys draw their dwells and glides from ranges; a seed fixes them, so the length of a rendering is known
  * before it begins (lengthOf simulates the JourneyPlayer) and the file holds exactly that. Its presets are the bank's
  * and the player's own (.empyrean files in Documents/Empyrean/Presets, its subfolders too).
@@ -13,6 +16,7 @@
 #include "RenderKit.h"
 #include "additiv/Engine.h"
 #include "additiv/Journey.h"
+#include "additiv/NightDirector.h"
 #include "additiv/Params.h"
 #include "additiv/Presets.h"
 #include "additiv/Sun.h"
@@ -321,6 +325,7 @@ public:
             item.m_name = j.m_name.empty() ? fallback : juce::String( j.m_name );
             item.m_kind = own                                       ? "Yours"
                           : item.m_name.startsWith( "Whole Night" ) ? "Whole night"
+                          : item.m_name.startsWith( "Night " )      ? "Night director"
                           : item.m_name.endsWith( " - Night" )      ? "Night"
                                                                     : "Journey";
             double shortest = 0.0, longest = 0.0;
@@ -343,6 +348,16 @@ public:
         {
             additiv::Journey j;
             if ( j.parse( additiv::builtinJourneyText( i ) ) && !j.m_steps.empty() ) add( std::move( j ), false, {} );
+        }
+        // The night director's (NightDirector.h, 20.11.2026): 6, 8 and 10 hours from the groups the Whole Nights draw
+        // from, on the first dice -- a night with a form, once through. Another is made on the instrument's Journey
+        // page (Night ...) and saved; it is then listed among the player's files.
+        for ( double hours : { 6.0, 8.0, 10.0 } )
+        {
+            additiv::NightRequest r;
+            r.m_hours = hours;
+            additiv::NightPlan night = additiv::composeNight( r );
+            if ( !night.m_journey.m_steps.empty() ) add( std::move( night.m_journey ), false, {} );
         }
         juce::Array<juce::File> files =
             empyreanDocuments().getChildFile( "Journeys" ).findChildFiles( juce::File::findFiles, false, "*.journey" );
